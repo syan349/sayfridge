@@ -1,13 +1,21 @@
-# Please edit this gitignore file to suit your needs. You may
-# look at other .gitignore files in the provided examples for inspiration.
-
+# Operating system files
 .DS_Store
-node_modules
+Thumbs.db
 
-# Local project documents
-/docs/
+# Editor settings
+.vscode/
+.idea/
 
-# Environment variables - Edit if necessary
+# Local Codex repository guidance
+/AGENTS.md
+
+# Logs
+*.log
+
+# Local image assets migrated from CS734
+/assets/images/
+
+# Environment variables
 .env
 .env.*
 !.env.example

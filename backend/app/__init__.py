@@ -1,0 +1,1 @@
+"""SayFridge backend application package."""
