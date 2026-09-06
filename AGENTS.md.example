@@ -1,0 +1,59 @@
+# SayFridge Repository Guide
+
+This file is the top-level map for coding agents working in this repository.
+Keep changes inside the component that owns the behavior.
+
+## Repository map
+
+- `mobile/` — Flutter application for Android and iOS.
+  - Main application code: `mobile/lib/`
+  - Flutter tests: `mobile/test/`
+  - Mobile-specific instructions: `mobile/README.md`
+- `web/` — React, TypeScript, and Vite application.
+  - User and administrator UI: `web/src/`
+  - Current application entry: `web/src/App.tsx`
+  - Web-specific instructions: `web/README.md`
+- `backend/` — Python 3.11 and FastAPI service.
+  - FastAPI entry: `backend/app/main.py`
+  - Backend tests: `backend/tests/`
+  - Backend-specific instructions: `backend/README.md`
+- `docs/` — Project scope, architecture, and design decisions.
+- `assets/` — Project-level reference and design assets.
+- `README.md` — Project introduction and team information, not deployment docs.
+
+## Where to make changes
+
+- Change Flutter screens, device behavior, or mobile interactions in `mobile/`.
+- Change browser pages, components, or admin/user UI in `web/`.
+- Change APIs, validation, business rules, Agents, Workers, or persistence in `backend/`.
+- Change cross-system architecture or agreed project scope in `docs/`.
+- Keep infrastructure and deployment configuration out of the application folders
+  when a future top-level `infra/` directory is introduced.
+
+## Project boundaries
+
+- Mobile and Web call the FastAPI backend; they do not access the database directly.
+- Agent code belongs to the backend and must not bypass backend validation or write
+  directly to the database.
+- User and administrator Web pages currently share one React project.
+- Add new backend layers such as `agents/`, `workers/`, or `repositories/` only when
+  their first real implementation is added; do not create speculative empty modules.
+- Preserve the root `README.md`, `team-image.jpg`, existing documents, and assets
+  unless the requested task explicitly changes them.
+
+## Tooling and checks
+
+Do not write tests for reversible, low-impact changes that mirror the implementation. If you do choose to verify your work with tests, make sure that the tests are meaningful and necessary to verify implementation.
+
+Run tests appropriate to the change and complete required checks. Once those pass, broaden or repeat testing only when new changes, failures, or unresolved concerns justify it; otherwise, continue toward completing the task.
+
+- Mobile: run `flutter analyze` and `flutter test` from `mobile/`.
+- Web: run `npm run lint` and `npm run build` from `web/`.
+- Backend: use Python 3.11 and run `python -m pytest` from `backend/`.
+- Keep global ignore rules in the root `.gitignore` and framework-specific rules in
+  `mobile/.gitignore`, `web/.gitignore`, and `backend/.gitignore`.
+- Never commit `.env` files, virtual environments, dependency folders, build output,
+  caches, or local secrets.
+
+Add a nested `AGENTS.md` inside a component only when that component needs more
+detailed instructions than this top-level map.
