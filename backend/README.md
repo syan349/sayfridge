@@ -1,12 +1,14 @@
 # SayFridge Backend
 
-SayFridge 的 FastAPI 后端。当前版本提供健康检查、基础本地邮箱密码认证，以及 Neon PostgreSQL、SQLAlchemy 2.x ORM 和 Alembic 迁移基础设施；库存 CRUD、Agent、Worker 等业务功能尚未实现。
+The FastAPI backend for SayFridge. The current version provides health checks, basic local email/password authentication, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and Alembic migrations. Inventory CRUD, Agent, and Worker features have not been implemented yet.
 
-## 环境要求
+## Requirements
 
 - Python 3.11
 
-## Windows 本地运行
+## Run locally on Windows
+
+Run the following commands from the `backend` directory after configuring `.env` as described below:
 
 ```powershell
 py -3.11 -m venv .venv
@@ -15,45 +17,94 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-服务启动后可访问：
+Once the server starts, the following endpoints are available:
 
-- 健康检查：`GET http://127.0.0.1:8000/health`
-- 注册：`POST http://127.0.0.1:8000/api/v1/auth/register`
-- 登录：`POST http://127.0.0.1:8000/api/v1/auth/login`
-- 当前用户：`GET http://127.0.0.1:8000/api/v1/auth/me`
-- API 文档：`http://127.0.0.1:8000/docs`
+- Health check: `GET http://127.0.0.1:8000/health`
+- Register: `POST http://127.0.0.1:8000/api/v1/auth/register`
+- Log in: `POST http://127.0.0.1:8000/api/v1/auth/login`
+- Current user: `GET http://127.0.0.1:8000/api/v1/auth/me`
+- API documentation: `http://127.0.0.1:8000/docs`
 
-## 认证配置
+## Authentication settings
 
-- `JWT_SECRET_KEY`：HS256 签名密钥，至少 32 个字符，只能保存在本机或部署环境中；
-- `ACCESS_TOKEN_EXPIRE_MINUTES`：Access Token 有效分钟数，默认 `15`。
+- `JWT_SECRET_KEY`: HS256 signing secret with at least 32 characters. Store it only in the local or deployment environment.
+- `ACCESS_TOKEN_EXPIRE_MINUTES`: Access token lifetime in minutes; defaults to `15`.
 
-认证仅支持本地邮箱密码、短期 Bearer Access Token。当前没有 Refresh Token、服务端会话、Logout、第三方登录、邮箱验证、密码恢复或 MFA。
+Authentication supports local email/password accounts and short-lived Bearer access tokens. Refresh tokens, server-side sessions, logout, third-party login, email verification, password recovery, and MFA are not currently available.
 
-## 数据库配置与迁移
+## Database configuration and migrations
 
-复制 `.env.example` 为 `.env`，只在本机填写真实连接信息：
+Copy `.env.example` to `.env` and enter real connection details only in the local file:
 
-- `DATABASE_URL`：FastAPI 运行时使用的 Neon 池化连接；
-- `DATABASE_URL_DIRECT`：Alembic 使用的 Neon 直连地址。
+- `DATABASE_URL`: Neon pooled connection used by FastAPI at runtime.
+- `DATABASE_URL_DIRECT`: Neon direct connection used by Alembic.
 
-两个地址都必须使用 `postgresql+psycopg://` 前缀。`.env` 已被 Git 忽略，禁止把连接串或密码写入代码、迁移或文档。
+Both URLs must use the `postgresql+psycopg://` prefix. Git ignores `.env`; never put real connection strings or passwords in code, migrations, or documentation.
 
 ```powershell
-# 查看当前迁移版本
+# Show the current migration revision
 alembic current
 
-# 应用所有迁移
+# Apply all migrations
 alembic upgrade head
 
-# 检查 ORM 与数据库是否还有未生成的差异
+# Check for model/database differences not yet covered by migrations
 alembic check
 ```
 
-首份迁移创建设计文档规定的八张表。后续修改模型时必须同时生成并提交新的迁移，不在 Neon SQL Editor 手工改表。
+The initial migration creates the eight tables specified in the design document. Subsequent model changes must include a new migration committed alongside the code. Do not manually change tables in the Neon SQL Editor.
 
-## 测试
+## Tests
 
 ```powershell
 python -m pytest
 ```
+
+## B01–B03 local startup and Postman
+
+On macOS / Linux, create an environment with Python 3.11 from the `backend` directory. Skip environment creation if `.venv` already exists:
+
+```bash
+python3.11 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+If you use an existing Conda environment, activate it and use `python` instead of `.venv/bin/python`. Each team member should use their own `.env` and must not commit real credentials.
+
+- [Authentication API manual](../docs/API_REFERENCE.md)
+- Optional local Postman collection: `docs/postman/SayFridge_Auth.postman_collection.json` (not included in the planned documentation commit; see the API manual for manual requests)
+- [B01–B03 authentication test results](../docs/testing/B01-B03_AUTH_TEST_RESULTS.md)
+- [Backend test results index](../docs/testing/README.md)
+
+## One test suite for local development and CI
+
+Run all 45 scenarios from `backend` with the same command on macOS and GitHub Actions:
+
+```bash
+python -m pytest -v
+```
+
+The suite contains 11 database-free scenarios and 34 scenarios that use real PostgreSQL fixtures. There is no fake database session. Some invalid requests are rejected before executing SQL, but their API tests use the same real database setup. Uvicorn does not need to be running: pytest loads the ASGI application directly.
+
+- Local development: copy `.env.test.example` to `.env.test` and supply the direct URL for your isolated Neon test database (currently `sayfridge_auth_test`).
+- GitHub Actions: the workflow starts a disposable PostgreSQL 18 service and supplies `TEST_DATABASE_URL` through its environment. It does not connect to Neon or require Neon credentials.
+- An existing process environment variable takes precedence over `.env.test`. Keep the PostgreSQL major versions aligned between local testing and CI.
+
+Never commit `.env` or `.env.test`. Commit only the templates and workflow. The CI password is a disposable test value, not a Neon credential.
+
+Database tests require `postgresql+psycopg://`, a database name ending in `_test`, and a direct connection (not a Neon pooler). Missing configuration fails the selected database tests instead of silently skipping them. The application `.env` is never used as a fallback.
+
+Each database test migrates a fresh random `auth_test_*` schema using Alembic, performs real database operations, and drops only its own schema in teardown, including after normal assertion failures. Forced termination or a network failure during cleanup may leave a schema behind. Postman data is outside this cleanup process.
+
+To select a subset explicitly:
+
+```bash
+# 11 database-free scenarios
+python -m pytest -v -m "not postgres"
+
+# 34 scenarios with real PostgreSQL fixtures
+python -m pytest -v -m postgres
+```
+
+CI runs the full suite for pull requests targeting `main`, pushes to `main`, and manual dispatches. It uploads the JUnit report even if tests fail.
