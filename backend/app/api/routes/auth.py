@@ -20,12 +20,14 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 @router.post(
     "/register",
     response_model=UserPublic,
+    summary="Register user",
     status_code=status.HTTP_201_CREATED,
 )
 async def register(
     payload: RegisterRequest,
     session: AsyncSession = Depends(get_db_session),
 ) -> User:
+    """Create a local non-admin account without creating inventory."""
     try:
         return await register_user(session, str(payload.email), payload.password)
     except EmailAlreadyRegisteredError as exc:
@@ -35,15 +37,16 @@ async def register(
         ) from exc
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponse, summary="Log in")
 async def login(
     payload: LoginRequest,
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> LoginResponse:
+    """Validate credentials and issue a short-lived access token."""
     user = await authenticate_user(session, str(payload.email), payload.password)
     if user is None:
-        # 邮箱不存在、密码错误和账号不可用统一响应，避免泄露账号状态。
+        # Return the same response for unknown emails, incorrect passwords, and unavailable accounts to avoid disclosing account status.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -61,6 +64,7 @@ async def login(
     )
 
 
-@router.get("/me", response_model=UserPublic)
+@router.get("/me", response_model=UserPublic, summary="Get current user")
 async def me(current_user: User = Depends(get_current_user)) -> User:
+    """Read the current account status and role."""
     return current_user

@@ -9,7 +9,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
-    """从 backend/.env 或进程环境中读取后端配置。"""
+    """Read backend settings from backend/.env or process environment variables."""
 
     model_config = SettingsConfigDict(
         env_file=BACKEND_DIR / ".env",
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # repr=False 防止调试时意外把完整连接串打印到日志。
+    # repr=False prevents full connection strings from appearing in debug representations.
     database_url: SecretStr = Field(alias="DATABASE_URL", repr=False)
     database_url_direct: SecretStr = Field(alias="DATABASE_URL_DIRECT", repr=False)
     jwt_secret_key: SecretStr = Field(alias="JWT_SECRET_KEY", repr=False)
@@ -32,20 +32,20 @@ class Settings(BaseSettings):
     @classmethod
     def require_psycopg_driver(cls, value: SecretStr) -> SecretStr:
         if not value.get_secret_value().startswith("postgresql+psycopg://"):
-            raise ValueError("数据库连接必须使用 postgresql+psycopg:// 驱动前缀")
+            raise ValueError("Database URLs must use the postgresql+psycopg:// driver prefix")
         return value
 
     @field_validator("jwt_secret_key")
     @classmethod
     def require_strong_jwt_secret(cls, value: SecretStr) -> SecretStr:
-        # HS256 的安全性直接依赖共享密钥，拒绝短密钥以避免弱配置启动。
+        # HS256 security depends on the shared secret; reject short secrets to prevent startup with weak settings.
         if len(value.get_secret_value()) < 32:
-            raise ValueError("JWT_SECRET_KEY 至少需要 32 个字符")
+            raise ValueError("JWT_SECRET_KEY must contain at least 32 characters")
         return value
 
 
 @lru_cache
 def get_settings() -> Settings:
-    """缓存配置对象，避免每次创建会话时重复读取环境。"""
+    """Cache settings to avoid rereading the environment for each new session."""
 
     return Settings()

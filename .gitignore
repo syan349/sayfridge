@@ -15,8 +15,8 @@ Thumbs.db
 # Local image assets migrated from CS734
 /assets/images/
 
-# Environment variables
+# Local environment files: commit only the example template
 .env
 .env.*
 !.env.example
-!.env.test
+!.env.test.example

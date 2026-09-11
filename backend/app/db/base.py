@@ -2,7 +2,7 @@ from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 
 
-# 固定约束命名后，Alembic 才能稳定地生成和回滚迁移。
+# Consistent constraint names allow Alembic to generate and roll back migrations reliably.
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",

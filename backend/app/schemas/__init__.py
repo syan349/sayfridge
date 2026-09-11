@@ -1,1 +1,1 @@
-"""API 请求与响应模型。"""
+"""API request and response models."""
