@@ -44,6 +44,7 @@ def test_duplicate_registration_returns_409(database) -> None:
     assert response.status_code == 409
 
 
+@pytest.mark.ci
 def test_registration_cannot_create_admin_user(database) -> None:
 
     response = request(
@@ -190,6 +191,7 @@ def test_me_reads_and_returns_current_active_user_without_password_hash(database
 
 
 @pytest.mark.parametrize("token_kind", ["missing", "invalid", "expired"])
+@pytest.mark.ci
 def test_me_rejects_missing_invalid_or_expired_token(database, token_kind: str) -> None:
     headers = None
     if token_kind == "invalid":
