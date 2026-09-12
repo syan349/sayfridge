@@ -1,6 +1,8 @@
 import secrets
 import uuid
 
+from starlette.concurrency import run_in_threadpool
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +15,7 @@ LOCAL_PROVIDER = "LOCAL"
 ACTIVE_STATUS = "ACTIVE"
 USER_ROLE = "USER"
 
-# 用户不存在时也执行一次 Argon2id 校验，降低基于响应耗时枚举邮箱的风险。
+# Verify an Argon2id hash even for unknown users to reduce email enumeration through response timing.
 _DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
 
 
@@ -48,7 +50,7 @@ async def register_user(
 
     user = User(
         email=normalized_email,
-        password_hash=hash_password(password),
+        password_hash=await run_in_threadpool(hash_password, password),
         auth_provider=LOCAL_PROVIDER,
         role=USER_ROLE,
         status=ACTIVE_STATUS,
@@ -57,9 +59,15 @@ async def register_user(
     try:
         await session.commit()
     except IntegrityError as exc:
-        # 预检查之外仍由数据库唯一约束处理并发注册竞争。
+        # Treat only email uniqueness violations as duplicate registration; propagate other database errors.
         await session.rollback()
-        raise EmailAlreadyRegisteredError from exc
+        if (
+            getattr(exc.orig, "sqlstate", None) == "23505"
+            and getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+            == "uq_user_email"
+        ):
+            raise EmailAlreadyRegisteredError from exc
+        raise
     await session.refresh(user)
     return user
 
@@ -71,7 +79,7 @@ async def authenticate_user(
 ) -> User | None:
     user = await get_user_by_email(session, email)
     stored_hash = user.password_hash if user and user.password_hash else _DUMMY_PASSWORD_HASH
-    password_matches = verify_password(password, stored_hash)
+    password_matches = await run_in_threadpool(verify_password, password, stored_hash)
 
     if (
         user is None

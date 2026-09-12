@@ -46,7 +46,7 @@ def create_access_token(
 
 
 def decode_access_token(token: str, secret_key: SecretStr) -> uuid.UUID:
-    # 固定算法并强制关键 Claims，不能信任 Token 头自行声明的算法或用途。
+    # Fix the algorithm and require key claims; do not trust the token header to determine its algorithm or purpose.
     payload = jwt.decode(
         token,
         secret_key.get_secret_value(),

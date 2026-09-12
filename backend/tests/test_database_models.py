@@ -1,7 +1,7 @@
 from sqlalchemy import CheckConstraint
 
 from app.db.base import Base
-from app.db import models  # noqa: F401  # 导入后模型才会注册到 Base.metadata。
+from app.db import models  # noqa: F401  # Import models to register them with Base.metadata.
 
 
 EXPECTED_TABLES = {

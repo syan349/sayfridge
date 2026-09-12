@@ -1,1 +1,1 @@
-"""版本化 API 路由。"""
+"""Versioned API routes."""

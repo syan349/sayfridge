@@ -37,7 +37,7 @@ async def get_current_user(
     except jwt.InvalidTokenError as exc:
         raise authentication_error() from exc
 
-    # Token 只证明签发时身份；角色和状态必须每次从数据库读取当前值。
+    # A token proves identity at issuance; read the current role and status from the database on every request.
     user = await get_user_by_id(session, user_id)
     if user is None or user.status != ACTIVE_STATUS:
         raise authentication_error()
