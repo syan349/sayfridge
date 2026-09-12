@@ -4,7 +4,7 @@ Validation date: 2026-09-13. Tested working tree: `syan349_feat_backend_apis`,
 based on `1efc65e58409` (PR #61 merge). B04 changes are not committed or pushed.
 
 Design: [Backend design handbook](../BACKEND_DESIGN.md), sections 3, 4.2, and 7.
-Manual usage: [B04 API reference](../API_REFERENCE.md#8-b04-storage-spaces).
+Manual usage: [B04 API reference](../API_REFERENCE.md#3-storage-spaces--b04).
 
 ## 1. Delivered scope
 

@@ -8,9 +8,12 @@ Naming convention: `Bxx[-Byy]_FEATURE_TEST_RESULTS.md`. For example, the authent
 | --- | --- | --- |
 | B01–B03 | [Authentication test results](B01-B03_AUTH_TEST_RESULTS.md) | Registration, login, current user, database integration, and recorded manual acceptance |
 | B04 | [Storage-space test results](B04_STORAGE_SPACES_TEST_RESULTS.md) | Six space APIs, ownership, validation, pagination, PostgreSQL locking, uniqueness, and rollback |
+| B05–B06 | [Catalog test results](B05-B06_CATALOG_TEST_RESULTS.md) | Seven category/definition APIs, visibility, normalized names, state transitions, locking, and rollback |
 
 Each report should state the validation date, tested commit or working-tree status, environment, commands, results, and outstanding checks. Clearly separate current results from historical runs, and local execution from remote CI. Add dated entries for later verification; update this index as more work packages are implemented.
 
+
+Manual request setup and acceptance workflows: [Postman guide](POSTMAN_GUIDE.md).
 
 ## CI selection policy
 
@@ -19,12 +22,12 @@ run using pytest markers; do not create a second CI-only implementation.
 
 | Execution | Selection | Command from backend |
 | --- | --- | --- |
-| Local default | All 115 scenarios | `python -m pytest -v` |
-| Local fast check | 22 core scenarios | `python -m pytest -v -m ci` |
-| Automatic PR/main CI | Same 22 core scenarios | `python -m pytest -v -m ci --strict-markers` |
-| Manual GitHub workflow dispatch | All 115 scenarios | `python -m pytest -v --strict-markers` |
+| Local default | All 192 scenarios | `python -m pytest -v` |
+| Local fast check | 30 core scenarios | `python -m pytest -v -m ci` |
+| Automatic PR/main CI | Same 30 core scenarios | `python -m pytest -v -m ci --strict-markers` |
+| Manual GitHub workflow dispatch | All 192 scenarios | `python -m pytest -v --strict-markers` |
 
-The 93 unselected cases are retained, not skipped or disabled in the full suite.
+The 162 unselected cases are retained, not skipped or disabled in the full suite.
 The `ci` marker is registered in `backend/pytest.ini`. Mark a whole test with
 `@pytest.mark.ci`, or an individual parameter with
 `pytest.param(..., marks=pytest.mark.ci)` to avoid pulling every boundary variant
@@ -56,9 +59,17 @@ retaining all ownership operations and critical archive/stock coordination.
 | B04 | IN_STOCK inventory blocks archival and remains unchanged | 1 |
 | B04 | Concurrent case-insensitive same-name creation has one winner | 1 |
 | B04 | Archival waits on a real space lock and rechecks newly committed stock | 1 |
-| **Total** | **6 authentication + 16 storage-space scenarios** | **22** |
+| B05 | Category state filtering, ordering, pagination, and response fields | 1 |
+| B06 | Public/private visibility, category state, scope, and definition pagination | 1 |
+| B06 | Create/read/PATCH/archive/restore lifecycle and unchanged retry timestamps | 1 |
+| B06 | Reject client-supplied owner ID without writes | 1 |
+| B06 | Public, foreign, and missing IDs yield identical PATCH 404 responses | 1 |
+| B06 | Archived legacy-equivalent names remain reserved across categories | 1 |
+| B06 | Concurrent normalized-name creation has one winner across categories | 1 |
+| B06 | Restore waits on a category lock and rechecks its committed state | 1 |
+| **Total** | **6 authentication + 16 storage-space + 8 catalog scenarios** | **30** |
 
-The core set includes 21 real PostgreSQL fixture cases and one database-free token
+The core set includes 29 real PostgreSQL fixture cases and one database-free token
 signature test. CI still uses its disposable PostgreSQL 18 service, never Neon.
 Required check name `test-job` is preserved. Automatic checks upload the core JUnit
 report; manual dispatch uploads the full report.
@@ -76,7 +87,7 @@ report; manual dispatch uploads the full report.
   overhead. Measure remote PR time separately from local pytest time.
 
 
-### Selection verification (2026-09-13)
+### Historical B04 selection verification (2026-09-13)
 
 - `pytest --collect-only -q -m ci --strict-markers`: 22 selected, 93 deselected.
 - `pytest --collect-only -q --strict-markers`: all 115 scenarios collected.
@@ -87,3 +98,17 @@ report; manual dispatch uploads the full report.
 - The previous full-suite run passed all 115 in 20.02 seconds; it predates the
   marker-only selection change. The two timings are local observations, not a
   controlled benchmark or a prediction of total GitHub Actions duration.
+
+### B05–B06 selection verification (2026-09-13)
+
+- Full execution: **192 passed in 22.13 seconds**.
+- Core execution: **30 passed, 162 deselected in 4.13 seconds**.
+- The new catalog files contribute 77 scenarios: 8 core and 69 full-suite-only.
+- Full-suite composition is 181 real PostgreSQL fixture cases and 11
+  database-free cases. There is no mock database substitution.
+- Runs used macOS, Python 3.11.16, and a disposable local PostgreSQL 18 container.
+  The container was removed after checking that test schemas were cleaned up.
+- Existing workflow selection remains unchanged: automatic runs use `-m ci`;
+  manual dispatch runs the full suite. The required job ID stays `test-job`.
+- These are local results. No remote GitHub Actions run or Neon test was performed
+  for this delivery; local timing does not predict total CI duration.
