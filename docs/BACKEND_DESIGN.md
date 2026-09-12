@@ -1,6 +1,6 @@
 # SayFridge Backend Design Handbook
 
-> Updated: 2026-09-11. This handbook is the shared design reference for the current backend development phase. Unless an endpoint is explicitly identified as already implemented, its content is a planned contract, not evidence of passing tests or applied database migrations.
+> Updated: 2026-09-13. This handbook is the shared design reference for the current backend development phase. Unless an endpoint is explicitly identified as already implemented, its content is a planned contract, not evidence of passing tests or applied database migrations.
 >
 > The development and acceptance plan incorporates the course requirements: tests accompany features, with plans for cloud capacity, security, and deployment. Existing API business rules remain unchanged. Section 10 retains three questions for the project owner to clarify. Editing this handbook does not itself execute tests, migrations, or deployments.
 
@@ -63,7 +63,7 @@ The three source documents are archived in `archive/backend-design-2026-09-11/` 
 | [Database models](../backend/app/db/models.py) | ORM fields and constraints for eight tables | Evidence of local structure, not proof of remote migration |
 | [Initial migration](../backend/migrations/versions/02ec95582dc7_create_initial_eight_tables.py) | Revision `02ec95582dc7`, creating eight tables | Add the notes migration after it; recheck the migration head during implementation |
 | [Database session](../backend/app/db/session.py) | Request-scoped AsyncSession | Supplies sessions without automatically committing business transactions |
-| [Application entry point](../backend/app/main.py) | Currently registers authentication routes and health check only | Register five business route groups later |
+| [Application entry point](../backend/app/main.py) | Registers authentication, B04 storage-space routes, and health check | Register remaining business route groups when implemented |
 | [Authentication dependencies](../backend/app/api/dependencies.py) | Validates tokens and reads current user state | Reuse identity checks and add an administrator dependency |
 | [Authentication routes](../backend/app/api/routes/auth.py), [schemas](../backend/app/schemas/auth.py), and [service](../backend/app/services/auth.py) | Registration, login, and current-user endpoints already exist | Preserve compatibility and add password change |
 | [Backend README](../backend/README.md) | Current startup and verification instructions | Update implemented capabilities and migration instructions after implementation |
@@ -89,7 +89,7 @@ Frontend request
   → Response model: expose only permitted fields
 ```
 
-Routes may execute simple ORM queries directly. Services must handle multi-table writes, quantity calculations, idempotency, and batches. More APIs do not necessarily require more tables. Updating data requires no migration; adding fields requires matching model and migration changes.
+Routes handle HTTP parameters, dependencies, response models, and error translation. Put database queries and business rules in feature services, including simple reads, so modules follow the same structure as authentication. Services own write transactions, multi-table writes, quantity calculations, idempotency, and batches. More APIs do not necessarily require more tables. Updating data requires no migration; adding fields requires matching model and migration changes.
 
 ### 2.1 Tables and business ownership
 
@@ -257,6 +257,8 @@ The existing registration/login contract accepts only email and password and rej
 Both password fields require 8–128 characters and a valid Bearer token. Success returns `{"changed":true}`. The client clears its local login state and logs in again. The backend does not add token revocation; existing tokens remain valid until natural expiry, which defaults to 15 minutes.
 
 ### 4.2 Storage spaces
+
+B04 is implemented in `app/api/routes/storage_spaces.py` and `app/services/storage_spaces.py`. See the [API manual](API_REFERENCE.md#8-b04-storage-spaces) and [B04 verification record](testing/B04_STORAGE_SPACES_TEST_RESULTS.md). No B04 schema migration is required.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
@@ -613,7 +615,7 @@ Only one of two different modifications with the same version may succeed; concu
 
 ### 8.1 File list
 
-Paths below are relative to `backend/` unless explicitly identified as repository-root documentation paths. The table retains the original plan of 10 new files and 9 modified files for business implementation. Additional tests, CI, and deployment configuration are not constrained by that historical count. Record actual paths when those approaches are selected; do not pre-create empty directories.
+Paths below are relative to `backend/` unless explicitly identified as repository-root documentation paths. The table records feature responsibilities rather than a fixed file count. B04 uses its own service module, following the same route/service separation as authentication. Additional tests, CI, and deployment configuration are not constrained by the original file count. Record actual paths when those approaches are selected; do not pre-create empty directories.
 
 | Change | File | Responsibility | Tables read/written |
 | --- | --- | --- | --- |
@@ -623,7 +625,8 @@ Paths below are relative to `backend/` unless explicitly identified as repositor
 | Add | `app/api/routes/inventory_operations.py` | Preview, operations POST, three history GET endpoints | inventory_item, inventory_operation |
 | Add | `app/api/routes/admin.py` | User state, public category, and public definition management | user, item_category, item_definition |
 | Add | `app/schemas/business.py` | Request/response models from sections 3–4, grouped by feature | No database access |
-| Add | `app/services/catalog.py` | Space/catalog writes, states, names | storage_space, item_category, item_definition; read inventory for archival |
+| Add (B04 implemented) | `app/services/storage_spaces.py` | Space queries, ownership, names, state changes, and transactions | storage_space; read inventory_item for archival |
+| Add | `app/services/catalog.py` | Category/definition queries, writes, states, names | item_category, item_definition |
 | Add | `app/services/inventory.py` | Pure quantity calculations, inventory writes, versions, idempotency, batch transactions | inventory_item, inventory_operation; lock/check related spaces/catalog |
 | Add | `migrations/versions/<revision>_add_inventory_notes.py` | Add nullable TEXT notes to inventory_item only | Schema change only |
 | Add | Repository-root `docs/API_REFERENCE.md` | Implemented frontend contracts, examples, and verification status | No database access |
@@ -735,7 +738,7 @@ Formal development permits and requires relevant tests, isolated test database c
 
 Run backend CI in the course GitHub repository. PR checks include tests, necessary import/OpenAPI checks, and dependency checks. Database tests use isolated services and dedicated credentials. Performance testing is repeatable manual or scheduled work, not required in full for every small change. Record commands, code version, and results, and fix failures before completion.
 
-Current B01–B03 tests use the same code locally and in CI: 11 database-free scenarios and 34 scenarios with real PostgreSQL fixtures. Local tests use the isolated database configured in `.env.test`; CI sets TEST_DATABASE_URL for a disposable PostgreSQL service and does not access Neon. Missing test database configuration fails database tests rather than silently skipping them. See [B01–B03 test results](testing/B01-B03_AUTH_TEST_RESULTS.md) for evidence and limits.
+B01–B04 share one set of test definitions: 115 scenarios in total (11 database-free and 104 with real PostgreSQL fixtures). Local pytest defaults to the full suite; automatic PR/main CI selects 22 high-priority cases using the ci marker, and manual workflow dispatch runs the full suite. See the [CI selection policy](testing/README.md#ci-selection-policy). Local tests use the isolated database configured in `.env.test`; CI sets TEST_DATABASE_URL for a disposable PostgreSQL service and does not access Neon. Missing test database configuration fails database tests rather than silently skipping them. See [B01–B03 test results](testing/B01-B03_AUTH_TEST_RESULTS.md) for evidence and limits.
 
 Key business checks:
 

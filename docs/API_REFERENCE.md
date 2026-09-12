@@ -1,6 +1,6 @@
-# SayFridge API Reference: B01–B03
+# SayFridge API Reference: B01–B04
 
-This reference covers the implemented registration, login, and current-user endpoints only. B03 does not include profile editing in this phase. Password change, refresh tokens, cookie login, and logout endpoints are outside this delivery. Design rules are maintained in the [backend design handbook](BACKEND_DESIGN.md).
+This reference covers implemented registration, login, current-user, and B04 storage-space endpoints. Section 8 provides the storage-space Postman workflow. B03 does not include profile editing in this phase. Password change, refresh tokens, cookie login, and logout endpoints are outside this delivery. Design rules are maintained in the [backend design handbook](BACKEND_DESIGN.md).
 
 ## 1. Start the backend
 
@@ -176,14 +176,154 @@ Run from backend:
 # 11 scenarios that do not require a database
 python -m pytest -v -m "not postgres"
 
-# All 45 scenarios; requires an isolated test database
+# Full backend suite; requires an isolated test database
 python -m pytest -v
 ```
 
 Database tests read TEST_DATABASE_URL from the process environment or the ignored backend/.env.test file, with the process value taking precedence. They accept only a psycopg direct connection to a database named with the `_test` suffix. They never fall back to the application .env. Each test creates a random auth_test_* schema, applies real Alembic migrations, and cleans only that schema. The current developer's isolated Neon test database is sayfridge_auth_test.
 
-The suite contains 11 database-free scenarios and 34 scenarios with real PostgreSQL fixtures. FakeAsyncSession has been removed. Missing TEST_DATABASE_URL causes database tests to fail rather than silently skip. Local and CI runs use identical test code. CI supplies an environment variable pointing to its temporary PostgreSQL container, not Neon.
+The suite includes 45 B01–B03 scenarios and 70 B04 scenarios: 11 database-free and 104 with real PostgreSQL fixtures. FakeAsyncSession has been removed. Missing TEST_DATABASE_URL causes database tests to fail rather than silently skip. Local and CI runs use identical test code with different selections: local `python -m pytest -v` runs all 115 cases; automatic PR/main CI uses `-m ci` for 22 core cases; manual workflow dispatch runs all 115. CI supplies an environment variable pointing to its temporary PostgreSQL container, not Neon.
 
-CI is configured for Python 3.11 and PostgreSQL 18 on PRs to main, pushes to main, and manual dispatches. Actual remote results must be checked after triggering GitHub Actions. No commit, push, or Issue closure is implied by this document. The user has confirmed successful manual Postman/Neon integration testing; team review remains outstanding.
+CI is configured for Python 3.11 and PostgreSQL 18 on PRs to main, pushes to main, and manual dispatches. Actual remote results must be checked after triggering GitHub Actions. No commit, push, or Issue closure is implied by this document. The user previously confirmed B01–B03 manual Postman/Neon testing, and PR #61 was merged. B04 manual Postman/Neon acceptance and remote CI are not yet recorded.
 
 See [B01–B03 authentication test results](testing/B01-B03_AUTH_TEST_RESULTS.md) for detailed evidence and limitations.
+
+
+## 8. B04: storage spaces
+
+All six endpoints require `Authorization: Bearer {{access_token}}`. Use the login
+steps in section 4, then select **Bearer Token** in Postman. Each request checks
+the user's current ACTIVE account state. Administrators also access only their
+own spaces through these endpoints.
+
+No additional database migration is needed beyond the existing initial migration.
+Start the backend as in section 1. These requests use the running application's
+`.env` database; they do not use the pytest test database or its automatic cleanup.
+
+### 8.1 Create a space
+
+**POST `{{base_url}}/api/v1/storage-spaces`**
+
+Body: **raw / JSON**, Content-Type: **application/json**.
+
+```json
+{
+  "name": "B04 Postman Fridge",
+  "type": "FRIDGE"
+}
+```
+
+Expected: **201** with `id`, `name`, `type`, `status`, `created_at`, and `updated_at`.
+Save the returned `id` as a Postman variable named `space_id`.
+
+- Name is trimmed and must contain 1–100 characters after trimming.
+- Types: FRIDGE, FREEZER, PANTRY, WAREHOUSE, OTHER (case sensitive).
+- The server assigns user ownership and ACTIVE status. Extra fields are rejected.
+- An ACTIVE name is unique per user using PostgreSQL `lower(name)`. Archived
+  spaces do not reserve names. Duplicate creation, including different letter
+  casing, returns **409 / NAME_CONFLICT**. Creation is not idempotent.
+
+### 8.2 List spaces
+
+**GET `{{base_url}}/api/v1/storage-spaces`**
+
+No body. Default query parameters: `status=ACTIVE`, `page=1`, `page_size=20`.
+`status` also accepts ARCHIVED or ALL. Page must be at least 1; page_size is 1–100.
+Unknown list query parameters are rejected. Results sort by name and then UUID,
+ascending, using the database's ordering.
+
+Example: `{{base_url}}/api/v1/storage-spaces?status=ALL&page=1&page_size=10`
+
+Expected: **200** with this structure:
+
+```json
+{
+  "items": [],
+  "total": 0,
+  "page": 1,
+  "page_size": 10
+}
+```
+
+The example above represents an empty result. With the space created in 8.1,
+`items` contains its public fields and `total` includes it. The count covers all
+matching rows, not just the page. An out-of-range page has empty items while
+retaining the total. Count and items are read in one SQL statement/snapshot.
+
+### 8.3 Read one space
+
+**GET `{{base_url}}/api/v1/storage-spaces/{{space_id}}`**
+
+Expected: **200** with the public space fields. Both ACTIVE and ARCHIVED spaces
+are readable by their owner. Missing and other users' IDs both return **404**:
+
+```json
+{"detail":{"code":"NOT_FOUND","message":"Storage space not found"}}
+```
+
+### 8.4 Edit a space
+
+**PATCH `{{base_url}}/api/v1/storage-spaces/{{space_id}}`**
+
+Body: **raw / JSON**.
+
+```json
+{
+  "name": "B04 Renamed Fridge",
+  "type": "FREEZER"
+}
+```
+
+Expected: **200** with the updated fields. Submit name, type, or both. Omitted
+fields remain unchanged. Empty objects, explicit nulls, invalid values, and extra
+fields return **422**. Only ACTIVE spaces can be edited; restore an archived
+space first. A conflicting active name returns **409 / NAME_CONFLICT**, and no
+part of the edit is committed. An unchanged request preserves `updated_at`.
+
+### 8.5 Archive a space
+
+**POST `{{base_url}}/api/v1/storage-spaces/{{space_id}}/archive`**
+
+Select **Body: none**; do not send `{}` or JSON null.
+
+Expected: **200**, `status=ARCHIVED`. Repeat the same request: **200** with unchanged
+timestamps. IN_STOCK inventory prevents archival with **409 / STATE_CONFLICT**;
+EMPTY, DISCARDED, and ARCHIVED inventory do not. Inventory records are not modified.
+The service locks the space before checking inventory. Future inventory writers
+must coordinate on that same row lock, as required by the design handbook.
+
+After archival, the space disappears from the default list, remains visible with
+`status=ARCHIVED` or `status=ALL`, and remains accessible by its detail URL.
+
+### 8.6 Restore a space
+
+**POST `{{base_url}}/api/v1/storage-spaces/{{space_id}}/restore`**
+
+Select **Body: none**.
+
+Expected: **200**, `status=ACTIVE`. Repeating restore on an ACTIVE space returns
+its current state without changing timestamps. If another ACTIVE space belonging
+to the same user has claimed its name, return **409 / NAME_CONFLICT** and keep the
+original space ARCHIVED. Rename the active namesake before retrying restoration.
+
+### 8.7 Errors and manual checks
+
+Business errors use `detail.code` and `detail.message`. Validation errors may also
+include `detail.errors` containing field locations and messages, never raw values.
+Authentication errors keep the existing B01–B03 format.
+
+| Check | Expected |
+| --- | --- |
+| Create, list, detail, edit, archive, restore in order | 201, then 200 for each later operation |
+| Repeat unchanged edit/archive/restore | 200; unchanged updated_at |
+| Reuse an active name with different casing | 409 / NAME_CONFLICT |
+| Archive, create an active namesake, then restore the original | 409; original remains archived |
+| Edit an archived space | 409 / STATE_CONFLICT |
+| Use another account's space ID or an absent UUID | Identical 404 / NOT_FOUND |
+| Invalid UUID, name/type, page parameters, null PATCH, or extra fields | 422 / VALIDATION_ERROR |
+| Missing/invalid/expired token or inactive account | 401 |
+
+Automated inventory and lock tests prepare their own fixtures; manually exercising
+stock-dependent archival awaits inventory APIs or a controlled test fixture. Do
+not alter shared Neon tables just to manufacture an acceptance case. B04 manual
+Postman acceptance is pending; automated results are in the [B04 test report](testing/B04_STORAGE_SPACES_TEST_RESULTS.md).
