@@ -63,7 +63,7 @@ The three source documents are archived in `archive/backend-design-2026-09-11/` 
 | [Database models](../backend/app/db/models.py) | ORM fields and constraints for eight tables | Evidence of local structure, not proof of remote migration |
 | [Initial migration](../backend/migrations/versions/02ec95582dc7_create_initial_eight_tables.py) | Revision `02ec95582dc7`, creating eight tables | Add the notes migration after it; recheck the migration head during implementation |
 | [Database session](../backend/app/db/session.py) | Request-scoped AsyncSession | Supplies sessions without automatically committing business transactions |
-| [Application entry point](../backend/app/main.py) | Registers authentication, B04 storage-space routes, and health check | Register remaining business route groups when implemented |
+| [Application entry point](../backend/app/main.py) | Registers authentication, storage-space and catalog routes, and health check | Register remaining business route groups when implemented |
 | [Authentication dependencies](../backend/app/api/dependencies.py) | Validates tokens and reads current user state | Reuse identity checks and add an administrator dependency |
 | [Authentication routes](../backend/app/api/routes/auth.py), [schemas](../backend/app/schemas/auth.py), and [service](../backend/app/services/auth.py) | Registration, login, and current-user endpoints already exist | Preserve compatibility and add password change |
 | [Backend README](../backend/README.md) | Current startup and verification instructions | Update implemented capabilities and migration instructions after implementation |
@@ -258,7 +258,7 @@ Both password fields require 8–128 characters and a valid Bearer token. Succes
 
 ### 4.2 Storage spaces
 
-B04 is implemented in `app/api/routes/storage_spaces.py` and `app/services/storage_spaces.py`. See the [API manual](API_REFERENCE.md#8-b04-storage-spaces) and [B04 verification record](testing/B04_STORAGE_SPACES_TEST_RESULTS.md). No B04 schema migration is required.
+B04 is implemented in `app/api/routes/storage_spaces.py` and `app/services/storage_spaces.py`. See the [API manual](API_REFERENCE.md#3-storage-spaces--b04) and [B04 verification record](testing/B04_STORAGE_SPACES_TEST_RESULTS.md). No B04 schema migration is required.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
@@ -294,12 +294,14 @@ B04 is implemented in `app/api/routes/storage_spaces.py` and `app/services/stora
 
 ### 4.3 Categories and item definitions
 
+B05–B06 are implemented in `app/api/routes/catalog.py` and `app/services/catalog.py`. Name normalization is shared through `app/core/catalog.py`; request/response models remain in `app/schemas/business.py`. See [API usage](API_REFERENCE.md#5-item-definitions--b06). No additional table, migration, public-catalog write endpoint, or shared-database seed is included.
+
 All authenticated users can read public definitions. Only the owner can read and maintain private definitions. Ordinary users cannot edit public definitions.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
 | GET /item-categories | item_category | Default ACTIVE; sort by sort_order, name, id ascending |
-| `GET /item-definitions`, `GET /item-definitions/{id}` | Public or own item_definition, joined to category | Lists default to ACTIVE definitions with ACTIVE categories; filter by q, category_id, scope, status. Stable name, scope, id order. Details may show archived definitions visible to the user |
+| `GET /item-definitions`, `GET /item-definitions/{id}` | Public or own item_definition, joined to category | Lists default to ACTIVE definitions with ACTIVE categories; filter by q, category_id, scope, status. Default scope ALL; stable name, scope, id ascending order (PRIVATE before PUBLIC for equal names). Details may show archived definitions visible to the user |
 
 #### 4.3.1 `POST /item-definitions`
 
@@ -311,9 +313,9 @@ All authenticated users can read public definitions. Only the owner can read and
 #### 4.3.2 `PATCH /item-definitions/{id}`
 
 - **Request:** name/category_id.
-- **State and validation:** own ACTIVE definition; check ownership, target category, and uniqueness.
+- **State and validation:** own ACTIVE definition; check ownership and uniqueness. A submitted category_id must identify an ACTIVE category. A name-only edit may retain an archived current category because it creates no new association.
 - **Writes:** corresponding fields, normalized_name, updated_at.
-- **History and retries:** none; conflict 409; current associated display values change accordingly.
+- **History and retries:** none; conflict 409; current associated display values change accordingly. Unchanged requests preserve updated_at and do not rewrite legacy normalization keys.
 
 #### 4.3.3 `POST /item-definitions/{id}/archive`
 
@@ -327,7 +329,7 @@ All authenticated users can read public definitions. Only the owner can read and
 - **Request:** none.
 - **State and validation:** own definition and ACTIVE category; check both ownership and category.
 - **Writes:** status=ACTIVE, updated_at.
-- **History and retries:** none; archived category 409; repeated requests return current state.
+- **History and retries:** none; archived category 409, including repeated restore of an already ACTIVE definition; valid repeated requests return current state.
 
 ### 4.4 Inventory and batch management
 
@@ -626,7 +628,7 @@ Paths below are relative to `backend/` unless explicitly identified as repositor
 | Add | `app/api/routes/admin.py` | User state, public category, and public definition management | user, item_category, item_definition |
 | Add | `app/schemas/business.py` | Request/response models from sections 3–4, grouped by feature | No database access |
 | Add (B04 implemented) | `app/services/storage_spaces.py` | Space queries, ownership, names, state changes, and transactions | storage_space; read inventory_item for archival |
-| Add | `app/services/catalog.py` | Category/definition queries, writes, states, names | item_category, item_definition |
+| Add (B05–B06 implemented) | `app/services/catalog.py` | Category/definition queries, writes, states, names | item_category, item_definition |
 | Add | `app/services/inventory.py` | Pure quantity calculations, inventory writes, versions, idempotency, batch transactions | inventory_item, inventory_operation; lock/check related spaces/catalog |
 | Add | `migrations/versions/<revision>_add_inventory_notes.py` | Add nullable TEXT notes to inventory_item only | Schema change only |
 | Add | Repository-root `docs/API_REFERENCE.md` | Implemented frontend contracts, examples, and verification status | No database access |
@@ -719,7 +721,7 @@ The project owner supplies section 10 decisions. Work independent of undecided f
 
 This handbook owns design rules. `docs/API_REFERENCE.md` documents implemented requests, responses, and usage examples; do not duplicate design decisions or open-question lists there. Update this handbook when design changes.
 
-The API reference must describe purpose and permissions in English, request/response fields, defaults, enumerations, and error codes. Include examples for login, space creation, item selection, stock entry, preview, consumption, reconciliation, and history. Explain version conflicts, retries, expiry dates, startup, migrations, and actual verification status. Follow the file responsibilities in section 8.
+The API reference must describe purpose and permissions in English, request/response fields, defaults, enumerations, and error codes. Include examples for login, space creation, item selection, stock entry, preview, consumption, reconciliation, and history. Explain version conflicts, retries, and expiry dates. Link to the backend README for startup/migrations, the Postman guide for client setup, and the test index for actual verification status. Follow the file responsibilities in section 8.
 
 Use FastAPI's built-in /docs, /redoc, and /openapi.json; add no documentation-export script.
 
@@ -738,7 +740,7 @@ Formal development permits and requires relevant tests, isolated test database c
 
 Run backend CI in the course GitHub repository. PR checks include tests, necessary import/OpenAPI checks, and dependency checks. Database tests use isolated services and dedicated credentials. Performance testing is repeatable manual or scheduled work, not required in full for every small change. Record commands, code version, and results, and fix failures before completion.
 
-B01–B04 share one set of test definitions: 115 scenarios in total (11 database-free and 104 with real PostgreSQL fixtures). Local pytest defaults to the full suite; automatic PR/main CI selects 22 high-priority cases using the ci marker, and manual workflow dispatch runs the full suite. See the [CI selection policy](testing/README.md#ci-selection-policy). Local tests use the isolated database configured in `.env.test`; CI sets TEST_DATABASE_URL for a disposable PostgreSQL service and does not access Neon. Missing test database configuration fails database tests rather than silently skipping them. See [B01–B03 test results](testing/B01-B03_AUTH_TEST_RESULTS.md) for evidence and limits.
+All implemented work packages share one set of test definitions. Local pytest defaults to the full suite; automatic PR/main CI selects high-priority cases using the ci marker, and manual workflow dispatch runs the full suite. Counts are maintained in the test index rather than the design specification. See the [CI selection policy](testing/README.md#ci-selection-policy). Local tests use the isolated database configured in `.env.test`; CI sets TEST_DATABASE_URL for a disposable PostgreSQL service and does not access Neon. Missing test database configuration fails database tests rather than silently skipping them. See [B01–B03 test results](testing/B01-B03_AUTH_TEST_RESULTS.md) for evidence and limits.
 
 Key business checks:
 

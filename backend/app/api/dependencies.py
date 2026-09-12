@@ -1,5 +1,5 @@
 import jwt
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,3 +42,11 @@ async def get_current_user(
     if user is None or user.status != ACTIVE_STATUS:
         raise authentication_error()
     return user
+
+
+async def require_empty_body(request: Request) -> None:
+    if await request.body():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "VALIDATION_ERROR", "message": "This endpoint does not accept a request body"},
+        )

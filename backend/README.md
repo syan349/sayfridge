@@ -1,6 +1,6 @@
 # SayFridge Backend
 
-The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and Alembic migrations. Inventory CRUD, Agent, and Worker features have not been implemented yet.
+The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and Alembic migrations. Inventory CRUD, Agent, and Worker features have not been implemented yet.
 
 ## Requirements
 
@@ -26,6 +26,8 @@ Once the server starts, the following endpoints are available:
 - Storage spaces: `GET/POST http://127.0.0.1:8000/api/v1/storage-spaces`
 - Space detail/edit: `GET/PATCH http://127.0.0.1:8000/api/v1/storage-spaces/{id}`
 - Space archive/restore: `POST http://127.0.0.1:8000/api/v1/storage-spaces/{id}/archive` or `/restore`
+- Categories: `GET http://127.0.0.1:8000/api/v1/item-categories`
+- Item definitions: `GET/POST http://127.0.0.1:8000/api/v1/item-definitions`; detail/PATCH and archive/restore under `/{id}`
 - API documentation: `http://127.0.0.1:8000/docs`
 
 ## Authentication settings
@@ -63,7 +65,7 @@ The initial migration creates the eight tables specified in the design document.
 python -m pytest
 ```
 
-## B01–B04 local startup and Postman
+## B01–B06 local startup and Postman
 
 On macOS / Linux, create an environment with Python 3.11 from the `backend` directory. Skip environment creation if `.venv` already exists:
 
@@ -75,7 +77,7 @@ python3.11 -m venv .venv
 
 If you use an existing Conda environment, activate it and use `python` instead of `.venv/bin/python`. Each team member should use their own `.env` and must not commit real credentials.
 
-- [Authentication and storage-space API manual](../docs/API_REFERENCE.md)
+- [Authentication, storage-space, and catalog API manual](../docs/API_REFERENCE.md)
 - Optional local Postman collection: `docs/postman/SayFridge_Auth.postman_collection.json` (not included in the planned documentation commit; see the API manual for manual requests)
 - [B01–B03 authentication test results](../docs/testing/B01-B03_AUTH_TEST_RESULTS.md)
 - [B04 storage-space test results](../docs/testing/B04_STORAGE_SPACES_TEST_RESULTS.md)
@@ -83,13 +85,13 @@ If you use an existing Conda environment, activate it and use `python` instead o
 
 ## One test suite for local development and CI
 
-Run all 115 scenarios from `backend` with the same command on macOS and GitHub Actions:
+Run the full suite from `backend` with the same command on macOS and GitHub Actions:
 
 ```bash
 python -m pytest -v
 ```
 
-The suite contains 11 database-free scenarios and 104 scenarios that use real PostgreSQL fixtures. There is no fake database session. Some invalid requests are rejected before executing SQL, but their API tests use the same real database setup. Uvicorn does not need to be running: pytest loads the ASGI application directly.
+The suite contains database-free scenarios and scenarios that use real PostgreSQL fixtures. Current counts are listed in the [test index](../docs/testing/README.md). There is no fake database session. Some invalid requests are rejected before executing SQL, but their API tests use the same real database setup. Uvicorn does not need to be running: pytest loads the ASGI application directly.
 
 - Local development: copy `.env.test.example` to `.env.test` and supply the direct URL for your isolated Neon test database (currently `sayfridge_auth_test`).
 - GitHub Actions: the workflow starts a disposable PostgreSQL 18 service and supplies `TEST_DATABASE_URL` through its environment. It does not connect to Neon or require Neon credentials.
@@ -107,12 +109,12 @@ To select a subset explicitly:
 # 11 database-free scenarios
 python -m pytest -v -m "not postgres"
 
-# 104 scenarios with real PostgreSQL fixtures
+# Scenarios with real PostgreSQL fixtures
 python -m pytest -v -m postgres
 ```
 
 Automatic CI for pull requests targeting `main` and pushes to `main` runs the
-22 high-priority scenarios marked `ci`. Manual workflow dispatch runs all 115.
+high-priority scenarios marked `ci`. Manual workflow dispatch runs the full suite.
 Both use the same test definitions and temporary PostgreSQL service; there is no
 separate CI implementation of a test. The required job remains `test-job`, and
 JUnit reports are uploaded even on failure.
@@ -138,8 +140,8 @@ not the fixed time needed for GitHub runner setup and dependency installation.
 Routes parse HTTP inputs, obtain the authenticated user/session, and translate
 business errors into HTTP responses. Feature services contain database queries,
 business rules, and write transaction boundaries. B04 uses
-`app/services/storage_spaces.py`; catalog services will be separate. Request and
-response contracts live in `app/schemas/business.py`. B04 adds no schema migration.
+`app/services/storage_spaces.py`; B05–B06 use `app/services/catalog.py`. Request and
+response contracts live in `app/schemas/business.py`. B04–B06 add no schema migration. Public categories must be initialized through an approved setup or administrator process before creating private definitions; these APIs do not seed shared databases.
 
 Run B04 tests alone with:
 

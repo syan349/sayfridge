@@ -2,11 +2,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_empty_body
 from app.db.models import StorageSpace, User
 from app.db.session import get_db_session
 from app.schemas.business import (
@@ -36,14 +36,6 @@ async def storage_space_error_handler(request: Request, exc: service.StorageSpac
     else:
         code, http_status = "STATE_CONFLICT", status.HTTP_409_CONFLICT
     return JSONResponse(status_code=http_status, content={"detail": {"code": code, "message": str(exc)}})
-
-
-async def require_empty_body(request: Request) -> None:
-    if await request.body():
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"code": "VALIDATION_ERROR", "message": "This endpoint does not accept a request body"},
-        )
 
 
 @router.get("", response_model=StorageSpacePage, status_code=status.HTTP_200_OK)

@@ -8,10 +8,14 @@ from app.api.routes.storage_spaces import (
     storage_space_error_handler,
 )
 from app.services.storage_spaces import StorageSpaceError
+from app.api.routes.catalog import router as catalog_router, catalog_error_handler
+from app.services.catalog import CatalogError
 
 app = FastAPI(title="SayFridge Backend")
 app.include_router(auth_router)
 app.include_router(storage_spaces_router)
+app.include_router(catalog_router)
+app.add_exception_handler(CatalogError, catalog_error_handler)
 app.add_exception_handler(StorageSpaceError, storage_space_error_handler)
 
 
@@ -22,8 +26,9 @@ async def health() -> dict[str, str]:
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Use business validation errors for B04 while preserving authentication errors."""
-    if request.url.path == "/api/v1/storage-spaces" or request.url.path.startswith("/api/v1/storage-spaces/"):
+    """Use business validation errors for business routes while preserving authentication errors."""
+    if any(request.url.path == prefix or request.url.path.startswith(prefix + "/")
+           for prefix in ("/api/v1/storage-spaces", "/api/v1/item-categories", "/api/v1/item-definitions")):
         return JSONResponse(status_code=422, content={"detail": {
             "code": "VALIDATION_ERROR",
             "message": "Invalid request parameters",
