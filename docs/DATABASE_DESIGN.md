@@ -1,20 +1,20 @@
-# SayFridge 数据库设计
+# SayFridge Database Design
 
-> 状态：已确认并完成第一阶段数据库基础实施
+> Status: Approved; first-phase database foundations implemented
 >
-> 数据库：Neon PostgreSQL
+> Database: Neon PostgreSQL
 >
-> 范围：个人用户、公共与私有物品词典、库存状态、操作历史与对话历史
+> Scope: Individual users, public and private item catalogs, inventory state, operation history, and conversation history
 
-## 1. 总体结构
+## 1. Overall Structure
 
-当前设计包含八张表：
+The current design consists of eight tables:
 
 ~~~text
 item_category
 └── item_definition
-    ├── owner_user_id = NULL       公共物品定义
-    └── owner_user_id = user.id    用户私有物品定义
+    ├── owner_user_id = NULL       Public item definition
+    └── owner_user_id = user.id    User-owned private item definition
 
 user
 ├── storage_space
@@ -26,251 +26,251 @@ user
     └── conversation_message
 ~~~
 
-- 一个用户可以拥有多个平级存储空间；不建立嵌套空间或 household。
-- item_category 是公共品类词典，例如蔬菜、乳制品、肉类、日用品。
-- item_definition 是物品定义词典，例如西红柿、黄瓜、香蕉；它不是条码、SKU 或某一批具体库存。
-- item_definition.owner_user_id 为 NULL 时是公共物品；有用户 ID 时仅该用户可见和维护。
-- inventory_item 是某用户、某存储空间中的一批具体库存；名称和品类通过 item_definition 关联，不在库存表重复保存。
-- inventory_operation 是一条单物品库存操作，可来自 AI 或手动按钮；它不是通用会计流水，也不按小票建立操作主表。
-- 一张照片或小票识别 N 个物品时，创建 N 条独立的 inventory_operation。
-- 对话历史与库存操作历史不设置外键。
+- A user may own multiple independent storage spaces. Nested spaces and households are not modeled.
+- `item_category` is the public category catalog, with entries such as vegetables, dairy products, meat, and household supplies.
+- `item_definition` is the item catalog, with entries such as tomatoes, cucumbers, and bananas. An item definition does not represent a barcode, SKU, or specific inventory batch.
+- An `item_definition` is public when `owner_user_id` is NULL. When a user ID is present, only that user may view and maintain the private definition.
+- `inventory_item` represents a specific inventory batch in a user's storage space. Its name and category are obtained through `item_definition` rather than duplicated in the inventory table.
+- `inventory_operation` represents an operation on a single inventory item, initiated through AI or a manual action. It is not a general accounting ledger, and there is no parent operation table organized by receipt.
+- When a photo or receipt yields N recognized items, create N independent `inventory_operation` records.
+- Conversation history and inventory operation history are not linked by foreign keys.
 
-## 2. user 用户表
+## 2. User Table: `user`
 
-| 字段 | 含义 |
+| Field | Description |
 | --- | --- |
-| id | 用户主键 |
-| email | 登录邮箱，必须唯一 |
-| password_hash | 本地登录密码哈希，禁止保存明文密码 |
-| auth_provider | 登录来源，例如 LOCAL 或第三方认证提供商 |
-| role | 用户角色，例如 USER、ADMIN |
-| status | 账号状态，例如 ACTIVE、SUSPENDED、DISABLED |
-| voice_limit_seconds | 当前额度周期允许使用的语音秒数 |
-| voice_used_seconds | 当前额度周期已经使用的语音秒数 |
-| voice_quota_reset_at | 语音额度下次重置时间 |
-| created_at | 用户创建时间 |
-| updated_at | 用户最后更新时间 |
+| id | User primary key |
+| email | Unique email address used for login |
+| password_hash | Password hash for local authentication; plaintext passwords must never be stored |
+| auth_provider | Authentication provider, such as LOCAL or a third-party identity provider |
+| role | User role, such as USER or ADMIN |
+| status | Account status, such as ACTIVE, SUSPENDED, or DISABLED |
+| voice_limit_seconds | Voice usage allowance, in seconds, for the current quota period |
+| voice_used_seconds | Voice usage consumed, in seconds, during the current quota period |
+| voice_quota_reset_at | Next scheduled reset time for the voice quota |
+| created_at | User creation timestamp |
+| updated_at | Last user update timestamp |
 
-## 3. storage_space 存储空间表
+## 3. Storage Space Table: `storage_space`
 
-| 字段 | 含义 |
+| Field | Description |
 | --- | --- |
-| id | 存储空间主键 |
-| user_id | 所属用户，外键关联 user.id |
-| name | 用户定义名称，例如厨房冰箱、车库冷柜 |
-| type | 空间类型，例如 FRIDGE、FREEZER、PANTRY、WAREHOUSE、OTHER |
-| status | 空间状态，例如 ACTIVE、ARCHIVED |
-| created_at | 空间创建时间 |
-| updated_at | 空间最后更新时间 |
+| id | Storage space primary key |
+| user_id | Owning user; foreign key referencing user.id |
+| name | User-defined name, such as Kitchen Fridge or Garage Freezer |
+| type | Space type, such as FRIDGE, FREEZER, PANTRY, WAREHOUSE, or OTHER |
+| status | Space status, such as ACTIVE or ARCHIVED |
+| created_at | Space creation timestamp |
+| updated_at | Last space update timestamp |
 
-主要约束与索引：
+Key constraints and indexes:
 
-- 所有库存查询和写入均通过 storage_space.user_id 验证当前认证用户。
-- 建立 (user_id, status) 索引；同一用户的活动空间名称建议唯一。
-- 空间归档时不得让仍在库物品失去归属。
+- All inventory queries and writes verify ownership against the authenticated user through `storage_space.user_id`.
+- Create an index on `(user_id, status)`. Active space names should be unique within each user's spaces.
+- Archiving a space must not leave in-stock items without an owning space.
 
-## 4. item_category 公共品类词典表
+## 4. Public Category Catalog Table: `item_category`
 
-一行代表一个可筛选的公共品类。首批可预置蔬菜、水果、肉类、乳制品、主食、日用品、其他等类别。
+Each row represents a public category available for filtering. Initial seed categories may include vegetables, fruit, meat, dairy products, staple foods, household supplies, and other items.
 
-| 字段 | 含义 |
+| Field | Description |
 | --- | --- |
-| id | 品类主键 |
-| name | 展示名称，例如蔬菜 |
-| normalized_name | 规范化名称，用于搜索和去重 |
-| status | ACTIVE 或 ARCHIVED |
-| sort_order | 前端展示顺序 |
-| created_at | 创建时间 |
-| updated_at | 最后更新时间 |
+| id | Category primary key |
+| name | Display name, such as Vegetables |
+| normalized_name | Normalized name used for searching and deduplication |
+| status | ACTIVE or ARCHIVED |
+| sort_order | Display order in the frontend |
+| created_at | Creation timestamp |
+| updated_at | Last update timestamp |
 
-- 品类不归普通用户私有；公共品类由系统初始化或管理员维护。
-- 不物理删除已被物品定义引用的品类，改为 ARCHIVED。
+- Categories are not privately owned by ordinary users. Public categories are initialized by the system or maintained by administrators.
+- Categories referenced by item definitions must not be physically deleted; set their status to ARCHIVED instead.
 
-## 5. item_definition 物品定义词典表
+## 5. Item Definition Catalog Table: `item_definition`
 
-一行代表一个物品名称及其所属品类。
+Each row represents an item name and its associated category.
 
-| 字段 | 含义 |
+| Field | Description |
 | --- | --- |
-| id | 物品定义主键 |
-| name | 展示名称，例如西红柿、黄瓜、香蕉 |
-| normalized_name | 规范化名称，用于搜索和去重 |
-| category_id | 所属品类，外键关联 item_category.id |
-| owner_user_id | 可为空；NULL 为公共物品，有值为该用户私有物品 |
-| status | ACTIVE 或 ARCHIVED |
-| created_at | 创建时间 |
-| updated_at | 最后更新时间 |
+| id | Item definition primary key |
+| name | Display name, such as Tomatoes, Cucumbers, or Bananas |
+| normalized_name | Normalized name used for searching and deduplication |
+| category_id | Associated category; foreign key referencing item_category.id |
+| owner_user_id | Nullable; NULL indicates a public definition, while a user ID indicates that user's private definition |
+| status | ACTIVE or ARCHIVED |
+| created_at | Creation timestamp |
+| updated_at | Last update timestamp |
 
-可见性规则：
+Visibility rule:
 
 ~~~text
 owner_user_id IS NULL
-OR owner_user_id = 当前认证用户 id
+OR owner_user_id = authenticated_user_id
 ~~~
 
-建议建立两个部分唯一约束：
+Two partial unique indexes are recommended:
 
-- 公共物品：normalized_name 在 owner_user_id IS NULL 范围内唯一；
-- 私有物品：(owner_user_id, normalized_name) 在 owner_user_id IS NOT NULL 范围内唯一。
+- Public definitions: `normalized_name` is unique where `owner_user_id IS NULL`.
+- Private definitions: `(owner_user_id, normalized_name)` is unique where `owner_user_id IS NOT NULL`.
 
-## 6. inventory_item 具体库存表
+## 6. Inventory Item Table: `inventory_item`
 
-一行代表一个具体库存物品或批次。同一物品在购买日期、到期日期或存储空间不同时可保存为多行。
+Each row represents a specific inventory item or batch. The same item may have multiple rows when purchase dates, expiry dates, or storage spaces differ.
 
-| 字段 | 含义 |
+| Field | Description |
 | --- | --- |
-| id | 库存物品主键 |
-| storage_space_id | 所属存储空间，外键关联 storage_space.id |
-| item_definition_id | 物品定义，外键关联 item_definition.id |
-| purchase_date | 购买日期，可以为空 |
-| expiry_date | 到期日期，可以为空；无法确认时不得由模型擅自推断 |
-| status | IN_STOCK、EMPTY、DISCARDED 或 ARCHIVED |
-| initial_amount | 首次入库数量；创建后不随普通操作改变 |
-| initial_unit | 首次入库单位 |
-| confirmed_current_amount | 用户最后一次可确认的当前库存数量 |
-| confirmed_current_unit | 已确认当前库存单位 |
-| confirmed_at | 已确认当前库存最后更新时间 |
-| estimated_current_amount | 当前有效估算库存数量；无有效估算时为 NULL |
-| estimated_current_unit | 当前有效估算库存单位；无有效估算时为 NULL |
-| estimated_at | 当前估算最后生成或更新时间；无有效估算时为 NULL |
-| version | 乐观锁版本号，每次正式更新递增 |
-| created_at | 库存记录创建时间 |
-| updated_at | 库存记录最后更新时间 |
+| id | Inventory item primary key |
+| storage_space_id | Owning storage space; foreign key referencing storage_space.id |
+| item_definition_id | Item definition; foreign key referencing item_definition.id |
+| purchase_date | Purchase date; nullable |
+| expiry_date | Expiry date; nullable. The AI model must not infer an unverified date on its own |
+| status | IN_STOCK, EMPTY, DISCARDED, or ARCHIVED |
+| initial_amount | Quantity initially added to inventory; ordinary operations do not change it after creation |
+| initial_unit | Unit of the initial quantity |
+| confirmed_current_amount | Most recent current inventory quantity that the user could confirm |
+| confirmed_current_unit | Unit of the confirmed current quantity |
+| confirmed_at | Last update timestamp for the confirmed current quantity |
+| estimated_current_amount | Current valid estimated inventory quantity; NULL when no valid estimate exists |
+| estimated_current_unit | Unit of the current valid estimate; NULL when no valid estimate exists |
+| estimated_at | Timestamp when the current estimate was last generated or updated; NULL when no valid estimate exists |
+| version | Optimistic locking version; incremented for each committed update |
+| created_at | Inventory record creation timestamp |
+| updated_at | Last inventory record update timestamp |
 
-数量状态规则：
+Quantity state rules:
 
 ~~~text
 initial_*
-= 首次入库历史事实，永远不变
+= Immutable historical facts about the initial stock entry
 
 confirmed_current_*
-= 用户最后一次能够确认的实际库存基线
+= The most recent actual inventory baseline confirmed by the user
 
 estimated_current_*
-= 在确认基线之后，包含不确定换算或 AI 推测的当前结果
+= The current result after the confirmed baseline, incorporating uncertain conversions or AI estimates
 ~~~
 
-- 新建库存时：confirmed_current_* 等于 initial_*；estimated_current_* 和 estimated_at 均为 NULL。
-- estimated_current_amount 与 estimated_current_unit 必须同时为空或同时有值；estimated_at 必须与它们同时为空或同时有值。
-- 数量统一使用 NUMERIC(12,3)，禁止浮点类型；所有已存数量不得小于 0。
-- 当前界面展示规则：estimated_current_* 非空时展示它并标注“约 / AI 估算”；否则展示 confirmed_current_*。
-- status 只有在确定库存为 0 时才自动变为 EMPTY；估算为 0 只能提示“可能用完”，不能自动隐藏库存。
+- On inventory creation, `confirmed_current_*` equals `initial_*`; `estimated_current_*` and `estimated_at` are all NULL.
+- `estimated_current_amount` and `estimated_current_unit` must either both be NULL or both have values. `estimated_at` must be NULL or populated together with them.
+- All quantities use `NUMERIC(12,3)`, never floating-point types. Stored quantities must be nonnegative.
+- Display `estimated_current_*` when it is non-NULL, labeled "Approximately / AI estimate". Otherwise, display `confirmed_current_*`.
+- Automatically change `status` to EMPTY only when the inventory quantity is confirmed to be zero. An estimate of zero may produce a "Possibly used up" indication but must not automatically hide the inventory item.
 
-所有权关系：
+Ownership relationship:
 
 ~~~text
 inventory_item.storage_space_id
 → storage_space.user_id
-→ 当前认证用户
+→ Authenticated user
 ~~~
 
-## 7. inventory_operation 单物品库存操作表
+## 7. Inventory Operation Table: `inventory_operation`
 
-一行代表对一个 inventory_item 的一次正式增减、估算或重新确认。Agent 和前端都不能绕过该记录直接修改库存。
+Each row represents a committed addition, consumption, estimate, or reconfirmation for one `inventory_item`. Neither the Agent nor the frontend may bypass this record and modify inventory directly.
 
-| 字段 | 含义 |
+| Field | Description |
 | --- | --- |
-| id | 操作主键 |
-| inventory_item_id | 被操作库存，外键关联 inventory_item.id |
-| operation_type | ADD、CONSUME 或 RECONCILE |
-| affects_state | CONFIRMED 或 ESTIMATED，说明本次操作修改哪一层当前状态 |
-| input_method | TEXT、VOICE、PHOTO、RECEIPT 或 MANUAL |
-| quantity_kind | 用户表达类型：AMOUNT、FRACTION、QUALITATIVE |
-| quantity_value | 用户原始值，例如 2、1/2、some 或盘点后的 18.5 |
-| quantity_unit | 用户原始单位，例如 kg、g、each、cup、remaining；定性表达可为空 |
-| calculation_method | EXACT、CONVERTED 或 AI_ESTIMATED |
-| applied_change_amount | ADD 或 CONSUME 正式应用的变化量；RECONCILE 时可为空 |
-| applied_change_unit | applied_change_amount 的单位；RECONCILE 时可为空 |
-| status | PENDING_CONFIRMATION、SUCCESS、FAILED 或 UNDONE |
-| idempotency_key | 幂等键，防止重试造成重复操作 |
-| created_at | 操作创建时间 |
-| updated_at | 操作最后更新时间 |
-| undone_at | 撤回时间；未撤回时为空 |
+| id | Operation primary key |
+| inventory_item_id | Target inventory item; foreign key referencing inventory_item.id |
+| operation_type | ADD, CONSUME, or RECONCILE |
+| affects_state | CONFIRMED or ESTIMATED; identifies which current quantity state the operation changes |
+| input_method | TEXT, VOICE, PHOTO, RECEIPT, or MANUAL |
+| quantity_kind | Type of quantity expression provided by the user: AMOUNT, FRACTION, or QUALITATIVE |
+| quantity_value | Original user-provided value, such as 2, 1/2, some, or 18.5 after a stock count |
+| quantity_unit | Original user-provided unit, such as kg, g, each, cup, or remaining; nullable for qualitative expressions |
+| calculation_method | EXACT, CONVERTED, or AI_ESTIMATED |
+| applied_change_amount | Quantity change applied by ADD or CONSUME; nullable for RECONCILE |
+| applied_change_unit | Unit of applied_change_amount; nullable for RECONCILE |
+| status | PENDING_CONFIRMATION, SUCCESS, FAILED, or UNDONE |
+| idempotency_key | Idempotency key that prevents retries from creating duplicate operations |
+| created_at | Operation creation timestamp |
+| updated_at | Last operation update timestamp |
+| undone_at | Undo timestamp; NULL if the operation has not been undone |
 
-语义规则：
+Semantic rules:
 
-- quantity_value 和 quantity_unit 保留用户的原始表达，不得被标准单位覆盖。
-- EXACT 与 CONVERTED 表示普通后端可确定计算；AI_ESTIMATED 表示需要 AI 给出候选值并经用户确认。
-- 当前没有有效估算时，确定的 ADD 或 CONSUME 更新 CONFIRMED 状态。
-- 当前有有效估算时，后续增减基于估算结果并更新 ESTIMATED 状态；不能因为“本次扣减可确定”就丢弃历史估算。
-- RECONCILE 表示用户重新称重、盘点或明确说明“现在还剩 X”；它更新 confirmed_current_*，并在同一事务中清空 estimated_current_* 和 estimated_at。
-- 只有 SUCCESS 操作影响库存；PENDING_CONFIRMATION、FAILED 和 UNDONE 均不影响当前状态。
-- 普通 ADD、CONSUME 可按已确认变化量撤回；RECONCILE 如录入错误，以新的 RECONCILE 更正，不恢复旧估算链。
+- `quantity_value` and `quantity_unit` preserve the user's original expression and must not be overwritten with standardized units.
+- EXACT and CONVERTED indicate calculations that the backend can determine without AI. AI_ESTIMATED requires an AI-proposed value and user confirmation.
+- When no valid estimate exists, a deterministic ADD or CONSUME operation updates the CONFIRMED state.
+- When a valid estimate exists, subsequent additions and consumption use that estimate as their baseline and update the ESTIMATED state. A deterministic change in the current operation must not discard uncertainty inherited from earlier estimates.
+- RECONCILE represents the user reweighing, counting stock, or explicitly stating "X remains now". It updates `confirmed_current_*` and clears `estimated_current_*` and `estimated_at` in the same transaction.
+- Only SUCCESS operations affect inventory. PENDING_CONFIRMATION, FAILED, and UNDONE operations do not affect the current state.
+- Ordinary ADD and CONSUME operations may be undone using their confirmed changes. An incorrect RECONCILE entry is corrected with a new RECONCILE operation; it does not restore the previous chain of estimates.
 
-## 8. conversation 会话表
+## 8. Conversation Table: `conversation`
 
-| 字段 | 含义 |
+| Field | Description |
 | --- | --- |
-| id | 会话主键 |
-| user_id | 所属用户，外键关联 user.id |
-| title | 会话标题 |
-| created_at | 创建时间 |
-| updated_at | 最后一条消息或会话信息更新时间 |
+| id | Conversation primary key |
+| user_id | Owning user; foreign key referencing user.id |
+| title | Conversation title |
+| created_at | Creation timestamp |
+| updated_at | Timestamp of the latest message or conversation metadata update |
 
-建立 (user_id, updated_at DESC) 索引，用于列出最近会话。
+Create an index on `(user_id, updated_at DESC)` to list recent conversations.
 
-## 9. conversation_message 消息表
+## 9. Conversation Message Table: `conversation_message`
 
-| 字段 | 含义 |
+| Field | Description |
 | --- | --- |
-| id | 消息主键 |
-| conversation_id | 所属会话，外键关联 conversation.id |
-| role | USER 或 ASSISTANT |
-| content | 用户消息、转写文本或需要向用户展示的回复；不保存模型隐藏推理 |
-| created_at | 消息创建时间 |
+| id | Message primary key |
+| conversation_id | Owning conversation; foreign key referencing conversation.id |
+| role | USER or ASSISTANT |
+| content | User message, transcription, or response intended for the user; must not store the model's hidden reasoning |
+| created_at | Message creation timestamp |
 
-- 消息按 (conversation_id, created_at, id) 稳定排序。
-- 不保存系统提示词、隐藏推理、API 密钥或访问令牌。
-- 对话记录不作为库存事实或库存审计来源。
+- Order messages deterministically by `(conversation_id, created_at, id)`.
+- Do not store system prompts, hidden reasoning, API keys, or access tokens.
+- Conversation records are not a source of inventory facts or inventory audit evidence.
 
-## 10. 数量状态与展示示例
+## 10. Quantity State and Display Example
 
 ~~~text
-买入 20 kg 西红柿
+Purchase 20 kg of tomatoes
 → confirmed = 20 kg
 → estimated = NULL
-→ 展示：20 kg（已确认）
+→ Display: 20 kg (confirmed)
 
-用户说“用了一半”
-→ 确定扣减 10 kg
+The user says, "I used half"
+→ Deterministic consumption of 10 kg
 → confirmed = 10 kg
 → estimated = NULL
-→ 展示：10 kg（已确认）
+→ Display: 10 kg (confirmed)
 
-用户说“又用了两个”
-→ 两个无法直接换算为 kg
-→ 估算约扣减 0.3 kg，经用户确认
+The user says, "I used two more"
+→ Two individual items cannot be directly converted to kg
+→ Estimated consumption of approximately 0.3 kg, confirmed by the user
 → confirmed = 10 kg
 → estimated = 9.7 kg
-→ 展示：约 9.7 kg（AI 估算）
+→ Display: Approximately 9.7 kg (AI estimate)
 
-用户重新称重：“现在还剩 9.5 kg”
+The user reweighs the stock: "There is 9.5 kg left now"
 → confirmed = 9.5 kg
 → estimated = NULL
-→ 展示：9.5 kg（已确认）
+→ Display: 9.5 kg (confirmed)
 ~~~
 
-## 11. 正式写入流程
+## 11. Validated Write Workflow
 
 ~~~text
-用户输入
-→ Agent 提取原始数量表达并提出候选操作
-→ 后端以 confirmed 或有效 estimated 为正确基数计算
-→ 对 AI_ESTIMATED 候选向用户展示原始表达和拟采用结果
-→ 用户确认
-→ FastAPI 校验身份、可见性、单位、数量、状态、version 与幂等键
-→ PostgreSQL 事务更新 inventory_item 并写入 inventory_operation
+User input
+→ The Agent extracts the original quantity expression and proposes an operation
+→ The backend calculates using the confirmed quantity or valid estimate as the appropriate baseline
+→ For an AI_ESTIMATED proposal, show the user the original expression and proposed result
+→ User confirmation
+→ FastAPI validates identity, visibility, units, quantities, state, version, and the idempotency key
+→ A PostgreSQL transaction updates inventory_item and inserts inventory_operation
 ~~~
 
-事务必须保证：
+Transactions must guarantee that:
 
-- 用户只能操作自己 storage_space 下的库存，也只能选择公共或自己的 item_definition；
-- 估算不存在时，确定操作更新 confirmed；估算存在时，后续增减更新 estimated；
-- RECONCILE 原子更新 confirmed 并清空 estimated；
-- CONSUME 不得将所修改状态的数量减至小于 0；
-- 库存更新和 SUCCESS 操作记录同时提交或同时回滚；
-- idempotency_key 阻止同一正式请求执行两次。
+- Users can operate only on inventory in their own `storage_space` and can select only public or personally owned `item_definition` entries.
+- Without an estimate, deterministic operations update the confirmed state. With an estimate, subsequent additions and consumption update the estimated state.
+- RECONCILE atomically updates the confirmed state and clears the estimated state.
+- CONSUME cannot reduce the quantity in the affected state below zero.
+- The inventory update and SUCCESS operation record are committed together or rolled back together.
+- The `idempotency_key` prevents the same validated request from being executed twice.
 
-## 12. 实现状态
+## 12. Implementation Status
 
-本文是已确认的数据库设计基线。当前仓库已建立 Neon 连接配置、SQLAlchemy ORM 模型和首份八表 Alembic 迁移；库存 CRUD、Repository 和受控业务接口尚未实现。Flutter、Web 与 Agent 均不得直接访问数据库。
+This document is the approved database design baseline. The repository has Neon connection configuration, SQLAlchemy ORM models, and an initial Alembic migration for the eight tables. Inventory CRUD, a repository layer, and controlled business APIs have not yet been implemented. Flutter, Web, and the Agent must not access the database directly.

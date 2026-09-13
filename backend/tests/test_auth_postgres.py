@@ -12,6 +12,7 @@ from auth_test_support import exercise
 pytestmark = pytest.mark.postgres
 
 
+@pytest.mark.ci
 def test_register_login_me_database_lifecycle(database):
     async def scenario(client, sessions):
         payload = {"email": " User@Example.COM ", "password": "PostmanDemo42!"}

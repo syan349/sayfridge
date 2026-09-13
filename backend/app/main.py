@@ -3,9 +3,20 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.routes.auth import router as auth_router
+from app.api.routes.storage_spaces import (
+    router as storage_spaces_router,
+    storage_space_error_handler,
+)
+from app.services.storage_spaces import StorageSpaceError
+from app.api.routes.catalog import router as catalog_router, catalog_error_handler
+from app.services.catalog import CatalogError
 
 app = FastAPI(title="SayFridge Backend")
 app.include_router(auth_router)
+app.include_router(storage_spaces_router)
+app.include_router(catalog_router)
+app.add_exception_handler(CatalogError, catalog_error_handler)
+app.add_exception_handler(StorageSpaceError, storage_space_error_handler)
 
 
 @app.get("/health")
@@ -15,7 +26,14 @@ async def health() -> dict[str, str]:
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Preserve the 422 detail list without echoing passwords or raw input."""
+    """Use business validation errors for business routes while preserving authentication errors."""
+    if any(request.url.path == prefix or request.url.path.startswith(prefix + "/")
+           for prefix in ("/api/v1/storage-spaces", "/api/v1/item-categories", "/api/v1/item-definitions")):
+        return JSONResponse(status_code=422, content={"detail": {
+            "code": "VALIDATION_ERROR",
+            "message": "Invalid request parameters",
+            "errors": [{"loc": error["loc"], "msg": error["msg"]} for error in exc.errors()],
+        }})
     return JSONResponse(
         status_code=422,
         content={"detail": [
