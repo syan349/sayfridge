@@ -112,6 +112,7 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('storage_space_id', sa.UUID(), nullable=False),
     sa.Column('item_definition_id', sa.UUID(), nullable=False),
+    sa.Column('notes', sa.Text(), nullable=True),
     sa.Column('purchase_date', sa.Date(), nullable=True),
     sa.Column('expiry_date', sa.Date(), nullable=True),
     sa.Column('status', sa.String(length=16), server_default='IN_STOCK', nullable=False),

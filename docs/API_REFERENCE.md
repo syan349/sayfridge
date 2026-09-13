@@ -1,6 +1,6 @@
-# SayFridge API Reference: B01–B06
+# SayFridge API Reference: B01–B09
 
-Implemented authentication, storage-space, category, and item-definition contracts.
+Implemented authentication, storage-space, catalog, and inventory contracts.
 For setup, see the [backend README](../backend/README.md). For implementation and
 locking rules, see the [design handbook](BACKEND_DESIGN.md). Test commands, CI
 selection, and acceptance evidence are in the [test index](testing/README.md).
@@ -17,7 +17,8 @@ For manual requests, see the [Postman guide](testing/POSTMAN_GUIDE.md).
   Deleted, SUSPENDED, or DISABLED accounts cannot use an otherwise valid token.
 - IDs are UUIDs. Invalid IDs or request parameters return 422.
 - Create/PATCH schemas reject extra fields. List queries reject unknown parameters.
-- PATCH changes only submitted fields; empty objects and explicit nulls return 422.
+- PATCH changes only submitted fields; empty changes return 422. Explicit null is
+  accepted only for inventory dates and notes; other fields reject it.
   Failed writes are atomic. Unchanged edits preserve `updated_at`.
 - Archive/restore accept no body, including no `{}` or JSON null.
 - Creation is not idempotent. Valid repeated archive/restore requests preserve timestamps.
@@ -26,7 +27,7 @@ For manual requests, see the [Postman guide](testing/POSTMAN_GUIDE.md).
 
 ### Pagination
 
-All three list endpoints accept `status=ACTIVE|ARCHIVED|ALL` (default ACTIVE),
+Space/category/definition list endpoints accept `status=ACTIVE|ARCHIVED|ALL` (default ACTIVE),
 `page` (integer ≥1, default 1), and `page_size` (1–100, default 20).
 
 ```json
@@ -57,7 +58,7 @@ Business errors use:
 
 Business validation may include `detail.errors`, with `loc` and `msg` for each
 invalid field. Codes: `NOT_FOUND`, `NAME_CONFLICT`, `STATE_CONFLICT`,
-`RESOURCE_CHANGED`, and `VALIDATION_ERROR`. Error messages depend on the resource.
+`RESOURCE_CHANGED`, `VERSION_CONFLICT`, `VERSION_LIMIT_REACHED`, and `VALIDATION_ERROR`. Error messages depend on the resource.
 Authentication failures on business endpoints retain the authentication format.
 
 ## 2. Authentication — B01–B03
@@ -263,3 +264,93 @@ preserve inventory and reserve the name. Repeated archival leaves timestamps unc
 **200**, Definition response with ACTIVE status. The current category must be
 ACTIVE, even when the definition is already active; otherwise **409 / STATE_CONFLICT**.
 A valid repeated restore leaves timestamps unchanged.
+
+
+## 6. Inventory — B07–B09
+
+Inventory requires nullable `inventory_item.notes` in the current table structure.
+See the backend README for development database synchronization; Neon is unchanged.
+
+### Inventory response and shared rules
+
+| Fields | Meaning |
+| --- | --- |
+| id, storage_space_id, item_definition_id | UUID identifiers |
+| storage_space_name, item_definition_name, category_id, category_name | Current associated names/category, not historical snapshots |
+| purchase_date, expiry_date, notes | Nullable YYYY-MM-DD dates; nullable notes |
+| status, version | IN_STOCK/EMPTY/DISCARDED/ARCHIVED; positive integer version |
+| initial_amount, initial_unit | Original stock facts |
+| confirmed_current_amount, confirmed_current_unit, confirmed_at | Confirmed balance and timezone-aware timestamp |
+| estimated_current_amount, estimated_current_unit, estimated_at | Estimate trio, all nullable |
+| display_amount, display_unit, is_estimated | Use a non-null estimate, including zero; otherwise confirmed balance |
+| created_at, updated_at | Timezone-aware timestamps |
+
+Amounts are decimal strings. Only the space owner can read/write inventory;
+foreign and missing item IDs return identical 404 / NOT_FOUND. Archived associated
+spaces/definitions/categories do not hide existing stock or prevent metadata edits.
+No owner IDs are returned. These APIs do not create operation history.
+
+### GET /inventory-items — B07
+
+**200**, paginated Inventory responses. Read-only; count/items share one snapshot.
+Sort by expiry_date ascending, NULLS LAST, then UUID ascending.
+
+| Parameter | Default / meaning |
+| --- | --- |
+| status | IN_STOCK; also EMPTY, DISCARDED, ARCHIVED, ALL |
+| page, page_size | 1 and 20; page ≥1, page_size 1–100 |
+| q | Empty; trimmed literal case-insensitive substring of item definition name, at most 100 characters |
+| storage_space_id, category_id | Optional UUID filters; inaccessible/nonexistent matches yield empty results |
+| purchase_from, purchase_to | Optional inclusive YYYY-MM-DD boundaries |
+| expiry_from, expiry_to | Optional inclusive YYYY-MM-DD boundaries |
+
+Reversed date ranges return 422. Date filters exclude NULL dates. List defaults
+filter inventory state only, not associated resource states.
+
+### GET /inventory-items/{id} — B07
+
+**200**, Inventory response in any inventory state. Read-only.
+
+### POST /inventory-items — B08
+
+```json
+{"storage_space_id":"<space UUID>","item_definition_id":"<definition UUID>","amount":"2.5","unit":"kg"}
+```
+
+Required fields above; optional purchase_date, expiry_date, notes (≤1,000 characters).
+Amount must be a positive ordinary decimal string with at most three decimal places,
+at most 999999999.999; numeric JSON values, exponents, and nonfinite values are rejected.
+Units are trimmed, 1–16 characters, and casefolded; the stored result must fit 16
+characters. g/kg/ml/l symbols are canonicalized by casing; no word aliases or count
+unit equivalences are inferred. Other literal units remain distinct. Dates must
+use YYYY-MM-DD. Expired stock and purchase dates after expiry are allowed.
+
+**201**, Inventory response. Space must be owned/ACTIVE; definition must be visible
+(public or owned private) and ACTIVE; its category must be ACTIVE. Missing/foreign
+associations return 404; archived associations return 409 / STATE_CONFLICT.
+
+Insert one IN_STOCK row: initial and confirmed amounts/units equal validated input,
+confirmed_at is server time, estimates are NULL, version is 1. No ADD event is created.
+State checks coordinate with concurrent archival. Relationship changes during lock
+acquisition return 409 / RESOURCE_CHANGED. Creation has no idempotency guarantee.
+
+### PATCH /inventory-items/{id} — B09
+
+```json
+{"expected_version":1,"notes":"Opened today"}
+```
+
+Required expected_version: integer 1–2147483647. Supply at least one of
+storage_space_id, purchase_date, expiry_date, notes. Null clears dates/notes only.
+Definition ID, quantities, states, and timestamps cannot be changed here.
+
+**200**, Inventory response. Only IN_STOCK/EMPTY may be edited; terminal states
+return 409 / STATE_CONFLICT. A move needs an owned ACTIVE destination (404/409).
+EMPTY stock can move out of an archived space. Version mismatch returns
+409 / VERSION_CONFLICT, including otherwise unchanged requests.
+
+Apply actual changes together and increment version once. Unchanged requests
+preserve version/timestamps. A change at the maximum version returns
+409 / VERSION_LIMIT_REACHED. Location changes during lock acquisition return
+409 / RESOURCE_CHANGED. Preserve all quantity/confirmation/estimate fields and
+initial facts; write no metadata/move event. After conflicts, reload before retrying.

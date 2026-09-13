@@ -1,6 +1,6 @@
 # SayFridge Backend
 
-The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and Alembic migrations. Inventory CRUD, Agent, and Worker features have not been implemented yet.
+The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, and metadata/location editing are implemented. Quantity operations, inventory disposal/archival, Agent, and Worker features remain planned.
 
 ## Requirements
 
@@ -28,6 +28,7 @@ Once the server starts, the following endpoints are available:
 - Space archive/restore: `POST http://127.0.0.1:8000/api/v1/storage-spaces/{id}/archive` or `/restore`
 - Categories: `GET http://127.0.0.1:8000/api/v1/item-categories`
 - Item definitions: `GET/POST http://127.0.0.1:8000/api/v1/item-definitions`; detail/PATCH and archive/restore under `/{id}`
+- Inventory: `GET/POST http://127.0.0.1:8000/api/v1/inventory-items`; detail/PATCH under `/{id}`
 - API documentation: `http://127.0.0.1:8000/docs`
 
 ## Authentication settings
@@ -37,7 +38,7 @@ Once the server starts, the following endpoints are available:
 
 Authentication supports local email/password accounts and short-lived Bearer access tokens. Refresh tokens, server-side sessions, logout, third-party login, email verification, password recovery, and MFA are not currently available.
 
-## Database configuration and migrations
+## Development database setup
 
 Copy `.env.example` to `.env` and enter real connection details only in the local file:
 
@@ -46,18 +47,19 @@ Copy `.env.example` to `.env` and enter real connection details only in the loca
 
 Both URLs must use the `postgresql+psycopg://` prefix. Git ignores `.env`; never put real connection strings or passwords in code, migrations, or documentation.
 
-```powershell
-# Show the current migration revision
-alembic current
+Before the first backend release, maintain the latest table definition, ORM,
+and API contracts together; record structural changes in the design handbook.
+Incremental migration histories and deployment rollback procedures are not required.
+The existing Alembic initial script is retained as the fresh-database initializer:
 
-# Apply all migrations
-alembic upgrade head
-
-# Check for model/database differences not yet covered by migrations
-alembic check
+```bash
+python -m alembic upgrade head
 ```
 
-The initial migration creates the eight tables specified in the design document. Subsequent model changes must include a new migration committed alongside the code. Do not manually change tables in the Neon SQL Editor.
+This command initializes a fresh database/schema. Editing the initial script does
+not update an already initialized database. Existing development databases must
+be synchronized explicitly; do not assume the command reapplies the definition.
+
 
 ## Tests
 
@@ -65,7 +67,7 @@ The initial migration creates the eight tables specified in the design document.
 python -m pytest
 ```
 
-## B01–B06 local startup and Postman
+## B01–B09 local startup and Postman
 
 On macOS / Linux, create an environment with Python 3.11 from the `backend` directory. Skip environment creation if `.venv` already exists:
 
@@ -148,3 +150,30 @@ Run B04 tests alone with:
 ```bash
 python -m pytest tests/test_storage_spaces_api.py tests/test_storage_spaces_postgres.py -v
 ```
+
+
+## Inventory setup and verification
+
+Inventory uses nullable TEXT `inventory_item.notes`, included in the latest initial
+schema and ORM. Existing development databases that lack this column need a
+one-time schema synchronization, for example:
+
+```sql
+ALTER TABLE inventory_item ADD COLUMN IF NOT EXISTS notes TEXT;
+```
+
+This change has not been executed against Neon. No separate notes migration script
+or versioned upgrade/downgrade workflow is required during this development phase.
+
+The inventory routes use `app/schemas/inventory.py` and `app/services/inventory.py`.
+An owned active space and visible active definition/category must exist before
+stock entry. No shared seed data is inserted automatically.
+
+Run inventory tests alone with:
+
+```bash
+python -m pytest -v tests/test_inventory_api.py tests/test_inventory_postgres.py
+```
+
+These tests use the existing isolated test database configuration and initialize the latest structure
+within disposable test schemas. They do not need Uvicorn running.
