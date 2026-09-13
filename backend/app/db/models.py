@@ -25,7 +25,7 @@ from app.db.base import Base
 
 
 def uuid_primary_key() -> Mapped[uuid.UUID]:
-    """UUID 在 Python 侧生成，避免依赖数据库扩展。"""
+    """Generate UUIDs in Python to avoid requiring database extensions."""
 
     return mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -92,7 +92,7 @@ class StorageSpace(Base):
         ),
         CheckConstraint("status IN ('ACTIVE', 'ARCHIVED')", name="status_allowed"),
         Index("ix_storage_space_user_status", "user_id", "status"),
-        # 只限制活动空间名；归档后允许用户重新使用相同名称。
+        # Enforce unique names only for active spaces; allow names to be reused after archival.
         Index(
             "uq_storage_space_active_user_name",
             "user_id",
@@ -148,7 +148,7 @@ class ItemDefinition(Base):
     __tablename__ = "item_definition"
     __table_args__ = (
         CheckConstraint("status IN ('ACTIVE', 'ARCHIVED')", name="status_allowed"),
-        # PostgreSQL 的部分唯一索引分别约束公共词典和每个用户的私有词典。
+        # Separate PostgreSQL partial unique indexes constrain the public dictionary and each user's private dictionary.
         Index(
             "uq_item_definition_public_name",
             "normalized_name",
@@ -231,6 +231,7 @@ class InventoryItem(Base):
         ForeignKey("item_definition.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    notes: Mapped[str | None] = mapped_column(Text)
     purchase_date: Mapped[date | None] = mapped_column(Date)
     expiry_date: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(

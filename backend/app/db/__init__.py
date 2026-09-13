@@ -1,1 +1,1 @@
-"""数据库基础设施与模型。"""
+"""Database infrastructure and models."""

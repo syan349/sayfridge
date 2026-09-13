@@ -1,0 +1,126 @@
+"""Inventory query, stock entry, metadata, and public response contracts."""
+import re
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Annotated, Literal
+from uuid import UUID
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, field_validator, model_validator
+
+InventoryStatus = Literal["IN_STOCK", "EMPTY", "DISCARDED", "ARCHIVED"]
+Notes = Annotated[str, StringConstraints(max_length=1000)]
+
+
+def _calendar_date(value):
+    if type(value) is date or (isinstance(value, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value)):
+        return value
+    raise ValueError("Date must use YYYY-MM-DD")
+
+
+CalendarDate = Annotated[date, BeforeValidator(_calendar_date)]
+
+
+class InventoryCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    storage_space_id: UUID
+    item_definition_id: UUID
+    amount: str
+    unit: str
+    purchase_date: CalendarDate | None = None
+    expiry_date: CalendarDate | None = None
+    notes: Notes | None = None
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, value: str) -> str:
+        if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,3})?", value):
+            raise ValueError("Amount must be a decimal string with at most three decimal places")
+        if not Decimal("0") < Decimal(value) <= Decimal("999999999.999"):
+            raise ValueError("Amount must be positive and at most 999999999.999")
+        return value
+
+    @field_validator("unit")
+    @classmethod
+    def normalize_unit(cls, value: str) -> str:
+        value = value.strip()
+        if not 1 <= len(value) <= 16:
+            raise ValueError("Unit must contain 1 to 16 characters after trimming")
+        # Normalize symbol casing without guessing aliases or count-unit equivalence.
+        value = value.casefold()
+        if len(value) > 16:
+            raise ValueError("Normalized unit must contain at most 16 characters")
+        return value
+
+
+class InventoryUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=1, le=2147483647, strict=True)
+    storage_space_id: UUID | None = None
+    purchase_date: CalendarDate | None = None
+    expiry_date: CalendarDate | None = None
+    notes: Notes | None = None
+
+    @model_validator(mode="after")
+    def validate_changes(self):
+        if not self.model_fields_set - {"expected_version"}:
+            raise ValueError("Provide at least one metadata or location field")
+        if "storage_space_id" in self.model_fields_set and self.storage_space_id is None:
+            raise ValueError("Storage space must not be null")
+        return self
+
+
+class InventoryListQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["IN_STOCK", "EMPTY", "DISCARDED", "ARCHIVED", "ALL"] = "IN_STOCK"
+    q: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] = ""
+    storage_space_id: UUID | None = None
+    category_id: UUID | None = None
+    purchase_from: CalendarDate | None = None
+    purchase_to: CalendarDate | None = None
+    expiry_from: CalendarDate | None = None
+    expiry_to: CalendarDate | None = None
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def validate_ranges(self):
+        for prefix in ("purchase", "expiry"):
+            start, end = getattr(self, prefix + "_from"), getattr(self, prefix + "_to")
+            if start is not None and end is not None and start > end:
+                raise ValueError("Date range start must not follow its end")
+        return self
+
+
+class InventoryItemRead(BaseModel):
+    id: UUID
+    storage_space_id: UUID
+    storage_space_name: str
+    item_definition_id: UUID
+    item_definition_name: str
+    category_id: UUID
+    category_name: str
+    purchase_date: date | None
+    expiry_date: date | None
+    notes: str | None
+    status: InventoryStatus
+    initial_amount: Decimal
+    initial_unit: str
+    confirmed_current_amount: Decimal
+    confirmed_current_unit: str
+    confirmed_at: datetime
+    estimated_current_amount: Decimal | None
+    estimated_current_unit: str | None
+    estimated_at: datetime | None
+    display_amount: Decimal
+    display_unit: str
+    is_estimated: bool
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class InventoryPage(BaseModel):
+    items: list[InventoryItemRead]
+    total: int
+    page: int
+    page_size: int

@@ -1,3 +1,3 @@
-SayFridge 单数据库迁移目录。
+Single-database migration directory for SayFridge.
 
-迁移命令从 backend/.env 读取 DATABASE_URL_DIRECT；应用运行时另用 DATABASE_URL。
+Migrations read DATABASE_URL_DIRECT from backend/.env; the application uses DATABASE_URL at runtime.

@@ -42,6 +42,7 @@ def test_expired_access_token_is_rejected() -> None:
         decode_access_token(token, TEST_SECRET)
 
 
+@pytest.mark.ci
 def test_forged_access_token_is_rejected() -> None:
     token = create_access_token(uuid.uuid4(), TEST_SECRET, 15)
 
