@@ -36,6 +36,7 @@ A collection file is not required; requests can be created manually.
 | B01–B03 | Register → login → current user; verify identity and absence of password hash; check duplicate registration, wrong password, invalid input, and missing/expired token |
 | B04 | Create → list → detail → PATCH → archive → restore; check ownership, invalid input, duplicate active name, and unchanged retries |
 | B05–B06 | List categories → save an ACTIVE category_id → create private definition → save definition_id → list/filter → detail → rename → archive → restore; check name conflicts and foreign access |
+| B07–B09 | Use an owned active space and visible active definition → create stock → list/filter → detail → PATCH with expected_version; check stale versions, foreign IDs, and invalid amounts |
 
 Use the API reference for exact status codes and database effects. B05 requires
 categories populated through an approved initialization process; it has no write

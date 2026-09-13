@@ -72,3 +72,16 @@ Stock-creation and movement APIs are outside B04. Their future implementations
 must take the same space row lock and recheck ACTIVE state before adding stock,
 as described in section 7 of the design handbook. The B04 lock test exercises
 this coordination with a controlled real database writer.
+
+
+### Historical B04 selection verification (2026-09-13)
+
+- `pytest --collect-only -q -m ci --strict-markers`: 22 selected, 93 deselected.
+- `pytest --collect-only -q --strict-markers`: all 115 scenarios collected.
+- Core execution on macOS/Python 3.11.16 with disposable PostgreSQL 18:
+  **22 passed, 93 deselected in 3.15 seconds**.
+- Workflow YAML parsed and automatic/manual conditions, triggers, and `test-job`
+  name checked. No remote workflow was triggered by this change.
+- The previous full-suite run passed all 115 in 20.02 seconds; it predates the
+  marker-only selection change. The two timings are local observations, not a
+  controlled benchmark or a prediction of total GitHub Actions duration.

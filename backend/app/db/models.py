@@ -231,6 +231,7 @@ class InventoryItem(Base):
         ForeignKey("item_definition.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    notes: Mapped[str | None] = mapped_column(Text)
     purchase_date: Mapped[date | None] = mapped_column(Date)
     expiry_date: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(

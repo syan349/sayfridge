@@ -15,7 +15,7 @@ Start with section 1 for scope. Use section 4 when implementing an endpoint, sec
 - [5. Quantity calculations and records](#5-quantity-calculations-and-records)
 - [6. State and relationship rules](#6-state-and-relationship-rules)
 - [7. Transactions, versions, and repeated requests](#7-transactions-versions-and-repeated-requests)
-- [8. File responsibilities and database migrations](#8-file-responsibilities-and-database-migrations)
+- [8. File responsibilities and database structure](#8-file-responsibilities-and-database-structure)
 - [9. Implementation order and acceptance](#9-implementation-order-and-acceptance)
 - [10. Questions for the project owner](#10-questions-for-the-project-owner)
 - [11. GitHub work package mapping](#11-github-work-package-mapping)
@@ -34,7 +34,7 @@ Implement the backend flow of logging in, managing spaces and item definitions, 
 - Correcting an inventory item's definition association, restoring discarded or archived inventory, physical deletion, merging batches, and recording partial disposal. Space and catalog restoration endpoints remain in scope.
 - Frontend page implementation belongs to the Web and Flutter modules. The backend must support contract agreement and integration with both.
 
-These exclusions apply to the current phase; they do not permanently remove features from the project. Backend delivery includes code, related tests, the notes migration, API documentation, and cloud deployment preparation. Overall project delivery must also include actual cloud deployment and verification. Deployment can be staged but cannot be excluded indefinitely. The previous instruction to pause testing no longer applies to formal development; see section 9 for environment and acceptance rules.
+These exclusions apply to the current phase; they do not permanently remove features from the project. Backend delivery includes code, related tests, the notes field, API documentation, and cloud deployment preparation. Overall project delivery must also include actual cloud deployment and verification. Deployment can be staged but cannot be excluded indefinitely. The previous instruction to pause testing no longer applies to formal development; see section 9 for environment and acceptance rules.
 
 ### 1.3 Agreed design choices
 
@@ -61,12 +61,12 @@ The three source documents are archived in `archive/backend-design-2026-09-11/` 
 | [Quantity design](QUANTITY_STATE_DESIGN.md) | Confirmed quantities, estimates, reconciliation, and history goals | Define quantity updates; explicitly identify the reduced history scope |
 | [Architecture](ARCHITECTURE.md) | Frontend, backend, and Agent boundaries | FastAPI performs all business writes |
 | [Database models](../backend/app/db/models.py) | ORM fields and constraints for eight tables | Evidence of local structure, not proof of remote migration |
-| [Initial migration](../backend/migrations/versions/02ec95582dc7_create_initial_eight_tables.py) | Revision `02ec95582dc7`, creating eight tables | Add the notes migration after it; recheck the migration head during implementation |
+| [Initial table definition](../backend/migrations/versions/create_initial_tables.py) | Revision `02ec95582dc7`, creating eight tables | Maintain the latest initial table definition, including notes |
 | [Database session](../backend/app/db/session.py) | Request-scoped AsyncSession | Supplies sessions without automatically committing business transactions |
 | [Application entry point](../backend/app/main.py) | Registers authentication, storage-space and catalog routes, and health check | Register remaining business route groups when implemented |
 | [Authentication dependencies](../backend/app/api/dependencies.py) | Validates tokens and reads current user state | Reuse identity checks and add an administrator dependency |
 | [Authentication routes](../backend/app/api/routes/auth.py), [schemas](../backend/app/schemas/auth.py), and [service](../backend/app/services/auth.py) | Registration, login, and current-user endpoints already exist | Preserve compatibility and add password change |
-| [Backend README](../backend/README.md) | Current startup and verification instructions | Update implemented capabilities and migration instructions after implementation |
+| [Backend README](../backend/README.md) | Current startup and verification instructions | Update implemented capabilities and database setup instructions |
 
 At the time of consolidation, health, registration, login, and current-user endpoints existed. Inventory business routes and `inventory_item.notes` did not. Code and migration files describe local structure; they do not prove that a remote database has been migrated or that business tests have passed.
 
@@ -89,7 +89,7 @@ Frontend request
   → Response model: expose only permitted fields
 ```
 
-Routes handle HTTP parameters, dependencies, response models, and error translation. Put database queries and business rules in feature services, including simple reads, so modules follow the same structure as authentication. Services own write transactions, multi-table writes, quantity calculations, idempotency, and batches. More APIs do not necessarily require more tables. Updating data requires no migration; adding fields requires matching model and migration changes.
+Routes handle HTTP parameters, dependencies, response models, and error translation. Put database queries and business rules in feature services, including simple reads, so modules follow the same structure as authentication. Services own write transactions, multi-table writes, quantity calculations, idempotency, and batches. More APIs do not necessarily require more tables. Updating data requires no migration; adding fields requires matching model, table definition, and API updates.
 
 ### 2.1 Tables and business ownership
 
@@ -124,7 +124,7 @@ Frontends and the Agent perform business writes through FastAPI, not directly ag
 
 ### 2.3 Cloud deployment and protocol choice
 
-This phase starts with one FastAPI service and PostgreSQL. Web and Flutter access the same API over HTTPS through a cloud ingress or reverse proxy, which forwards to FastAPI and then the database. Retain the existing Neon pooled runtime connection and direct migration connection. This is the target deployment structure; application hosting has not yet been selected or provisioned.
+This phase starts with one FastAPI service and PostgreSQL. Web and Flutter access the same API over HTTPS through a cloud ingress or reverse proxy, which forwards to FastAPI and then the database. Retain the existing Neon pooled runtime connection and direct database administration connection. This is the target deployment structure; application hosting has not yet been selected or provisioned.
 
 ```text
 Web / Flutter
@@ -153,7 +153,7 @@ p95 means 95% of requests complete within that duration. These are targets to ve
 
 Measure API latency, errors, database connections, query time, and lock waits before optimizing. For slow queries, inspect execution plans, indexes, and pagination. For connection pressure, adjust per-instance limits so instance count times connection budget stays within database capacity. Consider more application instances when application CPU saturates. Current per-space serialization prioritizes correctness; if it becomes a bottleneck, review lock granularity and rerun consistency tests.
 
-Do not add caches or change indexes preemptively. If measurements justify schema changes, update this handbook, the ORM, and the incremental migration plan, explaining why they exceed the current notes-only schema change.
+Do not add caches or change indexes preemptively. If measurements justify schema changes, update this handbook, the ORM, and the current table definition, explaining why they exceed the current notes-only schema change.
 
 ## 3. Common API contracts
 
@@ -332,6 +332,17 @@ All authenticated users can read public definitions. Only the owner can read and
 - **History and retries:** none; archived category 409, including repeated restore of an already ACTIVE definition; valid repeated requests return current state.
 
 ### 4.4 Inventory and batch management
+
+B07–B09 list/detail, stock creation, and metadata/location PATCH are implemented in
+`app/api/routes/inventory.py`, `app/schemas/inventory.py`, and
+`app/services/inventory.py`. The initial table definition includes nullable notes. Batch endpoints,
+quantity operations, and inventory state-action endpoints remain planned. See the
+[API contract](API_REFERENCE.md#6-inventory--b07b09). Shared Neon schema synchronization and manual
+acceptance remain separate deployment steps.
+
+Stock entry stores trimmed/casefolded units (1–16 characters before and after
+normalization), with no inferred word aliases. Section 10.2 still concerns original
+unit text in future operation records; no operation record is written here.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
@@ -613,7 +624,7 @@ Verify quantities, versions, locks, and rollback with isolated PostgreSQL, not o
 
 Only one of two different modifications with the same version may succeed; concurrent identical idempotent requests apply once. Space archival racing against stock creation, moves, or EMPTY restoration must not leave invalid state. Verify whole-transaction rollback for mid-batch failure and failure between quantity update and operation insertion. Deliver these tests with the relevant APIs and rerun them after performance tuning or adding instances.
 
-## 8. File responsibilities and database migrations
+## 8. File responsibilities and database structure
 
 ### 8.1 File list
 
@@ -630,7 +641,7 @@ Paths below are relative to `backend/` unless explicitly identified as repositor
 | Add (B04 implemented) | `app/services/storage_spaces.py` | Space queries, ownership, names, state changes, and transactions | storage_space; read inventory_item for archival |
 | Add (B05–B06 implemented) | `app/services/catalog.py` | Category/definition queries, writes, states, names | item_category, item_definition |
 | Add | `app/services/inventory.py` | Pure quantity calculations, inventory writes, versions, idempotency, batch transactions | inventory_item, inventory_operation; lock/check related spaces/catalog |
-| Add | `migrations/versions/<revision>_add_inventory_notes.py` | Add nullable TEXT notes to inventory_item only | Schema change only |
+| Update | `migrations/versions/create_initial_tables.py` | Include nullable TEXT notes in the latest initial table definition | Fresh database initialization |
 | Add | Repository-root `docs/API_REFERENCE.md` | Implemented frontend contracts, examples, and verification status | No database access |
 | Modify | `app/main.py` | Register five route groups, CORS, and new business error handling | No direct business writes |
 | Modify | `app/api/dependencies.py` | require_admin, reusing current-user lookup | user |
@@ -646,7 +657,7 @@ Additional file responsibilities do not add product APIs or tables:
 | `backend/tests/` | Reuse authentication tests and add business-rule, API, PostgreSQL integration, and concurrency tests. Use a repeatable team-selected tool/script for performance tests |
 | `.github/workflows/` | Backend checks, isolated database tests, and dependency checks in the course repository; trigger on PRs or agreed events |
 | Actual deployment configuration path | Record once hosting is selected; include startup, environment variable names, HTTPS, connection budgets, and logs, without real secrets |
-| `backend/README.md` | Update local startup, testing, deployment, migration, initialization, and rollback instructions; link this handbook |
+| `backend/README.md` | Update local startup, testing, development database setup and initialization instructions; link this handbook |
 
 ### 8.2 Code organization
 
@@ -682,7 +693,7 @@ async def preview_operation(...):
     """Calculate the resulting quantity without changing inventory or history."""
 ```
 
-### 8.4 Notes migration
+### 8.4 Notes field
 
 | Topic | Plan |
 | --- | --- |
@@ -693,12 +704,20 @@ async def preview_operation(...):
 | API limits | At most 1,000 characters; explicit null in PATCH clears it |
 | Affected APIs | Single/batch creation and inventory PATCH write it; lists, details, and other InventoryItemRead responses return it |
 | ORM | Add only the notes mapping to InventoryItem |
-| Migration | New revision adds the column; downgrade removes it. Removal loses notes and needs separate rollback assessment |
-| Timing | Implement model/migration after agreement; confirm target database before execution; deploy dependent code only after the column exists |
+| Development approach | Update the initial table definition and ORM; do not add an incremental notes migration |
+| Timing | Synchronize the development database structure before using notes-dependent APIs |
 
-During development, run and verify migrations in an explicitly isolated test database. Prepare shared/deployed database migrations under section 9.5. Editing this document runs no migration. Changing the ORM alone does not add a database field. Confirm migration head and target environment before deployment without reading out or exposing connection secrets.
+Before the first backend release, maintain the latest database definition, ORM,
+and API documentation together. Record table/column changes here, without a
+versioned migration or rollback workflow. Existing Alembic infrastructure is used
+only to initialize fresh development/test schemas. Updating the initial script
+will not change databases that already ran it; synchronize those explicitly.
+This document does not authorize deletion or rebuilding of shared data.
 
-Add an incremental migration; do not edit the initial eight-table migration. Add no tables, change no inventory_operation fields/types/constraints, and add no push fields, token versions, idempotency tables, or audit tables. The current initial revision is 02ec95582dc7; recheck the actual head during implementation.
+Current change: add nullable TEXT `inventory_item.notes`; existing rows have NULL
+notes. Add no tables and change no inventory_operation fields or constraints.
+The initial schema file is editable in this pre-release phase. Migration lifecycle
+planning is deferred until the backend is released.
 
 ## 9. Implementation order and acceptance
 
@@ -708,12 +727,12 @@ Testing begins in the first stage and grows with each endpoint. CI, deployment p
 
 | Order | Work | Completion condition |
 | --- | --- | --- |
-| 1 | Test foundations, request models, notes migration | Existing authentication tests are repeatable; isolated PostgreSQL works; notes upgrade/downgrade verified; CI foundations established |
+| 1 | Test foundations, request models, notes field | Existing authentication tests are repeatable; isolated PostgreSQL works; notes storage verified in a fresh schema; CI foundations established |
 | 2 | Spaces and catalog | Ownership, names, states, archival/restoration implemented; related API and database tests pass |
 | 3 | Inventory and quantities | Calculations, versions, idempotency, batches, and queries implemented; rollback/concurrency verified with endpoints; performance baseline begins |
 | 4 | Administration and password change | Permissions, account states, and password behavior implemented; success/rejection tests pass |
 | 5 | Frontend integration and security checks | Documentation matches implementation; key Web/Android/iOS flows have verification records; applicable risks addressed or explicitly outstanding |
-| 6 | Cloud deployment and overall verification | Reproducible migration, startup, initialization, HTTPS, and CORS settings; deployed version passes smoke/performance checks with retained results |
+| 6 | Cloud deployment and overall verification | Reproducible database setup, startup, initialization, HTTPS, and CORS settings; deployed version passes smoke/performance checks with retained results |
 
 The project owner supplies section 10 decisions. Work independent of undecided fields may proceed, but an unresolved contract cannot be marked complete.
 
@@ -721,19 +740,19 @@ The project owner supplies section 10 decisions. Work independent of undecided f
 
 This handbook owns design rules. `docs/API_REFERENCE.md` documents implemented requests, responses, and usage examples; do not duplicate design decisions or open-question lists there. Update this handbook when design changes.
 
-The API reference must describe purpose and permissions in English, request/response fields, defaults, enumerations, and error codes. Include examples for login, space creation, item selection, stock entry, preview, consumption, reconciliation, and history. Explain version conflicts, retries, and expiry dates. Link to the backend README for startup/migrations, the Postman guide for client setup, and the test index for actual verification status. Follow the file responsibilities in section 8.
+The API reference must describe purpose and permissions in English, request/response fields, defaults, enumerations, and error codes. Include examples for login, space creation, item selection, stock entry, preview, consumption, reconciliation, and history. Explain version conflicts, retries, and expiry dates. Link to the backend README for startup/database setup, the Postman guide for client setup, and the test index for actual verification status. Follow the file responsibilities in section 8.
 
 Use FastAPI's built-in /docs, /redoc, and /openapi.json; add no documentation-export script.
 
 ### 9.3 Continuous testing and CI
 
-Formal development permits and requires relevant tests, isolated test database creation, and migrations. Do not run destructive tests on real user data or shared deployment databases. Run relevant checks per change and agreed backend checks before merging. Do not mechanically add tests for documentation or low-risk changes.
+Formal development permits and requires relevant tests, isolated test database creation, and current-schema initialization. Do not run destructive tests on real user data or shared deployment databases. Run relevant checks per change and agreed backend checks before merging. Do not mechanically add tests for documentation or low-risk changes.
 
 | Test level | Content and timing |
 | --- | --- |
 | Unit tests | Quantity calculations, units/precision, state decisions, passwords, tokens; alongside rule implementation |
 | API tests | Requests/responses, authentication, validation errors, pagination, denied access; alongside endpoints |
-| PostgreSQL integration and concurrency | Real constraints, migrations, transaction rollback, version races, idempotency; alongside database writes, not replaced by fake objects |
+| PostgreSQL integration and concurrency | Real constraints, schema initialization, transaction rollback, version races, idempotency; alongside database writes, not replaced by fake objects |
 | Frontend/device integration | Collaborate on login, stock entry, consumption, reconciliation, history, expired tokens, and errors. Flutter uses Android/iOS devices or simulators and records environments |
 | Performance | Section 2.4 data/load/targets for queries, quantity writes, and hotspots; start once key flows work and repeat after optimization |
 | Deployment verification | Check service, database reads, protected endpoints, and complete business flows after deployment. A passing /health does not prove database/business health |
@@ -752,7 +771,7 @@ Key business checks:
 6. If batch item N fails, items 1 through N-1 are not persisted; duplicate IDs are rejected.
 7. Rounding 1/3, tiny-fraction rejection, unit conversion, maximum values, and out-of-range results follow section 5.2; preview and submission agree.
 8. Archived catalog names stay reserved; state transitions, history visibility, and the three expiry buckets are correct.
-9. The notes migration adds only its intended column. Verify database revision, API output, and deployment status separately.
+9. The notes change adds only its intended column. Verify current table structure and API output.
 
 ### 9.4 Completion criteria for each API task
 
@@ -774,17 +793,21 @@ Add the following tasks to the existing GitHub Project and link dependencies to 
 | --- | --- |
 | Backend architecture and capacity | Confirm frontend scenarios, deployment structure, REST rationale, and initial load; record measurements, bottlenecks, and scaling options |
 | Security review | Check section 3.5 measures and record applicability, evidence, outstanding work, and reasons for exclusions |
-| Deployment and overall verification | Select hosting, migrations, and initialization; complete cloud deployment, frontend/device flows, and performance verification |
+| Deployment and overall verification | Select hosting and database initialization; complete cloud deployment, frontend/device flows, and performance verification |
 
-Before deployment, identify the target environment, application/database regions and specifications, connection budget, actual CORS origins, secret configuration method, and release version. Validate migrations in isolation first, then confirm target database state and backup/recovery procedures. Deploy notes-dependent code only after the column exists. Prepare administrators and public categories with repeatable, controlled initialization; do not automatically promote accounts while serving requests.
+For the course deployment, identify the target environment, regions, connection
+budget, actual CORS origins, secret configuration, and application version. Ensure
+the database matches the current table definition. Initialize administrators and
+public categories explicitly; do not promote accounts while serving requests.
+Record service URL, commit, and smoke results without credentials or private data.
+Pre-release work does not require incremental migration or rollback planning.
 
-After deployment, record service URL, commit, migration revision, and smoke results. Logs/screenshots must omit credentials and private user data. Prepare application rollback. A notes downgrade deletes data and is not a lossless default rollback. List unexecuted migrations, deployments, and tests explicitly. This document update does not start cloud services or access the target database.
 
 ### 9.6 Team collaboration and change records
 
 Use the course GitHub repository and Project board for tasks, assignments, and progress. Link each API task to test/review records; identify owners, collaborators, and dependencies for cross-API tasks. Hold at least one full-team meeting weekly, with minutes in the course GitHub Wiki or Project. Members should explain designs and code to one another to prepare for individual interviews about the whole system.
 
-The former blanket instruction against all commits/pushes no longer defines formal development. Use team branches and PRs to retain version-control evidence. This handbook does not authorize automatic commits/pushes during a documentation edit. Preserve scope documents and others' changes; do not modify real .env files, the initial migration, images, or unrelated code. Explain necessary changes to other design documents and synchronize affected rules. Completion reports identify actual changed paths, verification, and limits.
+The former blanket instruction against all commits/pushes no longer defines formal development. Use team branches and PRs to retain version-control evidence. This handbook does not authorize automatic commits/pushes during a documentation edit. Preserve scope documents and others' changes; do not modify real .env files, images, or unrelated code. Explain necessary changes to other design documents and synchronize affected rules. Completion reports identify actual changed paths, verification, and limits.
 
 ## 10. Questions for the project owner
 
