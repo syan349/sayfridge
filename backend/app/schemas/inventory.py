@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
+from app.core.quantity import MAX_QUANTITY
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
@@ -35,8 +36,8 @@ class InventoryCreate(BaseModel):
     def validate_amount(cls, value: str) -> str:
         if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,3})?", value):
             raise ValueError("Amount must be a decimal string with at most three decimal places")
-        if not Decimal("0") < Decimal(value) <= Decimal("999999999.999"):
-            raise ValueError("Amount must be positive and at most 999999999.999")
+        if not Decimal("0") < Decimal(value) <= MAX_QUANTITY:
+            raise ValueError(f"Amount must be positive and at most {MAX_QUANTITY}")
         return value
 
     @field_validator("unit")
