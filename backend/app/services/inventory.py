@@ -5,9 +5,13 @@ from uuid import UUID
 
 from sqlalchemy import func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
-from app.db.models import InventoryItem, ItemCategory, ItemDefinition, StorageSpace
+from app.db.models import InventoryItem, InventoryOperation, ItemCategory, ItemDefinition, StorageSpace
 from app.schemas.inventory import InventoryItemRead
+from app.schemas.inventory_operations import InventoryOperationRead, OperationResult
+from app.services.inventory_quantities import calculate_addition
+from app.core.quantity import QuantityError
 
 
 class InventoryError(Exception):
@@ -148,6 +152,127 @@ async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
         result = await get_inventory(session, item.id, user_id)
         await session.commit()
         return result
+    except Exception:
+        await session.rollback()
+        raise
+
+async def _load_inventory_for_addition(session:AsyncSession, item_id:UUID, user_id:UUID) -> tuple[InventoryItem, StorageSpace]:
+    inventory = await get_inventory(session, item_id, user_id)
+    space = await _space(session, inventory.storage_space_id, user_id)
+
+    locked_item = (await session.execute(select(InventoryItem).where(InventoryItem.id == item_id)
+        .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+
+    if locked_item is None:
+        raise InventoryError("NOT_FOUND", "Inventory item not found")
+    if locked_item.storage_space_id != space.id:
+        raise InventoryError("RESOURCE_CHANGED", "Inventory location changed; refresh and retry")
+
+    return (locked_item, space)
+
+
+def _validate_new_addition(item: InventoryItem, space: StorageSpace, expected_version: int) -> None:
+    if item.version != expected_version:
+        raise InventoryError("VERSION_CONFLICT", "Inventory has changed; refresh and retry")
+    if item.status not in {"IN_STOCK", "EMPTY"}:
+        raise InventoryError("STATE_CONFLICT", "Terminal inventory cannot receive additions")
+    if item.status == "EMPTY":
+        _active(space, "Storage space")
+    if item.version == 2147483647:
+        raise InventoryError("VERSION_LIMIT_REACHED", "Inventory version limit reached")
+
+
+async def _operation_by_key(session: AsyncSession, key: str) -> InventoryOperation | None:
+    return (await session.execute(select(InventoryOperation).where(
+        InventoryOperation.idempotency_key == key
+    ).execution_options(populate_existing=True))).scalar_one_or_none()
+
+
+async def _addition_replay(session, operation, item_id, user_id, quantity_value, quantity_unit):
+    # Compare literal business input, excluding expected_version. Never reapply a
+    # failed or undone historical record, and never expose its internal key.
+    if operation.status != "SUCCESS" or (
+        operation.inventory_item_id, operation.operation_type, operation.quantity_kind,
+        operation.quantity_value, operation.quantity_unit,
+    ) != (item_id, "ADD", "AMOUNT", quantity_value, quantity_unit):
+        raise InventoryError("IDEMPOTENCY_CONFLICT", "Key is already associated with a different request")
+    inventory = await get_inventory(session, item_id, user_id)
+    return OperationResult(operation=InventoryOperationRead.model_validate(operation),
+                           inventory=inventory, replayed=True)
+
+
+async def add_inventory(session: AsyncSession, item_id: UUID, user_id: UUID, *,
+                        expected_version: int, quantity_value: str, quantity_unit: str,
+                        idempotency_key: str) -> OperationResult:
+    """Apply one ADD atomically, or return its prior record and current inventory.
+
+    The route passes schema-validated input. Only this outer service commits or
+    rolls back. Database uniqueness also protects a key reused across spaces.
+    """
+    key = f"{user_id}:{idempotency_key}"
+    try:
+        try:
+            await get_inventory(session, item_id, user_id)
+            operation = await _operation_by_key(session, key)
+            if operation is not None:
+                result = await _addition_replay(session, operation, item_id, user_id,
+                                                quantity_value, quantity_unit)
+            else:
+                item, space = await _load_inventory_for_addition(session, item_id, user_id)
+                # A matching request may have committed while this request waited.
+                operation = await _operation_by_key(session, key)
+                if operation is not None:
+                    result = await _addition_replay(session, operation, item_id, user_id,
+                                                    quantity_value, quantity_unit)
+                else:
+                    _validate_new_addition(item, space, expected_version)
+                    calculation = calculate_addition(item, Decimal(quantity_value), quantity_unit)
+                    now = datetime.now(timezone.utc)
+                    if calculation.affects_state == "ESTIMATED":
+                        # An exact addition cannot turn the existing estimate into a confirmation.
+                        item.estimated_current_amount = calculation.amount
+                        item.estimated_current_unit = calculation.unit
+                        item.estimated_at = now
+                    else:
+                        item.confirmed_current_amount = calculation.amount
+                        item.confirmed_current_unit = calculation.unit
+                        item.confirmed_at = now
+                    item.status = "IN_STOCK"
+                    item.version += 1
+                    await session.flush()
+                    operation = InventoryOperation(
+                        inventory_item_id=item.id, operation_type="ADD", quantity_kind="AMOUNT",
+                        quantity_value=quantity_value, quantity_unit=quantity_unit,
+                        input_method="MANUAL", calculation_method=calculation.calculation_method,
+                        affects_state=calculation.affects_state,
+                        applied_change_amount=calculation.applied_change_amount,
+                        applied_change_unit=calculation.unit, status="SUCCESS", idempotency_key=key,
+                    )
+                    session.add(operation)
+                    await session.flush()
+                    result = OperationResult(operation=InventoryOperationRead.model_validate(operation),
+                                             inventory=await get_inventory(session, item.id, user_id),
+                                             replayed=False)
+            await session.commit()
+            return result
+        except IntegrityError as exc:
+            await session.rollback()
+            if not (getattr(exc.orig, "sqlstate", None) == "23505" and
+                    getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+                    == "uq_inventory_operation_idempotency_key"):
+                raise
+            # A different inventory/space may have claimed the same user-scoped key.
+            await get_inventory(session, item_id, user_id)
+            operation = await _operation_by_key(session, key)
+            if operation is None:
+                raise
+            result = await _addition_replay(session, operation, item_id, user_id,
+                                            quantity_value, quantity_unit)
+            await session.commit()
+            return result
+    except QuantityError as exc:
+        await session.rollback()
+        raise InventoryError(exc.code, str(exc)) from exc
     except Exception:
         await session.rollback()
         raise
