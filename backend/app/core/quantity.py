@@ -6,10 +6,18 @@ MAX_QUANTITY = Decimal("999999999.999")
 QUANTITY_PRECISION = Decimal("0.001")
 
 
+class QuantityError(ValueError):
+    """A calculation failure with a stable public business error code."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
 def validate_addition_amount(amount: Decimal) -> None:
     """Validate a parsed addition before conversion or rounding.
 
-    The future request schema must also validate the original decimal string;
+    The request schema also validates the original decimal string;
     Decimal alone cannot preserve every aspect of the client's input syntax.
     """
     if not isinstance(amount, Decimal) or not amount.is_finite():
@@ -17,7 +25,7 @@ def validate_addition_amount(amount: Decimal) -> None:
     if amount <= 0:
         raise ValueError("Added value must be greater than zero")
     if amount > MAX_QUANTITY:
-        raise ValueError("Added value is above the maximum")
+        raise QuantityError("QUANTITY_OUT_OF_RANGE", "Added value is above the maximum")
     # Preserve input scale: 2.1250 has four decimal places, even with a final zero.
     if amount.as_tuple().exponent < -3:
         raise ValueError("Added amount must have at most three decimal places")
