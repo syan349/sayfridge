@@ -1,4 +1,4 @@
-# SayFridge API Reference: B01–B10
+# SayFridge API Reference: B01–B11
 
 Implemented authentication, storage-space, catalog, and inventory contracts.
 For setup, see the [backend README](../backend/README.md). For implementation and
@@ -358,13 +358,13 @@ preserve version/timestamps. A change at the maximum version returns
 initial facts; write no metadata/move event. After conflicts, reload before retrying.
 
 
-## 7. Inventory additions — B10
+## 7. Inventory quantity operations — B10–B11
 
 ### POST /inventory-items/{id}/operations
 
-**201** for a new ADD; **200** for a successful replay. Bearer authentication and
-an owned inventory item are required. Only ADD/AMOUNT is supported; CONSUME,
-RECONCILE, preview, and history endpoints remain planned.
+**201** for a new operation; **200** for a successful replay. Bearer authentication
+and an owned inventory item are required. RECONCILE, preview, and history endpoints
+remain planned.
 
 Required header: `Idempotency-Key`, 1–64 visible ASCII characters, without spaces.
 Keys are case-sensitive and scoped to the current user across all inventory items.
@@ -380,31 +380,52 @@ Keys are case-sensitive and scoped to the current user across all inventory item
 ```
 
 All five fields are required; extra fields are rejected. expected_version is a
-strict integer from 1 to 2147483647. quantity_value is a positive ordinary decimal
+strict integer from 1 to 2147483647. For AMOUNT, quantity_value is a positive ordinary decimal
 string, at most 32 characters and three decimal places, no greater than
 999999999.999. Scientific notation and numeric JSON values are rejected. Preserve
 literal quantity text ("2" differs from "2.0"). Trim unit whitespace before storage,
 retain case, and require 1–16 characters both before and after casefolding.
 
-**Effect:** lock the space then inventory; check version and allowed state. ADD
-is allowed for IN_STOCK and for EMPTY in an ACTIVE space. Archived definitions or
-categories do not block additions to existing stock. Update the estimated balance
+| Operation | Quantity kind | Input | Allowed state |
+| --- | --- | --- | --- |
+| ADD | AMOUNT | Decimal string and unit | IN_STOCK; EMPTY only in an ACTIVE space |
+| CONSUME | AMOUNT | Decimal string and unit | IN_STOCK only |
+| CONSUME | FRACTION | `p/q`, positive integers with p ≤ q; unit `remaining` | IN_STOCK only |
+
+Fraction text is limited to 32 characters and preserved literally: `1/2` and
+`2/4` are different retry inputs. For example, consume one third with:
+
+```json
+{"expected_version": 1, "operation_type": "CONSUME", "quantity_kind": "FRACTION", "quantity_value": "1/3", "quantity_unit": "remaining"}
+```
+
+**Effect:** lock the space then inventory; check version and allowed state.
+Archived definitions/categories do not block operations on existing stock;
+IN_STOCK consumption is also allowed in an archived space. Update the estimated balance
 and timestamp if an estimate exists (including zero); otherwise update the
 confirmed balance and timestamp. Preserve initial quantities and the other balance.
-Set IN_STOCK, increment version/update time, and insert one SUCCESS operation in
+Confirmed zero becomes EMPTY; estimated zero remains IN_STOCK. Otherwise set
+IN_STOCK. Increment version/update time and insert one SUCCESS operation in
 the same transaction. Any failure rolls back both writes.
 
 **Calculation:** convert g↔kg or ml↔l to the current effective unit; identical
 casefolded units are exact. Reject other differing units. Round the applied change
-to three places using ROUND_HALF_UP before addition. Reject changes rounded to zero
+to three places using ROUND_HALF_UP before addition/subtraction. Reject changes rounded to zero
 and amounts outside NUMERIC(12,3). A valid 0.5 g addition to kg stock applies 0.001 kg;
 a raw 0.0005 kg input is invalid because it has four decimal places.
+
+For consumption, check the unrounded change against the balance first; rounding
+must not hide over-consumption. Fractions use exact integer-ratio arithmetic.
+Reject rounding that erases a positive remainder. Consuming `1/3` of 1 kg applies
+0.333 kg and leaves 0.667 kg; consuming `1/2` of 0.001 kg is rejected. Explicitly
+consuming all of 0.001 kg is allowed. Applied changes are positive; operation_type
+indicates addition or subtraction.
 
 **Response:** `{operation, inventory, replayed}`. inventory uses the response in
 section 6. operation includes id, inventory_item_id, operation_type,
 quantity_kind/value/unit, input_method, calculation_method, affects_state,
 applied_change_amount/unit, status, created_at, updated_at, and undone_at.
-For new ADD records: input_method=MANUAL, calculation_method=EXACT or CONVERTED,
+For new ADD/CONSUME records: input_method=MANUAL, calculation_method=EXACT or CONVERTED,
 affects_state=CONFIRMED or ESTIMATED, status=SUCCESS, undone_at=null. Decimal amounts
 serialize as strings. Internal idempotency keys are never returned.
 
@@ -417,8 +438,9 @@ the same key returns IDEMPOTENCY_CONFLICT. Failed requests do not reserve keys.
 
 **Errors:** 401 unauthenticated; 404 NOT_FOUND; 409 VERSION_CONFLICT,
 VERSION_LIMIT_REACHED, STATE_CONFLICT, RESOURCE_CHANGED, IDEMPOTENCY_CONFLICT;
-422 VALIDATION_ERROR, UNIT_NOT_CONVERTIBLE, QUANTITY_TOO_SMALL, QUANTITY_OUT_OF_RANGE.
+422 VALIDATION_ERROR, UNIT_NOT_CONVERTIBLE, QUANTITY_TOO_SMALL, QUANTITY_OUT_OF_RANGE,
+INSUFFICIENT_QUANTITY, QUANTITY_PRECISION_UNSUPPORTED.
 
 Manual verification: GET the inventory version, submit this request with a new key,
 then resend it unchanged. Expect 201 followed by 200, the same operation ID, and
-only one quantity increase. No database initialization change is needed for B10.
+only one quantity change. No database initialization change is needed for B10–B11.

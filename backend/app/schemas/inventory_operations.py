@@ -5,9 +5,9 @@ from decimal import Decimal
 from uuid import UUID
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
-from app.core.quantity import validate_addition_amount
+from app.core.quantity import validate_addition_amount, parse_consumption_fraction
 from app.schemas.inventory import InventoryItemRead
 
 
@@ -18,29 +18,35 @@ IdempotencyKey = Annotated[
 
 
 class InventoryOperationCreate(BaseModel):
-    """B10 request body. Database ownership/state/version checks belong to services.
+    """ADD/CONSUME request body. Database ownership/state/version checks belong to services.
 
-    Only ADD/AMOUNT is currently supported. Require both fields
-    explicitly so a client cannot accidentally request a different operation.
+    Amounts support ADD and CONSUME; fractions support only CONSUME.
+    Require both operation and quantity kind explicitly.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     expected_version: int = Field(strict=True, ge=1, le=2147483647)
-    operation_type: Literal["ADD"]
-    quantity_kind: Literal["AMOUNT"]
+    operation_type: Literal["ADD", "CONSUME"]
+    quantity_kind: Literal["AMOUNT", "FRACTION"]
     quantity_value: str = Field(strict=True, max_length=32)
     quantity_unit: str = Field(strict=True)
 
-    @field_validator("quantity_value")
-    @classmethod
-    def validate_quantity_value(cls, value: str) -> str:
-        """Check raw syntax before Decimal conversion; keep the original expression."""
-        if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,3})?", value):
-            raise ValueError("Quantity must be a decimal string with at most three decimal places")
-        validate_addition_amount(Decimal(value))
-        # Preserve 2 versus 2.0 for the later idempotency comparison and history.
-        return value
+    @model_validator(mode="after")
+    def validate_quantity(self):
+        """Validate the selected input form while preserving its literal expression."""
+        if self.quantity_kind == "FRACTION":
+            if self.operation_type != "CONSUME":
+                raise ValueError("Fractions are supported only for CONSUME")
+            if self.quantity_unit != "remaining":
+                raise ValueError("Fraction quantity_unit must be remaining")
+            parse_consumption_fraction(self.quantity_value)
+        else:
+            if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,3})?", self.quantity_value):
+                raise ValueError("Quantity must be a decimal string with at most three decimal places")
+            validate_addition_amount(Decimal(self.quantity_value))
+        # Preserve 2 versus 2.0 and 1/2 versus 2/4 for idempotency and history.
+        return self
 
     @field_validator("quantity_unit")
     @classmethod
@@ -58,7 +64,7 @@ class InventoryOperationRead(BaseModel):
     """Public operation fields, including existing historical states.
 
     Read declared fields from an ORM object and omit the internal idempotency key.
-    New B10 writes will use ADD, AMOUNT, MANUAL, and SUCCESS; historical records
+    New writes use ADD/CONSUME, AMOUNT/FRACTION, MANUAL, and SUCCESS; historical records
     may contain other values already supported by the database.
     """
 
