@@ -1,30 +1,47 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:sayfridge/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('opens the account creation flow', (tester) async {
+    await tester.pumpWidget(const SayFridgeApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Sign in'), findsOneWidget);
+    await tester.tap(find.text('Create an account'));
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    expect(find.text('Create Account'), findsOneWidget);
+    expect(find.text('Full Name'), findsOneWidget);
+    expect(find.byKey(const Key('sign-up-button')), findsOneWidget);
+  });
+
+  testWidgets('sign in validates empty credentials', (tester) async {
+    await tester.pumpWidget(const SayFridgeApp());
+
+    await tester.tap(find.byKey(const Key('sign-in-button')));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Please enter your email'), findsOneWidget);
+    expect(find.text('Please enter your password'), findsOneWidget);
+  });
+
+  testWidgets('avatar selection returns the chosen avatar', (tester) async {
+    await tester.pumpWidget(const SayFridgeApp());
+    await tester.tap(find.text('Create an account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('choose one'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose your avatar'), findsOneWidget);
+    final tomato = find.byKey(const Key('avatar-tomato'));
+    await tester.ensureVisible(tomato);
+    await tester.tap(tomato);
+    final useAvatar = find.byKey(const Key('use-avatar-button'));
+    await tester.ensureVisible(useAvatar);
+    await tester.tap(useAvatar);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Full Name'), findsOneWidget);
+    expect(find.byKey(const Key('selected-avatar-tomato')), findsOneWidget);
   });
 }
