@@ -65,7 +65,7 @@ async def create_inventory(payload: InventoryCreate, session: AsyncSession = Dep
                 }},
              response_model = OperationResult,
              status_code = 201,
-             summary = "Add or consume inventory quantity",
+             summary = "Add, consume, or reconcile inventory quantity",
             )
 async def create_inventory_operation(item_id:UUID, payload:InventoryOperationCreate, 
                                      idempotency_key: Annotated[IdempotencyKey, Header(alias="Idempotency-Key")],

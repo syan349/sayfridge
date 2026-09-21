@@ -1,13 +1,13 @@
-"""Pure addition and consumption calculations shared by submission and future preview."""
+"""Pure quantity calculations shared by submission and future preview."""
 from dataclasses import dataclass
 from fractions import Fraction
 from decimal import Decimal, ROUND_HALF_UP
 
 from app.db.models import InventoryItem
 from app.core.quantity import (
-    MAX_QUANTITY, QUANTITY_PRECISION, QuantityError, validate_addition_amount, parse_consumption_fraction,
+    MAX_QUANTITY, QUANTITY_PRECISION, QuantityError, validate_addition_amount, validate_quantity_amount,
+    parse_consumption_fraction,
 )
-
 
 @dataclass(frozen=True)
 class QuantityCalculation:
@@ -123,3 +123,8 @@ def calculate_consumption(item: InventoryItem, quantity_kind: str, quantity_valu
         raise QuantityError("QUANTITY_PRECISION_UNSUPPORTED", "Rounding would erase a positive remaining quantity")
     return QuantityCalculation(output_amount, current_unit, amount_type, applied, method,
                                Fraction(applied) != unrounded)
+
+def prepare_reconciliation(amount: Decimal, unit: str) -> tuple[Decimal, str]:
+    """Validate and return a confirmed stocktake total without unit conversion."""
+    validate_quantity_amount(amount, allow_zero=True)
+    return (amount, unit)

@@ -76,7 +76,7 @@ def test_maximum_is_inclusive():
 @pytest.mark.parametrize("changes", [
     {"quantity_value": value} for value in ["2.1250", "1e2", "NaN", "Infinity", "+1", " 2", "2 ", ".5", "2.", "0", "1000000000", 2, None, "0"*33+"1"]
 ] + [{"expected_version": value} for value in [True, "1", 1.0, 0, 2147483648]] + [
-    {"operation_type": "RECONCILE"}, {"quantity_kind": "FRACTION"},
+    {"operation_type": "REMOVE"}, {"quantity_kind": "FRACTION"},
     {"input_method": "MANUAL"}, {"affects_state": "CONFIRMED"},
     {"idempotency_key": "in-body"}, {"quantity_unit": " "}, {"quantity_unit": "x"*17},
 ])

@@ -10,6 +10,7 @@
 | B07–B09 | [Inventory](B07-B09_INVENTORY_TEST_RESULTS.md) | Queries, stock entry, metadata, versions, and notes |
 | B10 | [Inventory additions](B10_INVENTORY_ADDITIONS_TEST_RESULTS.md) | Quantity precision, ADD, idempotency, locking, and rollback |
 | B11 | [Inventory consumption](B11_INVENTORY_CONSUMPTION_TEST_RESULTS.md) | CONSUME amounts/fractions, precision, state, retries, and concurrency |
+| B12 | [Inventory reconciliation](B12_INVENTORY_RECONCILIATION_TEST_RESULTS.md) | Confirmed totals, estimate clearing, state, retries, and atomicity |
 
 Manual requests: [Postman guide](POSTMAN_GUIDE.md).
 Setup and database configuration: [backend README](../../backend/README.md).
@@ -20,11 +21,11 @@ Run commands from `backend`. Uvicorn does not need to be running.
 
 | Execution | Selection | Command |
 | --- | --- | --- |
-| Local full regression | 408 scenarios | `python -m pytest -v` |
-| Local core check | 49 scenarios | `python -m pytest -v -m ci` |
+| Local full regression | 439 scenarios | `python -m pytest -v` |
+| Local core check | 53 scenarios | `python -m pytest -v -m ci` |
 | Automatic PR/main CI | Same core set | `python -m pytest -v -m ci --strict-markers` |
 | Manual workflow dispatch | Full suite | `python -m pytest -v --strict-markers` |
-| Database-free check | 108 scenarios | `python -m pytest -v -m "not postgres"` |
+| Database-free check | 122 scenarios | `python -m pytest -v -m "not postgres"` |
 
 Database tests use real PostgreSQL. Locally, supply `TEST_DATABASE_URL` through the
 process environment or ignored `.env.test`; never use the application database.
@@ -35,7 +36,7 @@ isolated schema and clean it up after each test.
 
 Use one test implementation for local and CI runs. Mark a small set covering
 permissions, representative workflows, atomic failures, and concurrency risks.
-Keep boundary variants in the full suite. The remaining 359 scenarios still run
+Keep boundary variants in the full suite. The remaining 386 scenarios still run
 in full regression; a core pass alone is not evidence of a full-suite pass.
 
 | Feature | Core scenarios |
@@ -46,7 +47,8 @@ in full regression; a core pass alone is not evidence of a full-suite pass.
 | Inventory | 8 |
 | Inventory additions | 6 |
 | Inventory consumption | 5 |
-| **Total** | **49** |
+| Inventory reconciliation | 4 |
+| **Total** | **53** |
 
 Use `@pytest.mark.ci` for a whole test or `pytest.param(..., marks=pytest.mark.ci)`
 for selected parameters. The marker is registered in `backend/pytest.ini`;

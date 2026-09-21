@@ -78,7 +78,7 @@ def test_fraction_contract_rejects_invalid_expressions(value):
     {"quantity_kind": "FRACTION", "quantity_value": "1/2", "quantity_unit": "kg"},
     {"quantity_kind": "FRACTION", "quantity_value": "1/2", "quantity_unit": "Remaining"},
     {"quantity_value": "1.0001"}, {"quantity_value": "0"}, {"quantity_value": "1e2"},
-    {"expected_version": True}, {"quantity_value": 1}, {"operation_type": "RECONCILE"},
+    {"expected_version": True}, {"quantity_value": 1}, {"operation_type": "REMOVE"},
 ])
 def test_consumption_contract_rejects_invalid_combinations(changes):
     with pytest.raises(ValidationError):
