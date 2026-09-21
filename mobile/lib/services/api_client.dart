@@ -14,10 +14,15 @@ class ApiClient {
   Future<Map<String, dynamic>> getJson(
     String path, {
     String? accessToken,
+    Map<String, String>? queryParameters,
   }) async {
+    final uri = ApiConfig.buildUri(path).replace(
+      queryParameters: queryParameters,
+    );
+
     final response = await _send(
       () => _client.get(
-        ApiConfig.buildUri(path),
+        uri,
         headers: _headers(accessToken: accessToken),
       ),
     );

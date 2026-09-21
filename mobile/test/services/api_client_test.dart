@@ -35,6 +35,37 @@ void main() {
       expect(result['email'], 'user@example.com');
     });
 
+    test('GET includes query parameters in the request URL', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.path, '/api/v1/storage-spaces');
+        expect(request.url.queryParameters['status'], 'ACTIVE');
+        expect(request.url.queryParameters['page'], '2');
+        expect(request.url.queryParameters['page_size'], '20');
+
+        return http.Response(
+          jsonEncode({
+            'items': [],
+            'total': 0,
+            'page': 2,
+            'page_size': 20,
+          }),
+          200,
+        );
+      });
+
+      final apiClient = ApiClient(client: mockClient);
+
+      await apiClient.getJson(
+        '/storage-spaces',
+        queryParameters: {
+          'status': 'ACTIVE',
+          'page': '2',
+          'page_size': '20',
+        },
+      );
+    });
+
     test('POST sends a JSON request body', () async {
       final mockClient = MockClient((request) async {
         expect(request.method, 'POST');
