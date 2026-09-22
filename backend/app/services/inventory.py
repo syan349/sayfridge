@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import aliased
 
 from app.db.models import InventoryItem, InventoryOperation, ItemCategory, ItemDefinition, StorageSpace
 from app.schemas.inventory import InventoryItemRead
@@ -82,6 +83,63 @@ async def list_inventory_operations(
         .order_by(InventoryOperation.created_at.desc(), InventoryOperation.id.desc())
     )
     return list(result.all())
+
+
+def _select_owned_operations(user_id: UUID):
+    return (
+        select(InventoryOperation)
+        .join(InventoryItem, InventoryOperation.inventory_item_id == InventoryItem.id)
+        .join(StorageSpace, InventoryItem.storage_space_id == StorageSpace.id)
+        .where(StorageSpace.user_id == user_id)
+    )
+
+
+async def list_owned_inventory_operations(session: AsyncSession, user_id: UUID, **query):
+    """Read one deterministic page of operation history visible to the current user."""
+    statement = _select_owned_operations(user_id)
+    for key, column in (
+        ("inventory_item_id", InventoryOperation.inventory_item_id),
+        ("operation_type", InventoryOperation.operation_type),
+        ("status", InventoryOperation.status),
+    ):
+        if query[key] is not None:
+            statement = statement.where(column == query[key])
+    if query["created_from"] is not None:
+        statement = statement.where(InventoryOperation.created_at >= query["created_from"])
+    if query["created_to"] is not None:
+        statement = statement.where(InventoryOperation.created_at < query["created_to"])
+
+    filtered = statement.cte("filtered_inventory_operations")
+    total = select(func.count().label("total")).select_from(filtered).subquery()
+    page = (
+        select(filtered)
+        .order_by(filtered.c.created_at.desc(), filtered.c.id.desc())
+        .offset(min((query["page"] - 1) * query["page_size"], 2**63 - 1))
+        .limit(query["page_size"])
+        .subquery()
+    )
+    operation_model = aliased(InventoryOperation, page)
+    rows = (await session.execute(
+        select(operation_model, total.c.total)
+        .select_from(total)
+        .outerjoin(page, true())
+        .order_by(page.c.created_at.desc(), page.c.id.desc())
+    )).all()
+    return [operation for operation, _ in rows if operation is not None], rows[0].total
+
+
+async def get_inventory_operation(
+    session: AsyncSession,
+    operation_id: UUID,
+    user_id: UUID,
+) -> InventoryOperation:
+    """Read one operation through its inventory ownership chain."""
+    operation = (await session.execute(
+        _select_owned_operations(user_id).where(InventoryOperation.id == operation_id)
+    )).scalar_one_or_none()
+    if operation is None:
+        raise InventoryError("NOT_FOUND", "Inventory operation not found")
+    return operation
 
 
 async def _space(session, space_id, user_id):

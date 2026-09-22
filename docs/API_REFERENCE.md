@@ -511,5 +511,32 @@ fields documented above. Internal idempotency keys are omitted.
 
 Authentication and inventory ownership are required. Foreign and missing inventory
 IDs return identical **404 / NOT_FOUND** responses. This endpoint is read-only and
-does not change inventory, operation records, versions, or timestamps. The global
-operation list and operation-detail endpoints remain planned.
+does not change inventory, operation records, versions, or timestamps.
+
+### GET /inventory-operations — B14
+
+**200**, a paginated object containing `items`, `total`, `page`, and `page_size`.
+Only operations belonging to the current user's inventory are visible. Results use
+the same public operation fields and `created_at DESC, id DESC` ordering as the
+item-scoped endpoint.
+
+| Parameter | Default / meaning |
+| --- | --- |
+| inventory_item_id | Optional UUID; inaccessible or nonexistent values produce an empty page |
+| operation_type | Optional ADD, CONSUME, or RECONCILE |
+| status | Optional PENDING_CONFIRMATION, SUCCESS, FAILED, or UNDONE |
+| created_from | Optional timezone-aware timestamp; inclusive |
+| created_to | Optional timezone-aware timestamp; exclusive |
+| page, page_size | 1 and 20; page ≥1, page_size 1–100 |
+
+When both time boundaries are supplied, `created_from` must be earlier than
+`created_to`. Naive timestamps, invalid enums, reversed/equal ranges, and unknown
+query parameters return **422 / VALIDATION_ERROR**. Counts cover the complete
+filtered result, including when the requested page is empty.
+
+### GET /inventory-operations/{id} — B14
+
+**200**, one public operation response. The associated inventory may be in any
+state and may belong to archived associations. Foreign and missing operation IDs
+return identical **404 / NOT_FOUND** responses. Internal idempotency keys are not
+returned. This endpoint is read-only.

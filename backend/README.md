@@ -1,6 +1,6 @@
 # SayFridge Backend
 
-The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, metadata/location editing, discard, and archival are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented, including item-scoped history reads. Preview, global history queries, Agent, and Worker features remain planned.
+The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, metadata/location editing, discard, and archival are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented, including item-scoped and global history reads. Preview, Agent, and Worker features remain planned.
 
 ## Requirements
 
@@ -35,6 +35,8 @@ Once the server starts, the following endpoints are available:
 - Discard in-stock inventory: `POST http://127.0.0.1:8000/api/v1/inventory-items/{id}/discard`
 - Archive in-stock or empty inventory: `POST http://127.0.0.1:8000/api/v1/inventory-items/{id}/archive`
 - Item operation history: `GET http://127.0.0.1:8000/api/v1/inventory-items/{id}/operations`
+- Global operation history: `GET http://127.0.0.1:8000/api/v1/inventory-operations`
+- Operation detail: `GET http://127.0.0.1:8000/api/v1/inventory-operations/{id}`
 - API documentation: `http://127.0.0.1:8000/docs`
 
 ## Authentication settings
@@ -219,8 +221,8 @@ Run the inventory state-action tests from backend:
 python -m pytest -v tests/test_inventory_discard.py tests/test_inventory_archive.py
 ```
 
-Run the item-scoped operation history tests from backend:
+Run the operation history tests from backend:
 
 ```bash
-python -m pytest -v tests/test_inventory_item_history.py
+python -m pytest -v tests/test_inventory_item_history.py tests/test_inventory_operation_history.py
 ```

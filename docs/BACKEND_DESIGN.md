@@ -447,8 +447,7 @@ Detailed preview response fields remain open in section 10.1.
 
 #### 4.6.3 History queries
 
-Implementation status: the item-scoped history endpoint is implemented. The global
-history list and operation-detail endpoints remain planned.
+Implementation status: all three history endpoints are implemented.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |

@@ -1,8 +1,7 @@
 # B14 Inventory History Test Results
 
-Date: 2026-09-22. Scope: `GET /inventory-items/{id}/operations` on
-`syan349_feat_backend_apis`. The global history list and operation-detail endpoints
-remain pending, so B14 is not yet complete as a whole.
+Date: 2026-09-22. Scope: item-scoped history, global filtered history, and operation
+detail endpoints on `syan349_feat_backend_apis`.
 
 ## Environment and command
 
@@ -12,7 +11,7 @@ scenario used a freshly migrated random schema and removed it afterward.
 Run from `backend`:
 
 ```bash
-python -m pytest -v tests/test_inventory_item_history.py --strict-markers
+python -m pytest -v tests/test_inventory_item_history.py tests/test_inventory_operation_history.py --strict-markers
 ```
 
 ## Coverage
@@ -22,11 +21,16 @@ python -m pytest -v tests/test_inventory_item_history.py --strict-markers
 - Empty history and history retained for DISCARDED or ARCHIVED inventory.
 - Public operation fields with the internal idempotency key omitted.
 - Authentication, ownership isolation, missing resources, and invalid UUID input.
+- Owned-only global history with stable pagination and accurate filtered totals.
+- Inventory, operation-type, status, and half-open timestamp filters.
+- Timezone-aware timestamps and rejection of invalid, reversed, or unknown queries.
+- Owned operation detail in every inventory/association state, with foreign and
+  missing operation IDs producing identical responses.
 
 ## Verification status
 
-All 7 item-scoped history scenarios passed in 44.40 seconds. Two representative
-scenarios are marked for core CI: ordering/field exposure and foreign-resource
-isolation. Full regression, remote CI, manual Postman acceptance, the global history
-list, and operation detail remain pending. No database structure change or migration
-script is required.
+All 7 item-scoped history scenarios passed in 44.40 seconds. All 17 global
+list/detail scenarios passed in 112.77 seconds. Four representative scenarios are
+marked for core CI: ordering/field exposure and resource isolation for both route
+groups. Full regression, remote CI, and manual Postman acceptance remain pending.
+No database structure change or migration script is required.
