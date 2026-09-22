@@ -26,7 +26,8 @@ router = APIRouter(prefix="/api/v1/inventory-items", tags=["inventory"], respons
 async def inventory_error_handler(request: Request, exc: service.InventoryError):
     if exc.code == "NOT_FOUND":
         status_code = 404
-    elif exc.code in ["UNIT_NOT_CONVERTIBLE", "QUANTITY_TOO_SMALL", "QUANTITY_OUT_OF_RANGE"]:
+    elif exc.code in ["VALIDATION_ERROR", "UNIT_NOT_CONVERTIBLE", "QUANTITY_TOO_SMALL", "QUANTITY_OUT_OF_RANGE",
+                       "INSUFFICIENT_QUANTITY", "QUANTITY_PRECISION_UNSUPPORTED"]:
         status_code = 422
     else:
         status_code = 409
@@ -64,13 +65,14 @@ async def create_inventory(payload: InventoryCreate, session: AsyncSession = Dep
                 }},
              response_model = OperationResult,
              status_code = 201,
-             summary = "Add quantity to existing inventory",
+             summary = "Add, consume, or reconcile inventory quantity",
             )
 async def create_inventory_operation(item_id:UUID, payload:InventoryOperationCreate, 
                                      idempotency_key: Annotated[IdempotencyKey, Header(alias="Idempotency-Key")],
                                      response: Response, session:AsyncSession = Depends(get_db_session), 
                                      user:User = Depends(get_current_user)):
-    result = await service.add_inventory(session, item_id, user.id, 
+    result = await service.submit_inventory_operation(session, item_id, user.id,
+                                operation_type=payload.operation_type, quantity_kind=payload.quantity_kind,
                                 expected_version = payload.expected_version, quantity_value = payload.quantity_value, 
                                 quantity_unit = payload.quantity_unit, idempotency_key = idempotency_key)
     if result.replayed:

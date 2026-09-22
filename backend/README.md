@@ -1,6 +1,6 @@
 # SayFridge Backend
 
-The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, and metadata/location editing are implemented. ADD quantity submission with idempotency and atomic operation history is implemented. CONSUME/RECONCILE, preview, history queries, inventory disposal/archival, Agent, and Worker features remain planned.
+The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, and metadata/location editing are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented. Preview, history queries, inventory disposal/archival, Agent, and Worker features remain planned.
 
 ## Requirements
 
@@ -30,6 +30,8 @@ Once the server starts, the following endpoints are available:
 - Item definitions: `GET/POST http://127.0.0.1:8000/api/v1/item-definitions`; detail/PATCH and archive/restore under `/{id}`
 - Inventory: `GET/POST http://127.0.0.1:8000/api/v1/inventory-items`; detail/PATCH under `/{id}`
 - Add to existing inventory: `POST http://127.0.0.1:8000/api/v1/inventory-items/{id}/operations` (ADD/AMOUNT; Idempotency-Key required)
+- Consume inventory: the same operations endpoint (CONSUME with AMOUNT or FRACTION)
+- Confirm a physical stocktake: the same operations endpoint (RECONCILE/AMOUNT)
 - API documentation: `http://127.0.0.1:8000/docs`
 
 ## Authentication settings
@@ -180,13 +182,13 @@ These tests use the existing isolated test database configuration and initialize
 within disposable test schemas. They do not need Uvicorn running.
 
 
-## Inventory additions
+## Inventory quantity operations
 
-B10 uses the existing inventory_item and inventory_operation tables. No schema
+B10–B12 use the existing inventory_item and inventory_operation tables. No schema
 change or incremental migration is introduced. Request/response schemas are in
 `app/schemas/inventory_operations.py`; the transaction is in `app/services/inventory.py`,
 and pure calculation helpers remain in `app/services/inventory_quantities.py`.
-See [API reference](../docs/API_REFERENCE.md#7-inventory-additions--b10) for requests
+See [API reference](../docs/API_REFERENCE.md#7-inventory-quantity-operations--b10b12) for requests
 and retry behavior. Run the complete addition tests from backend:
 
 ```bash
@@ -195,3 +197,15 @@ python -m pytest -v tests/test_inventory_quantities.py tests/test_inventory_addi
 
 Temporary B10 exercise files are not required. Tests use the same isolated
 PostgreSQL configuration as the existing test suite, with no application data writes.
+
+Run the complete consumption tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_consumption*.py
+```
+
+Run the complete reconciliation tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_reconciliation*.py
+```

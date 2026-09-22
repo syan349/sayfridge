@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from app.db.models import InventoryItem, InventoryOperation, ItemCategory, ItemDefinition, StorageSpace
 from app.schemas.inventory import InventoryItemRead
 from app.schemas.inventory_operations import InventoryOperationRead, OperationResult
-from app.services.inventory_quantities import calculate_addition
+from app.services.inventory_quantities import calculate_addition, calculate_consumption, prepare_reconciliation
 from app.core.quantity import QuantityError
 
 
@@ -156,7 +156,7 @@ async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
         await session.rollback()
         raise
 
-async def _load_inventory_for_addition(session:AsyncSession, item_id:UUID, user_id:UUID) -> tuple[InventoryItem, StorageSpace]:
+async def _load_inventory_for_operation(session:AsyncSession, item_id:UUID, user_id:UUID) -> tuple[InventoryItem, StorageSpace]:
     inventory = await get_inventory(session, item_id, user_id)
     space = await _space(session, inventory.storage_space_id, user_id)
 
@@ -171,12 +171,16 @@ async def _load_inventory_for_addition(session:AsyncSession, item_id:UUID, user_
     return (locked_item, space)
 
 
-def _validate_new_addition(item: InventoryItem, space: StorageSpace, expected_version: int) -> None:
+def _validate_new_operation(item: InventoryItem, space: StorageSpace, expected_version: int, operation_type: str) -> None:
     if item.version != expected_version:
         raise InventoryError("VERSION_CONFLICT", "Inventory has changed; refresh and retry")
-    if item.status not in {"IN_STOCK", "EMPTY"}:
-        raise InventoryError("STATE_CONFLICT", "Terminal inventory cannot receive additions")
-    if item.status == "EMPTY":
+    if operation_type in {"ADD", "RECONCILE"}:
+        allowed = {"IN_STOCK", "EMPTY"}
+    else:
+        allowed = {"IN_STOCK"}
+    if item.status not in allowed:
+        raise InventoryError("STATE_CONFLICT", "Inventory state does not allow this operation")
+    if operation_type == "ADD" and item.status == "EMPTY":
         _active(space, "Storage space")
     if item.version == 2147483647:
         raise InventoryError("VERSION_LIMIT_REACHED", "Inventory version limit reached")
@@ -188,65 +192,101 @@ async def _operation_by_key(session: AsyncSession, key: str) -> InventoryOperati
     ).execution_options(populate_existing=True))).scalar_one_or_none()
 
 
-async def _addition_replay(session, operation, item_id, user_id, quantity_value, quantity_unit):
+async def _operation_replay(session, operation, item_id, user_id, operation_type, quantity_kind, quantity_value, quantity_unit):
     # Compare literal business input, excluding expected_version. Never reapply a
     # failed or undone historical record, and never expose its internal key.
     if operation.status != "SUCCESS" or (
         operation.inventory_item_id, operation.operation_type, operation.quantity_kind,
         operation.quantity_value, operation.quantity_unit,
-    ) != (item_id, "ADD", "AMOUNT", quantity_value, quantity_unit):
+    ) != (item_id, operation_type, quantity_kind, quantity_value, quantity_unit):
         raise InventoryError("IDEMPOTENCY_CONFLICT", "Key is already associated with a different request")
     inventory = await get_inventory(session, item_id, user_id)
     return OperationResult(operation=InventoryOperationRead.model_validate(operation),
                            inventory=inventory, replayed=True)
 
 
-async def add_inventory(session: AsyncSession, item_id: UUID, user_id: UUID, *,
-                        expected_version: int, quantity_value: str, quantity_unit: str,
-                        idempotency_key: str) -> OperationResult:
-    """Apply one ADD atomically, or return its prior record and current inventory.
+async def submit_inventory_operation(session: AsyncSession, item_id: UUID, user_id: UUID, *,
+                        expected_version: int, operation_type: str, quantity_kind: str,
+                        quantity_value: str, quantity_unit: str, idempotency_key: str) -> OperationResult:
+    """Apply one ADD/CONSUME/RECONCILE atomically, or return its prior record and current inventory.
 
     The route passes schema-validated input. Only this outer service commits or
     rolls back. Database uniqueness also protects a key reused across spaces.
     """
+    if operation_type not in {"ADD", "CONSUME", "RECONCILE"} or quantity_kind not in {"AMOUNT", "FRACTION"}:
+        raise InventoryError("VALIDATION_ERROR", "Unsupported operation or quantity kind")
+    if operation_type == "ADD" and quantity_kind != "AMOUNT":
+        raise InventoryError("VALIDATION_ERROR", "ADD requires AMOUNT")
+    if operation_type == "RECONCILE" and quantity_kind != "AMOUNT":
+        raise InventoryError("VALIDATION_ERROR", "RECONCILE requires AMOUNT")
     key = f"{user_id}:{idempotency_key}"
     try:
         try:
             await get_inventory(session, item_id, user_id)
             operation = await _operation_by_key(session, key)
             if operation is not None:
-                result = await _addition_replay(session, operation, item_id, user_id,
+                result = await _operation_replay(session, operation, item_id, user_id, operation_type, quantity_kind,
                                                 quantity_value, quantity_unit)
             else:
-                item, space = await _load_inventory_for_addition(session, item_id, user_id)
+                item, space = await _load_inventory_for_operation(session, item_id, user_id)
                 # A matching request may have committed while this request waited.
                 operation = await _operation_by_key(session, key)
                 if operation is not None:
-                    result = await _addition_replay(session, operation, item_id, user_id,
+                    result = await _operation_replay(session, operation, item_id, user_id, operation_type, quantity_kind,
                                                     quantity_value, quantity_unit)
                 else:
-                    _validate_new_addition(item, space, expected_version)
-                    calculation = calculate_addition(item, Decimal(quantity_value), quantity_unit)
+                    _validate_new_operation(item, space, expected_version, operation_type)
                     now = datetime.now(timezone.utc)
-                    if calculation.affects_state == "ESTIMATED":
-                        # An exact addition cannot turn the existing estimate into a confirmation.
-                        item.estimated_current_amount = calculation.amount
-                        item.estimated_current_unit = calculation.unit
-                        item.estimated_at = now
-                    else:
-                        item.confirmed_current_amount = calculation.amount
-                        item.confirmed_current_unit = calculation.unit
+
+                    if operation_type == "ADD":
+                        calculation = calculate_addition(item, Decimal(quantity_value), quantity_unit)
+                    elif operation_type == "CONSUME":
+                        calculation = calculate_consumption(item, quantity_kind, quantity_value, quantity_unit)
+                    elif operation_type == "RECONCILE":
+                        reconciled_amount, reconciled_unit = prepare_reconciliation(
+                            Decimal(quantity_value), quantity_unit
+                        )
+
+                    if operation_type == "RECONCILE":
+                        if item.status == "EMPTY" and reconciled_amount > 0:
+                            _active(space, "Storage space")
+                        item.confirmed_current_amount = reconciled_amount
+                        item.confirmed_current_unit = reconciled_unit
                         item.confirmed_at = now
-                    item.status = "IN_STOCK"
+                        item.estimated_current_amount = None
+                        item.estimated_current_unit = None
+                        item.estimated_at = None
+                        item.status = "EMPTY" if reconciled_amount == 0 else "IN_STOCK"
+                        operation_calculation_method = "EXACT"
+                        operation_affects_state = "CONFIRMED"
+                        operation_applied_change_amount = None
+                        operation_applied_change_unit = None
+                    else:
+                        if calculation.affects_state == "ESTIMATED":
+                            # Exact arithmetic does not turn an existing estimate into a confirmation.
+                            item.estimated_current_amount = calculation.amount
+                            item.estimated_current_unit = calculation.unit
+                            item.estimated_at = now
+                        else:
+                            item.confirmed_current_amount = calculation.amount
+                            item.confirmed_current_unit = calculation.unit
+                            item.confirmed_at = now
+                        item.status = ("EMPTY" if calculation.affects_state == "CONFIRMED"
+                                       and calculation.amount == 0 else "IN_STOCK")
+                        operation_calculation_method = calculation.calculation_method
+                        operation_affects_state = calculation.affects_state
+                        operation_applied_change_amount = calculation.applied_change_amount
+                        operation_applied_change_unit = calculation.unit
                     item.version += 1
                     await session.flush()
                     operation = InventoryOperation(
-                        inventory_item_id=item.id, operation_type="ADD", quantity_kind="AMOUNT",
+                        inventory_item_id=item.id, operation_type=operation_type, quantity_kind=quantity_kind,
                         quantity_value=quantity_value, quantity_unit=quantity_unit,
-                        input_method="MANUAL", calculation_method=calculation.calculation_method,
-                        affects_state=calculation.affects_state,
-                        applied_change_amount=calculation.applied_change_amount,
-                        applied_change_unit=calculation.unit, status="SUCCESS", idempotency_key=key,
+                        input_method="MANUAL", calculation_method=operation_calculation_method,
+                        affects_state=operation_affects_state,
+                        applied_change_amount=operation_applied_change_amount,
+                        applied_change_unit=operation_applied_change_unit,
+                        status="SUCCESS", idempotency_key=key,
                     )
                     session.add(operation)
                     await session.flush()
@@ -266,7 +306,7 @@ async def add_inventory(session: AsyncSession, item_id: UUID, user_id: UUID, *,
             operation = await _operation_by_key(session, key)
             if operation is None:
                 raise
-            result = await _addition_replay(session, operation, item_id, user_id,
+            result = await _operation_replay(session, operation, item_id, user_id, operation_type, quantity_kind,
                                             quantity_value, quantity_unit)
             await session.commit()
             return result
@@ -276,3 +316,14 @@ async def add_inventory(session: AsyncSession, item_id: UUID, user_id: UUID, *,
     except Exception:
         await session.rollback()
         raise
+
+
+async def add_inventory(session: AsyncSession, item_id: UUID, user_id: UUID, *,
+                        expected_version: int, quantity_value: str, quantity_unit: str,
+                        idempotency_key: str) -> OperationResult:
+    """Retain the B10 service entry point while sharing the transaction machinery."""
+    return await submit_inventory_operation(
+        session, item_id, user_id, expected_version=expected_version,
+        operation_type="ADD", quantity_kind="AMOUNT", quantity_value=quantity_value,
+        quantity_unit=quantity_unit, idempotency_key=idempotency_key,
+    )
