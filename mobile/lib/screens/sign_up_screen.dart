@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
@@ -20,6 +23,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
   AvatarChoice _avatar = avatarChoices.first;
+  Uint8List? _uploadedAvatarBytes;
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void dispose() {
@@ -36,7 +41,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
         builder: (_) => AvatarPickerScreen(initialAvatar: _avatar),
       ),
     );
-    if (selected != null && mounted) setState(() => _avatar = selected);
+    if (selected != null && mounted) {
+      setState(() {
+        _avatar = selected;
+        _uploadedAvatarBytes = null;
+      });
+    }
+  }
+
+  Future<void> _uploadAvatar() async {
+    try {
+      final image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 90,
+        requestFullMetadata: false,
+      );
+      if (image == null) return;
+
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      setState(() => _uploadedAvatarBytes = bytes);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to open the photo library. Please try again.'),
+        ),
+      );
+    }
   }
 
   void _submit() {
@@ -53,6 +87,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
+      title: 'Create Account',
       child: AuthContent(
         padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
         child: AutofillGroup(
@@ -61,35 +96,39 @@ class _SignUpScreenState extends State<SignUpScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Text(
-                    'Create Account',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                ),
                 const SizedBox(height: 20),
                 Center(
                   child: AvatarBubble(
-                    key: Key('selected-avatar-${_avatar.name.toLowerCase()}'),
+                    key: Key(
+                      _uploadedAvatarBytes == null
+                          ? 'selected-avatar-${_avatar.name.toLowerCase()}'
+                          : 'selected-avatar-uploaded',
+                    ),
                     choice: _avatar,
+                    imageBytes: _uploadedAvatarBytes,
                     size: 122,
-                    onTap: _chooseAvatar,
+                    onUploadTap: _uploadAvatar,
                     showUploadBadge: true,
                   ),
                 ),
                 const SizedBox(height: 12),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    const Text('or ', style: TextStyle(fontSize: 16)),
-                    UnderlinedAction(
-                      label: 'choose one',
-                      onPressed: _chooseAvatar,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    const Text(' from library', style: TextStyle(fontSize: 16)),
-                  ],
+                Center(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text('or ', style: TextStyle(fontSize: 16)),
+                      UnderlinedAction(
+                        label: 'choose one',
+                        onPressed: _chooseAvatar,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      const Text(
+                        ' from library',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 26),
                 AuthField(

@@ -207,28 +207,29 @@ class _SocialButtons extends StatelessWidget {
           Semantics(
             button: true,
             label: 'Continue with ${provider.$1}',
-            child: InkWell(
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    '${provider.$1} sign in is ready to connect to the API.',
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${provider.$1} sign in is ready to connect to the API.',
+                    ),
                   ),
                 ),
-              ),
-              borderRadius: BorderRadius.circular(10),
-              child: Ink(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Image.asset(
-                    provider.$2,
-                    width: provider.$3,
-                    height: provider.$3,
-                    fit: BoxFit.contain,
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: Center(
+                    child: Image.asset(
+                      provider.$2,
+                      width: provider.$3,
+                      height: provider.$3,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),
