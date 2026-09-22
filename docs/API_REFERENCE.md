@@ -1,4 +1,4 @@
-# SayFridge API Reference: B01–B13
+# SayFridge API Reference: B01–B14
 
 Implemented authentication, storage-space, catalog, and inventory contracts.
 For setup, see the [backend README](../backend/README.md). For implementation and
@@ -396,7 +396,7 @@ catalog association is archived. It creates no inventory operation record and do
 not alter quantities or quantity timestamps.
 
 
-## 7. Inventory quantity operations — B10–B12
+## 7. Inventory quantity operations and history — B10–B12 and B14
 
 ### POST /inventory-items/{id}/operations
 
@@ -496,3 +496,20 @@ INSUFFICIENT_QUANTITY, QUANTITY_PRECISION_UNSUPPORTED.
 Manual verification: GET the inventory version, submit this request with a new key,
 then resend it unchanged. Expect 201 followed by 200, the same operation ID, and
 only one quantity change. No database initialization change is needed for B10–B12.
+
+### GET /inventory-items/{id}/operations — B14
+
+**200**, an array containing every operation for the owned inventory item. Results
+are ordered by `created_at` descending and then operation `id` descending, providing
+stable newest-first output. An item with no operation records returns `[]`.
+
+The endpoint remains available for `IN_STOCK`, `EMPTY`, `DISCARDED`, and `ARCHIVED`
+inventory. It returns all stored operation states, including historical
+`PENDING_CONFIRMATION`, `FAILED`, and `UNDONE` records; clients must not display
+those states as effective quantity changes. Each element uses the operation response
+fields documented above. Internal idempotency keys are omitted.
+
+Authentication and inventory ownership are required. Foreign and missing inventory
+IDs return identical **404 / NOT_FOUND** responses. This endpoint is read-only and
+does not change inventory, operation records, versions, or timestamps. The global
+operation list and operation-detail endpoints remain planned.

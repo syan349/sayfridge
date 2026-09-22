@@ -69,6 +69,21 @@ async def list_inventory(session: AsyncSession, user_id: UUID, **query):
     return [_read_model(row) for row in rows if row["id"] is not None], rows[0]["total"]
 
 
+async def list_inventory_operations(
+    session: AsyncSession,
+    item_id: UUID,
+    user_id: UUID,
+) -> list[InventoryOperation]:
+    """Read every operation for one owned inventory item in deterministic newest-first order."""
+    await get_inventory(session, item_id, user_id)
+    result = await session.scalars(
+        select(InventoryOperation)
+        .where(InventoryOperation.inventory_item_id == item_id)
+        .order_by(InventoryOperation.created_at.desc(), InventoryOperation.id.desc())
+    )
+    return list(result.all())
+
+
 async def _space(session, space_id, user_id):
     space = (await session.execute(select(StorageSpace).where(
         StorageSpace.id == space_id, StorageSpace.user_id == user_id).with_for_update()

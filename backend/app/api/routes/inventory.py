@@ -19,7 +19,12 @@ from app.schemas.inventory import (
     InventoryUpdate,
 )
 from app.services import inventory as service
-from app.schemas.inventory_operations import InventoryOperationCreate, OperationResult, IdempotencyKey
+from app.schemas.inventory_operations import (
+    IdempotencyKey,
+    InventoryOperationCreate,
+    InventoryOperationRead,
+    OperationResult,
+)
 
 
 router = APIRouter(prefix="/api/v1/inventory-items", tags=["inventory"], responses={
@@ -63,6 +68,21 @@ async def create_inventory(payload: InventoryCreate, session: AsyncSession = Dep
                            user: User = Depends(get_current_user)):
     """Create a confirmed stock batch in active associations without an ADD event."""
     return await service.create_inventory(session, user.id, **payload.model_dump())
+
+
+@router.get(
+    "/{item_id}/operations",
+    response_model=list[InventoryOperationRead],
+    summary="List inventory operation history",
+)
+async def list_inventory_operations(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """List all operation records for one owned inventory item, newest first."""
+    return await service.list_inventory_operations(session, item_id, user.id)
+
 
 @router.post("/{item_id}/operations",
             responses={

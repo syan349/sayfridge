@@ -12,6 +12,7 @@
 | B11 | [Inventory consumption](B11_INVENTORY_CONSUMPTION_TEST_RESULTS.md) | CONSUME amounts/fractions, precision, state, retries, and concurrency |
 | B12 | [Inventory reconciliation](B12_INVENTORY_RECONCILIATION_TEST_RESULTS.md) | Confirmed totals, estimate clearing, state, retries, and atomicity |
 | B13 | [Inventory state](B13_INVENTORY_STATE_TEST_RESULTS.md) | Discard/archive transitions, preservation, isolation, and concurrency |
+| B14 | [Inventory history](B14_INVENTORY_HISTORY_TEST_RESULTS.md) | Item-scoped ordering, states, field exposure, and ownership; global queries pending |
 
 Manual requests: [Postman guide](POSTMAN_GUIDE.md).
 Setup and database configuration: [backend README](../../backend/README.md).
@@ -22,8 +23,8 @@ Run commands from `backend`. Uvicorn does not need to be running.
 
 | Execution | Selection | Command |
 | --- | --- | --- |
-| Local full regression | 471 scenarios | `python -m pytest -v` |
-| Local core check | 57 scenarios | `python -m pytest -v -m ci` |
+| Local full regression | 478 scenarios | `python -m pytest -v` |
+| Local core check | 59 scenarios | `python -m pytest -v -m ci` |
 | Automatic PR/main CI | Same core set | `python -m pytest -v -m ci --strict-markers` |
 | Manual workflow dispatch | Full suite | `python -m pytest -v --strict-markers` |
 | Database-free check | 122 scenarios | `python -m pytest -v -m "not postgres"` |
@@ -37,7 +38,7 @@ isolated schema and clean it up after each test.
 
 Use one test implementation for local and CI runs. Mark a small set covering
 permissions, representative workflows, atomic failures, and concurrency risks.
-Keep boundary variants in the full suite. The remaining 414 scenarios still run
+Keep boundary variants in the full suite. The remaining 419 scenarios still run
 in full regression; a core pass alone is not evidence of a full-suite pass.
 
 | Feature | Core scenarios |
@@ -51,7 +52,8 @@ in full regression; a core pass alone is not evidence of a full-suite pass.
 | Inventory reconciliation | 4 |
 | Inventory discard | 2 |
 | Inventory archive | 2 |
-| **Total** | **57** |
+| Item operation history | 2 |
+| **Total** | **59** |
 
 Use `@pytest.mark.ci` for a whole test or `pytest.param(..., marks=pytest.mark.ci)`
 for selected parameters. The marker is registered in `backend/pytest.ini`;

@@ -1,6 +1,6 @@
 # SayFridge Backend
 
-The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, metadata/location editing, discard, and archival are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented. Preview, history queries, Agent, and Worker features remain planned.
+The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, metadata/location editing, discard, and archival are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented, including item-scoped history reads. Preview, global history queries, Agent, and Worker features remain planned.
 
 ## Requirements
 
@@ -34,6 +34,7 @@ Once the server starts, the following endpoints are available:
 - Confirm a physical stocktake: the same operations endpoint (RECONCILE/AMOUNT)
 - Discard in-stock inventory: `POST http://127.0.0.1:8000/api/v1/inventory-items/{id}/discard`
 - Archive in-stock or empty inventory: `POST http://127.0.0.1:8000/api/v1/inventory-items/{id}/archive`
+- Item operation history: `GET http://127.0.0.1:8000/api/v1/inventory-items/{id}/operations`
 - API documentation: `http://127.0.0.1:8000/docs`
 
 ## Authentication settings
@@ -184,13 +185,13 @@ These tests use the existing isolated test database configuration and initialize
 within disposable test schemas. They do not need Uvicorn running.
 
 
-## Inventory quantity operations
+## Inventory quantity operations and item history
 
 B10–B12 use the existing inventory_item and inventory_operation tables. No schema
 change or incremental migration is introduced. Request/response schemas are in
 `app/schemas/inventory_operations.py`; the transaction is in `app/services/inventory.py`,
 and pure calculation helpers remain in `app/services/inventory_quantities.py`.
-See [API reference](../docs/API_REFERENCE.md#7-inventory-quantity-operations--b10b12) for requests
+See [API reference](../docs/API_REFERENCE.md#7-inventory-quantity-operations-and-history--b10b12-and-b14) for requests
 and retry behavior. Run the complete addition tests from backend:
 
 ```bash
@@ -216,4 +217,10 @@ Run the inventory state-action tests from backend:
 
 ```bash
 python -m pytest -v tests/test_inventory_discard.py tests/test_inventory_archive.py
+```
+
+Run the item-scoped operation history tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_item_history.py
 ```
