@@ -62,7 +62,10 @@ flutter:
 
   assets:
     - assets/icons/social/
+    - assets/icons/assistant/
+    - assets/icons/inventory/
     - assets/images/avatars/
+    - assets/images/assistant/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

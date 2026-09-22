@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
+import 'ai_assistant_screen.dart';
 import 'sign_up_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -34,8 +35,8 @@ class _SignInScreenState extends State<SignInScreen> {
   void _submit() {
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sign in is ready to connect to the API.')),
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const AiAssistantScreen()),
     );
   }
 
