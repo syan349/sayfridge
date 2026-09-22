@@ -378,7 +378,22 @@ The transition changes only status, version, and updated_at. It preserves initia
 confirmed, and estimated quantities and their timestamps, location, catalog
 association, dates, and notes. It creates no inventory operation record. Concurrent
 requests using the same version have one successful transition; later requests must
-reload the inventory state. Inventory archival remains planned separately.
+reload the inventory state.
+
+### POST /inventory-items/{id}/archive — B13
+
+```json
+{"expected_version":1}
+```
+
+The request contract, ownership rules, version errors, preserved fields, and
+single-winner concurrency behavior are the same as discard. **200** returns the
+Inventory response with status `ARCHIVED` and version incremented once.
+
+Archive accepts `IN_STOCK` and `EMPTY` inventory. `DISCARDED` and `ARCHIVED` return
+**409 / STATE_CONFLICT**. The transition is allowed when the containing space or
+catalog association is archived. It creates no inventory operation record and does
+not alter quantities or quantity timestamps.
 
 
 ## 7. Inventory quantity operations — B10–B12

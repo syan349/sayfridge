@@ -1,8 +1,7 @@
 # B13 Inventory State Test Results
 
-Date: 2026-09-21. Scope: the inventory discard endpoint on
-`syan349_feat_backend_apis`. Inventory archival remains pending and B13 is not yet
-complete as a whole.
+Date: 2026-09-22. Scope: inventory discard and archive endpoints on
+`syan349_feat_backend_apis`.
 
 ## Environment and command
 
@@ -12,7 +11,7 @@ scenario used a freshly migrated random schema and removed it afterward.
 Run from `backend`:
 
 ```bash
-python -m pytest -v tests/test_inventory_discard.py --strict-markers
+python -m pytest -v tests/test_inventory_discard.py tests/test_inventory_archive.py --strict-markers
 ```
 
 ## Coverage
@@ -25,11 +24,16 @@ python -m pytest -v tests/test_inventory_discard.py --strict-markers
 - Stale and maximum versions, invalid request bodies, authentication, and ownership.
 - Discard from an archived space.
 - Concurrent requests sharing one expected version have one winner.
+- Successful archival from both IN_STOCK and EMPTY while preserving the same facts.
+- Rejection of DISCARDED and already ARCHIVED source states.
+- Archive request validation, authorization, version boundaries, archived-space
+  behavior, and concurrent single-winner behavior.
 
 ## Verification status
 
-All 16 discard scenarios passed in 103.82 seconds. Two representative scenarios
-are marked for the core CI selection: the preservation lifecycle and concurrent
-single-winner behavior. Full regression, remote CI, manual Postman acceptance, and
-the inventory archive endpoint remain pending. No database structure change or
-migration script is required.
+All 16 archive scenarios passed in 100.97 seconds. The 16 discard scenarios also
+passed again in 99.83 seconds after the shared transaction refactor. Four
+representative scenarios are marked for the core CI selection: one preservation
+lifecycle and one concurrent single-winner case for each endpoint. Full regression,
+remote CI, and manual Postman acceptance remain pending. No database structure
+change or migration script is required.

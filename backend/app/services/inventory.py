@@ -157,14 +157,17 @@ async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
         raise
 
 
-async def discard_inventory(
+async def _transition_inventory_state(
     session: AsyncSession,
     item_id: UUID,
     user_id: UUID,
     *,
     expected_version: int,
+    target_status: str,
+    allowed_statuses: set[str],
+    conflict_message: str,
 ) -> InventoryItemRead:
-    """Move owned IN_STOCK inventory to the terminal DISCARDED state."""
+    """Apply one locked, version-checked terminal inventory transition."""
     try:
         planned = await get_inventory(session, item_id, user_id)
         space = await _space(session, planned.storage_space_id, user_id)
@@ -180,11 +183,11 @@ async def discard_inventory(
             raise InventoryError("RESOURCE_CHANGED", "Inventory location changed; refresh and retry")
         if item.version != expected_version:
             raise InventoryError("VERSION_CONFLICT", "Inventory has changed; refresh and retry")
-        if item.status != "IN_STOCK":
-            raise InventoryError("STATE_CONFLICT", "Only in-stock inventory can be discarded")
+        if item.status not in allowed_statuses:
+            raise InventoryError("STATE_CONFLICT", conflict_message)
         if item.version == 2147483647:
             raise InventoryError("VERSION_LIMIT_REACHED", "Inventory version limit reached")
-        item.status = "DISCARDED"
+        item.status = target_status
         item.version += 1
         await session.flush()
         result = await get_inventory(session, item.id, user_id)
@@ -193,6 +196,44 @@ async def discard_inventory(
     except Exception:
         await session.rollback()
         raise
+
+
+async def discard_inventory(
+    session: AsyncSession,
+    item_id: UUID,
+    user_id: UUID,
+    *,
+    expected_version: int,
+) -> InventoryItemRead:
+    """Move owned IN_STOCK inventory to the terminal DISCARDED state."""
+    return await _transition_inventory_state(
+        session,
+        item_id,
+        user_id,
+        expected_version=expected_version,
+        target_status="DISCARDED",
+        allowed_statuses={"IN_STOCK"},
+        conflict_message="Only in-stock inventory can be discarded",
+    )
+
+
+async def archive_inventory(
+    session: AsyncSession,
+    item_id: UUID,
+    user_id: UUID,
+    *,
+    expected_version: int,
+) -> InventoryItemRead:
+    """Move owned IN_STOCK or EMPTY inventory to the terminal ARCHIVED state."""
+    return await _transition_inventory_state(
+        session,
+        item_id,
+        user_id,
+        expected_version=expected_version,
+        target_status="ARCHIVED",
+        allowed_statuses={"IN_STOCK", "EMPTY"},
+        conflict_message="Only in-stock or empty inventory can be archived",
+    )
 
 async def _load_inventory_for_operation(session:AsyncSession, item_id:UUID, user_id:UUID) -> tuple[InventoryItem, StorageSpace]:
     inventory = await get_inventory(session, item_id, user_id)

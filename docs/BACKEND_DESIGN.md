@@ -336,7 +336,7 @@ All authenticated users can read public definitions. Only the owner can read and
 B07–B09 list/detail, stock creation, and metadata/location PATCH are implemented in
 `app/api/routes/inventory.py`, `app/schemas/inventory.py`, and
 `app/services/inventory.py`. The initial table definition includes nullable notes. Batch endpoints
-and inventory archival remain planned; B13 inventory discard is implemented. B10 ADD, B11 CONSUME, and B12
+remain planned; B13 inventory discard and archival are implemented. B10 ADD, B11 CONSUME, and B12
 RECONCILE submission are implemented under section 4.6.2. See the
 [API contract](API_REFERENCE.md#6-inventory--b07b09-and-b13). Shared Neon schema synchronization and manual
 acceptance remain separate deployment steps.
@@ -373,7 +373,7 @@ This phase provides no inventory definition correction. item_definition_id is im
 
 Endpoints: `POST /inventory-items/{id}/discard`, `POST /inventory-items/{id}/archive`.
 
-Implementation status: discard is implemented; archive remains planned.
+Implementation status: discard and archive are implemented.
 
 1. **Request fields:** expected_version; do not accept quantities or arbitrary status values.
 2. **Allowed state:** discard only from IN_STOCK; archive from IN_STOCK or EMPTY. DISCARDED and ARCHIVED are terminal and read-only. Repeated actions return 409 without changing version.

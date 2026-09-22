@@ -110,3 +110,16 @@ async def discard_inventory(
     return await service.discard_inventory(
         session, item_id, user.id, expected_version=payload.expected_version
     )
+
+
+@router.post("/{item_id}/archive", response_model=InventoryItemRead, summary="Archive inventory")
+async def archive_inventory(
+    item_id: UUID,
+    payload: InventoryStateAction,
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Archive owned in-stock or empty inventory without changing quantities or history."""
+    return await service.archive_inventory(
+        session, item_id, user.id, expected_version=payload.expected_version
+    )
