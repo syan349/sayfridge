@@ -27,6 +27,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       daysLeft: '1 day left',
       imageAsset: '$_inventoryRoot/chicken_drumstick.png',
       quantityIsEstimate: true,
+      expiryIsEstimate: true,
     ),
     InventoryItemData(
       name: 'Salmon Fillet',
@@ -49,6 +50,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       daysLeft: '2 day left',
       imageAsset: '$_inventoryRoot/milk.png',
       quantityIsEstimate: true,
+      expiryIsEstimate: true,
     ),
     InventoryItemData(
       name: 'Beef tenderloin',
@@ -56,6 +58,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       location: 'Freezer',
       daysLeft: '3 day left',
       imageAsset: '$_inventoryRoot/beef_tenderloin.png',
+      expiryIsEstimate: true,
     ),
     InventoryItemData(
       name: 'Bacon',
@@ -258,7 +261,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               TextSpan(
                 text: '6 items',
                 style: TextStyle(
-                  color: Color(0xFFDF5C18),
+                  color: inventoryEstimatedColor,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -267,7 +270,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
           style: TextStyle(fontSize: 19, height: 1.2),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
+        const Row(
+          children: [
+            _ValueLegendItem(label: 'Exact', color: inventoryExactColor),
+            SizedBox(width: 25),
+            _ValueLegendItem(
+              label: 'AI - Estimated',
+              color: inventoryEstimatedColor,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         for (var index = 0; index < _expiringItems.length; index++) ...[
           InventoryItemCard(item: _expiringItems[index]),
           if (index != _expiringItems.length - 1) const SizedBox(height: 14),
@@ -341,6 +355,32 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             ),
             child: const Text('Log in / Sign up'),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ValueLegendItem extends StatelessWidget {
+  const _ValueLegendItem({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 11,
+          height: 11,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: const TextStyle(color: Color(0xFF818181), fontSize: 15),
         ),
       ],
     );

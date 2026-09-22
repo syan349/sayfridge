@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'app_bottom_navigation.dart';
 
+const inventoryExactColor = Color(0xFF3F9E36);
+const inventoryEstimatedColor = Color(0xFFE95A18);
+
 class AssistantHeader extends StatelessWidget {
   const AssistantHeader({
     required this.onNewConversation,
@@ -292,6 +295,7 @@ class InventoryItemData {
     required this.daysLeft,
     required this.imageAsset,
     this.quantityIsEstimate = false,
+    this.expiryIsEstimate = false,
   });
 
   final String name;
@@ -300,6 +304,7 @@ class InventoryItemData {
   final String daysLeft;
   final String imageAsset;
   final bool quantityIsEstimate;
+  final bool expiryIsEstimate;
 }
 
 class InventoryItemCard extends StatelessWidget {
@@ -363,8 +368,8 @@ class InventoryItemCard extends StatelessWidget {
                               '${item.quantityIsEstimate ? '≈ ' : ''}${item.quantity}',
                           style: TextStyle(
                             color: item.quantityIsEstimate
-                                ? const Color(0xFFF16A24)
-                                : const Color(0xFF61B24B),
+                                ? inventoryEstimatedColor
+                                : inventoryExactColor,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -386,18 +391,33 @@ class InventoryItemCard extends StatelessWidget {
           ),
           const SizedBox(width: 7),
           SizedBox(
-            width: compact ? 86 : 94,
+            width: compact ? 100 : 112,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  item.daysLeft,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    color: Color(0xFFF15B20),
-                    fontSize: 14.5,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      AssistantAssets.warn,
+                      width: 19,
+                      height: 19,
+                      fit: BoxFit.contain,
+                      cacheWidth: 64,
+                    ),
+                    const SizedBox(width: 11),
+                    Text(
+                      item.daysLeft,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: item.expiryIsEstimate
+                            ? inventoryEstimatedColor
+                            : inventoryExactColor,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 13),
                 Transform.translate(

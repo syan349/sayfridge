@@ -16,6 +16,7 @@ abstract final class AssistantAssets {
   static const report = '$root/report.png';
   static const send = '$root/send.png';
   static const update = '$root/update.png';
+  static const warn = '$root/warn.png';
 }
 
 class AppBottomNavigation extends StatelessWidget {
