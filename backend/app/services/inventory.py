@@ -1,4 +1,4 @@
-"""Inventory ownership, snapshot reads, stock creation, and versioned metadata writes."""
+"""Inventory ownership, reads, creation, quantity operations, and versioned writes."""
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
@@ -148,6 +148,44 @@ async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
             for key, value in changed.items():
                 setattr(item, key, value)
             item.version += 1
+        await session.flush()
+        result = await get_inventory(session, item.id, user_id)
+        await session.commit()
+        return result
+    except Exception:
+        await session.rollback()
+        raise
+
+
+async def discard_inventory(
+    session: AsyncSession,
+    item_id: UUID,
+    user_id: UUID,
+    *,
+    expected_version: int,
+) -> InventoryItemRead:
+    """Move owned IN_STOCK inventory to the terminal DISCARDED state."""
+    try:
+        planned = await get_inventory(session, item_id, user_id)
+        space = await _space(session, planned.storage_space_id, user_id)
+        item = (await session.execute(
+            select(InventoryItem)
+            .where(InventoryItem.id == item_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )).scalar_one_or_none()
+        if item is None:
+            raise InventoryError("NOT_FOUND", "Inventory item not found")
+        if item.storage_space_id != space.id:
+            raise InventoryError("RESOURCE_CHANGED", "Inventory location changed; refresh and retry")
+        if item.version != expected_version:
+            raise InventoryError("VERSION_CONFLICT", "Inventory has changed; refresh and retry")
+        if item.status != "IN_STOCK":
+            raise InventoryError("STATE_CONFLICT", "Only in-stock inventory can be discarded")
+        if item.version == 2147483647:
+            raise InventoryError("VERSION_LIMIT_REACHED", "Inventory version limit reached")
+        item.status = "DISCARDED"
+        item.version += 1
         await session.flush()
         result = await get_inventory(session, item.id, user_id)
         await session.commit()

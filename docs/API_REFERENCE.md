@@ -1,4 +1,4 @@
-# SayFridge API Reference: B01–B12
+# SayFridge API Reference: B01–B13
 
 Implemented authentication, storage-space, catalog, and inventory contracts.
 For setup, see the [backend README](../backend/README.md). For implementation and
@@ -268,7 +268,7 @@ ACTIVE, even when the definition is already active; otherwise **409 / STATE_CONF
 A valid repeated restore leaves timestamps unchanged.
 
 
-## 6. Inventory — B07–B09
+## 6. Inventory — B07–B09 and B13
 
 Inventory requires nullable `inventory_item.notes` in the current table structure.
 See the backend README for development database synchronization; Neon is unchanged.
@@ -356,6 +356,29 @@ preserve version/timestamps. A change at the maximum version returns
 409 / VERSION_LIMIT_REACHED. Location changes during lock acquisition return
 409 / RESOURCE_CHANGED. Preserve all quantity/confirmation/estimate fields and
 initial facts; write no metadata/move event. After conflicts, reload before retrying.
+
+### POST /inventory-items/{id}/discard — B13
+
+```json
+{"expected_version":1}
+```
+
+The body accepts only `expected_version`, a strict integer from 1 through
+2147483647. Bearer authentication and ownership are required; foreign and missing
+IDs both return **404 / NOT_FOUND**.
+
+**200**, Inventory response with status `DISCARDED` and version incremented once.
+Only `IN_STOCK` inventory may be discarded. `EMPTY`, `DISCARDED`, and `ARCHIVED`
+return **409 / STATE_CONFLICT**. A stale version returns **409 / VERSION_CONFLICT**,
+and a successful write at the maximum version is rejected with
+**409 / VERSION_LIMIT_REACHED**. Discard remains allowed when the containing space
+or catalog association is archived.
+
+The transition changes only status, version, and updated_at. It preserves initial,
+confirmed, and estimated quantities and their timestamps, location, catalog
+association, dates, and notes. It creates no inventory operation record. Concurrent
+requests using the same version have one successful transition; later requests must
+reload the inventory state. Inventory archival remains planned separately.
 
 
 ## 7. Inventory quantity operations — B10–B12

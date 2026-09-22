@@ -1,4 +1,4 @@
-"""Authenticated inventory reads, stock entry, and metadata maintenance."""
+"""Authenticated inventory reads, stock entry, quantity, metadata, and state actions."""
 from typing import Annotated
 from uuid import UUID
 
@@ -10,7 +10,14 @@ from app.api.dependencies import get_current_user
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas.business import BusinessErrorResponse
-from app.schemas.inventory import InventoryCreate, InventoryUpdate, InventoryListQuery, InventoryItemRead, InventoryPage
+from app.schemas.inventory import (
+    InventoryCreate,
+    InventoryItemRead,
+    InventoryListQuery,
+    InventoryPage,
+    InventoryStateAction,
+    InventoryUpdate,
+)
 from app.services import inventory as service
 from app.schemas.inventory_operations import InventoryOperationCreate, OperationResult, IdempotencyKey
 
@@ -90,3 +97,16 @@ async def update_inventory(item_id: UUID, payload: InventoryUpdate,
     values = payload.model_dump(exclude_unset=True)
     version = values.pop("expected_version")
     return await service.update_inventory(session, item_id, user.id, expected_version=version, changes=values)
+
+
+@router.post("/{item_id}/discard", response_model=InventoryItemRead, summary="Discard inventory")
+async def discard_inventory(
+    item_id: UUID,
+    payload: InventoryStateAction,
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Mark owned in-stock inventory as discarded without changing quantities or history."""
+    return await service.discard_inventory(
+        session, item_id, user.id, expected_version=payload.expected_version
+    )

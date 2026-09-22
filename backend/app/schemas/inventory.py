@@ -1,4 +1,4 @@
-"""Inventory query, stock entry, metadata, and public response contracts."""
+"""Inventory query, stock entry, metadata, state-action, and response contracts."""
 import re
 from datetime import date, datetime
 from decimal import Decimal
@@ -68,6 +68,13 @@ class InventoryUpdate(BaseModel):
         if "storage_space_id" in self.model_fields_set and self.storage_space_id is None:
             raise ValueError("Storage space must not be null")
         return self
+
+
+class InventoryStateAction(BaseModel):
+    """Version guard for an explicit inventory state transition."""
+
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=1, le=2147483647, strict=True)
 
 
 class InventoryListQuery(BaseModel):
