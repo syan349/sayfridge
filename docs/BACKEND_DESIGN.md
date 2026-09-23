@@ -467,6 +467,10 @@ Implementation status: all three history endpoints are implemented.
 
 Use existing administrator accounts; do not automatically promote ordinary users. If none exist, prepare one as a deployment task. This phase excludes administrator audit, role promotion, private inventory inspection, and changing another user's password.
 
+B25 administrator account management is implemented as `GET /admin/users`,
+`GET /admin/users/{id}`, and `PATCH /admin/users/{id}/status`. Administrator public
+catalog maintenance remains separate work without a B25 scope expansion.
+
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
 | `GET /admin/users`, `GET /admin/users/{id}` | user, with administrator permission | Expose id, email, role, status, created_at, updated_at. List filters q/role/status; created_at, id descending. No hashes or inventory |
