@@ -12,6 +12,7 @@ from app.db.session import get_db_session
 from app.schemas.business import BusinessErrorResponse
 from app.schemas.inventory import (
     InventoryBatchCreate,
+    InventoryBatchMove,
     InventoryBatchResult,
     InventoryCreate,
     InventoryItemRead,
@@ -77,6 +78,26 @@ async def batch_create_inventory(
         session,
         user.id,
         [item.model_dump() for item in payload.items],
+    )
+    return InventoryBatchResult(items=items, count=len(items))
+
+
+@router.post(
+    "/batch-move",
+    response_model=InventoryBatchResult,
+    summary="Move multiple inventory items atomically",
+)
+async def batch_move_inventory(
+    payload: InventoryBatchMove,
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Move every referenced item to one active owned space, or change none."""
+    items = await service.move_inventory_batch(
+        session,
+        user.id,
+        target_storage_space_id=payload.target_storage_space_id,
+        items=[item.model_dump() for item in payload.items],
     )
     return InventoryBatchResult(items=items, count=len(items))
 

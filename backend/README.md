@@ -232,3 +232,9 @@ Run the implemented B15 batch-create tests from backend:
 ```bash
 python -m pytest -v tests/test_inventory_batch_create.py --strict-markers
 ```
+
+Run the implemented B15 batch-move tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_batch_move.py --strict-markers
+```

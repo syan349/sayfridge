@@ -386,7 +386,7 @@ Implementation status: discard and archive are implemented.
 
 Endpoints: `POST /inventory-items/batch-create`, `POST /inventory-items/batch-move`, `POST /inventory-items/batch-archive`.
 
-Implementation status: batch-create is implemented. Batch-move and batch-archive remain planned.
+Implementation status: batch-create and batch-move are implemented. Batch-archive remains planned.
 
 | Topic | batch-create | batch-move | batch-archive |
 | --- | --- | --- | --- |

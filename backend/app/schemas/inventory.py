@@ -60,6 +60,20 @@ class InventoryBatchCreate(BaseModel):
     items: list[InventoryCreate] = Field(min_length=1, max_length=100)
 
 
+class InventoryBatchItem(BaseModel):
+    """One version-guarded inventory reference inside a batch write."""
+
+    model_config = ConfigDict(extra="forbid")
+    id: UUID
+    expected_version: int = Field(ge=1, le=2147483647, strict=True)
+
+
+class InventoryBatchMove(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    target_storage_space_id: UUID
+    items: list[InventoryBatchItem] = Field(min_length=1, max_length=100)
+
+
 class InventoryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=1, le=2147483647, strict=True)

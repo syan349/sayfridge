@@ -43,7 +43,11 @@ async def validation_error(request: Request, exc: RequestValidationError) -> JSO
             "message": "Invalid request parameters",
             "errors": errors,
         }
-        if request.url.path == "/api/v1/inventory-items/batch-create" and errors:
+        if request.url.path in {
+            "/api/v1/inventory-items/batch-create",
+            "/api/v1/inventory-items/batch-move",
+            "/api/v1/inventory-items/batch-archive",
+        } and errors:
             item_index = next((part for part in errors[0]["loc"] if isinstance(part, int)), None)
             if item_index is not None:
                 detail["item_index"] = item_index

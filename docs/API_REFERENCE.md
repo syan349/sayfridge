@@ -365,6 +365,40 @@ STATE_CONFLICT; relationships changed during lock acquisition return 409 /
 RESOURCE_CHANGED. The endpoint has no idempotency guarantee, so retry only after
 checking whether a response was received.
 
+### POST /inventory-items/batch-move — B15
+
+```json
+{
+  "target_storage_space_id": "<owned active space UUID>",
+  "items": [
+    {"id":"<inventory UUID>","expected_version":1},
+    {"id":"<inventory UUID>","expected_version":4}
+  ]
+}
+```
+
+The body accepts one target space and 1–100 distinct inventory references. Each
+reference contains only `id` and a strict integer `expected_version` from 1 through
+2147483647. Duplicate IDs return 422 / VALIDATION_ERROR at the second occurrence.
+The target must be owned and ACTIVE. Foreign and missing targets both return 404 /
+NOT_FOUND; an archived target returns 409 / STATE_CONFLICT.
+
+**200**, `{"items":[InventoryItemRead],"count":2}` in request order. Every item
+must be owned and currently IN_STOCK or EMPTY. A moved item receives the target
+storage_space_id and increments its version once. Moving an item already in the
+target space is a no-op: it still validates ownership, state, version, and the
+target's ACTIVE state, but preserves its version and updated_at. A no-op therefore
+remains valid at the maximum version; an actual move at that version returns 409 /
+VERSION_LIMIT_REACHED.
+
+The entire batch is atomic. Missing or inaccessible items return 404 / NOT_FOUND;
+stale versions return 409 / VERSION_CONFLICT; terminal inventory returns 409 /
+STATE_CONFLICT. Entry-specific errors include zero-based `item_index`, and any
+failure leaves every item in its original space. The operation preserves quantities,
+quantity timestamps, item definition, dates, notes, and status, and writes no move
+history. There is no idempotent response replay; after a lost response, reload the
+items before retrying.
+
 ### PATCH /inventory-items/{id} — B09
 
 ```json
