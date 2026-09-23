@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
+import 'ai_assistant_screen.dart';
 import 'sign_up_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -34,8 +35,8 @@ class _SignInScreenState extends State<SignInScreen> {
   void _submit() {
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sign in is ready to connect to the API.')),
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const AiAssistantScreen()),
     );
   }
 
@@ -207,28 +208,29 @@ class _SocialButtons extends StatelessWidget {
           Semantics(
             button: true,
             label: 'Continue with ${provider.$1}',
-            child: InkWell(
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    '${provider.$1} sign in is ready to connect to the API.',
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${provider.$1} sign in is ready to connect to the API.',
+                    ),
                   ),
                 ),
-              ),
-              borderRadius: BorderRadius.circular(10),
-              child: Ink(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Image.asset(
-                    provider.$2,
-                    width: provider.$3,
-                    height: provider.$3,
-                    fit: BoxFit.contain,
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: Center(
+                    child: Image.asset(
+                      provider.$2,
+                      width: provider.$3,
+                      height: provider.$3,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),
