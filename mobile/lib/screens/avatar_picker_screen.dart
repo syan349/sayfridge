@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -177,17 +179,21 @@ class AvatarBubble extends StatelessWidget {
   const AvatarBubble({
     required this.choice,
     this.size,
+    this.imageBytes,
     this.selected = false,
     this.showUploadBadge = false,
     this.onTap,
+    this.onUploadTap,
     super.key,
   });
 
   final AvatarChoice choice;
   final double? size;
+  final Uint8List? imageBytes;
   final bool selected;
   final bool showUploadBadge;
   final VoidCallback? onTap;
+  final VoidCallback? onUploadTap;
 
   @override
   Widget build(BuildContext context) {
@@ -211,7 +217,9 @@ class AvatarBubble extends StatelessWidget {
                         )
                       : null,
                   child: ClipOval(
-                    child: Image.asset(choice.assetPath, fit: BoxFit.cover),
+                    child: imageBytes == null
+                        ? Image.asset(choice.assetPath, fit: BoxFit.cover)
+                        : Image.memory(imageBytes!, fit: BoxFit.cover),
                   ),
                 ),
               ),
@@ -219,17 +227,26 @@ class AvatarBubble extends StatelessWidget {
                 Positioned(
                   right: -1,
                   bottom: 0,
-                  child: Container(
+                  child: SizedBox(
                     width: resolvedSize * 0.3,
                     height: resolvedSize * 0.3,
-                    decoration: BoxDecoration(
+                    child: Material(
                       color: showUploadBadge ? Colors.white : AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      showUploadBadge ? Icons.ios_share_rounded : Icons.check,
-                      size: resolvedSize * 0.2,
-                      color: showUploadBadge ? AppColors.text : Colors.white,
+                      shape: const CircleBorder(),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: showUploadBadge ? onUploadTap : null,
+                        customBorder: const CircleBorder(),
+                        child: Icon(
+                          showUploadBadge
+                              ? Icons.ios_share_rounded
+                              : Icons.check,
+                          size: resolvedSize * 0.2,
+                          color: showUploadBadge
+                              ? AppColors.text
+                              : Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ),
