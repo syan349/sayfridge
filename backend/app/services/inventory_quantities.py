@@ -1,15 +1,16 @@
-"""Pure addition calculations shared by submission and future preview."""
+"""Pure quantity calculations shared by submission and future preview."""
 from dataclasses import dataclass
+from fractions import Fraction
 from decimal import Decimal, ROUND_HALF_UP
 
 from app.db.models import InventoryItem
 from app.core.quantity import (
-    MAX_QUANTITY, QUANTITY_PRECISION, QuantityError, validate_addition_amount,
+    MAX_QUANTITY, QUANTITY_PRECISION, QuantityError, validate_addition_amount, validate_quantity_amount,
+    parse_consumption_fraction,
 )
 
-
 @dataclass(frozen=True)
-class AdditionCalculation:
+class QuantityCalculation:
     """Calculated values only; no mutation, database writes, or new storage fields."""
 
     amount: Decimal
@@ -61,7 +62,7 @@ def convert_addition_amount(added_amount: Decimal, input_unit: str, target_unit:
     raise QuantityError("UNIT_NOT_CONVERTIBLE", "Units cannot be converted")
 
 
-def calculate_addition(item: InventoryItem, added_amount: Decimal, input_unit: str) -> AdditionCalculation:
+def calculate_addition(item: InventoryItem, added_amount: Decimal, input_unit: str) -> QuantityCalculation:
     """Round the applied change once, then add it to the effective balance."""
     validate_addition_amount(added_amount)
     current_amount, current_unit, amount_type = get_addition_base(item)
@@ -75,10 +76,55 @@ def calculate_addition(item: InventoryItem, added_amount: Decimal, input_unit: s
     if output_amount > MAX_QUANTITY:
         raise QuantityError("QUANTITY_OUT_OF_RANGE", "Inventory amount is above the maximum")
     method = "EXACT" if input_unit.strip().casefold() == current_unit.strip().casefold() else "CONVERTED"
-    return AdditionCalculation(output_amount, current_unit, amount_type, applied, method, applied != converted)
+    return QuantityCalculation(output_amount, current_unit, amount_type, applied, method, applied != converted)
 
 
 def prepare_addition(item: InventoryItem, added_amount: Decimal, input_unit: str) -> tuple[Decimal, str, str]:
     """Keep the learned tuple interface; submission also needs calculation details."""
     result = calculate_addition(item, added_amount, input_unit)
     return (result.amount, result.unit, result.affects_state)
+
+
+def calculate_consumption(item: InventoryItem, quantity_kind: str, quantity_value: str,
+                          input_unit: str) -> QuantityCalculation:
+    """Consume an amount or exact fraction without silently erasing a remainder.
+
+    Fraction arithmetic keeps arbitrary valid integer ratios exact. Only the final
+    applied change is rounded to 0.001 using integer half-up arithmetic.
+    """
+    current_amount, current_unit, amount_type = get_addition_base(item)
+    balance = Fraction(current_amount)
+    if quantity_kind == "FRACTION":
+        numerator, denominator = parse_consumption_fraction(quantity_value)
+        if input_unit != "remaining":
+            raise ValueError("Fraction quantity_unit must be remaining")
+        unrounded = balance * Fraction(numerator, denominator)
+        method = "EXACT"
+    elif quantity_kind == "AMOUNT":
+        amount = Decimal(quantity_value)
+        validate_addition_amount(amount)
+        unrounded = Fraction(convert_addition_amount(amount, input_unit, current_unit))
+        method = "EXACT" if input_unit.strip().casefold() == current_unit.strip().casefold() else "CONVERTED"
+    else:
+        raise ValueError("Unsupported quantity kind")
+    if unrounded > balance:
+        raise QuantityError("INSUFFICIENT_QUANTITY", "Consumption exceeds the current balance")
+
+    scaled = unrounded * 1000
+    whole, remainder = divmod(scaled.numerator, scaled.denominator)
+    milliunits = whole + (2 * remainder >= scaled.denominator)
+    applied = (Decimal(milliunits) / 1000).quantize(QUANTITY_PRECISION)
+    if applied == 0:
+        raise QuantityError("QUANTITY_TOO_SMALL", "Consumed amount rounds to zero in the inventory unit")
+    if applied > MAX_QUANTITY:
+        raise QuantityError("QUANTITY_OUT_OF_RANGE", "Consumed amount is above the maximum")
+    output_amount = current_amount - applied
+    if unrounded < balance and output_amount == 0:
+        raise QuantityError("QUANTITY_PRECISION_UNSUPPORTED", "Rounding would erase a positive remaining quantity")
+    return QuantityCalculation(output_amount, current_unit, amount_type, applied, method,
+                               Fraction(applied) != unrounded)
+
+def prepare_reconciliation(amount: Decimal, unit: str) -> tuple[Decimal, str]:
+    """Validate and return a confirmed stocktake total without unit conversion."""
+    validate_quantity_amount(amount, allow_zero=True)
+    return (amount, unit)
