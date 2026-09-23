@@ -1,4 +1,4 @@
-# SayFridge API Reference: B01–B12
+# SayFridge API Reference: B01–B14
 
 Implemented authentication, storage-space, catalog, and inventory contracts.
 For setup, see the [backend README](../backend/README.md). For implementation and
@@ -268,7 +268,7 @@ ACTIVE, even when the definition is already active; otherwise **409 / STATE_CONF
 A valid repeated restore leaves timestamps unchanged.
 
 
-## 6. Inventory — B07–B09
+## 6. Inventory — B07–B09 and B13
 
 Inventory requires nullable `inventory_item.notes` in the current table structure.
 See the backend README for development database synchronization; Neon is unchanged.
@@ -357,8 +357,46 @@ preserve version/timestamps. A change at the maximum version returns
 409 / RESOURCE_CHANGED. Preserve all quantity/confirmation/estimate fields and
 initial facts; write no metadata/move event. After conflicts, reload before retrying.
 
+### POST /inventory-items/{id}/discard — B13
 
-## 7. Inventory quantity operations — B10–B12
+```json
+{"expected_version":1}
+```
+
+The body accepts only `expected_version`, a strict integer from 1 through
+2147483647. Bearer authentication and ownership are required; foreign and missing
+IDs both return **404 / NOT_FOUND**.
+
+**200**, Inventory response with status `DISCARDED` and version incremented once.
+Only `IN_STOCK` inventory may be discarded. `EMPTY`, `DISCARDED`, and `ARCHIVED`
+return **409 / STATE_CONFLICT**. A stale version returns **409 / VERSION_CONFLICT**,
+and a successful write at the maximum version is rejected with
+**409 / VERSION_LIMIT_REACHED**. Discard remains allowed when the containing space
+or catalog association is archived.
+
+The transition changes only status, version, and updated_at. It preserves initial,
+confirmed, and estimated quantities and their timestamps, location, catalog
+association, dates, and notes. It creates no inventory operation record. Concurrent
+requests using the same version have one successful transition; later requests must
+reload the inventory state.
+
+### POST /inventory-items/{id}/archive — B13
+
+```json
+{"expected_version":1}
+```
+
+The request contract, ownership rules, version errors, preserved fields, and
+single-winner concurrency behavior are the same as discard. **200** returns the
+Inventory response with status `ARCHIVED` and version incremented once.
+
+Archive accepts `IN_STOCK` and `EMPTY` inventory. `DISCARDED` and `ARCHIVED` return
+**409 / STATE_CONFLICT**. The transition is allowed when the containing space or
+catalog association is archived. It creates no inventory operation record and does
+not alter quantities or quantity timestamps.
+
+
+## 7. Inventory quantity operations and history — B10–B12 and B14
 
 ### POST /inventory-items/{id}/operations
 
@@ -458,3 +496,47 @@ INSUFFICIENT_QUANTITY, QUANTITY_PRECISION_UNSUPPORTED.
 Manual verification: GET the inventory version, submit this request with a new key,
 then resend it unchanged. Expect 201 followed by 200, the same operation ID, and
 only one quantity change. No database initialization change is needed for B10–B12.
+
+### GET /inventory-items/{id}/operations — B14
+
+**200**, an array containing every operation for the owned inventory item. Results
+are ordered by `created_at` descending and then operation `id` descending, providing
+stable newest-first output. An item with no operation records returns `[]`.
+
+The endpoint remains available for `IN_STOCK`, `EMPTY`, `DISCARDED`, and `ARCHIVED`
+inventory. It returns all stored operation states, including historical
+`PENDING_CONFIRMATION`, `FAILED`, and `UNDONE` records; clients must not display
+those states as effective quantity changes. Each element uses the operation response
+fields documented above. Internal idempotency keys are omitted.
+
+Authentication and inventory ownership are required. Foreign and missing inventory
+IDs return identical **404 / NOT_FOUND** responses. This endpoint is read-only and
+does not change inventory, operation records, versions, or timestamps.
+
+### GET /inventory-operations — B14
+
+**200**, a paginated object containing `items`, `total`, `page`, and `page_size`.
+Only operations belonging to the current user's inventory are visible. Results use
+the same public operation fields and `created_at DESC, id DESC` ordering as the
+item-scoped endpoint.
+
+| Parameter | Default / meaning |
+| --- | --- |
+| inventory_item_id | Optional UUID; inaccessible or nonexistent values produce an empty page |
+| operation_type | Optional ADD, CONSUME, or RECONCILE |
+| status | Optional PENDING_CONFIRMATION, SUCCESS, FAILED, or UNDONE |
+| created_from | Optional timezone-aware timestamp; inclusive |
+| created_to | Optional timezone-aware timestamp; exclusive |
+| page, page_size | 1 and 20; page ≥1, page_size 1–100 |
+
+When both time boundaries are supplied, `created_from` must be earlier than
+`created_to`. Naive timestamps, invalid enums, reversed/equal ranges, and unknown
+query parameters return **422 / VALIDATION_ERROR**. Counts cover the complete
+filtered result, including when the requested page is empty.
+
+### GET /inventory-operations/{id} — B14
+
+**200**, one public operation response. The associated inventory may be in any
+state and may belong to archived associations. Foreign and missing operation IDs
+return identical **404 / NOT_FOUND** responses. Internal idempotency keys are not
+returned. This endpoint is read-only.

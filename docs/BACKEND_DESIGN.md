@@ -335,10 +335,10 @@ All authenticated users can read public definitions. Only the owner can read and
 
 B07–B09 list/detail, stock creation, and metadata/location PATCH are implemented in
 `app/api/routes/inventory.py`, `app/schemas/inventory.py`, and
-`app/services/inventory.py`. The initial table definition includes nullable notes. Batch endpoints,
-inventory state-action endpoints remain planned. B10 ADD, B11 CONSUME, and B12
+`app/services/inventory.py`. The initial table definition includes nullable notes. Batch endpoints
+remain planned; B13 inventory discard and archival are implemented. B10 ADD, B11 CONSUME, and B12
 RECONCILE submission are implemented under section 4.6.2. See the
-[API contract](API_REFERENCE.md#6-inventory--b07b09). Shared Neon schema synchronization and manual
+[API contract](API_REFERENCE.md#6-inventory--b07b09-and-b13). Shared Neon schema synchronization and manual
 acceptance remain separate deployment steps.
 
 Stock entry stores trimmed/casefolded units (1–16 characters before and after
@@ -372,6 +372,8 @@ This phase provides no inventory definition correction. item_definition_id is im
 #### 4.4.3 Disposal and archival
 
 Endpoints: `POST /inventory-items/{id}/discard`, `POST /inventory-items/{id}/archive`.
+
+Implementation status: discard and archive are implemented.
 
 1. **Request fields:** expected_version; do not accept quantities or arbitrary status values.
 2. **Allowed state:** discard only from IN_STOCK; archive from IN_STOCK or EMPTY. DISCARDED and ARCHIVED are terminal and read-only. Repeated actions return 409 without changing version.
@@ -444,6 +446,8 @@ response decision in section 10.1. See API_REFERENCE.md for the implemented cont
 Detailed preview response fields remain open in section 10.1.
 
 #### 4.6.3 History queries
+
+Implementation status: all three history endpoints are implemented.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
