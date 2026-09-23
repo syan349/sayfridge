@@ -1,4 +1,4 @@
-"""Inventory ownership, snapshot reads, stock creation, and versioned metadata writes."""
+"""Inventory ownership, reads, creation, quantity operations, and versioned writes."""
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import aliased
 
 from app.db.models import InventoryItem, InventoryOperation, ItemCategory, ItemDefinition, StorageSpace
 from app.schemas.inventory import InventoryItemRead
@@ -67,6 +68,78 @@ async def list_inventory(session: AsyncSession, user_id: UUID, **query):
     rows = (await session.execute(select(page, total.c.total).select_from(total).outerjoin(page, true())
             .order_by(page.c.expiry_date.asc().nulls_last(), page.c.id))).mappings().all()
     return [_read_model(row) for row in rows if row["id"] is not None], rows[0]["total"]
+
+
+async def list_inventory_operations(
+    session: AsyncSession,
+    item_id: UUID,
+    user_id: UUID,
+) -> list[InventoryOperation]:
+    """Read every operation for one owned inventory item in deterministic newest-first order."""
+    await get_inventory(session, item_id, user_id)
+    result = await session.scalars(
+        select(InventoryOperation)
+        .where(InventoryOperation.inventory_item_id == item_id)
+        .order_by(InventoryOperation.created_at.desc(), InventoryOperation.id.desc())
+    )
+    return list(result.all())
+
+
+def _select_owned_operations(user_id: UUID):
+    return (
+        select(InventoryOperation)
+        .join(InventoryItem, InventoryOperation.inventory_item_id == InventoryItem.id)
+        .join(StorageSpace, InventoryItem.storage_space_id == StorageSpace.id)
+        .where(StorageSpace.user_id == user_id)
+    )
+
+
+async def list_owned_inventory_operations(session: AsyncSession, user_id: UUID, **query):
+    """Read one deterministic page of operation history visible to the current user."""
+    statement = _select_owned_operations(user_id)
+    for key, column in (
+        ("inventory_item_id", InventoryOperation.inventory_item_id),
+        ("operation_type", InventoryOperation.operation_type),
+        ("status", InventoryOperation.status),
+    ):
+        if query[key] is not None:
+            statement = statement.where(column == query[key])
+    if query["created_from"] is not None:
+        statement = statement.where(InventoryOperation.created_at >= query["created_from"])
+    if query["created_to"] is not None:
+        statement = statement.where(InventoryOperation.created_at < query["created_to"])
+
+    filtered = statement.cte("filtered_inventory_operations")
+    total = select(func.count().label("total")).select_from(filtered).subquery()
+    page = (
+        select(filtered)
+        .order_by(filtered.c.created_at.desc(), filtered.c.id.desc())
+        .offset(min((query["page"] - 1) * query["page_size"], 2**63 - 1))
+        .limit(query["page_size"])
+        .subquery()
+    )
+    operation_model = aliased(InventoryOperation, page)
+    rows = (await session.execute(
+        select(operation_model, total.c.total)
+        .select_from(total)
+        .outerjoin(page, true())
+        .order_by(page.c.created_at.desc(), page.c.id.desc())
+    )).all()
+    return [operation for operation, _ in rows if operation is not None], rows[0].total
+
+
+async def get_inventory_operation(
+    session: AsyncSession,
+    operation_id: UUID,
+    user_id: UUID,
+) -> InventoryOperation:
+    """Read one operation through its inventory ownership chain."""
+    operation = (await session.execute(
+        _select_owned_operations(user_id).where(InventoryOperation.id == operation_id)
+    )).scalar_one_or_none()
+    if operation is None:
+        raise InventoryError("NOT_FOUND", "Inventory operation not found")
+    return operation
 
 
 async def _space(session, space_id, user_id):
@@ -155,6 +228,85 @@ async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
     except Exception:
         await session.rollback()
         raise
+
+
+async def _transition_inventory_state(
+    session: AsyncSession,
+    item_id: UUID,
+    user_id: UUID,
+    *,
+    expected_version: int,
+    target_status: str,
+    allowed_statuses: set[str],
+    conflict_message: str,
+) -> InventoryItemRead:
+    """Apply one locked, version-checked terminal inventory transition."""
+    try:
+        planned = await get_inventory(session, item_id, user_id)
+        space = await _space(session, planned.storage_space_id, user_id)
+        item = (await session.execute(
+            select(InventoryItem)
+            .where(InventoryItem.id == item_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )).scalar_one_or_none()
+        if item is None:
+            raise InventoryError("NOT_FOUND", "Inventory item not found")
+        if item.storage_space_id != space.id:
+            raise InventoryError("RESOURCE_CHANGED", "Inventory location changed; refresh and retry")
+        if item.version != expected_version:
+            raise InventoryError("VERSION_CONFLICT", "Inventory has changed; refresh and retry")
+        if item.status not in allowed_statuses:
+            raise InventoryError("STATE_CONFLICT", conflict_message)
+        if item.version == 2147483647:
+            raise InventoryError("VERSION_LIMIT_REACHED", "Inventory version limit reached")
+        item.status = target_status
+        item.version += 1
+        await session.flush()
+        result = await get_inventory(session, item.id, user_id)
+        await session.commit()
+        return result
+    except Exception:
+        await session.rollback()
+        raise
+
+
+async def discard_inventory(
+    session: AsyncSession,
+    item_id: UUID,
+    user_id: UUID,
+    *,
+    expected_version: int,
+) -> InventoryItemRead:
+    """Move owned IN_STOCK inventory to the terminal DISCARDED state."""
+    return await _transition_inventory_state(
+        session,
+        item_id,
+        user_id,
+        expected_version=expected_version,
+        target_status="DISCARDED",
+        allowed_statuses={"IN_STOCK"},
+        conflict_message="Only in-stock inventory can be discarded",
+    )
+
+
+async def archive_inventory(
+    session: AsyncSession,
+    item_id: UUID,
+    user_id: UUID,
+    *,
+    expected_version: int,
+) -> InventoryItemRead:
+    """Move owned IN_STOCK or EMPTY inventory to the terminal ARCHIVED state."""
+    return await _transition_inventory_state(
+        session,
+        item_id,
+        user_id,
+        expected_version=expected_version,
+        target_status="ARCHIVED",
+        allowed_statuses={"IN_STOCK", "EMPTY"},
+        conflict_message="Only in-stock or empty inventory can be archived",
+    )
 
 async def _load_inventory_for_operation(session:AsyncSession, item_id:UUID, user_id:UUID) -> tuple[InventoryItem, StorageSpace]:
     inventory = await get_inventory(session, item_id, user_id)

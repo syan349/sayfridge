@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from app.core.quantity import validate_quantity_amount, parse_consumption_fraction
 from app.schemas.inventory import InventoryItemRead
@@ -86,6 +86,34 @@ class InventoryOperationRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     undone_at: datetime | None
+
+
+class InventoryOperationListQuery(BaseModel):
+    """Filters and pagination for the current user's operation history."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    inventory_item_id: UUID | None = None
+    operation_type: Literal["ADD", "CONSUME", "RECONCILE"] | None = None
+    status: Literal["PENDING_CONFIRMATION", "SUCCESS", "FAILED", "UNDONE"] | None = None
+    created_from: AwareDatetime | None = None
+    created_to: AwareDatetime | None = None
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def validate_time_range(self):
+        if self.created_from is not None and self.created_to is not None:
+            if self.created_from >= self.created_to:
+                raise ValueError("created_from must be earlier than created_to")
+        return self
+
+
+class InventoryOperationPage(BaseModel):
+    items: list[InventoryOperationRead]
+    total: int
+    page: int
+    page_size: int
 
 
 class OperationResult(BaseModel):
