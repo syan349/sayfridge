@@ -1,15 +1,15 @@
 """Inventory ownership, reads, creation, quantity operations, and versioned writes."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, or_, select, true
+from sqlalchemy import case, func, literal, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
 from app.db.models import InventoryItem, InventoryOperation, ItemCategory, ItemDefinition, StorageSpace
-from app.schemas.inventory import InventoryItemRead
+from app.schemas.inventory import ExpirySummaryItem, InventoryItemRead
 from app.schemas.inventory_operations import InventoryOperationRead, OperationResult
 from app.services.inventory_quantities import calculate_addition, calculate_consumption, prepare_reconciliation
 from app.core.quantity import QuantityError
@@ -69,6 +69,67 @@ async def list_inventory(session: AsyncSession, user_id: UUID, **query):
     rows = (await session.execute(select(page, total.c.total).select_from(total).outerjoin(page, true())
             .order_by(page.c.expiry_date.asc().nulls_last(), page.c.id))).mappings().all()
     return [_read_model(row) for row in rows if row["id"] is not None], rows[0]["total"]
+
+
+async def get_expiry_summary(session: AsyncSession, user_id: UUID, **query):
+    """Return expiry counts and one detail page from the same database statement."""
+    window_end = query["as_of"] + timedelta(days=query["days_before"])
+    bucket = case(
+        (InventoryItem.expiry_date < query["as_of"], literal("overdue")),
+        (InventoryItem.expiry_date == query["as_of"], literal("today")),
+        else_=literal("upcoming"),
+    ).label("bucket")
+    statement = _select_inventory(user_id).add_columns(bucket).where(
+        InventoryItem.status == "IN_STOCK",
+        InventoryItem.expiry_date.is_not(None),
+        InventoryItem.expiry_date <= window_end,
+    )
+    for key, column in (
+        ("storage_space_id", InventoryItem.storage_space_id),
+        ("category_id", ItemCategory.id),
+    ):
+        if query[key] is not None:
+            statement = statement.where(column == query[key])
+
+    all_buckets = statement.cte("expiry_inventory")
+    counts = select(
+        func.count().filter(all_buckets.c.bucket == "overdue").label("overdue"),
+        func.count().filter(all_buckets.c.bucket == "today").label("today"),
+        func.count().filter(all_buckets.c.bucket == "upcoming").label("upcoming"),
+    ).select_from(all_buckets).subquery()
+
+    filtered = select(all_buckets)
+    if query["bucket"] is not None:
+        filtered = filtered.where(all_buckets.c.bucket == query["bucket"])
+    filtered = filtered.cte("filtered_expiry_inventory")
+    total = select(func.count()).select_from(filtered).scalar_subquery().label("total")
+    page = (
+        select(filtered)
+        .order_by(filtered.c.expiry_date, filtered.c.id)
+        .offset(min((query["page"] - 1) * query["page_size"], 2**63 - 1))
+        .limit(query["page_size"])
+        .subquery()
+    )
+    rows = (await session.execute(
+        select(page, counts.c.overdue, counts.c.today, counts.c.upcoming, total)
+        .select_from(counts)
+        .outerjoin(page, true())
+        .order_by(page.c.expiry_date, page.c.id)
+    )).mappings().all()
+    items = [
+        ExpirySummaryItem(
+            **_read_model(row).model_dump(),
+            bucket=row["bucket"],
+        )
+        for row in rows
+        if row["id"] is not None
+    ]
+    first = rows[0]
+    return items, {
+        "overdue": first["overdue"],
+        "today": first["today"],
+        "upcoming": first["upcoming"],
+    }, first["total"]
 
 
 async def list_inventory_operations(

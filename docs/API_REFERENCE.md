@@ -268,7 +268,7 @@ ACTIVE, even when the definition is already active; otherwise **409 / STATE_CONF
 A valid repeated restore leaves timestamps unchanged.
 
 
-## 6. Inventory — B07–B09 and B13
+## 6. Inventory — B07–B09, B13, B15, and B22
 
 Inventory requires nullable `inventory_item.notes` in the current table structure.
 See the backend README for development database synchronization; Neon is unchanged.
@@ -312,6 +312,26 @@ filter inventory state only, not associated resource states.
 ### GET /inventory-items/{id} — B07
 
 **200**, Inventory response in any inventory state. Read-only.
+
+### GET /inventory-items/expiry-summary — B22
+
+Required query: `as_of=YYYY-MM-DD`. Optional query: `days_before` (default 3,
+0–365), `storage_space_id`, `category_id`, `bucket=overdue|today|upcoming`, `page`,
+and `page_size`. Adding `days_before` to `as_of` must remain within the legal date
+range.
+
+**200**, `{"counts":{"overdue":0,"today":0,"upcoming":0},"items":[],"total":0,
+"page":1,"page_size":20}`. Each item contains the normal Inventory response plus
+its `bucket`. The query includes only the current user's IN_STOCK inventory with a
+known expiry date. Archived spaces, definitions, and categories do not hide
+existing inventory.
+
+An expiry before `as_of` is overdue; equality is today; a later expiry through
+`as_of + days_before` inclusive is upcoming. Later and unknown dates are excluded.
+`counts` always covers all three buckets after space/category filtering. `bucket`
+filters only `items` and `total`. Results sort by expiry_date then ID ascending and
+use the standard pagination contract. Counts, total, and page come from one database
+statement. The endpoint writes nothing and sends no reminder or notification.
 
 ### POST /inventory-items — B08
 

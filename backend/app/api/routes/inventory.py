@@ -11,6 +11,8 @@ from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas.business import BusinessErrorResponse
 from app.schemas.inventory import (
+    ExpirySummary,
+    ExpirySummaryQuery,
     InventoryBatchArchive,
     InventoryBatchCreate,
     InventoryBatchMove,
@@ -120,6 +122,31 @@ async def batch_archive_inventory(
         items=[item.model_dump() for item in payload.items],
     )
     return InventoryBatchResult(items=items, count=len(items))
+
+
+@router.get(
+    "/expiry-summary",
+    response_model=ExpirySummary,
+    summary="Summarize owned inventory by expiry bucket",
+)
+async def get_expiry_summary(
+    query: Annotated[ExpirySummaryQuery, Query()],
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Return overdue, due-today, and upcoming stock from one read snapshot."""
+    items, counts, total = await service.get_expiry_summary(
+        session,
+        user.id,
+        **query.model_dump(),
+    )
+    return ExpirySummary(
+        counts=counts,
+        items=items,
+        total=total,
+        page=query.page,
+        page_size=query.page_size,
+    )
 
 
 @router.get("/{item_id}", response_model=InventoryItemRead, summary="Read owned inventory")

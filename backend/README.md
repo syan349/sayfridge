@@ -244,3 +244,9 @@ Run the implemented B15 batch-archive tests from backend:
 ```bash
 python -m pytest -v tests/test_inventory_batch_archive.py --strict-markers
 ```
+
+Run the B22 expiry-summary tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_expiry_summary.py --strict-markers
+```
