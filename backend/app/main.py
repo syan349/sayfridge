@@ -37,11 +37,17 @@ async def validation_error(request: Request, exc: RequestValidationError) -> JSO
     if any(request.url.path == prefix or request.url.path.startswith(prefix + "/")
            for prefix in ("/api/v1/storage-spaces", "/api/v1/item-categories", "/api/v1/item-definitions",
                           "/api/v1/inventory-items", "/api/v1/inventory-operations")):
-        return JSONResponse(status_code=422, content={"detail": {
+        errors = [{"loc": error["loc"], "msg": error["msg"]} for error in exc.errors()]
+        detail = {
             "code": "VALIDATION_ERROR",
             "message": "Invalid request parameters",
-            "errors": [{"loc": error["loc"], "msg": error["msg"]} for error in exc.errors()],
-        }})
+            "errors": errors,
+        }
+        if request.url.path == "/api/v1/inventory-items/batch-create" and errors:
+            item_index = next((part for part in errors[0]["loc"] if isinstance(part, int)), None)
+            if item_index is not None:
+                detail["item_index"] = item_index
+        return JSONResponse(status_code=422, content={"detail": detail})
     return JSONResponse(
         status_code=422,
         content={"detail": [

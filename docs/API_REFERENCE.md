@@ -336,6 +336,35 @@ confirmed_at is server time, estimates are NULL, version is 1. No ADD event is c
 State checks coordinate with concurrent archival. Relationship changes during lock
 acquisition return 409 / RESOURCE_CHANGED. Creation has no idempotency guarantee.
 
+### POST /inventory-items/batch-create — B15
+
+```json
+{
+  "items": [
+    {"storage_space_id":"<space UUID>","item_definition_id":"<definition UUID>","amount":"2.5","unit":"kg"},
+    {"storage_space_id":"<space UUID>","item_definition_id":"<definition UUID>","amount":"3","unit":"each","notes":"Second package"}
+  ]
+}
+```
+
+The body accepts only `items`, containing 1–100 `InventoryCreate` objects. Each
+entry follows the same amount, unit, date, notes, ownership, visibility, and ACTIVE
+association rules as `POST /inventory-items`. Identical entries are allowed because
+they may represent separate physical stock batches.
+
+**201**, `{"items":[InventoryItemRead],"count":2}`. Returned items remain in input
+order. Every row starts IN_STOCK at version 1 with equal initial and confirmed
+quantities, no estimate, and no ADD operation history.
+
+The complete request is one transaction: validation or database failure for any
+entry rolls back every insertion. Batch business errors include the zero-based
+`item_index` of the first determined failing entry; request-level errors such as an
+empty or oversized `items` list have no item index. Missing and inaccessible
+associations both return 404 / NOT_FOUND; archived associations return 409 /
+STATE_CONFLICT; relationships changed during lock acquisition return 409 /
+RESOURCE_CHANGED. The endpoint has no idempotency guarantee, so retry only after
+checking whether a response was received.
+
 ### PATCH /inventory-items/{id} — B09
 
 ```json

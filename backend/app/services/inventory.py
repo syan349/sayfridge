@@ -16,9 +16,10 @@ from app.core.quantity import QuantityError
 
 
 class InventoryError(Exception):
-    def __init__(self, code: str, message: str):
+    def __init__(self, code: str, message: str, *, item_index: int | None = None):
         super().__init__(message)
         self.code = code
+        self.item_index = item_index
 
 
 def _select_inventory(user_id):
@@ -186,6 +187,190 @@ async def create_inventory(session: AsyncSession, user_id: UUID, **values) -> In
         await session.flush()
         result = await get_inventory(session, item.id, user_id)
         # Stock entry deliberately creates no ADD event in this phase.
+        await session.commit()
+        return result
+    except Exception:
+        await session.rollback()
+        raise
+
+
+def _batch_error(error: InventoryError, item_index: int) -> InventoryError:
+    """Attach the first failing request position without changing its business code."""
+    if error.item_index is None:
+        error.item_index = item_index
+    return error
+
+
+async def create_inventory_batch(
+    session: AsyncSession,
+    user_id: UUID,
+    items: list[dict],
+) -> list[InventoryItemRead]:
+    """Create 1–100 stock rows in one transaction and preserve request order."""
+    try:
+        definition_ids = {values["item_definition_id"] for values in items}
+        space_ids = {values["storage_space_id"] for values in items}
+        planned_definitions = {
+            definition.id: definition
+            for definition in (await session.scalars(
+                select(ItemDefinition).where(
+                    ItemDefinition.id.in_(definition_ids),
+                    or_(
+                        ItemDefinition.owner_user_id.is_(None),
+                        ItemDefinition.owner_user_id == user_id,
+                    ),
+                )
+            )).all()
+        }
+        planned_spaces = {
+            space.id: space
+            for space in (await session.scalars(
+                select(StorageSpace).where(
+                    StorageSpace.id.in_(space_ids),
+                    StorageSpace.user_id == user_id,
+                )
+            )).all()
+        }
+        category_ids = {definition.category_id for definition in planned_definitions.values()}
+        planned_categories = {
+            category.id: category
+            for category in (await session.scalars(
+                select(ItemCategory).where(ItemCategory.id.in_(category_ids))
+            )).all()
+        }
+
+        planned_category_ids: list[UUID] = []
+        for item_index, values in enumerate(items):
+            space = planned_spaces.get(values["storage_space_id"])
+            if space is None:
+                raise InventoryError(
+                    "NOT_FOUND",
+                    "Storage space not found",
+                    item_index=item_index,
+                )
+            definition = planned_definitions.get(values["item_definition_id"])
+            if definition is None:
+                raise InventoryError(
+                    "NOT_FOUND",
+                    "Item definition not found",
+                    item_index=item_index,
+                )
+            category = planned_categories.get(definition.category_id)
+            if category is None:
+                raise InventoryError(
+                    "NOT_FOUND",
+                    "Item category not found",
+                    item_index=item_index,
+                )
+            for resource, description in (
+                (space, "Storage space"),
+                (category, "Item category"),
+                (definition, "Item definition"),
+            ):
+                try:
+                    _active(resource, description)
+                except InventoryError as error:
+                    raise _batch_error(error, item_index)
+            planned_category_ids.append(definition.category_id)
+
+        # Acquire every row in the same resource/id order used by other inventory writes.
+        spaces: dict[UUID, StorageSpace] = {}
+        for space_id in sorted(space_ids):
+            space = (await session.execute(
+                select(StorageSpace)
+                .where(StorageSpace.id == space_id, StorageSpace.user_id == user_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )).scalar_one_or_none()
+            if space is not None:
+                spaces[space_id] = space
+
+        categories: dict[UUID, ItemCategory] = {}
+        for category_id in sorted(set(planned_category_ids)):
+            category = (await session.execute(
+                select(ItemCategory)
+                .where(ItemCategory.id == category_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )).scalar_one_or_none()
+            if category is not None:
+                categories[category_id] = category
+
+        definitions: dict[UUID, ItemDefinition] = {}
+        for definition_id in sorted(definition_ids):
+            definition = (await session.execute(
+                select(ItemDefinition)
+                .where(ItemDefinition.id == definition_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )).scalar_one_or_none()
+            if definition is not None:
+                definitions[definition_id] = definition
+
+        now = datetime.now(timezone.utc)
+        created: list[InventoryItem] = []
+        for item_index, (submitted, category_id) in enumerate(zip(items, planned_category_ids)):
+            values = dict(submitted)
+            space = spaces.get(values["storage_space_id"])
+            if space is None:
+                raise InventoryError(
+                    "NOT_FOUND",
+                    "Storage space not found",
+                    item_index=item_index,
+                )
+            definition = definitions.get(values["item_definition_id"])
+            if definition is None or (
+                definition.owner_user_id is not None and definition.owner_user_id != user_id
+            ):
+                raise InventoryError(
+                    "NOT_FOUND",
+                    "Item definition not found",
+                    item_index=item_index,
+                )
+            if definition.category_id != category_id:
+                raise InventoryError(
+                    "RESOURCE_CHANGED",
+                    "Item category changed; refresh and retry",
+                    item_index=item_index,
+                )
+            category = categories.get(category_id)
+            if category is None:
+                raise InventoryError(
+                    "NOT_FOUND",
+                    "Item category not found",
+                    item_index=item_index,
+                )
+            for resource, description in (
+                (space, "Storage space"),
+                (category, "Item category"),
+                (definition, "Item definition"),
+            ):
+                try:
+                    _active(resource, description)
+                except InventoryError as error:
+                    raise _batch_error(error, item_index)
+            amount = Decimal(values.pop("amount"))
+            unit = values.pop("unit")
+            created.append(InventoryItem(
+                **values,
+                initial_amount=amount,
+                initial_unit=unit,
+                confirmed_current_amount=amount,
+                confirmed_current_unit=unit,
+                confirmed_at=now,
+                status="IN_STOCK",
+                version=1,
+            ))
+
+        session.add_all(created)
+        await session.flush()
+        rows = (await session.execute(
+            _select_inventory(user_id).where(
+                InventoryItem.id.in_([item.id for item in created])
+            )
+        )).mappings().all()
+        by_id = {row["id"]: _read_model(row) for row in rows}
+        result = [by_id[item.id] for item in created]
         await session.commit()
         return result
     except Exception:

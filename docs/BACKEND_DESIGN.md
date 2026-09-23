@@ -386,6 +386,8 @@ Implementation status: discard and archive are implemented.
 
 Endpoints: `POST /inventory-items/batch-create`, `POST /inventory-items/batch-move`, `POST /inventory-items/batch-archive`.
 
+Implementation status: batch-create is implemented. Batch-move and batch-archive remain planned.
+
 | Topic | batch-create | batch-move | batch-archive |
 | --- | --- | --- | --- |
 | Request | items: InventoryCreate[] | target_storage_space_id, items: [{id, expected_version}] | items: [{id, expected_version}] |

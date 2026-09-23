@@ -53,6 +53,13 @@ class InventoryCreate(BaseModel):
         return value
 
 
+class InventoryBatchCreate(BaseModel):
+    """One atomic request containing independently validated stock entries."""
+
+    model_config = ConfigDict(extra="forbid")
+    items: list[InventoryCreate] = Field(min_length=1, max_length=100)
+
+
 class InventoryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=1, le=2147483647, strict=True)
@@ -132,3 +139,8 @@ class InventoryPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class InventoryBatchResult(BaseModel):
+    items: list[InventoryItemRead]
+    count: int

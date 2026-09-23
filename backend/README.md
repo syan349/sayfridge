@@ -226,3 +226,9 @@ Run the operation history tests from backend:
 ```bash
 python -m pytest -v tests/test_inventory_item_history.py tests/test_inventory_operation_history.py
 ```
+
+Run the implemented B15 batch-create tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_batch_create.py --strict-markers
+```

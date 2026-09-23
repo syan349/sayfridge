@@ -11,6 +11,8 @@ from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas.business import BusinessErrorResponse
 from app.schemas.inventory import (
+    InventoryBatchCreate,
+    InventoryBatchResult,
     InventoryCreate,
     InventoryItemRead,
     InventoryListQuery,
@@ -44,7 +46,10 @@ async def inventory_error_handler(request: Request, exc: service.InventoryError)
     else:
         status_code = 409
 
-    return JSONResponse(status_code=status_code, content={"detail": {"code": exc.code, "message": str(exc)}})
+    detail = {"code": exc.code, "message": str(exc)}
+    if exc.item_index is not None:
+        detail["item_index"] = exc.item_index
+    return JSONResponse(status_code=status_code, content={"detail": detail})
 
 
 @router.get("", response_model=InventoryPage, summary="List owned inventory")
@@ -54,6 +59,26 @@ async def list_inventory(query: Annotated[InventoryListQuery, Query()],
     """Read a filtered page using current names and estimate-first display quantities."""
     items, total = await service.list_inventory(session, user.id, **query.model_dump())
     return InventoryPage(items=items, total=total, page=query.page, page_size=query.page_size)
+
+
+@router.post(
+    "/batch-create",
+    response_model=InventoryBatchResult,
+    status_code=201,
+    summary="Create multiple stock batches atomically",
+)
+async def batch_create_inventory(
+    payload: InventoryBatchCreate,
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Create every requested stock row, or roll back the complete batch."""
+    items = await service.create_inventory_batch(
+        session,
+        user.id,
+        [item.model_dump() for item in payload.items],
+    )
+    return InventoryBatchResult(items=items, count=len(items))
 
 
 @router.get("/{item_id}", response_model=InventoryItemRead, summary="Read owned inventory")
