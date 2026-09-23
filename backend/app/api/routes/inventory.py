@@ -11,6 +11,7 @@ from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas.business import BusinessErrorResponse
 from app.schemas.inventory import (
+    InventoryBatchArchive,
     InventoryBatchCreate,
     InventoryBatchMove,
     InventoryBatchResult,
@@ -97,6 +98,25 @@ async def batch_move_inventory(
         session,
         user.id,
         target_storage_space_id=payload.target_storage_space_id,
+        items=[item.model_dump() for item in payload.items],
+    )
+    return InventoryBatchResult(items=items, count=len(items))
+
+
+@router.post(
+    "/batch-archive",
+    response_model=InventoryBatchResult,
+    summary="Archive multiple inventory items atomically",
+)
+async def batch_archive_inventory(
+    payload: InventoryBatchArchive,
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Archive every referenced in-stock or empty item, or change none."""
+    items = await service.archive_inventory_batch(
+        session,
+        user.id,
         items=[item.model_dump() for item in payload.items],
     )
     return InventoryBatchResult(items=items, count=len(items))

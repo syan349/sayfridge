@@ -74,6 +74,11 @@ class InventoryBatchMove(BaseModel):
     items: list[InventoryBatchItem] = Field(min_length=1, max_length=100)
 
 
+class InventoryBatchArchive(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[InventoryBatchItem] = Field(min_length=1, max_length=100)
+
+
 class InventoryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=1, le=2147483647, strict=True)

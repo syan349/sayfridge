@@ -1,7 +1,7 @@
 # B15 Inventory Batch Test Results
 
-Date: 2026-09-23. Current scope: atomic batch creation and batch movement on
-`syan349_feat_backend_apis`. Batch archive remains pending.
+Date: 2026-09-23. Current scope: atomic batch creation, movement, and archival on
+`syan349_feat_backend_apis`.
 
 ## Environment and command
 
@@ -11,7 +11,7 @@ scenario used a freshly migrated random schema and removed it afterward.
 Run from `backend`:
 
 ```bash
-python -m pytest -v tests/test_inventory_batch_create.py tests/test_inventory_batch_move.py --strict-markers
+python -m pytest -v tests/test_inventory_batch_create.py tests/test_inventory_batch_move.py tests/test_inventory_batch_archive.py --strict-markers
 ```
 
 ## Coverage
@@ -30,12 +30,18 @@ python -m pytest -v tests/test_inventory_batch_create.py tests/test_inventory_ba
 - Duplicate IDs, ownership isolation, stale versions, and terminal states.
 - Version increments for actual moves and maximum-version handling.
 - Quantity, status, metadata, and operation-history preservation during moves.
+- Atomic archival of owned IN_STOCK and EMPTY items in request order.
+- Status and version changes with quantities, timestamps, location, metadata, and
+  operation history preserved.
+- Archival from archived source spaces, maximum-version handling, and rollback for
+  missing, foreign, stale, discarded, or already archived entries.
 
 ## Verification status
 
 All 11 batch-create scenarios passed locally in 67.35 seconds. All 15 batch-move
-scenarios passed locally in 106.03 seconds. Six representative scenarios are marked
-for the core selection across the two endpoints. Full regression and manual Postman
-acceptance remain pending. GitHub Actions is currently unavailable because the
-organization has exhausted its Actions quota. No database structure change or
-migration script is required.
+scenarios passed locally in 106.03 seconds. All 13 batch-archive scenarios passed
+locally in 97.10 seconds. Nine representative scenarios are marked for the core
+selection across the three endpoints. Full regression and manual Postman acceptance
+remain pending. GitHub Actions is currently unavailable because the organization
+has exhausted its Actions quota. No database structure change or migration script
+is required.

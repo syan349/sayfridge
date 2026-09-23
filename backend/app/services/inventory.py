@@ -525,6 +525,134 @@ async def move_inventory_batch(
         raise
 
 
+async def archive_inventory_batch(
+    session: AsyncSession,
+    user_id: UUID,
+    *,
+    items: list[dict],
+) -> list[InventoryItemRead]:
+    """Archive versioned inventory references in one all-or-nothing transaction."""
+    try:
+        item_ids: set[UUID] = set()
+        for item_index, reference in enumerate(items):
+            if reference["id"] in item_ids:
+                raise InventoryError(
+                    "VALIDATION_ERROR",
+                    "Duplicate inventory item ID",
+                    item_index=item_index,
+                )
+            item_ids.add(reference["id"])
+
+        planned_items = {
+            item.id: item
+            for item in (await session.scalars(
+                select(InventoryItem)
+                .join(StorageSpace)
+                .where(
+                    InventoryItem.id.in_(item_ids),
+                    StorageSpace.user_id == user_id,
+                )
+            )).all()
+        }
+        planned_source_ids: list[UUID] = []
+        for item_index, reference in enumerate(items):
+            item = planned_items.get(reference["id"])
+            if item is None:
+                raise InventoryError(
+                    "NOT_FOUND",
+                    "Inventory item not found",
+                    item_index=item_index,
+                )
+            if item.version != reference["expected_version"]:
+                raise InventoryError(
+                    "VERSION_CONFLICT",
+                    "Inventory has changed; refresh and retry",
+                    item_index=item_index,
+                )
+            if item.status not in {"IN_STOCK", "EMPTY"}:
+                raise InventoryError(
+                    "STATE_CONFLICT",
+                    "Only in-stock or empty inventory can be archived",
+                    item_index=item_index,
+                )
+            planned_source_ids.append(item.storage_space_id)
+
+        locked_spaces: dict[UUID, StorageSpace] = {}
+        for space_id in sorted(set(planned_source_ids)):
+            space = (await session.execute(
+                select(StorageSpace)
+                .where(StorageSpace.id == space_id, StorageSpace.user_id == user_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )).scalar_one_or_none()
+            if space is not None:
+                locked_spaces[space_id] = space
+
+        locked_items: dict[UUID, InventoryItem] = {}
+        for item_id in sorted(item_ids):
+            item = (await session.execute(
+                select(InventoryItem)
+                .where(InventoryItem.id == item_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )).scalar_one_or_none()
+            if item is not None:
+                locked_items[item_id] = item
+
+        ordered_items: list[InventoryItem] = []
+        for item_index, (reference, planned_source_id) in enumerate(
+            zip(items, planned_source_ids)
+        ):
+            item = locked_items.get(reference["id"])
+            if item is None or planned_source_id not in locked_spaces:
+                raise InventoryError(
+                    "NOT_FOUND",
+                    "Inventory item not found",
+                    item_index=item_index,
+                )
+            if item.storage_space_id != planned_source_id:
+                raise InventoryError(
+                    "RESOURCE_CHANGED",
+                    "Inventory location changed; refresh and retry",
+                    item_index=item_index,
+                )
+            if item.version != reference["expected_version"]:
+                raise InventoryError(
+                    "VERSION_CONFLICT",
+                    "Inventory has changed; refresh and retry",
+                    item_index=item_index,
+                )
+            if item.status not in {"IN_STOCK", "EMPTY"}:
+                raise InventoryError(
+                    "STATE_CONFLICT",
+                    "Only in-stock or empty inventory can be archived",
+                    item_index=item_index,
+                )
+            if item.version == 2147483647:
+                raise InventoryError(
+                    "VERSION_LIMIT_REACHED",
+                    "Inventory version limit reached",
+                    item_index=item_index,
+                )
+            item.status = "ARCHIVED"
+            item.version += 1
+            ordered_items.append(item)
+
+        await session.flush()
+        rows = (await session.execute(
+            _select_inventory(user_id).where(
+                InventoryItem.id.in_([item.id for item in ordered_items])
+            )
+        )).mappings().all()
+        by_id = {row["id"]: _read_model(row) for row in rows}
+        result = [by_id[item.id] for item in ordered_items]
+        await session.commit()
+        return result
+    except Exception:
+        await session.rollback()
+        raise
+
+
 async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
                            *, expected_version: int, changes: dict) -> InventoryItemRead:
     try:

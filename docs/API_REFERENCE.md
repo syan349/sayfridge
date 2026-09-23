@@ -399,6 +399,36 @@ quantity timestamps, item definition, dates, notes, and status, and writes no mo
 history. There is no idempotent response replay; after a lost response, reload the
 items before retrying.
 
+### POST /inventory-items/batch-archive — B15
+
+```json
+{
+  "items": [
+    {"id":"<inventory UUID>","expected_version":1},
+    {"id":"<inventory UUID>","expected_version":4}
+  ]
+}
+```
+
+The body accepts only `items`, containing 1–100 distinct inventory references.
+Each reference contains only `id` and a strict integer `expected_version` from 1
+through 2147483647. Duplicate IDs return 422 / VALIDATION_ERROR at the second
+occurrence.
+
+**200**, `{"items":[InventoryItemRead],"count":2}` in request order. Every item
+must be owned and currently IN_STOCK or EMPTY. The endpoint changes each status to
+ARCHIVED and increments each version once. It preserves storage space, definition,
+all quantity and quantity-timestamp fields, dates, notes, and operation history.
+Archiving from an already archived source storage space is allowed. No archive
+operation-history row is written.
+
+The entire batch is atomic. Missing or inaccessible items return 404 / NOT_FOUND;
+stale versions return 409 / VERSION_CONFLICT; DISCARDED or already ARCHIVED items
+return 409 / STATE_CONFLICT; and an item at the maximum version returns 409 /
+VERSION_LIMIT_REACHED. Entry-specific errors include zero-based `item_index`, and
+any failure leaves every item unchanged. There is no idempotent response replay;
+after a lost response, reload the items before retrying.
+
 ### PATCH /inventory-items/{id} — B09
 
 ```json
