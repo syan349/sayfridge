@@ -2,13 +2,15 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-
+import '../state/auth_controller.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
 import 'avatar_picker_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key});
+  const SignUpScreen({required this.authController, super.key});
+
+  final AuthController authController;
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -73,13 +75,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
+
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            AvatarPickerScreen(initialAvatar: _avatar, isFinalStep: true),
+    if (widget.authController.isSubmitting) return;
+
+    final success = await widget.authController.register(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account created. Please sign in.')),
+      );
+      Navigator.of(context).pop();
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.authController.errorMessage ?? 'Unable to create account.',
+        ),
       ),
     );
   }
