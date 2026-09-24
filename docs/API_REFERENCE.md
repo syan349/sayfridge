@@ -1,4 +1,4 @@
-# SayFridge API Reference: B01–B09
+# SayFridge API Reference: B01–B14
 
 Implemented authentication, storage-space, catalog, and inventory contracts.
 For setup, see the [backend README](../backend/README.md). For implementation and
@@ -58,7 +58,9 @@ Business errors use:
 
 Business validation may include `detail.errors`, with `loc` and `msg` for each
 invalid field. Codes: `NOT_FOUND`, `NAME_CONFLICT`, `STATE_CONFLICT`,
-`RESOURCE_CHANGED`, `VERSION_CONFLICT`, `VERSION_LIMIT_REACHED`, and `VALIDATION_ERROR`. Error messages depend on the resource.
+`RESOURCE_CHANGED`, `VERSION_CONFLICT`, `VERSION_LIMIT_REACHED`, `VALIDATION_ERROR`,
+`IDEMPOTENCY_CONFLICT`, `UNIT_NOT_CONVERTIBLE`, `QUANTITY_TOO_SMALL`, and
+`QUANTITY_OUT_OF_RANGE`. Error messages depend on the resource.
 Authentication failures on business endpoints retain the authentication format.
 
 ## 2. Authentication — B01–B03
@@ -266,7 +268,7 @@ ACTIVE, even when the definition is already active; otherwise **409 / STATE_CONF
 A valid repeated restore leaves timestamps unchanged.
 
 
-## 6. Inventory — B07–B09
+## 6. Inventory — B07–B09, B13, B15, and B22
 
 Inventory requires nullable `inventory_item.notes` in the current table structure.
 See the backend README for development database synchronization; Neon is unchanged.
@@ -311,6 +313,26 @@ filter inventory state only, not associated resource states.
 
 **200**, Inventory response in any inventory state. Read-only.
 
+### GET /inventory-items/expiry-summary — B22
+
+Required query: `as_of=YYYY-MM-DD`. Optional query: `days_before` (default 3,
+0–365), `storage_space_id`, `category_id`, `bucket=overdue|today|upcoming`, `page`,
+and `page_size`. Adding `days_before` to `as_of` must remain within the legal date
+range.
+
+**200**, `{"counts":{"overdue":0,"today":0,"upcoming":0},"items":[],"total":0,
+"page":1,"page_size":20}`. Each item contains the normal Inventory response plus
+its `bucket`. The query includes only the current user's IN_STOCK inventory with a
+known expiry date. Archived spaces, definitions, and categories do not hide
+existing inventory.
+
+An expiry before `as_of` is overdue; equality is today; a later expiry through
+`as_of + days_before` inclusive is upcoming. Later and unknown dates are excluded.
+`counts` always covers all three buckets after space/category filtering. `bucket`
+filters only `items` and `total`. Results sort by expiry_date then ID ascending and
+use the standard pagination contract. Counts, total, and page come from one database
+statement. The endpoint writes nothing and sends no reminder or notification.
+
 ### POST /inventory-items — B08
 
 ```json
@@ -334,6 +356,99 @@ confirmed_at is server time, estimates are NULL, version is 1. No ADD event is c
 State checks coordinate with concurrent archival. Relationship changes during lock
 acquisition return 409 / RESOURCE_CHANGED. Creation has no idempotency guarantee.
 
+### POST /inventory-items/batch-create — B15
+
+```json
+{
+  "items": [
+    {"storage_space_id":"<space UUID>","item_definition_id":"<definition UUID>","amount":"2.5","unit":"kg"},
+    {"storage_space_id":"<space UUID>","item_definition_id":"<definition UUID>","amount":"3","unit":"each","notes":"Second package"}
+  ]
+}
+```
+
+The body accepts only `items`, containing 1–100 `InventoryCreate` objects. Each
+entry follows the same amount, unit, date, notes, ownership, visibility, and ACTIVE
+association rules as `POST /inventory-items`. Identical entries are allowed because
+they may represent separate physical stock batches.
+
+**201**, `{"items":[InventoryItemRead],"count":2}`. Returned items remain in input
+order. Every row starts IN_STOCK at version 1 with equal initial and confirmed
+quantities, no estimate, and no ADD operation history.
+
+The complete request is one transaction: validation or database failure for any
+entry rolls back every insertion. Batch business errors include the zero-based
+`item_index` of the first determined failing entry; request-level errors such as an
+empty or oversized `items` list have no item index. Missing and inaccessible
+associations both return 404 / NOT_FOUND; archived associations return 409 /
+STATE_CONFLICT; relationships changed during lock acquisition return 409 /
+RESOURCE_CHANGED. The endpoint has no idempotency guarantee, so retry only after
+checking whether a response was received.
+
+### POST /inventory-items/batch-move — B15
+
+```json
+{
+  "target_storage_space_id": "<owned active space UUID>",
+  "items": [
+    {"id":"<inventory UUID>","expected_version":1},
+    {"id":"<inventory UUID>","expected_version":4}
+  ]
+}
+```
+
+The body accepts one target space and 1–100 distinct inventory references. Each
+reference contains only `id` and a strict integer `expected_version` from 1 through
+2147483647. Duplicate IDs return 422 / VALIDATION_ERROR at the second occurrence.
+The target must be owned and ACTIVE. Foreign and missing targets both return 404 /
+NOT_FOUND; an archived target returns 409 / STATE_CONFLICT.
+
+**200**, `{"items":[InventoryItemRead],"count":2}` in request order. Every item
+must be owned and currently IN_STOCK or EMPTY. A moved item receives the target
+storage_space_id and increments its version once. Moving an item already in the
+target space is a no-op: it still validates ownership, state, version, and the
+target's ACTIVE state, but preserves its version and updated_at. A no-op therefore
+remains valid at the maximum version; an actual move at that version returns 409 /
+VERSION_LIMIT_REACHED.
+
+The entire batch is atomic. Missing or inaccessible items return 404 / NOT_FOUND;
+stale versions return 409 / VERSION_CONFLICT; terminal inventory returns 409 /
+STATE_CONFLICT. Entry-specific errors include zero-based `item_index`, and any
+failure leaves every item in its original space. The operation preserves quantities,
+quantity timestamps, item definition, dates, notes, and status, and writes no move
+history. There is no idempotent response replay; after a lost response, reload the
+items before retrying.
+
+### POST /inventory-items/batch-archive — B15
+
+```json
+{
+  "items": [
+    {"id":"<inventory UUID>","expected_version":1},
+    {"id":"<inventory UUID>","expected_version":4}
+  ]
+}
+```
+
+The body accepts only `items`, containing 1–100 distinct inventory references.
+Each reference contains only `id` and a strict integer `expected_version` from 1
+through 2147483647. Duplicate IDs return 422 / VALIDATION_ERROR at the second
+occurrence.
+
+**200**, `{"items":[InventoryItemRead],"count":2}` in request order. Every item
+must be owned and currently IN_STOCK or EMPTY. The endpoint changes each status to
+ARCHIVED and increments each version once. It preserves storage space, definition,
+all quantity and quantity-timestamp fields, dates, notes, and operation history.
+Archiving from an already archived source storage space is allowed. No archive
+operation-history row is written.
+
+The entire batch is atomic. Missing or inaccessible items return 404 / NOT_FOUND;
+stale versions return 409 / VERSION_CONFLICT; DISCARDED or already ARCHIVED items
+return 409 / STATE_CONFLICT; and an item at the maximum version returns 409 /
+VERSION_LIMIT_REACHED. Entry-specific errors include zero-based `item_index`, and
+any failure leaves every item unchanged. There is no idempotent response replay;
+after a lost response, reload the items before retrying.
+
 ### PATCH /inventory-items/{id} — B09
 
 ```json
@@ -354,3 +469,233 @@ preserve version/timestamps. A change at the maximum version returns
 409 / VERSION_LIMIT_REACHED. Location changes during lock acquisition return
 409 / RESOURCE_CHANGED. Preserve all quantity/confirmation/estimate fields and
 initial facts; write no metadata/move event. After conflicts, reload before retrying.
+
+### POST /inventory-items/{id}/discard — B13
+
+```json
+{"expected_version":1}
+```
+
+The body accepts only `expected_version`, a strict integer from 1 through
+2147483647. Bearer authentication and ownership are required; foreign and missing
+IDs both return **404 / NOT_FOUND**.
+
+**200**, Inventory response with status `DISCARDED` and version incremented once.
+Only `IN_STOCK` inventory may be discarded. `EMPTY`, `DISCARDED`, and `ARCHIVED`
+return **409 / STATE_CONFLICT**. A stale version returns **409 / VERSION_CONFLICT**,
+and a successful write at the maximum version is rejected with
+**409 / VERSION_LIMIT_REACHED**. Discard remains allowed when the containing space
+or catalog association is archived.
+
+The transition changes only status, version, and updated_at. It preserves initial,
+confirmed, and estimated quantities and their timestamps, location, catalog
+association, dates, and notes. It creates no inventory operation record. Concurrent
+requests using the same version have one successful transition; later requests must
+reload the inventory state.
+
+### POST /inventory-items/{id}/archive — B13
+
+```json
+{"expected_version":1}
+```
+
+The request contract, ownership rules, version errors, preserved fields, and
+single-winner concurrency behavior are the same as discard. **200** returns the
+Inventory response with status `ARCHIVED` and version incremented once.
+
+Archive accepts `IN_STOCK` and `EMPTY` inventory. `DISCARDED` and `ARCHIVED` return
+**409 / STATE_CONFLICT**. The transition is allowed when the containing space or
+catalog association is archived. It creates no inventory operation record and does
+not alter quantities or quantity timestamps.
+
+
+## 7. Inventory quantity operations and history — B10–B12 and B14
+
+### POST /inventory-items/{id}/operations
+
+**201** for a new operation; **200** for a successful replay. Bearer authentication
+and an owned inventory item are required. Preview and history endpoints remain planned.
+
+Required header: `Idempotency-Key`, 1–64 visible ASCII characters, without spaces.
+Keys are case-sensitive and scoped to the current user across all inventory items.
+
+```json
+{
+  "expected_version": 1,
+  "operation_type": "ADD",
+  "quantity_kind": "AMOUNT",
+  "quantity_value": "500.0",
+  "quantity_unit": "g"
+}
+```
+
+All five fields are required; extra fields are rejected. expected_version is a
+strict integer from 1 to 2147483647. For AMOUNT, quantity_value is an ordinary
+decimal string, at most 32 characters and three decimal places, no greater than
+999999999.999. ADD and CONSUME require a positive value; RECONCILE permits zero.
+Scientific notation and numeric JSON values are rejected. Preserve
+literal quantity text ("2" differs from "2.0"). Trim unit whitespace before storage,
+retain case, and require 1–16 characters both before and after casefolding.
+
+| Operation | Quantity kind | Input | Allowed state |
+| --- | --- | --- | --- |
+| ADD | AMOUNT | Decimal string and unit | IN_STOCK; EMPTY only in an ACTIVE space |
+| CONSUME | AMOUNT | Decimal string and unit | IN_STOCK only |
+| CONSUME | FRACTION | `p/q`, positive integers with p ≤ q; unit `remaining` | IN_STOCK only |
+| RECONCILE | AMOUNT | Nonnegative confirmed total and its unit | IN_STOCK; EMPTY with zero, or positive only in an ACTIVE space |
+
+Fraction text is limited to 32 characters and preserved literally: `1/2` and
+`2/4` are different retry inputs. For example, consume one third with:
+
+```json
+{"expected_version": 1, "operation_type": "CONSUME", "quantity_kind": "FRACTION", "quantity_value": "1/3", "quantity_unit": "remaining"}
+```
+
+A physical stocktake that confirms 6 kg uses:
+
+```json
+{"expected_version": 1, "operation_type": "RECONCILE", "quantity_kind": "AMOUNT", "quantity_value": "6", "quantity_unit": "kg"}
+```
+
+**Effect:** lock the space then inventory; check version and allowed state.
+Archived definitions/categories do not block operations on existing stock;
+IN_STOCK consumption is also allowed in an archived space. Update the estimated balance
+and timestamp if an estimate exists (including zero); otherwise update the
+confirmed balance and timestamp. Preserve initial quantities and the other balance.
+Confirmed zero becomes EMPTY; estimated zero remains IN_STOCK. Otherwise set
+IN_STOCK. Increment version/update time and insert one SUCCESS operation in
+the same transaction. Any failure rolls back both writes.
+
+RECONCILE replaces the confirmed total and unit, updates confirmed_at, clears all
+three estimated fields, and sets EMPTY for zero or IN_STOCK for a positive total.
+It performs no conversion against the old unit. Even an unchanged total records a
+new physical confirmation and increments version.
+
+**Calculation:** convert g↔kg or ml↔l to the current effective unit; identical
+casefolded units are exact. Reject other differing units. Round the applied change
+to three places using ROUND_HALF_UP before addition/subtraction. Reject changes rounded to zero
+and amounts outside NUMERIC(12,3). A valid 0.5 g addition to kg stock applies 0.001 kg;
+a raw 0.0005 kg input is invalid because it has four decimal places.
+
+For consumption, check the unrounded change against the balance first; rounding
+must not hide over-consumption. Fractions use exact integer-ratio arithmetic.
+Reject rounding that erases a positive remainder. Consuming `1/3` of 1 kg applies
+0.333 kg and leaves 0.667 kg; consuming `1/2` of 0.001 kg is rejected. Explicitly
+consuming all of 0.001 kg is allowed. Applied changes are positive; operation_type
+indicates addition or subtraction.
+
+**Response:** `{operation, inventory, replayed}`. inventory uses the response in
+section 6. operation includes id, inventory_item_id, operation_type,
+quantity_kind/value/unit, input_method, calculation_method, affects_state,
+applied_change_amount/unit, status, created_at, updated_at, and undone_at.
+For new records: input_method=MANUAL and status=SUCCESS. ADD/CONSUME use
+calculation_method=EXACT or CONVERTED and affect the effective balance.
+RECONCILE uses calculation_method=EXACT, affects_state=CONFIRMED, and stores NULL
+applied_change_amount/unit because it confirms a total rather than a reliable delta.
+Decimal amounts serialize as strings. Internal idempotency keys are never returned.
+
+**Retry:** resend the same key, inventory ID, and literal business input. A matching
+successful operation returns its unchanged record plus current inventory, even if
+version/state changed since the original request. expected_version is not compared
+for replay. No quantities, versions, or timestamps change on replay. Access is
+still checked. Different input, another inventory ID, or a non-SUCCESS record for
+the same key returns IDEMPOTENCY_CONFLICT. Failed requests do not reserve keys.
+
+**Errors:** 401 unauthenticated; 404 NOT_FOUND; 409 VERSION_CONFLICT,
+VERSION_LIMIT_REACHED, STATE_CONFLICT, RESOURCE_CHANGED, IDEMPOTENCY_CONFLICT;
+422 VALIDATION_ERROR, UNIT_NOT_CONVERTIBLE, QUANTITY_TOO_SMALL, QUANTITY_OUT_OF_RANGE,
+INSUFFICIENT_QUANTITY, QUANTITY_PRECISION_UNSUPPORTED.
+
+Manual verification: GET the inventory version, submit this request with a new key,
+then resend it unchanged. Expect 201 followed by 200, the same operation ID, and
+only one quantity change. No database initialization change is needed for B10–B12.
+
+### GET /inventory-items/{id}/operations — B14
+
+**200**, an array containing every operation for the owned inventory item. Results
+are ordered by `created_at` descending and then operation `id` descending, providing
+stable newest-first output. An item with no operation records returns `[]`.
+
+The endpoint remains available for `IN_STOCK`, `EMPTY`, `DISCARDED`, and `ARCHIVED`
+inventory. It returns all stored operation states, including historical
+`PENDING_CONFIRMATION`, `FAILED`, and `UNDONE` records; clients must not display
+those states as effective quantity changes. Each element uses the operation response
+fields documented above. Internal idempotency keys are omitted.
+
+Authentication and inventory ownership are required. Foreign and missing inventory
+IDs return identical **404 / NOT_FOUND** responses. This endpoint is read-only and
+does not change inventory, operation records, versions, or timestamps.
+
+### GET /inventory-operations — B14
+
+**200**, a paginated object containing `items`, `total`, `page`, and `page_size`.
+Only operations belonging to the current user's inventory are visible. Results use
+the same public operation fields and `created_at DESC, id DESC` ordering as the
+item-scoped endpoint.
+
+| Parameter | Default / meaning |
+| --- | --- |
+| inventory_item_id | Optional UUID; inaccessible or nonexistent values produce an empty page |
+| operation_type | Optional ADD, CONSUME, or RECONCILE |
+| status | Optional PENDING_CONFIRMATION, SUCCESS, FAILED, or UNDONE |
+| created_from | Optional timezone-aware timestamp; inclusive |
+| created_to | Optional timezone-aware timestamp; exclusive |
+| page, page_size | 1 and 20; page ≥1, page_size 1–100 |
+
+When both time boundaries are supplied, `created_from` must be earlier than
+`created_to`. Naive timestamps, invalid enums, reversed/equal ranges, and unknown
+query parameters return **422 / VALIDATION_ERROR**. Counts cover the complete
+filtered result, including when the requested page is empty.
+
+### GET /inventory-operations/{id} — B14
+
+**200**, one public operation response. The associated inventory may be in any
+state and may belong to archived associations. Foreign and missing operation IDs
+return identical **404 / NOT_FOUND** responses. Internal idempotency keys are not
+returned. This endpoint is read-only.
+
+## 8. Administrator account management — B25
+
+All endpoints require an authenticated ACTIVE account whose current database role
+is ADMIN. Ordinary users receive **403 / FORBIDDEN**. These endpoints never return
+password hashes, authentication-provider details, quota fields, inventory, or
+private definitions. They do not promote users, change passwords, or create audit
+records.
+
+### GET /admin/users
+
+**200**, a paginated object containing `items`, `total`, `page`, and `page_size`.
+Each item exposes only `id`, `email`, `role`, `status`, `created_at`, and
+`updated_at`. Results sort by `created_at` descending and then ID descending.
+Counts and items use one database statement.
+
+| Parameter | Default / meaning |
+| --- | --- |
+| q | Empty; trimmed literal case-insensitive email substring, at most 100 characters |
+| role | ALL; also USER or ADMIN |
+| status | ALL; also ACTIVE, SUSPENDED, or DISABLED |
+| page, page_size | 1 and 20; page ≥1, page_size 1–100 |
+
+Unknown parameters and invalid values return **422 / VALIDATION_ERROR**.
+
+### GET /admin/users/{id}
+
+**200**, one administrator-safe user response with the same fields as the list.
+A missing user returns **404 / NOT_FOUND**. This read does not expose or inspect the
+user's inventory.
+
+### PATCH /admin/users/{id}/status
+
+```json
+{"status":"SUSPENDED"}
+```
+
+The body accepts only `status=ACTIVE|SUSPENDED|DISABLED`. The target must have
+`role=USER`; targeting the current or another administrator returns **403 /
+ADMIN_TARGET_FORBIDDEN**. A missing target returns **404 / NOT_FOUND**.
+
+**200**, the updated administrator-safe user response. The write changes only
+status and updated_at. Repeating the current status is a no-op and preserves
+updated_at. A suspended or disabled account is rejected by subsequent authenticated
+requests because every request reads current account state. Requests already in
+progress are not cancelled.

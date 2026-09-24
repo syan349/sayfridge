@@ -1,6 +1,6 @@
 # SayFridge Backend
 
-The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, and metadata/location editing are implemented. Quantity operations, inventory disposal/archival, Agent, and Worker features remain planned.
+The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, metadata/location editing, discard, and archival are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented, including item-scoped and global history reads. Preview, Agent, and Worker features remain planned.
 
 ## Requirements
 
@@ -29,6 +29,14 @@ Once the server starts, the following endpoints are available:
 - Categories: `GET http://127.0.0.1:8000/api/v1/item-categories`
 - Item definitions: `GET/POST http://127.0.0.1:8000/api/v1/item-definitions`; detail/PATCH and archive/restore under `/{id}`
 - Inventory: `GET/POST http://127.0.0.1:8000/api/v1/inventory-items`; detail/PATCH under `/{id}`
+- Add to existing inventory: `POST http://127.0.0.1:8000/api/v1/inventory-items/{id}/operations` (ADD/AMOUNT; Idempotency-Key required)
+- Consume inventory: the same operations endpoint (CONSUME with AMOUNT or FRACTION)
+- Confirm a physical stocktake: the same operations endpoint (RECONCILE/AMOUNT)
+- Discard in-stock inventory: `POST http://127.0.0.1:8000/api/v1/inventory-items/{id}/discard`
+- Archive in-stock or empty inventory: `POST http://127.0.0.1:8000/api/v1/inventory-items/{id}/archive`
+- Item operation history: `GET http://127.0.0.1:8000/api/v1/inventory-items/{id}/operations`
+- Global operation history: `GET http://127.0.0.1:8000/api/v1/inventory-operations`
+- Operation detail: `GET http://127.0.0.1:8000/api/v1/inventory-operations/{id}`
 - API documentation: `http://127.0.0.1:8000/docs`
 
 ## Authentication settings
@@ -177,3 +185,74 @@ python -m pytest -v tests/test_inventory_api.py tests/test_inventory_postgres.py
 
 These tests use the existing isolated test database configuration and initialize the latest structure
 within disposable test schemas. They do not need Uvicorn running.
+
+
+## Inventory quantity operations and item history
+
+B10–B12 use the existing inventory_item and inventory_operation tables. No schema
+change or incremental migration is introduced. Request/response schemas are in
+`app/schemas/inventory_operations.py`; the transaction is in `app/services/inventory.py`,
+and pure calculation helpers remain in `app/services/inventory_quantities.py`.
+See [API reference](../docs/API_REFERENCE.md#7-inventory-quantity-operations-and-history--b10b12-and-b14) for requests
+and retry behavior. Run the complete addition tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_quantities.py tests/test_inventory_additions.py tests/test_inventory_additions_postgres.py
+```
+
+Temporary B10 exercise files are not required. Tests use the same isolated
+PostgreSQL configuration as the existing test suite, with no application data writes.
+
+Run the complete consumption tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_consumption*.py
+```
+
+Run the complete reconciliation tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_reconciliation*.py
+```
+
+Run the inventory state-action tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_discard.py tests/test_inventory_archive.py
+```
+
+Run the operation history tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_item_history.py tests/test_inventory_operation_history.py
+```
+
+Run the implemented B15 batch-create tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_batch_create.py --strict-markers
+```
+
+Run the implemented B15 batch-move tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_batch_move.py --strict-markers
+```
+
+Run the implemented B15 batch-archive tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_batch_archive.py --strict-markers
+```
+
+Run the B22 expiry-summary tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_expiry_summary.py --strict-markers
+```
+
+Run the B25 administrator account-management tests from backend:
+
+```bash
+python -m pytest -v tests/test_admin_users.py --strict-markers
+```

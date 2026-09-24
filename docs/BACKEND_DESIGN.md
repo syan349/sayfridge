@@ -1,6 +1,6 @@
 # SayFridge Backend Design Handbook
 
-> Updated: 2026-09-13. This handbook is the shared design reference for the current backend development phase. Unless an endpoint is explicitly identified as already implemented, its content is a planned contract, not evidence of passing tests or applied database migrations.
+> Updated: 2026-09-21. This handbook is the shared design reference for the current backend development phase. Unless an endpoint is explicitly identified as already implemented, its content is a planned contract, not evidence of passing tests or applied database migrations.
 >
 > The development and acceptance plan incorporates the course requirements: tests accompany features, with plans for cloud capacity, security, and deployment. Existing API business rules remain unchanged. Section 10 retains three questions for the project owner to clarify. Editing this handbook does not itself execute tests, migrations, or deployments.
 
@@ -172,7 +172,7 @@ Do not add caches or change indexes preemptively. If measurements justify schema
 - Lists use `items/total/page/page_size`. Default page size is 20, maximum 100; minimum page is 1. Out-of-range pages return empty items. `total` counts all filtered results.
 - Ordinary creation has no idempotency guarantee. Quantity submissions require Idempotency-Key. Batch transactions are atomic but do not promise response replay.
 
-Section 10.2 must still clarify raw unit storage and length validation; no option is selected here.
+Operation units are trimmed before storage and keep their case. Both trimmed and casefolded lengths must be 1–16 characters; calculations use the casefolded form. See the resolved decision in section 10.2.
 
 ### 3.2 Response models
 
@@ -335,14 +335,15 @@ All authenticated users can read public definitions. Only the owner can read and
 
 B07–B09 list/detail, stock creation, and metadata/location PATCH are implemented in
 `app/api/routes/inventory.py`, `app/schemas/inventory.py`, and
-`app/services/inventory.py`. The initial table definition includes nullable notes. Batch endpoints,
-quantity operations, and inventory state-action endpoints remain planned. See the
-[API contract](API_REFERENCE.md#6-inventory--b07b09). Shared Neon schema synchronization and manual
+`app/services/inventory.py`. The initial table definition includes nullable notes. All three B15
+batch endpoints and B13 inventory discard and archival are implemented. B10 ADD, B11 CONSUME, and B12
+RECONCILE submission are implemented under section 4.6.2. See the
+[API contract](API_REFERENCE.md#6-inventory--b07b09-b13-b15-and-b22). Shared Neon schema synchronization and manual
 acceptance remain separate deployment steps.
 
 Stock entry stores trimmed/casefolded units (1–16 characters before and after
-normalization), with no inferred word aliases. Section 10.2 still concerns original
-unit text in future operation records; no operation record is written here.
+normalization), with no inferred word aliases. Section 10.2 defines case-preserving
+unit text for quantity operation records; stock entry itself writes no operation record.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
@@ -372,6 +373,8 @@ This phase provides no inventory definition correction. item_definition_id is im
 
 Endpoints: `POST /inventory-items/{id}/discard`, `POST /inventory-items/{id}/archive`.
 
+Implementation status: discard and archive are implemented.
+
 1. **Request fields:** expected_version; do not accept quantities or arbitrary status values.
 2. **Allowed state:** discard only from IN_STOCK; archive from IN_STOCK or EMPTY. DISCARDED and ARCHIVED are terminal and read-only. Repeated actions return 409 without changing version.
 3. **Reads and validation:** ownership, version, and source state.
@@ -382,6 +385,8 @@ Endpoints: `POST /inventory-items/{id}/discard`, `POST /inventory-items/{id}/arc
 #### 4.4.4 Three batch endpoints
 
 Endpoints: `POST /inventory-items/batch-create`, `POST /inventory-items/batch-move`, `POST /inventory-items/batch-archive`.
+
+Implementation status: all three batch endpoints are implemented.
 
 | Topic | batch-create | batch-move | batch-archive |
 | --- | --- | --- | --- |
@@ -401,6 +406,10 @@ Use the existing archive endpoint for the “delete and recreate” workflow: re
 Archiving and creating the replacement are independent requests with no cross-request rollback guarantee. Archive first, then create. If creation fails, the old batch remains archived and the user can retry entering the new batch. The new batch has its own ID, initial quantity, and version and does not inherit old operations. Already archived/discarded records retain their state without another archive action.
 
 ### 4.5 Inventory and expiry summaries
+
+B22 `GET /expiry-summary` is implemented under the inventory route as
+`GET /api/v1/inventory-items/expiry-summary`. `GET /inventory-summary` remains
+planned separately and is not part of B22.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
@@ -428,7 +437,12 @@ Expiry queries return database results only; they send no notifications, store n
 
 #### 4.6.2 POST /inventory-items/{id}/operations: submit a quantity operation
 
-1. **Request fields:** expected_version, operation_type, quantity_kind, quantity_value, quantity_unit; Idempotency-Key header required. Planned model: `InventoryOperationCreate`.
+Implementation status: B10 ADD/AMOUNT, B11 CONSUME with AMOUNT or FRACTION, and
+B12 RECONCILE/AMOUNT are implemented. No table changes or new
+migration scripts are needed. The preview endpoint remains planned pending the
+response decision in section 10.1. See API_REFERENCE.md for the implemented contract.
+
+1. **Request fields:** expected_version, operation_type, quantity_kind, quantity_value, quantity_unit; Idempotency-Key header required. Request model: `InventoryOperationCreate`.
 2. **Allowed state:** see section 6. RECONCILE confirms the current total; do not treat it as an increment/decrement.
 3. **Reads and validation:** identity/ownership → successful idempotency record → new-request version/state → units, precision, and nonnegative balance. Do not accept client after, affects_state, or calculation_method as authoritative write values.
 4. **Writes:** update inventory and insert a SUCCESS operation together under section 5; increment version; commit once.
@@ -438,6 +452,8 @@ Expiry queries return database results only; they send no notifications, store n
 Detailed preview response fields remain open in section 10.1.
 
 #### 4.6.3 History queries
+
+Implementation status: all three history endpoints are implemented.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
@@ -450,6 +466,10 @@ Detailed preview response fields remain open in section 10.1.
 ### 4.7 Administration
 
 Use existing administrator accounts; do not automatically promote ordinary users. If none exist, prepare one as a deployment task. This phase excludes administrator audit, role promotion, private inventory inspection, and changing another user's password.
+
+B25 administrator account management is implemented as `GET /admin/users`,
+`GET /admin/users/{id}`, and `PATCH /admin/users/{id}/status`. Administrator public
+catalog maintenance remains separate work without a B25 scope expansion.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
@@ -567,7 +587,7 @@ The client also supplies Idempotency-Key. In one transaction, update A to confir
 
 If A instead started at confirmed=10 each and estimated=7 each, the result is confirmed=10 each and estimated=5 each, with affects_state=ESTIMATED. Subtracting exactly 2 does not make an uncertain starting balance certain.
 
-Raw unit length and whitespace handling remain open in section 10.2; the other quantity rules above stand.
+Operation units are stored after trimming, preserving case; their casefolded form is used for calculations. Section 10.2 records this decision.
 
 ## 6. State and relationship rules
 
@@ -823,11 +843,12 @@ Open: exact nested fields, types, and nullability for before/after, plus final J
 
 ### 10.2 Original units and length validation
 
-Agreed: a unit is 1–16 characters after trimming. Operation records retain the original valid unit, while calculations use a normalized unit.
-
-Open: how leading/trailing whitespace is stored in quantity_unit; whether the original text is also limited to 16 characters or whether the stored text is trimmed but not converted. Prevent validated input from exceeding the database field length. See sections 3.1, 5.1, and 5.3.
-
-**Owner's decision:** Pending.
+**Owner's decision (2026-09-15):** Trim leading/trailing whitespace before storing
+quantity_unit; preserve the remaining literal case. The trimmed string must be
+1–16 characters. Validate that its casefolded form also fits the 16-character
+limit used by calculation units. Do not store or compare surrounding whitespace
+for idempotency. For example, " kg " and "kg" match, while "KG" and "kg" remain
+different stored business inputs even though their units are convertible.
 
 ### 10.3 Initial-history requirement in older work packages
 
