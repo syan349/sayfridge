@@ -335,10 +335,10 @@ All authenticated users can read public definitions. Only the owner can read and
 
 B07–B09 list/detail, stock creation, and metadata/location PATCH are implemented in
 `app/api/routes/inventory.py`, `app/schemas/inventory.py`, and
-`app/services/inventory.py`. The initial table definition includes nullable notes. Batch endpoints
-remain planned; B13 inventory discard and archival are implemented. B10 ADD, B11 CONSUME, and B12
+`app/services/inventory.py`. The initial table definition includes nullable notes. All three B15
+batch endpoints and B13 inventory discard and archival are implemented. B10 ADD, B11 CONSUME, and B12
 RECONCILE submission are implemented under section 4.6.2. See the
-[API contract](API_REFERENCE.md#6-inventory--b07b09-and-b13). Shared Neon schema synchronization and manual
+[API contract](API_REFERENCE.md#6-inventory--b07b09-b13-b15-and-b22). Shared Neon schema synchronization and manual
 acceptance remain separate deployment steps.
 
 Stock entry stores trimmed/casefolded units (1–16 characters before and after
@@ -386,6 +386,8 @@ Implementation status: discard and archive are implemented.
 
 Endpoints: `POST /inventory-items/batch-create`, `POST /inventory-items/batch-move`, `POST /inventory-items/batch-archive`.
 
+Implementation status: all three batch endpoints are implemented.
+
 | Topic | batch-create | batch-move | batch-archive |
 | --- | --- | --- | --- |
 | Request | items: InventoryCreate[] | target_storage_space_id, items: [{id, expected_version}] | items: [{id, expected_version}] |
@@ -404,6 +406,10 @@ Use the existing archive endpoint for the “delete and recreate” workflow: re
 Archiving and creating the replacement are independent requests with no cross-request rollback guarantee. Archive first, then create. If creation fails, the old batch remains archived and the user can retry entering the new batch. The new batch has its own ID, initial quantity, and version and does not inherit old operations. Already archived/discarded records retain their state without another archive action.
 
 ### 4.5 Inventory and expiry summaries
+
+B22 `GET /expiry-summary` is implemented under the inventory route as
+`GET /api/v1/inventory-items/expiry-summary`. `GET /inventory-summary` remains
+planned separately and is not part of B22.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
@@ -460,6 +466,10 @@ Implementation status: all three history endpoints are implemented.
 ### 4.7 Administration
 
 Use existing administrator accounts; do not automatically promote ordinary users. If none exist, prepare one as a deployment task. This phase excludes administrator audit, role promotion, private inventory inspection, and changing another user's password.
+
+B25 administrator account management is implemented as `GET /admin/users`,
+`GET /admin/users/{id}`, and `PATCH /admin/users/{id}/status`. Administrator public
+catalog maintenance remains separate work without a B25 scope expansion.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
