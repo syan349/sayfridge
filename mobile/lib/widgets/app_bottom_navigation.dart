@@ -19,10 +19,20 @@ abstract final class AssistantAssets {
   static const warn = '$root/warn.png';
 }
 
-class AppBottomNavigation extends StatelessWidget {
-  const AppBottomNavigation({this.onHomeTap, this.onProfileTap, super.key});
+enum AppNavigationDestination { home, assistant, profile }
 
+class AppBottomNavigation extends StatelessWidget {
+  const AppBottomNavigation({
+    this.selectedDestination = AppNavigationDestination.assistant,
+    this.onHomeTap,
+    this.onAssistantTap,
+    this.onProfileTap,
+    super.key,
+  });
+
+  final AppNavigationDestination selectedDestination;
   final VoidCallback? onHomeTap;
+  final VoidCallback? onAssistantTap;
   final VoidCallback? onProfileTap;
 
   @override
@@ -58,6 +68,8 @@ class AppBottomNavigation extends StatelessWidget {
                       label: 'Home',
                       asset: AssistantAssets.home,
                       onTap: onHomeTap,
+                      isSelected:
+                          selectedDestination == AppNavigationDestination.home,
                     ),
                   ),
                   const Expanded(child: SizedBox()),
@@ -66,6 +78,9 @@ class AppBottomNavigation extends StatelessWidget {
                       label: 'Profile',
                       asset: AssistantAssets.profile,
                       onTap: onProfileTap,
+                      isSelected:
+                          selectedDestination ==
+                          AppNavigationDestination.profile,
                     ),
                   ),
                 ],
@@ -75,35 +90,43 @@ class AppBottomNavigation extends StatelessWidget {
           Positioned(
             // Keep the centre label on the same baseline as Home and Profile.
             top: 8,
-            child: Column(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  padding: const EdgeInsets.all(11),
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: Color(0xFFDCEBD3), spreadRadius: 7),
-                    ],
+            child: GestureDetector(
+              onTap: onAssistantTap,
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    padding: const EdgeInsets.all(11),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Color(0xFFDCEBD3), spreadRadius: 7),
+                      ],
+                    ),
+                    child: Image.asset(
+                      AssistantAssets.chat,
+                      fit: BoxFit.contain,
+                      cacheWidth: 80,
+                    ),
                   ),
-                  child: Image.asset(
-                    AssistantAssets.chat,
-                    fit: BoxFit.contain,
-                    cacheWidth: 80,
+                  const SizedBox(height: 6),
+                  Text(
+                    'AI Assistant',
+                    style: TextStyle(
+                      color:
+                          selectedDestination ==
+                              AppNavigationDestination.assistant
+                          ? AppColors.primary
+                          : Colors.black,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'AI Assistant',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -117,11 +140,13 @@ class _NavigationItem extends StatelessWidget {
     required this.label,
     required this.asset,
     required this.onTap,
+    required this.isSelected,
   });
 
   final String label;
   final String asset;
   final VoidCallback? onTap;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -131,9 +156,22 @@ class _NavigationItem extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset(asset, width: 22, height: 22, cacheWidth: 72),
+          ColorFiltered(
+            colorFilter: ColorFilter.mode(
+              isSelected ? AppColors.primary : Colors.black,
+              BlendMode.srcIn,
+            ),
+            child: Image.asset(asset, width: 22, height: 22, cacheWidth: 72),
+          ),
           const SizedBox(height: 3),
-          Text(label, style: const TextStyle(fontSize: 11.5, height: 1)),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? AppColors.primary : Colors.black,
+              fontSize: 11.5,
+              height: 1,
+            ),
+          ),
         ],
       ),
     );
