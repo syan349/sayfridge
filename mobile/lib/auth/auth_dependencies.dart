@@ -7,6 +7,7 @@ import '../state/auth_controller.dart';
 class AuthDependencies {
   AuthDependencies._({
     required this.apiClient,
+    required this.tokenStorage,
     required this.authController,
   });
 
@@ -22,11 +23,13 @@ class AuthDependencies {
 
     return AuthDependencies._(
       apiClient: apiClient,
+      tokenStorage: tokenStorage,
       authController: authController,
     );
   }
 
   final ApiClient apiClient;
+  final TokenStorage tokenStorage;
   final AuthController authController;
 
   void dispose() {

@@ -8,9 +8,10 @@ import 'camera_input_screen.dart';
 import 'conversation_history_screen.dart';
 
 class AiAssistantScreen extends StatefulWidget {
-  const AiAssistantScreen({this.isGuest = false, super.key});
+  const AiAssistantScreen({this.isGuest = false, this.onHomeTap, super.key});
 
   final bool isGuest;
+  final VoidCallback? onHomeTap;
 
   @override
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
@@ -152,7 +153,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                     right: 35,
                     bottom: 4,
                     child: AppBottomNavigation(
-                      onHomeTap: () => _showPlaceholder('Home'),
+                      onHomeTap:
+                          widget.onHomeTap ?? () => _showPlaceholder('Home'),
                       onProfileTap: () => _showPlaceholder('Profile'),
                     ),
                   ),
