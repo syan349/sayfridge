@@ -107,17 +107,15 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
           );
         },
         authenticatedBuilder: (context, authController) {
-          return AiAssistantScreen(
-            onHomeTap: () {
+          return HomeScreen(
+            expirySummaryController: _expirySummaryController,
+            inventoryController: _inventoryController,
+            storageSpaceController: _storageSpaceController,
+            onAssistantTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (homeContext) => HomeScreen(
-                    expirySummaryController: _expirySummaryController,
-                    inventoryController: _inventoryController,
-                    storageSpaceController: _storageSpaceController,
-                    onAssistantTap: () {
-                      Navigator.of(homeContext).pop();
-                    },
+                  builder: (assistantContext) => AiAssistantScreen(
+                    onHomeTap: () => Navigator.of(assistantContext).pop(),
                   ),
                 ),
               );
