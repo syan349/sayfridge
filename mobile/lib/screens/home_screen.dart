@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../models/expiry_summary.dart';
+import '../models/inventory_item.dart';
+import '../models/storage_space.dart';
+import '../state/expiry_summary_controller.dart';
+import '../state/inventory_controller.dart';
+import '../state/storage_space_controller.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
+import 'expiring_items_screen.dart';
+import 'inventory_screen.dart';
+import 'storage_space_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     required this.onAssistantTap,
+    this.expirySummaryController,
+    this.inventoryController,
+    this.storageSpaceController,
     this.onProfileTap,
     this.onLoginTap,
     this.onStorageSpacesTap,
@@ -17,6 +29,9 @@ class HomeScreen extends StatelessWidget {
   });
 
   final VoidCallback onAssistantTap;
+  final ExpirySummaryController? expirySummaryController;
+  final InventoryController? inventoryController;
+  final StorageSpaceController? storageSpaceController;
   final VoidCallback? onProfileTap;
   final VoidCallback? onLoginTap;
   final VoidCallback? onStorageSpacesTap;
@@ -58,6 +73,9 @@ class HomeScreen extends StatelessWidget {
                             _GuestHomeContent(onLoginTap: onLoginTap)
                           else
                             _UserHomeContent(
+                              expirySummaryController: expirySummaryController,
+                              inventoryController: inventoryController,
+                              storageSpaceController: storageSpaceController,
                               onStorageSpacesTap: onStorageSpacesTap,
                               onSearchTap: onSearchTap,
                               onExpiringTap: onExpiringTap,
@@ -166,18 +184,56 @@ class _GuestHomeContent extends StatelessWidget {
   }
 }
 
-class _UserHomeContent extends StatelessWidget {
+class _UserHomeContent extends StatefulWidget {
   const _UserHomeContent({
+    required this.expirySummaryController,
+    required this.inventoryController,
+    required this.storageSpaceController,
     required this.onStorageSpacesTap,
     required this.onSearchTap,
     required this.onExpiringTap,
     required this.onInventoryTap,
   });
 
+  final ExpirySummaryController? expirySummaryController;
+  final InventoryController? inventoryController;
+  final StorageSpaceController? storageSpaceController;
   final VoidCallback? onStorageSpacesTap;
   final VoidCallback? onSearchTap;
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
+
+  @override
+  State<_UserHomeContent> createState() => _UserHomeContentState();
+}
+
+class _UserHomeContentState extends State<_UserHomeContent> {
+  StorageSpace? _selectedStorageSpace;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final controller = widget.storageSpaceController;
+    if (controller != null &&
+        controller.status == StorageSpaceLoadStatus.initial) {
+      controller.loadStorageSpaces();
+    }
+
+    final inventoryController = widget.inventoryController;
+    if (inventoryController != null &&
+        inventoryController.status == InventoryLoadStatus.initial) {
+      inventoryController.loadInventory();
+    }
+
+    final expirySummaryController = widget.expirySummaryController;
+    if (expirySummaryController != null &&
+        expirySummaryController.status == ExpirySummaryLoadStatus.initial) {
+      expirySummaryController.loadSummary(
+        asOf: DateUtils.dateOnly(DateTime.now()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +246,7 @@ class _UserHomeContent extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: onStorageSpacesTap,
+                onPressed: _openStorageSpaces,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.black,
                   backgroundColor: Colors.white,
@@ -200,12 +256,16 @@ class _UserHomeContent extends StatelessWidget {
                     vertical: 14,
                   ),
                 ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('All Spaces'),
-                    Icon(Icons.keyboard_arrow_down),
-                  ],
+                child: AnimatedBuilder(
+                  animation:
+                      widget.storageSpaceController ?? const _IdleListenable(),
+                  builder: (context, child) => Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(child: Text(_storageSpaceLabel)),
+                      const Icon(Icons.keyboard_arrow_down),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -213,7 +273,7 @@ class _UserHomeContent extends StatelessWidget {
             Expanded(
               flex: 2,
               child: InkWell(
-                onTap: onSearchTap,
+                onTap: widget.onSearchTap ?? _openInventory,
                 borderRadius: BorderRadius.circular(28),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -245,96 +305,30 @@ class _UserHomeContent extends StatelessWidget {
           style: TextStyle(fontSize: 29, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 24),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(
-              width: 120,
-              child: Column(
-                children: [
-                  Text(
-                    '6',
-                    style: TextStyle(
-                      color: Color(0xFFD95228),
-                      fontSize: 78,
-                      height: 0.9,
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Items',
-                    style: TextStyle(color: Colors.grey, fontSize: 20),
-                  ),
-                ],
-              ),
-            ),
-            Container(width: 1, height: 150, color: primaryColor),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                children: [
-                  _ExpiringItemRow(
-                    asset: 'assets/icons/inventory/milk.png',
-                    name: 'Milk',
-                    quantity: '750g',
-                    location: 'Fridge',
-                    daysLeft: '1 day left',
-                  ),
-                  Divider(),
-                  _ExpiringItemRow(
-                    asset: 'assets/icons/inventory/chicken_drumstick.png',
-                    name: 'Chicken',
-                    quantity: '≈ 500g',
-                    location: 'Fridge',
-                    daysLeft: '1 day left',
-                  ),
-                ],
-              ),
-            ),
-          ],
+        AnimatedBuilder(
+          animation: widget.expirySummaryController ?? const _IdleListenable(),
+          builder: (context, child) => _buildExpirySummary(primaryColor),
         ),
         const SizedBox(height: 18),
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton.icon(
-            onPressed: onExpiringTap,
+            onPressed: _openExpiringItems,
             iconAlignment: IconAlignment.end,
             icon: const Icon(Icons.chevron_right),
             label: const Text('View all expiring items'),
           ),
         ),
         const SizedBox(height: 50),
-        const Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Inventory',
-              style: TextStyle(fontSize: 29, fontWeight: FontWeight.w500),
-            ),
-            Text('12 items', style: TextStyle(fontSize: 21)),
-          ],
-        ),
-        const SizedBox(height: 28),
-        const Row(
-          children: [
-            Expanded(
-              child: _InventoryCount(value: '3', label: 'Meat'),
-            ),
-            _CategoryDivider(),
-            Expanded(
-              child: _InventoryCount(value: '4', label: 'Vegetables'),
-            ),
-            _CategoryDivider(),
-            Expanded(
-              child: _InventoryCount(value: '5', label: 'Others'),
-            ),
-          ],
+        AnimatedBuilder(
+          animation: widget.inventoryController ?? const _IdleListenable(),
+          builder: (context, child) => _buildInventorySummary(),
         ),
         const SizedBox(height: 30),
         SizedBox(
           width: 260,
           child: FilledButton.icon(
-            onPressed: onInventoryTap,
+            onPressed: _openInventory,
             iconAlignment: IconAlignment.end,
             icon: const Icon(Icons.chevron_right),
             label: const Text('View all items'),
@@ -343,78 +337,376 @@ class _UserHomeContent extends StatelessWidget {
       ],
     );
   }
+
+  String get _storageSpaceLabel {
+    final controller = widget.storageSpaceController;
+    if (controller == null) return 'All Spaces';
+
+    final selectedStorageSpace = _selectedStorageSpace;
+    if (selectedStorageSpace != null) return selectedStorageSpace.name;
+
+    return switch (controller.status) {
+      StorageSpaceLoadStatus.initial => 'All Spaces',
+      StorageSpaceLoadStatus.loading => 'Loading...',
+      StorageSpaceLoadStatus.loaded => 'All Spaces (${controller.total})',
+      StorageSpaceLoadStatus.empty => 'No spaces',
+      StorageSpaceLoadStatus.error => 'Try again',
+    };
+  }
+
+  Widget _buildExpirySummary(Color primaryColor) {
+    final controller = widget.expirySummaryController;
+    if (controller == null) {
+      return const _ExpiryStatusMessage(message: 'Expiry data unavailable.');
+    }
+
+    return switch (controller.status) {
+      ExpirySummaryLoadStatus.initial ||
+      ExpirySummaryLoadStatus.loading => const SizedBox(
+        height: 150,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      ExpirySummaryLoadStatus.empty => const _ExpiryCountAndContent(
+        count: 0,
+        child: _ExpiryStatusMessage(message: 'No items expiring soon.'),
+      ),
+      ExpirySummaryLoadStatus.error => _ExpiryCountAndContent(
+        count: 0,
+        child: _ExpiryStatusMessage(
+          message: controller.errorMessage ?? 'Unable to load expiry data.',
+          onRetry: controller.reload,
+        ),
+      ),
+      ExpirySummaryLoadStatus.loaded => _ExpiryCountAndContent(
+        count: controller.counts.total,
+        dividerColor: primaryColor,
+        child: Column(
+          children: [
+            for (
+              var index = 0;
+              index < controller.items.length && index < 2;
+              index++
+            ) ...[
+              if (index > 0) const Divider(),
+              _ExpiryItemRow(summaryItem: controller.items[index]),
+            ],
+          ],
+        ),
+      ),
+    };
+  }
+
+  Widget _buildInventorySummary() {
+    final controller = widget.inventoryController;
+    final status = controller?.status ?? InventoryLoadStatus.initial;
+    final total = status == InventoryLoadStatus.loaded ? controller!.total : 0;
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Inventory',
+              style: TextStyle(fontSize: 29, fontWeight: FontWeight.w500),
+            ),
+            Text(
+              '$total ${total == 1 ? 'item' : 'items'}',
+              style: const TextStyle(fontSize: 21),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+        switch (status) {
+          InventoryLoadStatus.initial ||
+          InventoryLoadStatus.loading => const SizedBox(
+            height: 80,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          InventoryLoadStatus.empty => const _InventoryStatusMessage(
+            icon: Icons.inventory_2_outlined,
+            message: 'Your inventory is empty.',
+          ),
+          InventoryLoadStatus.error => _InventoryStatusMessage(
+            icon: Icons.cloud_off_outlined,
+            message: controller?.errorMessage ?? 'Unable to load inventory.',
+            onRetry: controller?.reload,
+          ),
+          InventoryLoadStatus.loaded => _InventoryPreview(
+            items: controller!.items.take(3).toList(growable: false),
+          ),
+        },
+      ],
+    );
+  }
+
+  void _openStorageSpaces() {
+    final customAction = widget.onStorageSpacesTap;
+    if (customAction != null) {
+      customAction();
+      return;
+    }
+
+    final controller = widget.storageSpaceController;
+    if (controller == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (storageContext) => StorageSpaceScreen(
+          controller: controller,
+          onSelected: (space) {
+            Navigator.of(storageContext).pop();
+            _selectStorageSpace(space);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _selectStorageSpace(StorageSpace? space) {
+    setState(() {
+      _selectedStorageSpace = space;
+    });
+
+    widget.inventoryController?.loadInventory(storageSpaceId: space?.id);
+    widget.expirySummaryController?.loadSummary(
+      asOf: DateUtils.dateOnly(DateTime.now()),
+      storageSpaceId: space?.id,
+    );
+  }
+
+  void _openInventory() {
+    final customAction = widget.onInventoryTap;
+    if (customAction != null) {
+      customAction();
+      return;
+    }
+
+    final controller = widget.inventoryController;
+    if (controller == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => InventoryScreen(controller: controller),
+      ),
+    );
+  }
+
+  void _openExpiringItems() {
+    final customAction = widget.onExpiringTap;
+    if (customAction != null) {
+      customAction();
+      return;
+    }
+
+    final expiryController = widget.expirySummaryController;
+    final inventoryController = widget.inventoryController;
+    if (expiryController == null || inventoryController == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ExpiringItemsScreen(
+          controller: expiryController,
+          inventoryController: inventoryController,
+        ),
+      ),
+    );
+  }
 }
 
-class _ExpiringItemRow extends StatelessWidget {
-  const _ExpiringItemRow({
-    required this.asset,
-    required this.name,
-    required this.quantity,
-    required this.location,
-    required this.daysLeft,
+class _IdleListenable implements Listenable {
+  const _IdleListenable();
+
+  @override
+  void addListener(VoidCallback listener) {}
+
+  @override
+  void removeListener(VoidCallback listener) {}
+}
+
+class _ExpiryCountAndContent extends StatelessWidget {
+  const _ExpiryCountAndContent({
+    required this.count,
+    required this.child,
+    this.dividerColor,
   });
 
-  final String asset;
-  final String name;
-  final String quantity;
-  final String location;
-  final String daysLeft;
+  final int count;
+  final Widget child;
+  final Color? dividerColor;
 
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Image.asset(asset, width: 54, height: 54),
-        const SizedBox(width: 12),
+        SizedBox(
+          width: 120,
+          child: Column(
+            children: [
+              Text(
+                '$count',
+                style: const TextStyle(
+                  color: Color(0xFFD95228),
+                  fontSize: 78,
+                  height: 0.9,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                count == 1 ? 'Item' : 'Items',
+                style: const TextStyle(color: Colors.grey, fontSize: 20),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: 1,
+          height: 150,
+          color: dividerColor ?? Theme.of(context).colorScheme.primary,
+        ),
+        const SizedBox(width: 16),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
+class _ExpiryItemRow extends StatelessWidget {
+  const _ExpiryItemRow({required this.summaryItem});
+
+  final ExpirySummaryItem summaryItem;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = summaryItem.item;
+
+    return Row(
+      children: [
+        const Icon(Icons.inventory_2_outlined, size: 42),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(name, style: const TextStyle(fontSize: 17)),
+              Text(
+                item.itemDefinitionName,
+                style: const TextStyle(fontSize: 17),
+              ),
               const SizedBox(height: 3),
               Text(
-                '$quantity | $location',
+                '${item.displayQuantity} | ${item.storageSpaceName}',
                 style: const TextStyle(color: Colors.grey, fontSize: 14),
               ),
             ],
           ),
         ),
         Text(
-          daysLeft,
+          _bucketLabel(summaryItem.bucket),
           style: const TextStyle(color: Color(0xFFC66500), fontSize: 14),
         ),
       ],
     );
   }
+
+  String _bucketLabel(String bucket) {
+    return switch (bucket) {
+      'overdue' => 'Overdue',
+      'today' => 'Today',
+      'upcoming' => 'Soon',
+      _ => bucket,
+    };
+  }
 }
 
-class _InventoryCount extends StatelessWidget {
-  const _InventoryCount({required this.value, required this.label});
+class _ExpiryStatusMessage extends StatelessWidget {
+  const _ExpiryStatusMessage({required this.message, this.onRetry});
 
-  final String value;
-  final String label;
+  final String message;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(value, style: const TextStyle(fontSize: 54, height: 1)),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 16)),
+        Text(message, textAlign: TextAlign.center),
+        if (onRetry != null) ...[
+          const SizedBox(height: 8),
+          TextButton(onPressed: onRetry, child: const Text('Try again')),
+        ],
       ],
     );
   }
 }
 
-class _CategoryDivider extends StatelessWidget {
-  const _CategoryDivider();
+class _InventoryPreview extends StatelessWidget {
+  const _InventoryPreview({required this.items});
+
+  final List<InventoryItem> items;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 1,
+    return Row(
+      children: items
+          .map(
+            (item) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(
+                  children: [
+                    const Icon(Icons.inventory_2_outlined, size: 34),
+                    const SizedBox(height: 8),
+                    Text(
+                      item.itemDefinitionName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.displayQuantity,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+}
+
+class _InventoryStatusMessage extends StatelessWidget {
+  const _InventoryStatusMessage({
+    required this.icon,
+    required this.message,
+    this.onRetry,
+  });
+
+  final IconData icon;
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
       height: 80,
-      color: Theme.of(context).colorScheme.primary,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 10),
+          Flexible(child: Text(message)),
+          if (onRetry != null) ...[
+            const SizedBox(width: 8),
+            TextButton(onPressed: onRetry, child: const Text('Try again')),
+          ],
+        ],
+      ),
     );
   }
 }
