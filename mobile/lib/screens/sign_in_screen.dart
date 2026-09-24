@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-
+import '../state/auth_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
-import 'ai_assistant_screen.dart';
 import 'sign_up_screen.dart';
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
+  const SignInScreen({required this.authController, super.key});
+
+  final AuthController authController;
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -27,16 +28,37 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   void _openSignUp() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const SignUpScreen()));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SignUpScreen(authController: widget.authController),
+      ),
+    );
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
+
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const AiAssistantScreen()),
+    if (widget.authController.isSubmitting) return;
+
+    final success = await widget.authController.login(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.authController.errorMessage ?? 'Unable to sign in.',
+        ),
+      ),
     );
   }
 

@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sayfridge/main.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+Future<void> openSignInFromGuestHome(WidgetTester tester) async {
+  await tester.pumpWidget(const SayFridgeApp());
+  await tester.pumpAndSettle();
+
+  final loginButton = find.text('Log in / Sign up');
+  await tester.ensureVisible(loginButton);
+  await tester.pumpAndSettle();
+  await tester.tap(loginButton);
+  await tester.pumpAndSettle();
+}
 
 void main() {
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+  });
   testWidgets('opens the account creation flow', (tester) async {
-    await tester.pumpWidget(const SayFridgeApp());
+    await openSignInFromGuestHome(tester);
 
     expect(find.text('Sign in'), findsOneWidget);
     await tester.tap(find.text('Create an account'));
@@ -16,7 +31,7 @@ void main() {
   });
 
   testWidgets('sign in validates empty credentials', (tester) async {
-    await tester.pumpWidget(const SayFridgeApp());
+    await openSignInFromGuestHome(tester);
 
     await tester.tap(find.byKey(const Key('sign-in-button')));
     await tester.pump();
@@ -26,7 +41,7 @@ void main() {
   });
 
   testWidgets('avatar selection returns the chosen avatar', (tester) async {
-    await tester.pumpWidget(const SayFridgeApp());
+    await openSignInFromGuestHome(tester);
     await tester.tap(find.text('Create an account'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('choose one'));
