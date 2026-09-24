@@ -226,3 +226,33 @@ Run the operation history tests from backend:
 ```bash
 python -m pytest -v tests/test_inventory_item_history.py tests/test_inventory_operation_history.py
 ```
+
+Run the implemented B15 batch-create tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_batch_create.py --strict-markers
+```
+
+Run the implemented B15 batch-move tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_batch_move.py --strict-markers
+```
+
+Run the implemented B15 batch-archive tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_batch_archive.py --strict-markers
+```
+
+Run the B22 expiry-summary tests from backend:
+
+```bash
+python -m pytest -v tests/test_inventory_expiry_summary.py --strict-markers
+```
+
+Run the B25 administrator account-management tests from backend:
+
+```bash
+python -m pytest -v tests/test_admin_users.py --strict-markers
+```

@@ -268,7 +268,7 @@ ACTIVE, even when the definition is already active; otherwise **409 / STATE_CONF
 A valid repeated restore leaves timestamps unchanged.
 
 
-## 6. Inventory — B07–B09 and B13
+## 6. Inventory — B07–B09, B13, B15, and B22
 
 Inventory requires nullable `inventory_item.notes` in the current table structure.
 See the backend README for development database synchronization; Neon is unchanged.
@@ -313,6 +313,26 @@ filter inventory state only, not associated resource states.
 
 **200**, Inventory response in any inventory state. Read-only.
 
+### GET /inventory-items/expiry-summary — B22
+
+Required query: `as_of=YYYY-MM-DD`. Optional query: `days_before` (default 3,
+0–365), `storage_space_id`, `category_id`, `bucket=overdue|today|upcoming`, `page`,
+and `page_size`. Adding `days_before` to `as_of` must remain within the legal date
+range.
+
+**200**, `{"counts":{"overdue":0,"today":0,"upcoming":0},"items":[],"total":0,
+"page":1,"page_size":20}`. Each item contains the normal Inventory response plus
+its `bucket`. The query includes only the current user's IN_STOCK inventory with a
+known expiry date. Archived spaces, definitions, and categories do not hide
+existing inventory.
+
+An expiry before `as_of` is overdue; equality is today; a later expiry through
+`as_of + days_before` inclusive is upcoming. Later and unknown dates are excluded.
+`counts` always covers all three buckets after space/category filtering. `bucket`
+filters only `items` and `total`. Results sort by expiry_date then ID ascending and
+use the standard pagination contract. Counts, total, and page come from one database
+statement. The endpoint writes nothing and sends no reminder or notification.
+
 ### POST /inventory-items — B08
 
 ```json
@@ -335,6 +355,99 @@ Insert one IN_STOCK row: initial and confirmed amounts/units equal validated inp
 confirmed_at is server time, estimates are NULL, version is 1. No ADD event is created.
 State checks coordinate with concurrent archival. Relationship changes during lock
 acquisition return 409 / RESOURCE_CHANGED. Creation has no idempotency guarantee.
+
+### POST /inventory-items/batch-create — B15
+
+```json
+{
+  "items": [
+    {"storage_space_id":"<space UUID>","item_definition_id":"<definition UUID>","amount":"2.5","unit":"kg"},
+    {"storage_space_id":"<space UUID>","item_definition_id":"<definition UUID>","amount":"3","unit":"each","notes":"Second package"}
+  ]
+}
+```
+
+The body accepts only `items`, containing 1–100 `InventoryCreate` objects. Each
+entry follows the same amount, unit, date, notes, ownership, visibility, and ACTIVE
+association rules as `POST /inventory-items`. Identical entries are allowed because
+they may represent separate physical stock batches.
+
+**201**, `{"items":[InventoryItemRead],"count":2}`. Returned items remain in input
+order. Every row starts IN_STOCK at version 1 with equal initial and confirmed
+quantities, no estimate, and no ADD operation history.
+
+The complete request is one transaction: validation or database failure for any
+entry rolls back every insertion. Batch business errors include the zero-based
+`item_index` of the first determined failing entry; request-level errors such as an
+empty or oversized `items` list have no item index. Missing and inaccessible
+associations both return 404 / NOT_FOUND; archived associations return 409 /
+STATE_CONFLICT; relationships changed during lock acquisition return 409 /
+RESOURCE_CHANGED. The endpoint has no idempotency guarantee, so retry only after
+checking whether a response was received.
+
+### POST /inventory-items/batch-move — B15
+
+```json
+{
+  "target_storage_space_id": "<owned active space UUID>",
+  "items": [
+    {"id":"<inventory UUID>","expected_version":1},
+    {"id":"<inventory UUID>","expected_version":4}
+  ]
+}
+```
+
+The body accepts one target space and 1–100 distinct inventory references. Each
+reference contains only `id` and a strict integer `expected_version` from 1 through
+2147483647. Duplicate IDs return 422 / VALIDATION_ERROR at the second occurrence.
+The target must be owned and ACTIVE. Foreign and missing targets both return 404 /
+NOT_FOUND; an archived target returns 409 / STATE_CONFLICT.
+
+**200**, `{"items":[InventoryItemRead],"count":2}` in request order. Every item
+must be owned and currently IN_STOCK or EMPTY. A moved item receives the target
+storage_space_id and increments its version once. Moving an item already in the
+target space is a no-op: it still validates ownership, state, version, and the
+target's ACTIVE state, but preserves its version and updated_at. A no-op therefore
+remains valid at the maximum version; an actual move at that version returns 409 /
+VERSION_LIMIT_REACHED.
+
+The entire batch is atomic. Missing or inaccessible items return 404 / NOT_FOUND;
+stale versions return 409 / VERSION_CONFLICT; terminal inventory returns 409 /
+STATE_CONFLICT. Entry-specific errors include zero-based `item_index`, and any
+failure leaves every item in its original space. The operation preserves quantities,
+quantity timestamps, item definition, dates, notes, and status, and writes no move
+history. There is no idempotent response replay; after a lost response, reload the
+items before retrying.
+
+### POST /inventory-items/batch-archive — B15
+
+```json
+{
+  "items": [
+    {"id":"<inventory UUID>","expected_version":1},
+    {"id":"<inventory UUID>","expected_version":4}
+  ]
+}
+```
+
+The body accepts only `items`, containing 1–100 distinct inventory references.
+Each reference contains only `id` and a strict integer `expected_version` from 1
+through 2147483647. Duplicate IDs return 422 / VALIDATION_ERROR at the second
+occurrence.
+
+**200**, `{"items":[InventoryItemRead],"count":2}` in request order. Every item
+must be owned and currently IN_STOCK or EMPTY. The endpoint changes each status to
+ARCHIVED and increments each version once. It preserves storage space, definition,
+all quantity and quantity-timestamp fields, dates, notes, and operation history.
+Archiving from an already archived source storage space is allowed. No archive
+operation-history row is written.
+
+The entire batch is atomic. Missing or inaccessible items return 404 / NOT_FOUND;
+stale versions return 409 / VERSION_CONFLICT; DISCARDED or already ARCHIVED items
+return 409 / STATE_CONFLICT; and an item at the maximum version returns 409 /
+VERSION_LIMIT_REACHED. Entry-specific errors include zero-based `item_index`, and
+any failure leaves every item unchanged. There is no idempotent response replay;
+after a lost response, reload the items before retrying.
 
 ### PATCH /inventory-items/{id} — B09
 
@@ -540,3 +653,49 @@ filtered result, including when the requested page is empty.
 state and may belong to archived associations. Foreign and missing operation IDs
 return identical **404 / NOT_FOUND** responses. Internal idempotency keys are not
 returned. This endpoint is read-only.
+
+## 8. Administrator account management — B25
+
+All endpoints require an authenticated ACTIVE account whose current database role
+is ADMIN. Ordinary users receive **403 / FORBIDDEN**. These endpoints never return
+password hashes, authentication-provider details, quota fields, inventory, or
+private definitions. They do not promote users, change passwords, or create audit
+records.
+
+### GET /admin/users
+
+**200**, a paginated object containing `items`, `total`, `page`, and `page_size`.
+Each item exposes only `id`, `email`, `role`, `status`, `created_at`, and
+`updated_at`. Results sort by `created_at` descending and then ID descending.
+Counts and items use one database statement.
+
+| Parameter | Default / meaning |
+| --- | --- |
+| q | Empty; trimmed literal case-insensitive email substring, at most 100 characters |
+| role | ALL; also USER or ADMIN |
+| status | ALL; also ACTIVE, SUSPENDED, or DISABLED |
+| page, page_size | 1 and 20; page ≥1, page_size 1–100 |
+
+Unknown parameters and invalid values return **422 / VALIDATION_ERROR**.
+
+### GET /admin/users/{id}
+
+**200**, one administrator-safe user response with the same fields as the list.
+A missing user returns **404 / NOT_FOUND**. This read does not expose or inspect the
+user's inventory.
+
+### PATCH /admin/users/{id}/status
+
+```json
+{"status":"SUSPENDED"}
+```
+
+The body accepts only `status=ACTIVE|SUSPENDED|DISABLED`. The target must have
+`role=USER`; targeting the current or another administrator returns **403 /
+ADMIN_TARGET_FORBIDDEN**. A missing target returns **404 / NOT_FOUND**.
+
+**200**, the updated administrator-safe user response. The write changes only
+status and updated_at. Repeating the current status is a no-op and preserves
+updated_at. A suspended or disabled account is rejected by subsequent authenticated
+requests because every request reads current account state. Requests already in
+progress are not cancelled.

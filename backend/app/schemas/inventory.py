@@ -1,6 +1,6 @@
 """Inventory query, stock entry, metadata, state-action, and response contracts."""
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
@@ -9,6 +9,7 @@ from app.core.quantity import MAX_QUANTITY
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 InventoryStatus = Literal["IN_STOCK", "EMPTY", "DISCARDED", "ARCHIVED"]
+ExpiryBucket = Literal["overdue", "today", "upcoming"]
 Notes = Annotated[str, StringConstraints(max_length=1000)]
 
 
@@ -51,6 +52,32 @@ class InventoryCreate(BaseModel):
         if len(value) > 16:
             raise ValueError("Normalized unit must contain at most 16 characters")
         return value
+
+
+class InventoryBatchCreate(BaseModel):
+    """One atomic request containing independently validated stock entries."""
+
+    model_config = ConfigDict(extra="forbid")
+    items: list[InventoryCreate] = Field(min_length=1, max_length=100)
+
+
+class InventoryBatchItem(BaseModel):
+    """One version-guarded inventory reference inside a batch write."""
+
+    model_config = ConfigDict(extra="forbid")
+    id: UUID
+    expected_version: int = Field(ge=1, le=2147483647, strict=True)
+
+
+class InventoryBatchMove(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    target_storage_space_id: UUID
+    items: list[InventoryBatchItem] = Field(min_length=1, max_length=100)
+
+
+class InventoryBatchArchive(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[InventoryBatchItem] = Field(min_length=1, max_length=100)
 
 
 class InventoryUpdate(BaseModel):
@@ -99,6 +126,25 @@ class InventoryListQuery(BaseModel):
         return self
 
 
+class ExpirySummaryQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    as_of: CalendarDate
+    days_before: int = Field(default=3, ge=0, le=365)
+    storage_space_id: UUID | None = None
+    category_id: UUID | None = None
+    bucket: ExpiryBucket | None = None
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def validate_window(self):
+        try:
+            self.as_of + timedelta(days=self.days_before)
+        except OverflowError as exc:
+            raise ValueError("Expiry window exceeds the legal date range") from exc
+        return self
+
+
 class InventoryItemRead(BaseModel):
     id: UUID
     storage_space_id: UUID
@@ -132,3 +178,26 @@ class InventoryPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class ExpiryCounts(BaseModel):
+    overdue: int
+    today: int
+    upcoming: int
+
+
+class ExpirySummaryItem(InventoryItemRead):
+    bucket: ExpiryBucket
+
+
+class ExpirySummary(BaseModel):
+    counts: ExpiryCounts
+    items: list[ExpirySummaryItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class InventoryBatchResult(BaseModel):
+    items: list[InventoryItemRead]
+    count: int

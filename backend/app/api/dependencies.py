@@ -44,6 +44,19 @@ async def get_current_user(
     return user
 
 
+async def get_current_admin(user: User = Depends(get_current_user)) -> User:
+    """Require the current active account to hold the existing ADMIN role."""
+    if user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FORBIDDEN",
+                "message": "Administrator access required",
+            },
+        )
+    return user
+
+
 async def require_empty_body(request: Request) -> None:
     if await request.body():
         raise HTTPException(

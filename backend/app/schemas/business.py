@@ -68,6 +68,7 @@ class ValidationIssue(BaseModel):
 class BusinessErrorDetail(BaseModel):
     code: str
     message: str
+    item_index: int | None = None
     errors: list[ValidationIssue] | None = None
 
 
