@@ -218,7 +218,7 @@ def _active(row, description):
         raise InventoryError("STATE_CONFLICT", description + " is archived")
 
 
-async def create_inventory(session: AsyncSession, user_id: UUID, **values) -> InventoryItemRead:
+async def create_inventory(session: AsyncSession, user_id: UUID, *, commit: bool = True, **values) -> InventoryItemRead:
     try:
         planned = (await session.execute(select(ItemDefinition).where(
             ItemDefinition.id == values["item_definition_id"],
@@ -248,7 +248,8 @@ async def create_inventory(session: AsyncSession, user_id: UUID, **values) -> In
         await session.flush()
         result = await get_inventory(session, item.id, user_id)
         # Stock entry deliberately creates no ADD event in this phase.
-        await session.commit()
+        if commit:
+            await session.commit()
         return result
     except Exception:
         await session.rollback()
@@ -880,15 +881,17 @@ async def _operation_replay(session, operation, item_id, user_id, operation_type
 
 async def submit_inventory_operation(session: AsyncSession, item_id: UUID, user_id: UUID, *,
                         expected_version: int, operation_type: str, quantity_kind: str,
-                        quantity_value: str, quantity_unit: str, idempotency_key: str) -> OperationResult:
+                        quantity_value: str, quantity_unit: str, idempotency_key: str,
+                        commit: bool = True, input_method: str = "MANUAL",
+                        estimated_change: tuple[Decimal, str] | None = None) -> OperationResult:
     """Apply one ADD/CONSUME/RECONCILE atomically, or return its prior record and current inventory.
 
     The route passes schema-validated input. Only this outer service commits or
     rolls back. Database uniqueness also protects a key reused across spaces.
     """
-    if operation_type not in {"ADD", "CONSUME", "RECONCILE"} or quantity_kind not in {"AMOUNT", "FRACTION"}:
+    if operation_type not in {"ADD", "CONSUME", "RECONCILE"} or quantity_kind not in ({"AMOUNT", "FRACTION", "QUALITATIVE"} if estimated_change else {"AMOUNT", "FRACTION"}):
         raise InventoryError("VALIDATION_ERROR", "Unsupported operation or quantity kind")
-    if operation_type == "ADD" and quantity_kind != "AMOUNT":
+    if operation_type == "ADD" and quantity_kind != "AMOUNT" and estimated_change is None:
         raise InventoryError("VALIDATION_ERROR", "ADD requires AMOUNT")
     if operation_type == "RECONCILE" and quantity_kind != "AMOUNT":
         raise InventoryError("VALIDATION_ERROR", "RECONCILE requires AMOUNT")
@@ -911,7 +914,10 @@ async def submit_inventory_operation(session: AsyncSession, item_id: UUID, user_
                     _validate_new_operation(item, space, expected_version, operation_type)
                     now = datetime.now(timezone.utc)
 
-                    if operation_type == "ADD":
+                    if estimated_change is not None:
+                        from app.services.inventory_quantities import calculate_estimated_change
+                        calculation = calculate_estimated_change(item, operation_type, *estimated_change)
+                    elif operation_type == "ADD":
                         calculation = calculate_addition(item, Decimal(quantity_value), quantity_unit)
                     elif operation_type == "CONSUME":
                         calculation = calculate_consumption(item, quantity_kind, quantity_value, quantity_unit)
@@ -955,7 +961,7 @@ async def submit_inventory_operation(session: AsyncSession, item_id: UUID, user_
                     operation = InventoryOperation(
                         inventory_item_id=item.id, operation_type=operation_type, quantity_kind=quantity_kind,
                         quantity_value=quantity_value, quantity_unit=quantity_unit,
-                        input_method="MANUAL", calculation_method=operation_calculation_method,
+                        input_method=input_method, calculation_method=operation_calculation_method,
                         affects_state=operation_affects_state,
                         applied_change_amount=operation_applied_change_amount,
                         applied_change_unit=operation_applied_change_unit,
@@ -966,10 +972,14 @@ async def submit_inventory_operation(session: AsyncSession, item_id: UUID, user_
                     result = OperationResult(operation=InventoryOperationRead.model_validate(operation),
                                              inventory=await get_inventory(session, item.id, user_id),
                                              replayed=False)
-            await session.commit()
+            if commit:
+                await session.commit()
             return result
         except IntegrityError as exc:
             await session.rollback()
+            if not commit:
+                # The outer Agent transaction owns associations and the receipt too.
+                raise
             if not (getattr(exc.orig, "sqlstate", None) == "23505" and
                     getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
                     == "uq_inventory_operation_idempotency_key"):

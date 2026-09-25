@@ -7,6 +7,11 @@ MAX_QUANTITY = Decimal("999999999.999")
 QUANTITY_PRECISION = Decimal("0.001")
 
 
+def normalize_standard_unit(unit: str) -> str:
+    value = unit.strip().casefold()
+    return {"克": "g", "千克": "kg", "公斤": "kg", "毫升": "ml", "升": "l"}.get(value, value)
+
+
 class QuantityError(ValueError):
     """A calculation failure with a stable public business error code."""
 

@@ -273,4 +273,31 @@ Transactions must guarantee that:
 
 ## 12. Implementation Status
 
-This document is the approved database design baseline. The repository has Neon connection configuration, SQLAlchemy ORM models, and an initial Alembic migration for the eight tables. Inventory CRUD, a repository layer, and controlled business APIs have not yet been implemented. Flutter, Web, and the Agent must not access the database directly.
+This document is the original database design baseline. Current business API behavior is documented in BACKEND_DESIGN.md; the Agent extension is documented in AGENT_API.md. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
+
+## 13. Agent business receipts: `agent_inventory_action`
+
+The Agent extension adds a ninth business table. Each row is a committed, independently
+replayable action, saved in the same transaction as its inventory changes and any
+new private item definition or storage space. Failures and unconfirmed proposals
+remain in the LangGraph checkpoint, not successful business history.
+
+| Field | Meaning |
+| --- | --- |
+| id | Server-generated proposal/action UUID; primary key and retry identity |
+| user_id | Owning user foreign key |
+| conversation_id / turn_id | Logical LangGraph conversation and original request UUIDs; no conversation-table foreign key |
+| action | CREATE_STOCK, ADD, CONSUME or RECONCILE |
+| request_fingerprint | SHA-256 of the immutable prepared request |
+| request_snapshot | JSONB original expression, resolved target, preview, estimate source and memory snapshots |
+| result_snapshot | JSONB actual committed outcome and created inventory/operation identifiers |
+| created_at | Committed action creation timestamp |
+
+Existing quantity fields retain their semantics. Agent quantity operations use
+input_method=TEXT and retain original expressions in inventory_operation. Initial
+stock entry still does not fabricate an ADD operation. This receipt provides
+creation provenance and crash recovery without depending on chat history.
+
+For existing databases, `backend/scripts/setup_agent_actions.py --check` checks
+the table; `--initialize` explicitly adds it after confirmation. The updated initial
+schema includes it for fresh databases. Application startup does not run DDL.

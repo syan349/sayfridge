@@ -1,8 +1,13 @@
 # SayFridge Backend
 
-The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, metadata/location editing, discard, and archival are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented, including item-scoped and global history reads. Preview, Agent, and Worker features remain planned.
+The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, metadata/location editing, discard, and archival are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented, including item-scoped and global history reads. The text Agent adds server-calculated previews, estimated actions, confirmations, and per-item recovery; Worker features remain planned.
 
 ## Requirements
+
+The text Agent now has a six-node workflow, structured memory, independently
+committed inventory actions, confirmation/resume, and SSE recovery interfaces.
+See [Agent API and setup](../docs/AGENT_API.md). Existing databases require the
+explicit receipt-table setup described there before enabling Agent writes.
 
 - Python 3.11
 

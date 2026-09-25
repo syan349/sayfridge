@@ -48,7 +48,8 @@ def liter_to_milliliter(num_liters: Decimal) -> Decimal:
 
 
 def convert_addition_amount(added_amount: Decimal, input_unit: str, target_unit: str) -> Decimal:
-    source, target = input_unit.strip().casefold(), target_unit.strip().casefold()
+    from app.core.quantity import normalize_standard_unit
+    source, target = normalize_standard_unit(input_unit), normalize_standard_unit(target_unit)
     if source == "g" and target == "kg":
         return grams_to_kilograms(added_amount)
     if source == "kg" and target == "g":
@@ -123,6 +124,26 @@ def calculate_consumption(item: InventoryItem, quantity_kind: str, quantity_valu
         raise QuantityError("QUANTITY_PRECISION_UNSUPPORTED", "Rounding would erase a positive remaining quantity")
     return QuantityCalculation(output_amount, current_unit, amount_type, applied, method,
                                Fraction(applied) != unrounded)
+
+def calculate_estimated_change(item: InventoryItem, operation: str, amount: Decimal, unit: str) -> QuantityCalculation:
+    """Apply an approved estimated delta, never promote it to a confirmed fact."""
+    if operation not in {"ADD", "CONSUME"}:
+        raise ValueError("Estimates only apply to ADD/CONSUME")
+    if not amount.is_finite() or amount <= 0 or amount > MAX_QUANTITY:
+        raise ValueError("Estimated change must be a positive finite supported amount")
+    base, base_unit, _ = get_addition_base(item)
+    converted = convert_addition_amount(amount, unit, base_unit)
+    if operation == "CONSUME" and converted > base:
+        raise QuantityError("INSUFFICIENT_QUANTITY", "Consumption exceeds current balance")
+    applied = converted.quantize(QUANTITY_PRECISION, rounding=ROUND_HALF_UP)
+    if applied == 0:
+        raise QuantityError("QUANTITY_TOO_SMALL", "Estimated change rounds to zero")
+    result = base + applied if operation == "ADD" else base - applied
+    if operation == "CONSUME" and converted < base and result == 0:
+        raise QuantityError("QUANTITY_PRECISION_UNSUPPORTED", "Rounding erases positive remainder")
+    validate_quantity_amount(result, allow_zero=True)
+    return QuantityCalculation(result, base_unit, "ESTIMATED", applied, "AI_ESTIMATED", applied != converted)
+
 
 def prepare_reconciliation(amount: Decimal, unit: str) -> tuple[Decimal, str]:
     """Validate and return a confirmed stocktake total without unit conversion."""

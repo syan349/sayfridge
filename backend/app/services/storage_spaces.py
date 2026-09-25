@@ -62,11 +62,12 @@ async def list_storage_spaces(
     return [space for space, _ in rows if space is not None], rows[0].total
 
 
-async def _commit_space(session: AsyncSession, space: StorageSpace) -> StorageSpace:
+async def _commit_space(session: AsyncSession, space: StorageSpace, *, commit: bool = True) -> StorageSpace:
     await session.flush()
     # Read server timestamps while the write's locks are still held.
     await session.refresh(space)
-    await session.commit()
+    if commit:
+        await session.commit()
     return space
 
 
@@ -83,12 +84,12 @@ async def _rollback_write(session: AsyncSession, error: Exception) -> None:
 
 
 async def create_storage_space(
-    session: AsyncSession, user_id: UUID, *, name: str, type: str,
+    session: AsyncSession, user_id: UUID, *, name: str, type: str, commit: bool = True,
 ) -> StorageSpace:
     try:
         space = StorageSpace(user_id=user_id, name=name, type=type, status="ACTIVE")
         session.add(space)
-        return await _commit_space(session, space)
+        return await _commit_space(session, space, commit=commit)
     except Exception as error:
         await _rollback_write(session, error)
         raise

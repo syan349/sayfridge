@@ -1,6 +1,11 @@
 import os
+import sys
+import asyncio
 from pathlib import Path
 from dotenv import dotenv_values
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 # Override all required settings in the test process without relying on or modifying the local .env.

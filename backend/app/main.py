@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -16,14 +18,26 @@ from app.api.routes.inventory_operations import router as inventory_operations_r
 from app.services.inventory import InventoryError
 from app.api.routes.admin import router as admin_router, admin_error_handler
 from app.services.admin import AdminError
+from app.agents.persistence import close_agent_resources
+from app.api.routes.agent import router as agent_router
 
-app = FastAPI(title="SayFridge Backend")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        yield
+    finally:
+        await close_agent_resources()
+
+
+app = FastAPI(title="SayFridge Backend", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(storage_spaces_router)
 app.include_router(catalog_router)
 app.include_router(inventory_router)
 app.include_router(inventory_operations_router)
 app.include_router(admin_router)
+app.include_router(agent_router)
 app.add_exception_handler(InventoryError, inventory_error_handler)
 app.add_exception_handler(CatalogError, catalog_error_handler)
 app.add_exception_handler(StorageSpaceError, storage_space_error_handler)

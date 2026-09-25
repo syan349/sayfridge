@@ -1,6 +1,6 @@
 # SayFridge 库存数量与操作规则
 
-> 状态：业务设计。沿用现有数量字段；手动交互、用户记忆与历史重估为本轮补充的目标行为，不代表已实现。
+> 状态：业务设计。Agent 前向预览、估算提交和记忆能力已加入本地实现，接口见 [AGENT_API.md](./AGENT_API.md)；历史重估仍是目标行为。现有远程数据库需独立同步新增执行凭据表。
 >
 > 字段与约束见 [DATABASE_DESIGN.md](./DATABASE_DESIGN.md)，组件协作见 [ARCHITECTURE.md](./ARCHITECTURE.md)。本轮不调整数据库设计，历史重估所需的记录结构留待实施时细化。
 
