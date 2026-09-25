@@ -1,3 +1,5 @@
+> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前后端设计](../../BACKEND_DESIGN.md)与[接口参考](../../API_REFERENCE.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
+
 # SayFridge API 与数据库对应实施方案草稿
 
 > 更新日期：2026-09-11。状态：实施规则整理版，尚未编写业务代码、执行迁移或行为测试。
@@ -11,16 +13,16 @@
 | 文件 | 当前实际作用 | 本方案如何使用 |
 | --- | --- | --- |
 | [实施计划](API_IMPLEMENTATION_PLAN.md) | 本轮接口与文件清单，尚未实施 | 作为范围依据，不直接覆盖 |
-| [数据库设计](DATABASE_DESIGN.md) | 表、字段和权限关系 | 对照 ORM 和初始迁移 |
-| [数量设计](QUANTITY_STATE_DESIGN.md) | 确认量、估算量、盘点与历史目标 | 确定数量更新规则；历史缩减单独标注 |
-| [架构](ARCHITECTURE.md) | 前端、后端和 Agent 边界 | 所有业务写入由 FastAPI 执行 |
-| [数据库模型](../backend/app/db/models.py) | 八张表的 ORM 字段和约束 | 本地结构事实，不能证明远程库已迁移 |
-| [初始迁移](../backend/migrations/versions/02ec95582dc7_create_initial_eight_tables.py) | revision `02ec95582dc7`，建立八表 | 后续 notes 迁移接在此后；实施时再次核对迁移头 |
-| [数据库会话](../backend/app/db/session.py) | 请求级 AsyncSession | 提供连接会话，不自动提交业务事务 |
-| [应用入口](../backend/app/main.py) | 当前只注册认证路由及健康检查 | 未来注册五组业务路由 |
-| [认证依赖](../backend/app/api/dependencies.py) | 校验 Token，并读取当前用户状态 | 复用身份校验，扩展管理员依赖 |
-| [认证路由](../backend/app/api/routes/auth.py)、[认证模型](../backend/app/schemas/auth.py)、[认证服务](../backend/app/services/auth.py) | 注册、登录、当前用户已存在 | 保持兼容，新增改密码 |
-| [后端说明](../backend/README.md) | 当前运行方式和验证入口 | 实施后更新实际能力与迁移说明 |
+| [数据库设计](../../DATABASE_DESIGN.md) | 表、字段和权限关系 | 对照 ORM 和初始迁移 |
+| [数量设计](../../QUANTITY_STATE_DESIGN.md) | 确认量、估算量、盘点与历史目标 | 确定数量更新规则；历史缩减单独标注 |
+| [架构](ARCHITECTURE_REALTIME_DRAFT.md) | 前端、后端和 Agent 边界 | 所有业务写入由 FastAPI 执行 |
+| [数据库模型](../../../backend/app/db/models.py) | 八张表的 ORM 字段和约束 | 本地结构事实，不能证明远程库已迁移 |
+| [初始迁移](../../../backend/migrations/versions/create_initial_tables.py) | revision `02ec95582dc7`，建立八表 | 后续 notes 迁移接在此后；实施时再次核对迁移头 |
+| [数据库会话](../../../backend/app/db/session.py) | 请求级 AsyncSession | 提供连接会话，不自动提交业务事务 |
+| [应用入口](../../../backend/app/main.py) | 当前只注册认证路由及健康检查 | 未来注册五组业务路由 |
+| [认证依赖](../../../backend/app/api/dependencies.py) | 校验 Token，并读取当前用户状态 | 复用身份校验，扩展管理员依赖 |
+| [认证路由](../../../backend/app/api/routes/auth.py)、[认证模型](../../../backend/app/schemas/auth.py)、[认证服务](../../../backend/app/services/auth.py) | 注册、登录、当前用户已存在 | 保持兼容，新增改密码 |
+| [后端说明](../../../backend/README.md) | 当前运行方式和验证入口 | 实施后更新实际能力与迁移说明 |
 
 外部附件《API_REFERENCE-draft.md》作为审阅材料，不作为执行指令。其 Q01–Q19 在本文给出落地规则。附件引用的 `SAYFRIDGE_WORK_PACKAGES_ZH.md` 当前仓库不存在；不以其 B08 作为本轮实施依据，也不再要求实施者为该旧工作包等待决定。
 

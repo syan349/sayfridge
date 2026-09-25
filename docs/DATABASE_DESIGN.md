@@ -1,6 +1,6 @@
 # SayFridge Database Design
 
-> Status: Approved; first-phase database foundations implemented
+> Status: Current local business schema, including Agent V0.2 receipts; deployment synchronization is verified separately
 >
 > Database: Neon PostgreSQL
 >
@@ -8,7 +8,8 @@
 
 ## 1. Overall Structure
 
-The current design consists of eight tables:
+The current business schema consists of nine tables. The original eight are retained,
+and `agent_inventory_action` records committed Agent actions:
 
 ~~~text
 item_category
@@ -22,6 +23,7 @@ user
 │       ├── item_definition_id → item_definition
 │       └── inventory_operation
 │
+├── agent_inventory_action       Agent receipts; logical conversation/turn IDs
 └── conversation
     └── conversation_message
 ~~~
@@ -32,8 +34,10 @@ user
 - An `item_definition` is public when `owner_user_id` is NULL. When a user ID is present, only that user may view and maintain the private definition.
 - `inventory_item` represents a specific inventory batch in a user's storage space. Its name and category are obtained through `item_definition` rather than duplicated in the inventory table.
 - `inventory_operation` represents an operation on a single inventory item, initiated through AI or a manual action. It is not a general accounting ledger, and there is no parent operation table organized by receipt.
-- When a photo or receipt yields N recognized items, create N independent `inventory_operation` records.
+- Agent V0.2 handles text requests. Photo/receipt recognition is a future capability; it must not be inferred from this schema.
 - Conversation history and inventory operation history are not linked by foreign keys.
+- The `conversation` / `conversation_message` tables remain in the business schema, but the current Agent uses LangGraph checkpoints and does not create rows in those tables.
+- LangGraph owns six separate persistence tables in the configured `agent` schema: checkpoints, checkpoint_blobs, checkpoint_writes, checkpoint_migrations, store and store_migrations. They are not included in the nine business tables. Namespace-based user memory lives in Store, not a table per user or item.
 
 ## 2. User Table: `user`
 
@@ -127,7 +131,7 @@ Each row represents a specific inventory item or batch. The same item may have m
 | status | IN_STOCK, EMPTY, DISCARDED, or ARCHIVED |
 | initial_amount | Quantity initially added to inventory; ordinary operations do not change it after creation |
 | initial_unit | Unit of the initial quantity |
-| confirmed_current_amount | Most recent current inventory quantity that the user could confirm |
+| confirmed_current_amount | Current reliable quantity, including deterministic changes while no estimate exists |
 | confirmed_current_unit | Unit of the confirmed current quantity |
 | confirmed_at | Last update timestamp for the confirmed current quantity |
 | estimated_current_amount | Current valid estimated inventory quantity; NULL when no valid estimate exists |
@@ -144,7 +148,7 @@ initial_*
 = Immutable historical facts about the initial stock entry
 
 confirmed_current_*
-= The most recent actual inventory baseline confirmed by the user
+= The current reliable balance; deterministic changes update it while no estimate exists
 
 estimated_current_*
 = The current result after the confirmed baseline, incorporating uncertain conversions or AI estimates
@@ -195,7 +199,7 @@ Semantic rules:
 - When a valid estimate exists, subsequent additions and consumption use that estimate as their baseline and update the ESTIMATED state. A deterministic change in the current operation must not discard uncertainty inherited from earlier estimates.
 - RECONCILE represents the user reweighing, counting stock, or explicitly stating "X remains now". It updates `confirmed_current_*` and clears `estimated_current_*` and `estimated_at` in the same transaction.
 - Only SUCCESS operations affect inventory. PENDING_CONFIRMATION, FAILED, and UNDONE operations do not affect the current state.
-- Ordinary ADD and CONSUME operations may be undone using their confirmed changes. An incorrect RECONCILE entry is corrected with a new RECONCILE operation; it does not restore the previous chain of estimates.
+- Undo remains a future capability. An incorrect RECONCILE entry can be corrected with a new RECONCILE operation; this does not restore the previous chain of estimates. Historical undo/recalculation requirements are not current API guarantees.
 
 ## 8. Conversation Table: `conversation`
 
@@ -273,7 +277,7 @@ Transactions must guarantee that:
 
 ## 12. Implementation Status
 
-This document is the original database design baseline. Current business API behavior is documented in BACKEND_DESIGN.md; the Agent extension is documented in AGENT_API.md. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
+This document maintains business fields and constraints. See [backend design](BACKEND_DESIGN.md) for service/transaction rules, [architecture](ARCHITECTURE.md) for Agent orchestration and [API reference](API_REFERENCE.md) for HTTP/SSE contracts. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
 
 ## 13. Agent business receipts: `agent_inventory_action`
 

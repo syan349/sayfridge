@@ -1,3 +1,5 @@
+> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前后端设计](../../BACKEND_DESIGN.md)与[接口参考](../../API_REFERENCE.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
+
 # SayFridge 基础业务 API 实施计划
 
 > 更新：2026-09-11。状态：本轮范围与文件清单，尚未实施。逐接口字段、数据库读写、数量精度、历史查询及事务规则见 [API 与数据库实施规则](API_DATABASE_IMPLEMENTATION_DRAFT.md)。
@@ -312,3 +314,155 @@ async def preview_operation(...):
 - 未运行的测试、未执行的迁移明确写出，不把代码交付说成已经完成数据库和前端联调。
 
 **本次任务的边界：基础业务 API、一个备注字段、一份前端文档。提醒和推送整套移出。**
+
+## 附录：从项目范围文档移出的旧实施计划
+
+> 来源：Agent V0.2 基线中 PROJECT_SCOPE_BILINGUAL.md 第 3.2 节标题内误嵌的旧计划。下文仅作历史记录，当前产品范围见[范围文档](../../PROJECT_SCOPE_BILINGUAL.md)。
+
+SayFridge 非 Agent API 实施计划
+
+## 1. 范围调整
+
+采用上一版确认的业务范围，并删除以下接口：
+
+- `PATCH /users/me`
+- `PUT /users/me/avatar`
+- `DELETE /users/me/avatar`
+
+不增加昵称、头像字段及文件上传存储。保留改密码。
+
+时区放进提醒设置，由 `GET/PATCH /users/me/reminder-settings` 读取和修改，供临期统计和定时提醒共用；默认 `Pacific/Auckland`，允许设置其他有效 IANA 时区。
+
+本轮实现：
+
+| 模块 | 接口及功能 |
+|---|---|
+| 认证 | 保留注册、登录、当前用户查询；新增 `POST /auth/change-password` |
+| 存储空间 | `/storage-spaces` 列表、创建；`/{id}` 详情、编辑；`/{id}/archive`、`/{id}/restore` 归档与恢复 |
+| 品类 | `GET /item-categories`，供入库选择和库存筛选 |
+| 私有物品词典 | `/item-definitions` 查询、创建；`/{id}` 详情、编辑；归档、恢复 |
+| 库存 | `/inventory-items` 查询、入库；`/{id}` 详情、编辑；`/{id}/archive` 归档 |
+| 数量操作 | `POST /inventory-items/{id}/operation-preview` 预览；`POST /inventory-items/{id}/operations` 正式增加、消耗、盘点、丢弃 |
+| 历史 | 查询单件库存操作、全部操作及单条操作详情 |
+| 批量 | `batch-create`、`batch-move`、`batch-archive`，分别用于批量入库、移动和归档 |
+| 概览 | `GET /inventory-summary`、`GET /expiry-summary` |
+| 提醒设置 | `GET/PATCH /users/me/reminder-settings` |
+| 推送设备 | `PUT/DELETE /users/me/push-devices/{installation_id}` |
+| 站内通知 | 查询列表、未读数量、标记单条及全部已读 |
+| 管理员 | 用户列表及详情、修改普通用户状态；公共品类和物品词典管理；审计列表及详情 |
+
+除 `/health` 外，路径统一以 `/api/v1` 开头。
+
+不实现 Agent、识别、对话、任务调度、用户记忆、历史重估及撤回。手动纠错通过增加或重新盘点完成，保留原历史。
+
+## 2. 文件组织与可读性
+
+按功能组织，**不按每个 API 创建一个文件，也不把所有 API 放进同一个文件**。
+
+```text
+backend/
+├── app/
+│   ├── main.py                 # 创建应用，统一挂载 API
+│   ├── api/
+│   │   ├── router.py           # 汇总所有功能路由
+│   │   ├── dependencies.py     # 当前用户、管理员等共同依赖
+│   │   └── routes/             # auth、storage_spaces、catalog、
+│   │                          # inventory、inventory_operations、
+│   │                          # reminders、notifications、admin
+│   ├── schemas/               # 各模块请求与响应模型
+│   ├── services/              # 对应模块的计算、权限与事务逻辑
+│   ├── workers/               # 提醒调度、通知投递
+│   └── db/                    # ORM 模型及数据库连接
+├── migrations/                # 本次新增迁移
+└── tests/                     # 按业务模块组织测试
+```
+
+调用关系：
+
+**请求 → 功能路由 → 业务服务 → 数据库 → 明确的响应模型。**
+
+- `main.py` 只挂载总路由，不堆业务逻辑。
+- 路由负责参数、身份依赖、调用服务和返回 HTTP 响应。
+- 服务负责计算和事务，供手动操作及未来 Agent 共用。
+- 批量接口复用单件操作的业务规则，事务由批量服务统一控制。
+- 暂不添加通用 Repository 层；出现实际重复需求再引入。
+- 每个 API 编写简洁的中英文 `summary`、说明和必要字段描述，显示在 Swagger 中。
+- 注释解释数量状态、权限和事务等容易误解的规则，不逐行复述代码。
+
+由于本轮包含数据库扩展、后台提醒和测试，实际会新增多个文件，并修改少量现有入口、认证、配置与模型文件；不为减少文件数量牺牲职责划分。
+
+## 3. 业务规则与数据变更
+
+- 支持多个平级空间，不支持共享或嵌套；存在在库物品的空间不能归档。
+- 公共词典由管理员维护；普通用户仅维护自己的私有词典。
+- 新购批次独立入库，不自动合并；首次入库数量保持不变。
+- 普通库存编辑只能修改物品关联、日期、空间和备注，不能绕过操作接口直接修改数量。
+- 数量使用 `Decimal`，API 使用最多三位小数的十进制字符串；支持同单位和 `g/kg`、`ml/l` 确定性换算。
+- 有估算余额时，后续普通增减继续作用于估算；盘点更新确认余额并清空估算。
+- 预览不写数据；正式提交重新计算，校验版本和幂等键，库存与历史同事务提交。
+- 区分消耗、丢弃和归档；记录首次入库、数量操作、资料修改及归档的前后状态。
+- 批量最多 100 条，全部成功或全部失败；失败响应指出条目位置与原因。
+- 列表统一分页，默认 20 条、最多 100 条；库存默认按批次展示。
+- 提醒默认当地时间 09:00 临期、21:00 回顾，临期阈值 3 天，可修改或关闭。
+- 后台先保存站内通知，再推送；同一用户、提醒类型和当地日期不重复生成。
+- 手机推送默认采用 FCM；实际设备验证需要可用的 Firebase/APNs 配置。
+- 管理员只管理普通用户状态与公共词典，不提供私人库存或对话读取接口；管理写入同步记录审计。
+
+新增迁移包括：库存备注、操作历史扩展、请求幂等记录、提醒设置、推送设备、通知及投递记录、管理审计，以及使改密码后旧令牌失效的用户令牌版本。保留现有数据，不重写初始迁移。
+
+## 4. 前端 API 文档交付
+
+新增 [API_REFERENCE.md](../../API_REFERENCE.md)，提供完整前端接入说明；同步更新后端 README 的启动、迁移及提醒任务运行方法。
+
+文档必须包含：
+
+- 服务地址、`/api/v1` 前缀、Bearer Token 使用方式。
+- 每个接口的方法、路径、中英文用途、权限要求。
+- 路径参数、查询参数、请求字段、必填项、默认值和枚举。
+- 成功响应、错误响应及可复制的请求示例。
+- 数量字符串、日期、时区、分页和状态的统一约定。
+- `expected_version` 与 `Idempotency-Key` 的具体使用方式。
+- 新建空间和物品、入库、预览与确认消耗、盘点、查看历史的完整调用示例。
+- 批量失败、版本冲突、令牌失效、未知单位等前端处理方式。
+- 提醒设置、设备绑定、通知已读和管理员调用示例。
+- 已实现能力与需要外部推送配置才能验证的能力。
+
+同时交付与代码一致的 `/docs`、`/redoc`、`/openapi.json`，避免文档和实现各写一套。
+
+## 5. 验收与完成汇报
+
+使用 Python 3.11 执行后端测试，重点验证权限隔离、数量计算、操作历史、事务回滚、重复提交、并发冲突、批量原子性、改密码失效、提醒去重和管理员审计。
+
+验证迁移能够应用，已有认证仍可使用，完整手动库存流程无需任何 AI 服务。
+
+本轮仅实现后端和文档，不修改前端页面。实际推送在配置可用时做设备验证；否则明确报告尚未验证，不以模拟测试代替真实投递结论。
+
+完成后向你汇报：
+
+1. 已实现哪些 API，以及未完成或受外部配置影响的部分。
+2. 实际新增、修改的文件及各自职责。
+3. 运行过的测试与结果。
+4. 启动服务、迁移数据库和运行提醒任务的方法。
+5. 完整 API 文档位置与 Swagger 访问方式。
+
+## 附录：原范围文档中的概念工具建议
+
+> 这些是旧规划名称，不是当前工具清单；当前实现见[架构](../../ARCHITECTURE.md)。
+
+## 6. Agent and Tool Boundaries / Agent 与工具边界
+
+The Agent's job is interpretation and orchestration, not database ownership. The following minimum tool set is proposed. / Agent 的职责是理解和编排，而非拥有数据库权限。建议最小工具集如下：
+
+| Tool / 工具 | Purpose / 用途 | Safety and business constraints / 安全与业务约束 |
+| --- | --- | --- |
+| `search_inventory` | Query a user's inventory by name, category, or state / 按名称、类别、状态查询库存 | Derive `userId` from authenticated identity / 强制从认证身份获取 `userId` |
+| `create_inventory_draft` | Create a proposed stock-in item / 创建待确认的入库候选项 | Does not take effect immediately; retains source and confidence / 不直接生效；保存来源与置信度 |
+| `confirm_inventory_draft` | Confirm a proposal and formally add stock / 确认候选项并正式入库 | Requires explicit confirmation and server-side field validation / 必须用户确认，且服务端校验字段 |
+| `record_consumption` | Record consumption and reduce stock / 记录消耗、减少库存 | Never allow negative quantity; batch selection must be traceable / 不允许负库存，批次选择可追溯 |
+| `update_inventory_item` | Correct quantity, date, location, etc. / 更正数量、日期、位置等 | Field allowlist, authorisation, and audit / 字段白名单、权限校验、审计 |
+| `delete_inventory_item` | Remove or archive an erroneous item / 删除或归档错误记录 | Second confirmation or soft delete, plus audit / 二次确认或软删除及审计 |
+| `get_expiry_summary` | Retrieve expiry summary / 获取临期和过期摘要 | Return only data visible to the current user / 仅返回当前用户可见数据 |
+
+For consequential actions, use a **draft first, user confirmation second** pattern. Model output must conform to a structured schema; the backend must never concatenate model text into SQL or execute arbitrary commands.
+
+对高影响操作采用“**先生成草稿，再由用户确认执行**”的模式。模型输出必须遵循结构化 schema；后端绝不能将模型文本拼接为 SQL 或执行任意命令。

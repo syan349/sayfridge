@@ -27,16 +27,21 @@ Run commands from `backend`. Uvicorn does not need to be running.
 
 | Execution | Selection | Command |
 | --- | --- | --- |
-| Local full regression | 551 scenarios | `python -m pytest -v` |
+| Local full regression | Current suite; live-model tests require explicit opt-in | `python -m pytest -v` |
 | Local core check | 76 scenarios | `python -m pytest -v -m ci` |
 | Automatic PR/main CI | Same core set | `python -m pytest -v -m ci --strict-markers` |
 | Manual workflow dispatch | Full suite | `python -m pytest -v --strict-markers` |
-| Database-free check | 122 scenarios | `python -m pytest -v -m "not postgres"` |
+| Database-free check | Current database-free selection | `python -m pytest -v -m "not postgres"` |
 
 Database tests use real PostgreSQL. Locally, supply `TEST_DATABASE_URL` through the
 process environment or ignored `.env.test`; never use the application database.
 CI uses a disposable PostgreSQL 18 service, not Neon. Fixtures initialize an
 isolated schema and clean it up after each test.
+
+Use `python -m pytest --collect-only -q` to inspect the current suite. Historical
+reports retain the counts and outcomes of their recorded runs; do not sum overlapping
+test groups. The Agent V0.2 report includes the opt-in model checks and environment
+limitations of that run.
 
 ## CI selection policy
 
