@@ -13,10 +13,11 @@ EXPECTED_TABLES = {
     "inventory_operation",
     "conversation",
     "conversation_message",
+    "agent_inventory_action",
 }
 
 
-def test_database_metadata_contains_only_first_phase_tables() -> None:
+def test_database_metadata_contains_expected_business_tables() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
 
 

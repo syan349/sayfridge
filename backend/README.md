@@ -1,8 +1,30 @@
 # SayFridge Backend
 
-The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, metadata/location editing, discard, and archival are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented, including item-scoped and global history reads. Preview, Agent, and Worker features remain planned.
+The FastAPI backend for SayFridge. The current version provides health checks, local email/password authentication, B04 storage-space management, B05–B06 category queries and private item-definition management, and infrastructure for Neon PostgreSQL, SQLAlchemy 2.x ORM, and database initialization. Inventory listing, detail, stock entry, metadata/location editing, discard, and archival are implemented. ADD/CONSUME/RECONCILE quantity submission with idempotency and atomic operation history is implemented, including item-scoped and global history reads. The text Agent adds server-calculated previews, estimated actions, confirmations, and per-item recovery; Worker features remain planned.
+
+## Documentation guide
+
+| Question | Maintained reference |
+| --- | --- |
+| Product scope and future goals | [Project scope](../docs/PROJECT_SCOPE_BILINGUAL.md) |
+| Current components, Agent graph, tools, memory and user intervention | [Architecture](../docs/ARCHITECTURE.md) |
+| Initial, confirmed, estimated and reconciled quantities | [Quantity rules](../docs/QUANTITY_STATE_DESIGN.md) |
+| Tables, fields and constraints | [Database design](../docs/DATABASE_DESIGN.md) |
+| Backend services, permissions and transaction implementation | [Backend design](../docs/BACKEND_DESIGN.md) |
+| HTTP/SSE contracts for frontend integration | [API reference](../docs/API_REFERENCE.md) |
+| Validation evidence and test commands | [Test index](../docs/testing/README.md) |
+
+Startup, environment and database initialization instructions are maintained in this
+README. Superseded plans are under `docs/archive/2026-09-25/` and are historical
+references, not parallel implementation instructions.
 
 ## Requirements
+
+The text Agent now has a six-node workflow, structured memory, independently
+committed inventory actions, confirmation/resume, and SSE recovery interfaces.
+See [Agent interfaces](../docs/API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)
+and [Agent configuration and storage](#agent-configuration-and-storage). Existing
+databases require the explicit receipt-table setup before enabling Agent writes.
 
 - Python 3.11
 
@@ -116,7 +138,7 @@ Each database test migrates a fresh random `auth_test_*` schema using Alembic, p
 To select a subset explicitly:
 
 ```bash
-# 11 database-free scenarios
+# Database-free scenarios (inspect the current selection with --collect-only)
 python -m pytest -v -m "not postgres"
 
 # Scenarios with real PostgreSQL fixtures
@@ -256,3 +278,44 @@ Run the B25 administrator account-management tests from backend:
 ```bash
 python -m pytest -v tests/test_admin_users.py --strict-markers
 ```
+
+## Agent configuration and storage
+
+Python 3.11 and backend requirements are required. Agent persistence uses
+AGENT_DATABASE_URL when nonempty, otherwise DATABASE_URL_DIRECT. Keep credentials
+only in local/deployment secrets. AGENT_WORKFLOW_STEP_LIMIT defaults to 128 and is
+the six-node step budget; legacy AGENT_RECURSION_LIMIT does not control this workflow.
+
+On Windows, psycopg requires a Selector event loop. To run without reload with the
+installed Uvicorn version, use:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --loop asyncio:SelectorEventLoop
+```
+
+The existing reload development command also selects a compatible loop. Linux
+can use the normal Uvicorn asyncio loop.
+
+For an existing database, explicitly check both storage layers:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/setup_agent_storage.py --check
+.\.venv\Scripts\python.exe scripts/setup_agent_actions.py --check
+```
+
+The receipt-table script exits nonzero if missing or structurally incompatible.
+After checking the intended environment, `--initialize` prompts for INITIALIZE and
+adds only the receipt table. It does not run automatically on application startup.
+Fresh development/test schemas receive the table through the updated initial schema.
+Applying these local changes does not synchronize an existing remote database.
+
+Run `python -m pytest` against a separately configured TEST_DATABASE_URL ending in
+`_test`. Fixtures own disposable schemas. Live model checks are opt-in:
+
+```powershell
+$env:AGENT_LIVE_MODEL='1'
+.\.venv\Scripts\python.exe -m pytest tests/test_agent_live_model.py -q
+```
+
+Live checks use synthetic inventory in the isolated test database and incur model
+API usage; they never use the production inventory connection for test actions.

@@ -17,7 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -326,6 +326,20 @@ class InventoryOperation(Base):
     undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     inventory_item: Mapped[InventoryItem] = relationship(back_populates="operations")
+
+
+class AgentInventoryAction(Base):
+    """A committed business receipt, independent of LangGraph checkpoints."""
+    __tablename__ = "agent_inventory_action"
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    turn_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    action: Mapped[str] = mapped_column(String(24), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    result_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = created_at_column()
 
 
 class Conversation(Base):

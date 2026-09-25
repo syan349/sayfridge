@@ -1,0 +1,164 @@
+import asyncio
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
+from uuid import uuid4
+
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.tools import tool
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.store.memory import InMemoryStore
+from langgraph.types import Command
+
+from app.agents.state import AgentContext
+from app.agents.workflow import build_agent_graph
+from app.services import agent_actions, storage_spaces
+from app.services.inventory import InventoryError
+
+
+class ScriptModel:
+    def __init__(self, messages):
+        self.messages = iter(messages)
+    def bind_tools(self, tools):
+        return self
+    async def ainvoke(self, messages, **kwargs):
+        return next(self.messages, AIMessage(content="Completed results reported."))
+
+
+@asynccontextmanager
+async def fake_session():
+    yield object()
+
+
+def call(actions):
+    return AIMessage(content="", tool_calls=[{"name": "propose_inventory_actions", "args": {"actions": actions}, "id": str(uuid4()), "type": "tool_call"}])
+
+
+def initial():
+    return {"messages": [HumanMessage(content="use three items")], "turn_id": str(uuid4()),
+            "request_fingerprint": "test", "items": [], "requests": {}, "resume_requests": {}}
+
+
+def draft(key):
+    return {"item_key": key, "original_text": key, "action": "CONSUME", "item_query": key, "quantity_value": "1", "quantity_unit": "kg"}
+
+
+def setup_services(monkeypatch):
+    async def spaces(*args, **kwargs):
+        return [], 0
+    monkeypatch.setattr(storage_spaces, "list_storage_spaces", spaces)
+
+
+def test_partial_success_failure_pause_resume_and_cancel(monkeypatch):
+    from app.agents import workflow
+    setup_services(monkeypatch)
+    executed = []
+    async def prepare(session, user, draft, memory, as_of):
+        return {"draft": draft.model_dump(mode="json"), "requires_confirmation": draft.item_key == "estimated", "memory_snapshots": []}
+    async def execute(session, user, conversation, turn, proposal, preview, memory, approved=False):
+        key = preview["draft"]["item_key"]
+        executed.append(key)
+        if key == "failed":
+            raise InventoryError("INSUFFICIENT_QUANTITY", "Not enough")
+        assert key != "estimated" or approved
+        return {"inventory": {"id": key}}
+    monkeypatch.setattr(workflow, "prepare_action", prepare)
+    monkeypatch.setattr(workflow, "execute_action", execute)
+    async def scenario():
+        graph = build_agent_graph(ScriptModel([call([draft(k) for k in ("ok", "failed", "estimated")])]),
+            checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[])
+        config = {"configurable": {"thread_id": "partial"}, "recursion_limit": 80}
+        context = AgentContext(uuid4(), None, uuid4())
+        await graph.ainvoke(initial(), config, context=context)
+        state = await graph.aget_state(config)
+        assert [i["status"] for i in state.values["items"]] == ["SUCCEEDED", "FAILED", "NEEDS_CONFIRMATION"]
+        item = state.values["items"][-1]
+        intr = state.tasks[0].interrupts[0]
+        response = {"conversation_id": str(context.conversation_id), "request_id": str(uuid4()), "interrupt_id": intr.id,
+            "responses": [{"item_id": item["item_id"], "proposal_id": item["proposal_id"], "decision": "confirm"}]}
+        final = await graph.ainvoke(Command(resume={intr.id: response}), config, context=context)
+        assert [i["status"] for i in final["items"]] == ["SUCCEEDED", "FAILED", "SUCCEEDED"]
+        assert executed == ["ok", "failed", "estimated"]
+        assert not (await graph.aget_state(config)).next
+    asyncio.run(scenario())
+
+
+def test_tool_runtime_user_is_injected(monkeypatch):
+    from langgraph.prebuilt import ToolRuntime
+    setup_services(monkeypatch)
+    seen = []
+    @tool
+    async def who(runtime: ToolRuntime[AgentContext]) -> str:
+        """Read the authenticated identity."""
+        seen.append(runtime.context.user_id)
+        return "ok"
+    async def scenario():
+        user = uuid4()
+        graph = build_agent_graph(ScriptModel([AIMessage(content="", tool_calls=[{"name": "who", "args": {}, "id": "t", "type": "tool_call"}]), AIMessage(content="Done")]),
+            checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[who])
+        await graph.ainvoke(initial(), {"configurable": {"thread_id": "tools"}}, context=AgentContext(user, None, uuid4()))
+        assert seen == [user]
+    asyncio.run(scenario())
+
+
+def test_mixed_queries_and_proposal_never_execute(monkeypatch):
+    setup_services(monkeypatch)
+    @tool
+    async def forbidden() -> str:
+        """Must not run in a mixed proposal response."""
+        raise AssertionError("Executed mixed tool")
+    message = call([draft("x")])
+    message.tool_calls.append({"name": "forbidden", "args": {}, "id": "f", "type": "tool_call"})
+    async def scenario():
+        graph = build_agent_graph(ScriptModel([message, AIMessage(content="Please clarify")]),
+            checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[forbidden])
+        result = await graph.ainvoke(initial(), {"configurable": {"thread_id": "mixed"}}, context=AgentContext(uuid4(), None, uuid4()))
+        assert result["items"] == []
+    asyncio.run(scenario())
+
+
+def test_memory_save_survives_cancelled_stock_action(monkeypatch):
+    from app.agents import workflow
+    from app.agents.memory import MemoryService
+    from app.agents.tools import save_user_memory
+    setup_services(monkeypatch)
+    original_node = workflow.ToolNode
+    monkeypatch.setattr(workflow, "ToolNode", lambda tools, **kwargs: original_node(tools, handle_tool_errors=False))
+    async def prepare(session, user, draft, memory, as_of):
+        return {"draft": draft.model_dump(mode="json"), "requires_confirmation": True, "memory_snapshots": []}
+    monkeypatch.setattr(workflow, "prepare_action", prepare)
+    async def scenario():
+        user, conv = uuid4(), uuid4()
+        quote = "Remember that I prefer short answers"
+        memory_call = AIMessage(content="", tool_calls=[{"name": "save_user_memory", "id": "memory", "type": "tool_call", "args": {
+            "category": "USAGE_PREFERENCE", "content": "short answers", "conditions": {}, "authorization_quote": quote}}])
+        store = InMemoryStore()
+        graph = build_agent_graph(ScriptModel([memory_call, call([draft("estimate")])]), checkpointer=InMemorySaver(), store=store, session_factory=fake_session, tools=[save_user_memory])
+        config = {"configurable": {"thread_id": "save-cancel"}}
+        context = AgentContext(user, None, conv, user_message=quote)
+        await graph.ainvoke(initial(), config, context=context)
+        state = await graph.aget_state(config)
+        item, intr = state.values["items"][0], state.tasks[0].interrupts[0]
+        result = await graph.ainvoke(Command(resume={intr.id: {"conversation_id": str(conv), "interrupt_id": intr.id,
+            "request_id": str(uuid4()), "responses": [{"item_id": item["item_id"], "proposal_id": item["proposal_id"], "decision": "cancel"}]}}), config, context=context)
+        assert result["items"][0]["status"] == "CANCELLED"
+        assert len(await MemoryService(store, user).search_memories()) == 1
+    asyncio.run(scenario())
+
+
+def test_generic_confirmation_does_not_authorize_memory_save():
+    from app.agents.tools import _require_memory_instruction
+    import pytest
+    runtime = SimpleNamespace(context=AgentContext(uuid4(), None, user_message="yes"))
+    with pytest.raises(ValueError):
+        _require_memory_instruction(runtime, "yes")
+
+
+def test_tool_schemas_hide_injected_runtime_and_keep_strict_public_fields():
+    from app.agents.tools import AGENT_TOOLS, save_user_memory
+    from pydantic import ValidationError
+    import pytest
+    for tool in AGENT_TOOLS:
+        assert "runtime" not in tool.tool_call_schema.model_json_schema().get("properties", {})
+    with pytest.raises(ValidationError):
+        save_user_memory.args_schema.model_validate({"runtime": object(), "category": "USAGE_PREFERENCE",
+            "content": "short", "conditions": {}, "user_id": str(uuid4())})

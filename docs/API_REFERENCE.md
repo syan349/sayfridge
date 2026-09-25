@@ -1,6 +1,6 @@
-# SayFridge API Reference: B01–B14
+# SayFridge API Reference
 
-Implemented authentication, storage-space, catalog, and inventory contracts.
+Implemented authentication, storage-space, catalog, inventory, administrator-account and Agent V0.2 contracts.
 For setup, see the [backend README](../backend/README.md). For implementation and
 locking rules, see the [design handbook](BACKEND_DESIGN.md). Test commands, CI
 selection, and acceptance evidence are in the [test index](testing/README.md).
@@ -21,7 +21,7 @@ For manual requests, see the [Postman guide](testing/POSTMAN_GUIDE.md).
   accepted only for inventory dates and notes; other fields reject it.
   Failed writes are atomic. Unchanged edits preserve `updated_at`.
 - Archive/restore accept no body, including no `{}` or JSON null.
-- Creation is not idempotent. Valid repeated archive/restore requests preserve timestamps.
+- Ordinary manual creation is not idempotent. Agent actions have per-item receipts and retry identities (section 9). Valid repeated archive/restore requests preserve timestamps.
 - Business endpoints below give administrators the same ownership restrictions as
   ordinary users. Public-catalog administrator writes are outside this delivery.
 
@@ -267,6 +267,8 @@ preserve inventory and reserve the name. Repeated archival leaves timestamps unc
 ACTIVE, even when the definition is already active; otherwise **409 / STATE_CONFLICT**.
 A valid repeated restore leaves timestamps unchanged.
 
+
+<a id="6-inventory--b07b09"></a>
 
 ## 6. Inventory — B07–B09, B13, B15, and B22
 
@@ -699,3 +701,83 @@ status and updated_at. Repeating the current status is a no-op and preserves
 updated_at. A suspended or disabled account is rejected by subsequent authenticated
 requests because every request reads current account state. Requests already in
 progress are not cancelled.
+
+## 9. Agent V0.2 — chat, resume and recovery
+
+Paths in this section include the full `/api/v1` prefix. Responses from chat and
+resume use `text/event-stream`, not the ordinary JSON response format. A turn may
+contain up to 20 independently handled items. Unlike the manual batch endpoints,
+one failed Agent item does not roll back another successful item.
+
+Graph, memory and approval behavior: [current architecture](ARCHITECTURE.md).
+Configuration and explicit table setup: [backend README](../backend/README.md#agent-configuration-and-storage).
+
+All routes require the existing Bearer authentication. User identity is taken from
+authentication. Client-supplied IDs never bypass ownership checks.
+
+### POST /api/v1/agent/chat
+
+```json
+{"message":"I used two cups of rice","conversation_id":"<uuid>","request_id":"<uuid>","as_of":"2026-09-25"}
+```
+
+Only message is required. Clients should generate request_id before sending and
+reuse it with an identical body for retries. If omitted, the server generates it.
+The start event returns request_id and conversation_id. Supplying request_id without
+conversation_id produces a stable initial conversation for that user/request.
+`as_of` is a client-provided date, not an inferred server-local date.
+
+A new message on an interrupted conversation returns 409 AGENT_INPUT_REQUIRED;
+use resume. A running conversation returns 409 AGENT_CONVERSATION_BUSY. An
+unfinished crashed turn returns AGENT_RECOVERY_REQUIRED for a different request;
+retry its original request ID. Reusing an ID with different contents returns
+REQUEST_ID_CONFLICT.
+
+### POST /api/v1/agent/resume
+
+```json
+{
+  "conversation_id":"<uuid>",
+  "interrupt_id":"<current interrupt id>",
+  "request_id":"<new response uuid>",
+  "responses":[{"item_id":"<uuid>","proposal_id":"<uuid>","decision":"confirm"}]
+}
+```
+
+Supported decisions are confirm, answer, edit and cancel. Confirm/cancel carry only
+identifiers. Answer/edit require message, or selected_inventory_item_id from the
+current question's candidate list. Selecting a candidate still revalidates ownership.
+Each item may appear once. Partial answers are allowed; other questions remain pending.
+Text edits are interpreted by the Agent and always invalidate the edited proposal.
+Confirming a stale proposal/interrupt returns 409; confirming missing information
+returns 422. Confirmation never accepts a client-provided balance or estimated delta.
+
+If a commit outcome is unknown, the item reports EXECUTION_UNCERTAIN. Confirm retries
+the same immutable receipt first; editing/cancelling that unresolved item returns
+VERIFY_OUTCOME_FIRST to avoid duplicating an already committed action.
+
+### GET /api/v1/agent/conversations/{conversation_id}/state
+
+Returns request_id, status and sanitized items. When waiting, it also returns the
+current interrupt_id and pending questions. Other users receive 404. It does not
+return raw checkpoint messages, model prompts, credentials or tool internals.
+
+Turn states: COMPLETED, WAITING_INPUT, RECOVERABLE. Item states: DRAFT, READY,
+NEEDS_INPUT, NEEDS_CONFIRMATION, SUCCEEDED, FAILED, CANCELLED.
+
+### Events
+
+| Event | Payload |
+|---|---|
+| start | conversation_id, request_id |
+| text_delta | delta; only final user-facing answer text |
+| operation_preview | data: item/proposal identifiers, before/after, method, estimate basis |
+| action_required | data: interrupt_id and pending items |
+| operation_result | data: item status, actual result or error |
+| done | status and data containing current public state |
+| error | stable code and sanitized message; query state before retrying |
+
+Read the SSE stream until done, error or connection loss. A WAITING_INPUT done
+event is not successful completion of the inventory actions. Clients render each
+item's status and use the state endpoint after refresh/disconnection. Retried
+responses may repeat result events; reconcile UI items by item_id/proposal_id.

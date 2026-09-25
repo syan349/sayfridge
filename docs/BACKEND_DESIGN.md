@@ -1,8 +1,12 @@
 # SayFridge Backend Design Handbook
 
-> Updated: 2026-09-21. This handbook is the shared design reference for the current backend development phase. Unless an endpoint is explicitly identified as already implemented, its content is a planned contract, not evidence of passing tests or applied database migrations.
+> Updated: 2026-09-25 (documentation consolidation). This handbook is the shared design reference for the current backend development phase. Unless an endpoint is explicitly identified as already implemented, its content is a planned contract, not evidence of passing tests or applied database migrations.
 >
 > The development and acceptance plan incorporates the course requirements: tests accompany features, with plans for cloud capacity, security, and deployment. Existing API business rules remain unchanged. Section 10 retains three questions for the project owner to clarify. Editing this handbook does not itself execute tests, migrations, or deployments.
+
+This handbook owns backend service and transaction rules. Sections 4–7 describe the
+manual business API contracts; Agent V0.2 orchestration and its separate submission
+path are covered by [architecture](ARCHITECTURE.md) and [API reference, section 9](API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery).
 
 Start with section 1 for scope. Use section 4 when implementing an endpoint, sections 5–7 for quantity, state, and concurrency rules, and sections 8–9 for file responsibilities and acceptance requirements.
 
@@ -26,10 +30,10 @@ Start with section 1 for scope. Use section 4 when implementing an endpoint, sec
 
 Implement the backend flow of logging in, managing spaces and item definitions, manually adding stock, querying inventory, adding/consuming/reconciling quantities, and viewing operation history. Also provide batch management, inventory summaries, expiry queries, and basic administrator endpoints.
 
-### 1.2 Features outside this phase
+### 1.2 Manual-phase exclusions and current extensions
 
 - Reminder settings, user timezone settings, scheduled jobs, device registration, FCM push notifications, notification lists and read status, and their related tables and fields. On-demand expiry queries remain in scope.
-- AI Agent, voice and image recognition, conversations, memory, undo, history recalculation, distinguishing manual versus Agent sources, and linking operations to conversations.
+- The original manual-API phase excluded Agent execution and memory. Text Agent V0.2 now provides these through a separate workflow, TEXT-sourced operations and business receipts. Voice/image recognition, undo and historical recalculation remain future work.
 - Nicknames, avatars, forgotten-password recovery, token refresh, administrator audit records, complete change history, and historical snapshots.
 - Correcting an inventory item's definition association, restoring discarded or archived inventory, physical deletion, merging batches, and recording partial disposal. Space and catalog restoration endpoints remain in scope.
 - Frontend page implementation belongs to the Web and Flutter modules. The backend must support contract agreement and integration with both.
@@ -43,9 +47,9 @@ These exclusions apply to the current phase; they do not permanently remove feat
 | History | Record only successful ADD / CONSUME / RECONCILE quantity operations. Initial stock creation does not record ADD; metadata changes, moves, disposal, and archival do not create events. This reduces the complete-history goal for this phase; omitted history cannot reliably be reconstructed later. Section 10.3 retains the question about reconciling the old work package wording on initial operations. |
 | Item association | An inventory item's `item_definition_id` cannot change after creation, preventing existing quantity history from becoming associated with another item. See section 4.4 for correcting a wrongly entered item. |
 | Quantity precision | Store changes to three decimal places using ROUND_HALF_UP, keeping the consumed amount consistent with the remaining balance. See section 5. |
-| Repeated creation | Ordinary creation and batch requests do not guarantee idempotency. Clients must check results after a lost response; automatic safe retry is not promised. |
+| Repeated creation | Ordinary manual creation and batch requests do not guarantee idempotency. Agent V0.2 independently submitted items use business receipts for replay protection. |
 | Catalog deactivation | Prevent new associations without freezing normal management of existing inventory. |
-| Operation source | `input_method` is fixed to MANUAL in this phase. Do not add source fields or operation types. |
+| Operation source | Existing manual endpoints set `input_method=MANUAL`; the Agent submission service sets TEXT. Existing inventory operation types remain ADD, CONSUME and RECONCILE. |
 
 ### 1.4 How this handbook relates to implementation
 
@@ -53,17 +57,19 @@ This handbook merges the earlier API review draft, API implementation plan, and 
 
 Use this handbook for the current scope and endpoint behavior. Consult the references below for database or architectural background not covered here. Merging the documents does not resolve the questions in section 10. If implementation later differs from this handbook, record the difference explicitly and update the design and verification status.
 
-The three source documents are archived in `archive/backend-design-2026-09-11/` for traceability. They are not parallel development specifications.
+The repository's two superseded source documents are archived for traceability: [API implementation plan](archive/2026-09-25/API_IMPLEMENTATION_PLAN.md) and [API/database draft](archive/2026-09-25/API_DATABASE_IMPLEMENTATION_DRAFT.md). The earlier external review attachment is not present locally. Archived restrictions about pausing tests, specific file counts and an incremental notes migration are historical, not current instructions.
+
+The retained rules include ownership, status transitions, original quantity expressions, rounding, version checks, shared lock ordering, manual batch atomicity, idempotent quantity submissions and archive-then-recreate semantics. Agent requests are different from manual batch endpoints: each Agent item commits independently, with its own receipt and required creation dependencies.
 
 | Reference | Current role | Use in this design |
 | --- | --- | --- |
 | [Database design](DATABASE_DESIGN.md) | Tables, fields, and permission relationships | Compare with the ORM and initial migration |
 | [Quantity design](QUANTITY_STATE_DESIGN.md) | Confirmed quantities, estimates, reconciliation, and history goals | Define quantity updates; explicitly identify the reduced history scope |
 | [Architecture](ARCHITECTURE.md) | Frontend, backend, and Agent boundaries | FastAPI performs all business writes |
-| [Database models](../backend/app/db/models.py) | ORM fields and constraints for eight tables | Evidence of local structure, not proof of remote migration |
-| [Initial table definition](../backend/migrations/versions/create_initial_tables.py) | Revision `02ec95582dc7`, creating eight tables | Maintain the latest initial table definition, including notes |
+| [Database models](../backend/app/db/models.py) | ORM fields and constraints for nine business tables | Evidence of local structure, not proof of remote migration |
+| [Initial table definition](../backend/migrations/versions/create_initial_tables.py) | Revision `02ec95582dc7`, creating nine business tables | Maintain the latest initial table definition, including notes |
 | [Database session](../backend/app/db/session.py) | Request-scoped AsyncSession | Supplies sessions without automatically committing business transactions |
-| [Application entry point](../backend/app/main.py) | Registers authentication, storage-space and catalog routes, and health check | Register remaining business route groups when implemented |
+| [Application entry point](../backend/app/main.py) | Registers authentication, spaces, catalog, inventory, administrator and Agent routes | Check actual registered routes against the API reference |
 | [Authentication dependencies](../backend/app/api/dependencies.py) | Validates tokens and reads current user state | Reuse identity checks and add an administrator dependency |
 | [Authentication routes](../backend/app/api/routes/auth.py), [schemas](../backend/app/schemas/auth.py), and [service](../backend/app/services/auth.py) | Registration, login, and current-user endpoints already exist | Preserve compatibility and add password change |
 | [Backend README](../backend/README.md) | Current startup and verification instructions | Update implemented capabilities and database setup instructions |
@@ -524,7 +530,7 @@ Administrator state changes affect subsequent authenticated requests because eac
 | CONSUME fraction of the current balance | FRACTION | `p/q`, positive integers with p ≤ q, total length ≤ 32 | Fixed to remaining |
 | RECONCILE | AMOUNT | Nonnegative decimal string, including 0 | Newly confirmed unit, which may differ from the old unit |
 
-Do not support fractional ADD, fractional reconciliation, QUALITATIVE, or AI_ESTIMATED input. Fractions are expressions and are not subject to the three-decimal input syntax, but calculated results still follow three-decimal storage precision. Preserve the valid literal input in quantity_value; do not rewrite `1/2` to `0.5`. Store the original valid quantity_unit and derive a separate normalized unit for calculation.
+The manual quantity endpoint does not support fractional ADD, fractional reconciliation, QUALITATIVE, or AI_ESTIMATED input. Agent V0.2 handles approved estimates through its separate validated submission service. Fractions are expressions and are not subject to the three-decimal input syntax, but calculated results still follow three-decimal storage precision. Preserve the valid literal input in quantity_value; do not rewrite `1/2` to `0.5`. Store the original valid quantity_unit and derive a separate normalized unit for calculation.
 
 ### 5.2 Inventory field updates and rounding
 
@@ -537,7 +543,7 @@ Do not support fractional ADD, fractional reconciliation, QUALITATIVE, or AI_EST
 | Dates, location, or notes | Unchanged | Unchanged | Unchanged | Unchanged |
 | discard/archive | Unchanged | Unchanged | Unchanged | Set the corresponding terminal state |
 
-Ordinary additions/subtractions use the current effective balance unit, supporting g↔kg and ml↔l. Reject other differing units. RECONCILE need not convert the new unit to the previous unit.
+Manual additions/subtractions use the current effective balance unit, supporting g↔kg and ml↔l, including the implemented Chinese standard-unit spellings. Reject other differing units in the manual endpoint. Agent V0.2 can prepare an AI_ESTIMATED proposal for uncertain conversions. RECONCILE need not convert the new unit to the previous unit.
 
 Input still has at most three decimal places. Round the applied change from conversions or fractions to three places in the effective unit, using ROUND_HALF_UP (half up for nonnegative values). Do not round every quantity to an integer. Calculate fractions using integer ratios to 0.001 unit precision rather than first truncating values such as 1/3. Use Decimal for unit conversion.
 
@@ -559,7 +565,7 @@ Example: consuming 1/3 of 1 kg records 0.333 kg consumed and 0.667 kg remaining,
 | inventory_item_id | Current target inventory |
 | operation_type | Validated ADD / CONSUME / RECONCILE |
 | quantity_kind/value/unit | Preserve valid original quantity expressions; do not present converted values as original input |
-| input_method | Fixed to MANUAL in this phase; clients cannot invent VOICE/PHOTO sources |
+| input_method | MANUAL for these endpoints; TEXT for the separate Agent service. Clients cannot invent VOICE/PHOTO sources |
 | calculation_method | EXACT for same-unit amounts, explicit fractions, and direct reconciliation; CONVERTED for deterministic unit conversion |
 | affects_state | CONFIRMED for additions/subtractions without an estimate and for reconciliation; ESTIMATED for changes to an estimated balance |
 | applied_change_amount/unit | Positive applied ADD/CONSUME amount and stored unit; both NULL for reconciliation, without invented cross-unit deltas |
@@ -831,13 +837,13 @@ The former blanket instruction against all commits/pushes no longer defines form
 
 ## 10. Questions for the project owner
 
-The consolidation retains these three questions. After the owner decides, update the corresponding rules in the main text rather than leaving answers here while the body remains ambiguous.
+This section retains manual-phase decisions and unresolved historical questions. They are not blockers or alternative contracts for Agent V0.2. After a decision changes an active rule, update the corresponding main-text rule as well.
 
 ### 10.1 Complete quantity-preview response structure
 
 Agreed: return inventory ID, the calculation's base version, before/after state, applied change, calculation method, affects_state, and rounded.
 
-Open: exact nested fields, types, and nullability for before/after, plus final JSON names for applied change and calculation method. See sections 3.2 and 4.6.1.
+Open for the standalone manual preview endpoint: exact nested fields, types, and nullability for before/after, plus final JSON names for applied change and calculation method. See sections 3.2 and 4.6.1. Agent preview/resume is already implemented as the separate contract in API_REFERENCE.md section 9.
 
 **Owner's decision:** Pending.
 
@@ -852,9 +858,9 @@ different stored business inputs even though their units are convertible.
 
 ### 10.3 Initial-history requirement in older work packages
 
-Verified: the [older work package document](SAYFRIDGE_WORK_PACKAGES_ZH.md) exists and requires an initial operation record for new stock batches. The database implementation draft's statement that the file did not exist was inaccurate and is not a premise of this handbook.
+An earlier consolidation referred to an external/older work-package document named `SAYFRIDGE_WORK_PACKAGES_ZH.md` and an initial-operation-history requirement. That document is not present in the current checkout, so neither this handbook nor the archived draft establishes its current contents. Reconcile the historical requirement only if the source is provided.
 
-The current implementation plan creates no ADD for initial stock entry. This consolidation preserves that rule and its difference from the old work package. The owner must decide how to annotate the phase-specific exception in the old work package and which older design explanations need updating. See sections 1.3, 4.4.1, and the mapping below.
+The implemented stock-creation service creates no ADD for initial entry; Agent creation additionally records an action receipt. If the older work-package source is supplied, reconcile its wording with these current rules. Its absence does not reopen or block the current creation behavior. See sections 1.3, 4.4.1, and the mapping below.
 
 **Owner's decision:** Pending.
 
@@ -875,7 +881,7 @@ This table connects project tasks to design sections. It creates no additional d
 | B13 | 4.4.3, 6 | Disposal, archival, and state |
 | B14 | 4.6.3 | Quantity operation history |
 | B15 | 4.4.4 | Batch creation, moves, archival; no other batch editing promised |
-| B16–B21 | 1.2 | Agent, conversations, media, voice, quotas; later scope |
+| B16–B21 | 1.2 | Text Agent V0.2 and its memory/recovery interfaces are implemented locally; media, voice and quota workflows remain later scope |
 | B22 | 4.5 | Expiry summary; actual path /expiry-summary |
 | B23, B24, B28 | 1.2 | Reminders and push excluded |
 | B25 | 4.7 | Administrator account management |

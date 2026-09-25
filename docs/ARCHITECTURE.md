@@ -1,208 +1,175 @@
-# SayFridge Realtime + Async 双 Agent 完整架构
+# SayFridge 当前系统架构
 
-> 状态：目标架构草案。该图描述计划实现的组件边界，不代表当前已经完成部署。
+> 状态：描述 Agent V0.2 的本地实现，核对基线为提交 `3534290`。代码与验收完成不等于已部署到远程环境。
 >
-> 核心原则：**Async Agent 是主要业务执行者；Realtime Agent 是语音交互与任务调度入口。Agent 业务任务默认异步委托；手动操作直接调用 FastAPI。只有经过明确分类的低风险、低延迟、简单任务，才允许 Realtime Agent 直接处理。**
+> 旧 Realtime、LiveKit 和双 Agent 方案已归档为[历史目标架构](archive/2026-09-25/ARCHITECTURE_REALTIME_DRAFT.md)，不作为当前实施要求。
 
-## 完整架构图
+## 1. 组件与维护边界
+
+Web 和 Flutter 通过 FastAPI 访问业务能力；文本 Agent 也运行在后端。
+Graph 调用后端业务服务，复用身份、归属、数量、状态和事务规则。
+模型负责理解请求、查找信息和提出估算；最终余额及正式写入由后端计算和校验。
+
+| 组件 | 当前职责 | 主要依据 |
+| --- | --- | --- |
+| Web / Flutter | 请求、展示及提交用户选择；具体页面完成度以各组件为准 | [产品范围](PROJECT_SCOPE_BILINGUAL.md) |
+| FastAPI 路由 | 登录认证、请求校验、HTTP/SSE、会话恢复 | [API 参考](API_REFERENCE.md) |
+| 后端业务服务 | 所有权、状态、数量计算、版本检查、事务与幂等 | [后端设计](BACKEND_DESIGN.md) |
+| LangGraph | 一名业务 Agent 的六节点流程、待处理项目与暂停恢复 | 本文 |
+| PostgreSQL | 业务数据、执行凭据、检查点和用户记忆 | [数据库设计](DATABASE_DESIGN.md) |
+
+当前 Agent 支持查询、首次入库、增加、消耗、盘点和显式记忆维护。
+语音、图片识别、主动通知、撤回、历史重估和独立任务队列不属于当前实现。
+
+## 2. 六节点 Graph
+
+入口是 `__start__ -> prepare_context -> agent`。下面保留主路径；模型修正申请格式时还可以在 agent 内重新生成申请。
 
 ```mermaid
-flowchart TB
-    subgraph mobile["你们开发和维护：Flutter App"]
-        flutter["语音页面、麦克风与扬声器权限、连接状态、动画、结果卡片、确认按钮"]
-    end
-
-    subgraph livekitCloud["第三方实时通信：LiveKit Cloud"]
-        livekit["Room、SFU、音频 Track、TURN、弱网媒体恢复"]
-    end
-
-    subgraph realtimePlane["你们开发和部署：Python Realtime Agent Worker"]
-        sessionController["AgentSession：会话控制、VAD、轮次、插话、输出仲裁"]
-        taskDispatcher["Task Classifier / Dispatcher：默认异步委托；仅白名单快速任务直接处理"]
-        sessionController --> taskDispatcher
-    end
-
-    subgraph openaiCloud["第三方 AI API：OpenAI Realtime API"]
-        realtimeModel["实时语音理解、临时会话状态、语音生成、Function Call 请求"]
-    end
-
-    subgraph fastapiBackend["你们开发和部署：FastAPI 控制面与业务后端"]
-        apiControl["认证、LiveKit Token、REST 状态快照、限流"]
-        inventoryService["库存与历史查询、候选与重估计算、确认、版本校验、事务"]
-        taskService["Task Ledger：task_id、幂等、状态、取消、结果持久化"]
-        memoryService["用户记忆服务：按用户隔离、检索与更新"]
-        apiControl --> inventoryService
-        apiControl --> taskService
-    end
-
-    subgraph asyncPlane["你们开发和部署：异步业务执行面"]
-        taskQueue[["Task Queue"]]
-        taskWorker["Async Agent：LangGraph 编排、用户记忆检索、候选操作"]
-        resultEvents[["Result Events"]]
-        taskQueue --> taskWorker
-        taskWorker --> resultEvents
-    end
-
-    subgraph dataPlane["持久化状态"]
-        postgres[("PostgreSQL：库存、操作历史、用户记忆、任务与候选结果")]
-        redis[("Redis：可选的队列、Lease、短期事件唤醒")]
-    end
-
-    flutter <-->|"WebRTC / Opus 音频与临时状态"| livekit
-    livekit <-->|"双向 WebRTC 音频 Track"| sessionController
-    sessionController <-->|"Realtime WebSocket：音频与控制事件"| realtimeModel
-    realtimeModel -->|"Function Call 请求"| taskDispatcher
-
-    flutter <-->|"HTTPS：登录、Token、快照、手动操作与确认"| apiControl
-
-    taskDispatcher -->|"白名单快速任务：任务状态或结果读取"| taskService
-    taskDispatcher -->|"默认：delegate_task"| taskService
-    taskService -->|"任务入队"| taskQueue
-    taskQueue -.->|"可选队列实现"| redis
-
-    taskWorker -->|"受控业务 API"| inventoryService
-    taskWorker -->|"受控检索与更新"| memoryService
-    memoryService -->|"用户记忆持久化"| postgres
-    taskWorker -->|"进度与最终结果"| taskService
-    resultEvents -->|"会话空闲时回注"| sessionController
-
-    inventoryService -->|"唯一正式业务写入"| postgres
-    taskService -->|"保存任务与结果"| postgres
+flowchart TD
+    S(["__start__"]) --> C["prepare_context"]
+    C --> A["agent"]
+    A -. 查询与记忆 .-> T["tools"]
+    T --> A
+    A -. 变更申请 .-> P["prepare_operation"]
+    P -. 补查重估或收尾 .-> A
+    P -. 可执行 .-> E["execute_operation"]
+    P -. 等待用户 .-> W["await_user"]
+    W -. 确认 .-> E
+    W -. 补充修改取消 .-> A
+    E --> A
+    A -. 最终答复 .-> Z(["__end__"])
 ```
 
-## 关键执行链
+| 节点 | 当前功能 |
+| --- | --- |
+| prepare_context | 加载用户空间摘要和相关记忆，建立本轮缓存 |
+| agent | 理解请求、拆分项目、调用工具、提出估算，按真实执行结果组织答复 |
+| tools | 调用查询、匹配和显式记忆维护工具 |
+| prepare_operation | 校验目标与输入，检查适用记忆，调用后端计算预览，分类可执行或待处理项目 |
+| await_user | 将有效候选与问题保存到 Checkpoint 后暂停，处理结构化用户回复 |
+| execute_operation | 每项调用独立后端事务，返回实际结果、冲突或待核实状态 |
 
-### 1. 实时语音与白名单 Fast Path
+节点与模型工具属于两个层次。模型调用 `propose_inventory_actions` 时，
+agent 保存申请并将流程转向 prepare_operation；它不由通用 tools 节点直接执行。
+prepare_operation 和 execute_operation 都是普通 Python 节点，调用业务服务，不是额外模型。
 
-```text
-Flutter 麦克风
-→ WebRTC / Opus
-→ LiveKit Cloud
-→ Python Realtime Agent Worker
-→ OpenAI Realtime WebSocket
-→ 普通对话直接返回，业务请求进入任务分类
-→ 仅命中白名单的低风险、低延迟、简单任务直接处理
-→ AI 音频原路返回 Flutter
+## 3. 模型可用的工具
+
+| 工具 | 用途 |
+| --- | --- |
+| list_storage_spaces | 查询用户空间 |
+| list_inventory | 筛选和分页查询库存 |
+| get_inventory_detail | 查询具体批次 |
+| get_expiry_summary | 根据客户端提供的当地日期查询临期情况 |
+| resolve_inventory_targets | 按正式名称、别名、名称片段及模型提供的查询说法找到真实候选 |
+| list_item_definitions | 查询公共和当前用户的私人物品定义 |
+| list_item_categories | 查询已有公共品类 |
+| search_user_memories | 继续查询当前用户的适用记忆 |
+| save_user_memory | 根据用户明确要求保存或更新记忆 |
+| delete_user_memory | 根据用户明确要求删除记忆 |
+| propose_inventory_actions | 特殊变更申请入口，进入准备、确认和执行流程 |
+
+共十个普通工具和一个特殊申请入口。所有目标必须来自当前用户可访问的真实记录。
+同名批次无法唯一确定时返回候选；明确的最早到期偏好可以帮助选择，但并列时仍需用户选择。
+当前没有结构化开封状态，不能将“优先已开封”描述为已经实现的自动选择规则。
+名称与别名匹配不使用向量检索。
+
+## 4. 用户记忆的访问与使用
+
+长期记忆统一按用户放在 Store namespace：
+`("users", authenticated_user_id, "memories")`。物品和空间是适用条件，
+不为每件库存建立单独记忆库。用户身份由服务端认证取得，模型不能指定用户或 namespace。
+
+| 类型 | 内容与用途 |
+| --- | --- |
+| UNIT_RELATIONSHIP | 经验单位关系及物品、空间、量具和时间条件，供估算使用 |
+| USAGE_PREFERENCE | 用户明确的选择或展示偏好，例如最早到期批次 |
+| ENTITY_ALIAS | 随意叫法与真实空间或物品定义 ID 的对应 |
+
+记录使用版本化 JSON，并兼容读取旧格式。能够明确表达的换算使用十进制字符串，例如：
+
+```json
+{"source_amount":"1","source_unit":"cup","target_amount":"100","target_unit":"g"}
 ```
 
-Realtime Agent 的核心目标是保持自然语音交互和及时反馈，而不是承担主要业务执行。它不能因为任务“看起来简单”就自行直办；只有显式白名单允许的任务才能进入 Fast Path，其余任务一律异步委托。
+别名的结构化字段为 alias、target_type（SPACE 或 ITEM_DEFINITION）及 target_id；
+保存前校验目标可见性。全局批次偏好可以使用
+`{"batch_selection":"EARLIEST_EXPIRY"}`。
 
-### 2. 默认业务执行路径
+每轮按页读取用户记忆并缓存，向模型预加载最多 20 条、4,000 字符的相关内容。
+截断会明确标记；目标确定后，准备服务仍完整检查物品、空间、源/目标单位、量具和日期条件，
+不能把“预加载里没有”当作“用户没有记忆”。同轮只读工具循环复用缓存，记忆修改后失效。
 
-```text
-OpenAI 产生 Function Call 请求
-→ Python Realtime Worker 进行任务分类
-→ 未命中直接处理白名单（默认情况）
-→ FastAPI Task Ledger 创建 task_id
-→ Task Queue
-→ Async Agent 执行库存查询、候选操作、RAG 或多步骤工具编排
-→ FastAPI 保存进度和结果
-→ Result Event 通知 Realtime Worker
-→ 会话空闲时播报；否则由 Flutter 结果卡片展示
-```
+稳定物品 ID 优先于旧显示名称；g/kg、ml/l 及标准中文单位名按已有规范匹配。
+适用条件更具体的记忆优先；同等条件下相互矛盾则询问。缺少记忆所限定的量具或日期时，
+先补充适用条件。用户本轮明确说明可以作为当前操作的依据，不会自动覆盖旧记忆。
 
-异步委托是 Agent 业务任务的默认路径，不只是耗时任务的兜底路径。OpenAI Realtime API 不直接调用 Async Agent；Python Realtime Worker 负责创建受控任务，Async Agent 再通过 FastAPI 业务接口执行操作。
+没有适用记忆时，允许模型用自身知识提出 MODEL_KNOWLEDGE 估算。
+读取失败重试一次，仍失败则保留受影响项目等待处理，不将失败解释成无记忆。
+经验换算无论来自用户记忆还是模型知识，都不能自动升级为确定性换算。
 
-### 3. Agent 库存修改路径
+保存、更新和删除需要当前用户的明确记忆指令及从该消息原文提取的 authorization_quote。
+当前支持明确的中英文记忆表达（例如“记住”“remember”）；普通“好的”或估算确认不够。
+重复内容去重；记忆变更使本轮相关缓存失效。取消库存候选不会撤销一次独立的显式记忆保存。
 
-```text
-用户语音
-→ Realtime Agent 创建异步任务
-→ Async Agent 生成候选操作
-→ FastAPI 校验并保存 proposed action
-→ Flutter 获取并展示确认卡片
-→ 用户点击确认
-→ Flutter 通过 HTTPS 提交 action_id
-→ FastAPI 重新鉴权并校验参数、单位、库存版本和幂等键
-→ PostgreSQL 事务写入与审计
-```
+提交前检查引用记忆的内容指纹。记忆已变更或删除时重新准备候选。
+正式执行凭据保存当时使用的依据快照，后续记忆更新不会重写旧库存操作。
 
-用户插话只中断当前 AI 音频，不自动确认、撤销或取消后台任务。
+## 5. 候选、人工介入与逐项提交
 
-### 4. 手动库存操作路径
+一轮最多处理 20 项。项目可分别成功、失败、取消或等待输入。
+准备节点只计算预览；执行节点每项使用独立事务。
+一项失败不回滚其他成功项目。手动 batch-create/move/archive 的整批原子性仍由其接口单独保证。
 
-~~~text
-Flutter / Web 用户点击增加、减少或确认剩余
-→ 弹窗填写数量与单位，展示候选结果
-→ 用户确认
-→ HTTPS 调用 FastAPI
-→ 后端校验身份、单位、库存版本与幂等键，按当前状态计算
-→ 同一 PostgreSQL 事务更新库存与操作历史
-→ 返回最新库存
-~~~
+| 情况 | 当前处理 |
+| --- | --- |
+| 目标与确定性数量完整 | 准备后直接执行，不增加固定确认 |
+| 初始数量缺失 | 请用户补充；“两袋”可直接按 2 袋记录，无需先估计重量 |
+| 目标有歧义、记忆冲突或适用条件不足 | 集中询问必要信息，支持选择当前候选 |
+| AI_ESTIMATED 候选 | 展示原话、估算依据和候选变化量，确认当前 proposal_id 后执行 |
+| 拟新建私人物品或用户空间 | 展示名称、品类或空间类型，确认后创建；不创建公共品类 |
+| 修改候选 | 重新计算，旧候选失效 |
+| 取消项目 | 仅取消该未执行项目；已成功项目不受影响 |
 
-手动操作无需经过 Agent，与 Agent 操作共用后端业务规则和操作历史。预览不写库存，后端不信任客户端传来的最终余额；版本变化时返回冲突，重新展示结果供用户确认。确定性加减与单位换算由后端执行，遇到不确定换算可进入 Agent 候选流程。
+数量字段的更新规则只在[数量设计](QUANTITY_STATE_DESIGN.md)维护。
+确认一次估算不等于盘点；RECONCILE 必须表示用户实际确认的剩余总量。
+人工介入遵循明确分支，不能把“没有用户经验”作为禁止模型估算的理由。
 
-### 5. 用户记忆与历史重估路径
+Checkpoint 保存项目、候选、问题和执行进度。await_user 使用持久化 interrupt：
+暂停后 HTTP 流结束，等待期间不保持业务事务；客户端通过 resume 接口回答，
+并绑定当前 interrupt_id 和 proposal_id。客户端契约、状态与事件见
+[API 参考第 9 节](API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)。
 
-~~~text
-用户补充换算信息
-→ Async Agent 识别适用物品、条件与时间范围，必要时追问
-→ 经受控服务保存该用户的记忆及来源
-→ 用户信息适用于历史时，读取相关库存与有效操作历史
-→ FastAPI 从最近确认剩余的基线（或首次入库）计算重估候选
-→ 保存候选余额、依据、适用范围与库存版本
-→ Flutter / Web 展示原余额、新估算余额及修正依据
-→ 用户确认
-→ FastAPI 重新校验与计算，事务更新估算余额并新增更正记录
-~~~
+## 6. 持久化与恢复边界
 
-Agent 负责理解新信息、检索相关记忆与确定候选适用范围；后端负责确定的算术和状态变化。记忆更新不等于库存变更，拒绝库存候选也不会自动撤销用户已明确提供的换算说明。无法确定适用范围时先追问。
-
-重算保留原始历史，不跨越最近一次盘点去改变新的确认事实。候选产生后库存版本变化，需要重新生成结果并再次确认。详细规则见 [QUANTITY_STATE_DESIGN.md](./QUANTITY_STATE_DESIGN.md)。
-
-## 用户级记忆、业务历史与 LangGraph
-
-每个用户维护统一的 Agent 记忆，不按 item 建立独立记忆，也不为每个物品常驻运行 Agent。同一套 LangGraph 流程按当前认证用户读取相关记忆、本次库存状态及必要历史。记忆内容可限定物品、量具、时间等适用条件，并在条件一致时跨库存批次复用。
-
-| 内容 | 负责组件与存储 | 用途 |
+| 数据 | 保存位置 | 权威含义 |
 | --- | --- | --- |
-| 当前库存与正式操作历史 | FastAPI + PostgreSQL | 当前余额、审计、历史重估；手动和 Agent 共用 |
-| 用户长期记忆 | 受控用户记忆服务 + PostgreSQL | 用户习惯、换算说明、适用范围及来源 |
-| Agent 执行状态 | LangGraph checkpoint，持久化后端计划使用 PostgreSQL | 任务恢复、步骤状态与等待确认 |
-| 任务及候选结果 | FastAPI Task Ledger 与候选管理 | 客户端查询、确认、幂等及结果持久化 |
-| 应用日志 | 日志设施 | 错误与耗时排查，不作为库存事实来源 |
+| 当前库存与数量历史 | 业务表 | 实际业务状态 |
+| 成功 Agent 动作及依据 | agent_inventory_action | 已提交结果及幂等凭据 |
+| 跨会话用户知识 | PostgreSQL Store | 有适用条件的知识，不是库存事实 |
+| 本轮执行进度与候选 | LangGraph Checkpointer | 恢复与等待现场，不替代业务凭据 |
+| 临时检索缓存 | 请求运行时 | 减少重复读取，不持久保存连接或密钥 |
 
-检查点不能替代正式操作历史，也不能代替后端确认接口的权限和事务校验。用户记忆、检查点与业务记录的具体表结构及接入方式留待实施设计，本轮不修改数据库设计基线，不宣称这些能力已完成。
+Checkpoint 使用同步持久化，写入前保存稳定的候选/动作标识。
+同一项目的新空间、私人物品、库存变更和业务凭据在同一事务中提交或回滚；
+成功创建的关联可由后续项目复用。Agent 数量历史使用 TEXT 来源，原始表达仍保留；
+首次入库不伪造 ADD 历史。表字段由[数据库设计](DATABASE_DESIGN.md)维护。
 
-库存列表读取当前状态，历史按物品分页查询；Agent 按需加载相关用户记忆与有限历史，历史重估才读取对应区间。数据库按实际查询建立索引，不为每个用户或物品单独建表，不在每次任务中加载全部历史。
+重复提交先查业务凭据，再判断是否需要执行。业务已提交但 Checkpoint 尚未保存结果时，
+恢复读取原结果，不再次扣减。版本或记忆变更会使旧候选失效；提交结果未知时，
+保留原标识先核实，禁止更换标识绕过核实。
 
-## 任务路由规则
+同会话跨进程互斥使用独立直连 PostgreSQL 会话的 advisory lock。
+这条连接不占用 Checkpointer 池；流结束或暂停后释放锁，不在模型等待期间持有业务事务。
 
-以下规则适用于 Realtime Agent 收到的请求；用户手动操作走上述 FastAPI 路径。采用 **deny-by-default（默认不直办）** 的任务分类方式。一个任务只有同时满足“低风险、低延迟、逻辑简单、已进入显式白名单”四个条件，Realtime Agent 才能直接处理。
+## 7. 当前状态与其他入口
 
-| 任务类型 | 路由 | 示例 |
-| --- | --- | --- |
-| 非业务对话 | Realtime Agent 直接回答 | 问候、能力说明、重复刚才的回答 |
-| 白名单快速任务 | Realtime Agent 调用受控只读接口 | 查询当前异步任务状态、播报已经持久化的任务结果 |
-| 普通业务任务 | 默认委托 Async Agent | 库存查询、批次匹配、临期分析、候选入库或消耗操作 |
-| 复杂业务任务 | 委托 Async Agent | RAG、搜索、多步骤推理、多个工具的依赖调用 |
-| 正式业务写入 | FastAPI 确认接口 | 用户确认后执行库存新增、扣减、调整或归档 |
+Agent V0.2 已完成本地实现及记录在案的验收，证据见
+[Agent 验收报告](testing/AGENT_V02_TEST_RESULTS.md)和[测试索引](testing/README.md)。
+验收报告是特定运行的证据，不代表每次代码变化都重新执行了全部测试。
 
-“低风险、低延迟、简单”只是进入白名单的必要条件，不是充分条件。库存查询等任务即使可能很快完成，只要没有被显式批准为 Realtime Fast Path，就仍由 Async Agent 执行。
-
-## 组件归属与职责
-
-| 组件 | 运行/维护方 | 核心职责 | 明确不负责 |
-| --- | --- | --- | --- |
-| Flutter App | 你们 | 音频设备、UI、连接状态、结果卡片、提交用户确认 | 不保存模型密钥；不直接写数据库 |
-| LiveKit Cloud | LiveKit | WebRTC、SFU、Track、TURN、媒体传输恢复 | 不处理库存业务；不提供持久业务状态 |
-| Python Realtime Agent Worker | 你们 | Realtime Session、语音交互、插话、任务分类、默认异步委托、白名单快速任务 | 不作为主要业务执行者；不直接执行正式库存写入 |
-| OpenAI Realtime API | OpenAI | 实时语音理解与生成、临时会话状态、Function Call 请求 | 不拥有业务权限；不决定最终库存事实 |
-| Async Agent | 你们 | LangGraph 编排、用户记忆检索、库存查询、候选操作与历史重估范围识别 | 不接收实时音频；不绕过 FastAPI 直接修改库存表 |
-| FastAPI | 你们 | 鉴权、业务 API、任务账本、手动与 Agent 共用计算、重估候选、确认与事务 | 不承载 PCM 音频热路径 |
-| PostgreSQL | 你们或托管服务商 | 库存、操作历史、用户记忆、任务及候选结果的持久化存储 | 不执行 Agent 推理 |
-| Redis | 你们或托管服务商，可选 | 队列、Lease、短期通知与事件唤醒 | 不能成为任务结果或库存事实的唯一存储 |
-
-## 必须遵守的边界
-
-1. Agent 业务任务默认委托 Async Agent；Realtime Agent 直接处理属于显式例外。
-2. 直接处理白名单必须由代码或配置维护，不能仅依赖模型自行判断“任务很简单”。
-3. `Function Call` 是模型提出的工具调用请求，不等于已经执行成功。
-4. Realtime 模型和 Async Agent 的 JSON 参数都必须经过 Pydantic、权限和业务规则校验。
-5. `Realtime Session` 是短期会话状态，不是长期 Memory，也不是库存事实源。
-6. Async Agent 的任务进度和最终结果必须先持久化，再通知语音会话或 Flutter UI。
-7. Agent 修改遵循“候选操作 → 用户确认 → FastAPI 事务写入”；手动修改直接调用 FastAPI，同样经过用户确认、业务校验和操作记录。
-8. Realtime Agent 和 Async Agent 都不能绕过 FastAPI 直接修改库存数据库。
-9. Async Agent 采用 LangGraph 编排；仅按用户维护统一记忆，业务操作历史独立于图执行状态。
-10. 课程首版没有真实 RAG 场景时，不需要 Milvus 或 pgvector。
+远程部署必须单独检查 Agent schema 和业务执行凭据表。最近一次 V0.2 只读检查发现
+远程缺少 agent_inventory_action；本文不宣称已经执行远程建表。
+环境、Windows 事件循环、显式初始化及测试命令统一见
+[后端 README](../backend/README.md#agent-configuration-and-storage)。
