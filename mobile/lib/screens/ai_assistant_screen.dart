@@ -8,10 +8,18 @@ import 'camera_input_screen.dart';
 import 'conversation_history_screen.dart';
 
 class AiAssistantScreen extends StatefulWidget {
-  const AiAssistantScreen({this.isGuest = false, this.onHomeTap, super.key});
+  const AiAssistantScreen({
+    this.isGuest = false,
+    this.onHomeTap,
+    this.onProfileTap,
+    this.onLoginTap,
+    super.key,
+  });
 
   final bool isGuest;
   final VoidCallback? onHomeTap;
+  final VoidCallback? onProfileTap;
+  final VoidCallback? onLoginTap;
 
   @override
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
@@ -111,12 +119,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     ).push(MaterialPageRoute<void>(builder: (_) => const CameraInputScreen()));
   }
 
-  void _showPlaceholder(String destination) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$destination page is coming next.')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -154,8 +156,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                     bottom: 4,
                     child: AppBottomNavigation(
                       onHomeTap:
-                          widget.onHomeTap ?? () => _showPlaceholder('Home'),
-                      onProfileTap: () => _showPlaceholder('Profile'),
+                          widget.onHomeTap ??
+                          () => Navigator.of(context).maybePop(),
+                      onProfileTap: widget.onProfileTap,
                     ),
                   ),
                 ],
@@ -303,7 +306,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     return Column(
       children: [
-        const SizedBox(height: 44),
+        const SizedBox(height: 28),
         const Text(
           'Your inventory, organised\nwith a conversation.',
           textAlign: TextAlign.center,
@@ -313,7 +316,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             height: 1.18,
           ),
         ),
-        const SizedBox(height: 35),
+        const SizedBox(height: 25),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(17, 20, 17, 20),
@@ -338,17 +341,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 49),
+        const SizedBox(height: 32),
         const Text(
           'Log in to start your own inventory.',
           style: TextStyle(color: AppColors.muted, fontSize: 17),
         ),
-        const SizedBox(height: 36),
+        const SizedBox(height: 18),
         SizedBox(
           width: double.infinity,
           height: 58,
           child: FilledButton(
-            onPressed: () => Navigator.of(context).maybePop(),
+            onPressed:
+                widget.onLoginTap ?? () => Navigator.of(context).maybePop(),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.text,

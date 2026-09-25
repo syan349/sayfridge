@@ -397,7 +397,6 @@ class InventoryItemCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Image.asset(
                       AssistantAssets.warn,
@@ -406,37 +405,37 @@ class InventoryItemCard extends StatelessWidget {
                       fit: BoxFit.contain,
                       cacheWidth: 64,
                     ),
-                    const SizedBox(width: 11),
-                    Text(
-                      item.daysLeft,
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        color: item.expiryIsEstimate
-                            ? inventoryEstimatedColor
-                            : inventoryExactColor,
-                        fontSize: 14.5,
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        item.daysLeft,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: item.expiryIsEstimate
+                              ? inventoryEstimatedColor
+                              : inventoryExactColor,
+                          fontSize: 14.5,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 13),
-                Transform.translate(
-                  // Move the complete action as one unit. This preserves the
-                  // natural label/icon gap while optically aligning its edge.
-                  offset: const Offset(10, 0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Transform.translate(
-                        offset: const Offset(4, 0),
-                        child: const Text(
-                          'View item',
-                          style: TextStyle(fontSize: 13.5),
-                        ),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'View item',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13.5),
                       ),
-                      const Icon(Icons.chevron_right, size: 22),
-                    ],
-                  ),
+                    ),
+                    Icon(Icons.chevron_right, size: 22),
+                  ],
                 ),
               ],
             ),

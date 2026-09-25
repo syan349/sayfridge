@@ -5,12 +5,14 @@ import 'repositories/storage_space_repository.dart';
 import 'repositories/inventory_repository.dart';
 import 'screens/ai_assistant_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/sign_in_screen.dart';
 import 'services/inventory_api_service.dart';
 import 'services/storage_space_api_service.dart';
 import 'state/expiry_summary_controller.dart';
 import 'state/inventory_controller.dart';
 import 'state/storage_space_controller.dart';
+import 'state/auth_controller.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -67,6 +69,54 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
     super.dispose();
   }
 
+  void _openSignIn(BuildContext context, AuthController authController) {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => SignInScreen(authController: authController),
+      ),
+    );
+  }
+
+  void _openAssistant(
+    BuildContext context,
+    AuthController authController, {
+    required bool isGuest,
+  }) {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (assistantContext) => AiAssistantScreen(
+          isGuest: isGuest,
+          onHomeTap: () =>
+              Navigator.of(assistantContext).popUntil((route) => route.isFirst),
+          onProfileTap: isGuest
+              ? () => _openSignIn(assistantContext, authController)
+              : () => _openProfile(assistantContext, authController),
+          onLoginTap: isGuest
+              ? () => _openSignIn(assistantContext, authController)
+              : null,
+        ),
+      ),
+    );
+  }
+
+  void _openProfile(BuildContext context, AuthController authController) {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (profileContext) => ProfileScreen(
+          authController: authController,
+          onAssistantTap: () =>
+              _openAssistant(profileContext, authController, isGuest: false),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -83,27 +133,10 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
         unauthenticatedBuilder: (context, authController) {
           return HomeScreen(
             isGuest: true,
-            onLoginTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => SignInScreen(authController: authController),
-                ),
-              );
-            },
-            onAssistantTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const AiAssistantScreen(isGuest: true),
-                ),
-              );
-            },
-            onProfileTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => SignInScreen(authController: authController),
-                ),
-              );
-            },
+            onLoginTap: () => _openSignIn(context, authController),
+            onAssistantTap: () =>
+                _openAssistant(context, authController, isGuest: true),
+            onProfileTap: () => _openSignIn(context, authController),
           );
         },
         authenticatedBuilder: (context, authController) {
@@ -111,15 +144,9 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
             expirySummaryController: _expirySummaryController,
             inventoryController: _inventoryController,
             storageSpaceController: _storageSpaceController,
-            onAssistantTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (assistantContext) => AiAssistantScreen(
-                    onHomeTap: () => Navigator.of(assistantContext).pop(),
-                  ),
-                ),
-              );
-            },
+            onAssistantTap: () =>
+                _openAssistant(context, authController, isGuest: false),
+            onProfileTap: () => _openProfile(context, authController),
           );
         },
         errorBuilder: (context, authController) {

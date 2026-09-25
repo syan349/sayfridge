@@ -27,6 +27,7 @@ class InventoryController extends ChangeNotifier {
   DateTime? _purchaseTo;
   DateTime? _expiryFrom;
   DateTime? _expiryTo;
+  int _requestSequence = 0;
 
   InventoryLoadStatus get status => _status;
   List<InventoryItem> get items => _items;
@@ -55,6 +56,7 @@ class InventoryController extends ChangeNotifier {
     int page = 1,
     int pageSize = 20,
   }) async {
+    final requestSequence = ++_requestSequence;
     _status = InventoryLoadStatus.loading;
     _errorMessage = null;
     _inventoryStatus = status;
@@ -81,6 +83,8 @@ class InventoryController extends ChangeNotifier {
         pageSize: pageSize,
       );
 
+      if (requestSequence != _requestSequence) return;
+
       _items = result.items;
       _total = result.total;
       _page = result.page;
@@ -90,6 +94,7 @@ class InventoryController extends ChangeNotifier {
           ? InventoryLoadStatus.empty
           : InventoryLoadStatus.loaded;
     } catch (error) {
+      if (requestSequence != _requestSequence) return;
       _items = [];
       _total = 0;
       _hasNextPage = false;

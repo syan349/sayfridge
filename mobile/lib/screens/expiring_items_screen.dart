@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
 
-import '../models/expiry_summary.dart';
+import '../models/inventory_item.dart';
 import '../state/expiry_summary_controller.dart';
 import '../state/inventory_controller.dart';
+import '../state/storage_space_controller.dart';
+import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/inventory_visuals.dart';
 import 'inventory_detail_screen.dart';
+import 'inventory_screen.dart';
 
 class ExpiringItemsScreen extends StatelessWidget {
   const ExpiringItemsScreen({
     required this.controller,
     required this.inventoryController,
+    this.storageSpaceController,
     super.key,
   });
 
   final ExpirySummaryController controller;
   final InventoryController inventoryController;
+  final StorageSpaceController? storageSpaceController;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +32,46 @@ class ExpiringItemsScreen extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 children: [
-                  _buildHeader(context),
+                  const OverviewHeader(title: 'Expiry Overview'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(25, 8, 25, 7),
+                    child: Row(
+                      children: [
+                        _SpacePicker(
+                          controller: controller,
+                          spacesController: storageSpaceController,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _SearchButton(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => InventorySearchScreen(
+                                  controller: inventoryController,
+                                  storageSpaceController:
+                                      storageSpaceController,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        IconButton.filled(
+                          onPressed: () => _showBucketFilter(context),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                          ),
+                          icon: Image.asset(
+                            HomeAssets.filter,
+                            width: 22,
+                            height: 22,
+                          ),
+                          tooltip: 'Filter expiry group',
+                        ),
+                      ],
+                    ),
+                  ),
                   Expanded(
                     child: AnimatedBuilder(
                       animation: controller,
@@ -42,35 +87,27 @@ class ExpiringItemsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 20, 12),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back),
-            tooltip: 'Back',
-          ),
-          const SizedBox(width: 4),
-          const Expanded(
-            child: Text(
-              'Expiring items',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildContent(BuildContext context) {
     return switch (controller.status) {
       ExpirySummaryLoadStatus.initial || ExpirySummaryLoadStatus.loading =>
         const Center(child: CircularProgressIndicator()),
-      ExpirySummaryLoadStatus.error => _ExpiryError(
-        message: controller.errorMessage ?? 'Please try again.',
-        onRetry: controller.reload,
+      ExpirySummaryLoadStatus.error => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                controller.errorMessage ?? 'Unable to load expiring items.',
+                textAlign: TextAlign.center,
+              ),
+              TextButton(
+                onPressed: controller.reload,
+                child: const Text('Try again'),
+              ),
+            ],
+          ),
+        ),
       ),
       ExpirySummaryLoadStatus.empty ||
       ExpirySummaryLoadStatus.loaded => _buildSummary(context),
@@ -78,87 +115,162 @@ class ExpiringItemsScreen extends StatelessWidget {
   }
 
   Widget _buildSummary(BuildContext context) {
+    final overdue = controller.items
+        .where((entry) => entry.bucket == 'overdue')
+        .toList();
+    final soon = controller.items
+        .where((entry) => entry.bucket != 'overdue')
+        .toList();
     return RefreshIndicator(
       onRefresh: controller.reload,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: const EdgeInsets.fromLTRB(25, 8, 25, 32),
         children: [
-          _ExpiryCountsRow(counts: controller.counts),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _bucketChip(label: 'All', value: null),
-              _bucketChip(label: 'Overdue', value: 'overdue'),
-              _bucketChip(label: 'Today', value: 'today'),
-              _bucketChip(label: 'Upcoming', value: 'upcoming'),
-            ],
-          ),
-          const SizedBox(height: 20),
-          if (controller.items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 80),
-              child: Column(
-                children: [
-                  Icon(Icons.event_available_outlined, size: 64),
-                  SizedBox(height: 16),
-                  Text('No items in this expiry group.'),
-                ],
-              ),
-            )
-          else
-            for (final summaryItem in controller.items)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _ExpiryItemCard(
-                  summaryItem: summaryItem,
-                  onTap: () => _openDetails(context, summaryItem),
+          if (controller.bucket == null || controller.bucket == 'overdue') ...[
+            const Text(
+              'Expired',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 14),
+            if (overdue.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Text(
+                  'No expired items',
+                  style: TextStyle(color: AppColors.muted),
                 ),
               ),
-          if (controller.page > 1 || controller.hasNextPage) ...[
-            const SizedBox(height: 8),
+            for (final entry in overdue)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InventoryItemTile(
+                  item: entry.item,
+                  onTap: () => _openDetails(context, entry.item),
+                ),
+              ),
+            const SizedBox(height: 23),
+          ],
+          if (controller.bucket != 'overdue') ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                TextButton.icon(
-                  onPressed: controller.page > 1
-                      ? () => controller.loadPage(controller.page - 1)
-                      : null,
-                  icon: const Icon(Icons.chevron_left),
-                  label: const Text('Previous'),
+                const Text(
+                  'Expiry soon',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                 ),
-                Text('Page ${controller.page}'),
-                TextButton.icon(
-                  onPressed: controller.hasNextPage
-                      ? () => controller.loadPage(controller.page + 1)
-                      : null,
-                  iconAlignment: IconAlignment.end,
-                  icon: const Icon(Icons.chevron_right),
-                  label: const Text('Next'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Next 3 days | ${controller.counts.today + controller.counts.upcoming} items',
+                    textAlign: TextAlign.right,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
+            const SizedBox(height: 13),
+            const QuantityLegend(),
+            const SizedBox(height: 15),
+            if (soon.isEmpty)
+              Column(
+                children: [
+                  Image.asset(HomeAssets.noExpiry, width: 105, height: 105),
+                  const Text(
+                    'No items expiring soon',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            for (final entry in soon)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InventoryItemTile(
+                  item: entry.item,
+                  onTap: () => _openDetails(context, entry.item),
+                ),
+              ),
           ],
+          if (controller.page > 1 || controller.hasNextPage)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: controller.page > 1
+                      ? () => controller.loadPage(controller.page - 1)
+                      : null,
+                  child: const Text('Previous'),
+                ),
+                Text('Page ${controller.page}'),
+                TextButton(
+                  onPressed: controller.hasNextPage
+                      ? () => controller.loadPage(controller.page + 1)
+                      : null,
+                  child: const Text('Next'),
+                ),
+              ],
+            ),
         ],
       ),
     );
   }
 
-  Widget _bucketChip({required String label, required String? value}) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: controller.bucket == value,
-      onSelected: (_) => controller.selectBucket(value),
+  void _showBucketFilter(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Filter expiry group',
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 10),
+              for (final choice in const <(String, String?)>[
+                ('All', null),
+                ('Expired', 'overdue'),
+                ('Today', 'today'),
+                ('Upcoming', 'upcoming'),
+              ])
+                ListTile(
+                  title: Text(choice.$1),
+                  trailing: Icon(
+                    controller.bucket == choice.$2
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    controller.selectBucket(choice.$2);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  void _openDetails(BuildContext context, ExpirySummaryItem summaryItem) {
+  void _openDetails(BuildContext context, InventoryItem item) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => InventoryDetailScreen(
-          itemId: summaryItem.item.id,
+          itemId: item.id,
           controller: inventoryController.createDetailController(),
         ),
       ),
@@ -166,121 +278,103 @@ class ExpiringItemsScreen extends StatelessWidget {
   }
 }
 
-class _ExpiryCountsRow extends StatelessWidget {
-  const _ExpiryCountsRow({required this.counts});
+class _SpacePicker extends StatelessWidget {
+  const _SpacePicker({required this.controller, this.spacesController});
 
-  final ExpiryCounts counts;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _ExpiryCount(label: 'Overdue', value: counts.overdue),
-        _ExpiryCount(label: 'Today', value: counts.today),
-        _ExpiryCount(label: 'Upcoming', value: counts.upcoming),
-      ],
-    );
-  }
-}
-
-class _ExpiryCount extends StatelessWidget {
-  const _ExpiryCount({required this.label, required this.value});
-
-  final String label;
-  final int value;
+  final ExpirySummaryController controller;
+  final StorageSpaceController? spacesController;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
+    final spaces = <String, String>{};
+    for (final entry in controller.items) {
+      spaces[entry.item.storageSpaceId] = entry.item.storageSpaceName;
+    }
+    for (final space in spacesController?.storageSpaces ?? const []) {
+      spaces[space.id] = space.name;
+    }
+    return ActionChip(
+      backgroundColor: Colors.white,
+      side: const BorderSide(color: Color(0xFFE6EDDF)),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text('$value', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(
+            controller.storageSpaceId == null
+                ? 'All Spaces'
+                : spaces[controller.storageSpaceId] ?? 'Selected space',
+            style: const TextStyle(fontSize: 14),
+          ),
+          const SizedBox(width: 4),
+          const Icon(Icons.keyboard_arrow_down, size: 19),
         ],
+      ),
+      onPressed: () => showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: AppColors.background,
+        builder: (sheetContext) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(18),
+                child: Text(
+                  'Choose storage space',
+                  style: TextStyle(fontSize: 21),
+                ),
+              ),
+              ListTile(
+                title: const Text('All Spaces'),
+                onTap: () => _select(sheetContext, null),
+              ),
+              for (final space in spaces.entries)
+                ListTile(
+                  title: Text(space.value),
+                  onTap: () => _select(sheetContext, space.key),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
+
+  void _select(BuildContext sheetContext, String? id) {
+    Navigator.pop(sheetContext);
+    controller.selectStorageSpace(id);
+  }
 }
 
-class _ExpiryItemCard extends StatelessWidget {
-  const _ExpiryItemCard({required this.summaryItem, required this.onTap});
+class _SearchButton extends StatelessWidget {
+  const _SearchButton({required this.onTap});
 
-  final ExpirySummaryItem summaryItem;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final item = summaryItem.item;
-
-    return Card(
-      child: ListTile(
-        onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        leading: const CircleAvatar(child: Icon(Icons.event_outlined)),
-        title: Text(
-          item.itemDefinitionName,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: const Color(0xFFE6EDDF)),
         ),
-        subtitle: Text('${item.displayQuantity} · ${item.storageSpaceName}'),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Row(
           children: [
-            Text(_bucketLabel(summaryItem.bucket)),
-            const SizedBox(height: 4),
-            Text(_date(item.expiryDate)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _bucketLabel(String value) {
-    return switch (value) {
-      'overdue' => 'Overdue',
-      'today' => 'Today',
-      'upcoming' => 'Upcoming',
-      _ => value,
-    };
-  }
-
-  String _date(DateTime? value) {
-    if (value == null) return '';
-    final month = value.month.toString().padLeft(2, '0');
-    final day = value.day.toString().padLeft(2, '0');
-    return '${value.year}-$month-$day';
-  }
-}
-
-class _ExpiryError extends StatelessWidget {
-  const _ExpiryError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.cloud_off_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary,
+            Image.asset(HomeAssets.search, width: 21, height: 21),
+            const SizedBox(width: 6),
+            const Flexible(
+              child: Text(
+                'Search items ...',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: AppColors.muted, fontSize: 14),
+              ),
             ),
-            const SizedBox(height: 18),
-            Text(
-              'Unable to load expiring items',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 20),
-            FilledButton(onPressed: onRetry, child: const Text('Try again')),
           ],
         ),
       ),
