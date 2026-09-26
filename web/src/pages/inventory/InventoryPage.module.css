@@ -1,0 +1,41 @@
+.content {
+  padding: 0 var(--sf-page-pad-x) 24px;
+}
+
+.tableArea {
+  margin-top: 15px;
+}
+
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.stateTitle {
+  margin: 0;
+  font-family: var(--sf-font-display);
+  font-size: var(--sf-text-lg);
+  font-weight: 600;
+  color: var(--sf-text);
+}
+
+.stateText {
+  margin: 0;
+  font-size: var(--sf-text-md);
+  color: var(--sf-text-muted);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 4px;
+}
+
+.showing {
+  margin-right: auto;
+  font-size: var(--sf-text-sm);
+  color: var(--sf-text-muted);
+}
