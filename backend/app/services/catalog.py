@@ -118,10 +118,11 @@ async def _check_name(session: AsyncSession, user_id: UUID, name: str, exclude_i
     return normalized
 
 
-async def _commit_definition(session: AsyncSession, definition: ItemDefinition) -> ItemDefinition:
+async def _commit_definition(session: AsyncSession, definition: ItemDefinition, *, commit: bool = True) -> ItemDefinition:
     await session.flush()
     await session.refresh(definition)
-    await session.commit()
+    if commit:
+        await session.commit()
     return definition
 
 
@@ -134,7 +135,7 @@ async def _rollback_write(session: AsyncSession, error: Exception) -> None:
         raise CatalogNameConflictError("A private item definition already uses this name") from error
 
 
-async def create_definition(session: AsyncSession, user_id: UUID, *, name: str, category_id: UUID) -> ItemDefinition:
+async def create_definition(session: AsyncSession, user_id: UUID, *, name: str, category_id: UUID, commit: bool = True) -> ItemDefinition:
     try:
         categories = await _lock_categories(session, {category_id})
         _require_active(categories[category_id])
@@ -142,7 +143,7 @@ async def create_definition(session: AsyncSession, user_id: UUID, *, name: str, 
         definition = ItemDefinition(name=name, normalized_name=normalized, category_id=category_id,
                                     owner_user_id=user_id, status="ACTIVE")
         session.add(definition)
-        return await _commit_definition(session, definition)
+        return await _commit_definition(session, definition, commit=commit)
     except Exception as error:
         await _rollback_write(session, error)
         raise

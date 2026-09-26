@@ -3,6 +3,19 @@
 > Version / 版本：v0.1  
 > Positioning / 定位：A household inventory assistant for individuals and families to manage food, fresh produce, and everyday supplies. / 面向个人及家庭用户的食品、生鲜与日用品库存管理助手。
 
+## Delivery status / 交付状态
+
+This document defines product scope, not a release checklist. The feature journeys below include future goals. / 本文定义产品范围，不是已交付清单；下文功能与交互包含未来目标。
+
+| Capability / 能力 | Current boundary / 当前边界 |
+| --- | --- |
+| Authentication, spaces, catalog and inventory APIs / 认证、空间、词典和库存接口 | Implemented endpoints are listed in [API reference](API_REFERENCE.md). / 已实现接口以 API 参考为准。 |
+| Text Agent V0.2 / 文本 Agent | Local six-node implementation, memory, estimates and per-item resume/recovery; deployment requires storage checks. / 六节点、记忆、估算和逐项恢复已有本地实现，部署前仍需检查数据库。 |
+| Web/mobile experiences / Web 与移动端交互 | Product requirements; component code/readmes determine actual page coverage. / 属于产品要求，页面完成度以对应组件为准。 |
+| Voice, images, proactive notifications and historical recalculation / 语音、图片、主动提醒与历史重算 | Future goals, not current Agent V0.2 capabilities. / 未来目标，不属于当前 Agent V0.2 能力。 |
+
+Current implementation structure: [Architecture](ARCHITECTURE.md). Historical voice/dual-Agent design: [archived draft](archive/2026-09-25/ARCHITECTURE_REALTIME_DRAFT.md). / 当前实现结构与历史方案分开维护。
+
 ## 1. Project Overview / 项目概述
 
 SayFridge is an application consisting of a cross-platform mobile app, a user-facing web application, and an administrator web portal. It helps users build and maintain a household inventory with minimal manual entry, and proactively reminds them about expired or soon-to-expire items and missing consumption records.
@@ -34,21 +47,21 @@ MVP 面向个人用户。每个账户可以建立冰箱、冷柜、仓库等多�
 
 1. **Initial inventory setup / 首次建库**: The user photographs newly purchased items and their receipt. The system extracts candidate items, quantities, and dates, then asks the user to confirm before creating inventory records. / 用户拍摄刚购买的物品及小票；系统提取候选物品、数量和日期，用户确认后批量入库。
 2. **Daily stock-in / 日常入库**: The user says, “I bought two cartons of milk and one bag of rice.” Speech is transcribed, structured information is extracted, and a confirmation card is shown before the data is saved. / 用户说“我买了两盒牛奶和一袋米”；系统转写并提取结构化信息，展示确认卡片后保存。
-3. **Daily consumption / 日常消耗**: The user says, “We used three eggs and finished one carton of milk.” The system proposes deductions, normally prioritising the earliest-expiring batch, and allows correction. / 用户说“晚饭用了三个鸡蛋，喝掉一盒牛奶”；系统建议扣减库存，默认优先消耗最早到期批次，并允许修正。
+3. **Daily consumption / 日常消耗**: The user says, “We used three eggs and finished one carton of milk.” The system proposes deductions, using explicit batch preferences or asking the user to choose, and allows correction. / 用户说“晚饭用了三个鸡蛋，喝掉一盒牛奶”；系统按明确批次偏好或用户选择提出扣减，并允许修正。
 4. **Expiry handling / 临期处理**: At 9:00 AM, the system sends a summary of expired and soon-to-expire food. Users can mark an item as consumed, discarded, or view details. / 每日早上 9 点，系统推送已过期和即将过期食品摘要；用户可标记“已食用”“已丢弃”或查看详情。
 5. **End-of-day recall / 回顾式记录**: At 9:00 PM, the system gently prompts the user to recall today's usage, either through a guided category-by-category flow or a single free-form statement. / 每日晚上 9 点，系统提醒用户回顾当天使用情况；用户可按类别逐步记录，也可直接自由输入。
 6. **Web management / Web 管理**: Users use a desktop browser for bulk viewing, filtering, and editing current inventory; administrators handle system-level exceptions and operations. / 用户在电脑上批量查看、筛选和编辑当前库存；管理员处理系统级异常与运营工作。
 
 ## 3. Product Scope / 产品范围
 
-### 3.1 MVP features / MVP 必做功能
+### 3.1 Product goals across phases / 分阶段产品目标
 
 | Module / 模块 | Scope / 功能范围 |
 | --- | --- |
 | Accounts and personal inventory / 账户与个人库存 | Registration/login, profile, personal inventory, and access isolation by authenticated user / 注册登录、用户资料、个人库存、按认证用户进行权限隔离 |
 | Inventory management / 库存管理 | Create, view, edit, and delete items; quantity, unit, category, purchase date, expiry date, storage location, and notes / 物品增删改查；数量、单位、类别、购买日期、到期日、储存位置和备注 |
 | Multimodal input / 多模态录入 | Camera/image upload, receipt or invoice OCR, product-image recognition, voice input, and text input / 拍照上传、小票或发票 OCR、商品图像识别、语音与文字输入 |
-| Agent assistant / Agent 助手 | Intent parsing, controlled tool use, and explicit confirmation for missing, uncertain, or consequential information / 意图解析、受控工具调用；信息缺失、低置信度或会影响库存时须确认 |
+| Agent assistant / Agent 助手 | Intent parsing and controlled tool use; clarify missing/ambiguous information and confirm estimates or new associations / 意图解析、受控工具调用；缺失或歧义信息需补充，估算或新建关联需要确认 |
 | Reminders / 提醒机制 | 09:00 expiry reminder, 21:00 daily-recall reminder, and configurable schedule/on-off preferences / 09:00 临期提醒、21:00 使用情况回顾提醒、可配置时间与开关 |
 | User mobile app / 用户手机 App | Inventory overview, camera, voice/text entry, push notifications, item details, and manual maintenance / 库存概览、相机、语音/文字录入、推送、详情与手动维护 |
 | User web / 用户 Web | Shared inventory data with the app; large-screen browsing, filtering, and bulk editing / 与手机端共享数据；大屏浏览、筛选和批量编辑 |
@@ -61,7 +74,7 @@ MVP 面向个人用户。每个账户可以建立冰箱、冷柜、仓库等多�
 - OCR or image recognition that changes inventory without any user confirmation / 无需用户确认即可修改库存的全自动 OCR 或图像识别。
 - Medical or nutritional advice, or definitive food-safety judgement / 医疗、营养建议或食品安全责任判断。
 - Smart-fridge hardware, IoT sensors, Bluetooth, or NFC device integration / 智能冰箱硬件、IoT 传感器、蓝牙或 NFC 设备接入。
-- Multiple inventory spaces, shared inventory, fine-grained roles, or social features / 多库存空间、用户共享库存、细粒度角色体系或社交功能。
+- Nested inventory spaces, shared inventory, fine-grained roles, or social features / 嵌套库存空间、用户共享库存、细粒度角色体系或社交功能。多个平级空间已在范围内。
 - Fully automatic long-term consumption prediction or generative recipe recommendations / 全自动长期消耗预测或生成式食谱推荐。
 
 These may become stretch goals, but must not delay the MVP's core flow. / 它们可作为 Stretch Goals，但不能阻碍 MVP 主链路完成。
@@ -107,8 +120,8 @@ flowchart LR
 
 1. The user says or enters, “Used three eggs.” / 用户说或输入“用了三个鸡蛋”。
 2. The Agent calls a query tool to locate plausible inventory batches. / Agent 调用查询工具定位可能的库存批次。
-3. If there are multiple batches, the system suggests consuming the earliest-expiring batch first and shows the choice. / 如果有多个批次，系统默认建议优先扣减最早到期批次，并展示选择。
-4. On confirmation, the backend reduces stock. A zero-quantity item is marked as consumed and is hidden from the current in-stock list. / 确认后后端扣减库存；数量归零的物品标记为已用完，不显示在当前在库列表。
+3. If there are multiple batches, use an applicable user preference or ask the user to choose. / 多批次时使用适用的用户偏好；仍有歧义则让用户选择，不默认取第一批。
+4. After required clarification/confirmation, the backend reduces stock. Only confirmed zero becomes EMPTY; estimated zero remains visible as possibly used up. / 完成必要的补充或确认后，由后端扣减；只有确认归零才标记 EMPTY，估算为零仍保留为可能用完。数量语义见 [数量设计](QUANTITY_STATE_DESIGN.md)。
 
 ### 5.3 Scheduled reminders / 每日提醒流程
 
@@ -118,25 +131,20 @@ flowchart LR
 
 ## 6. Agent and Tool Boundaries / Agent 与工具边界
 
-The Agent's job is interpretation and orchestration, not database ownership. The following minimum tool set is proposed. / Agent 的职责是理解和编排，而非拥有数据库权限。建议最小工具集如下：
+The Agent interprets requests and proposes controlled actions. The backend validates
+identity, ownership and quantity rules, computes final balances and owns transactions.
+Current node/tool names and memory behavior are maintained only in
+[Architecture](ARCHITECTURE.md); public contracts are in [API reference](API_REFERENCE.md).
+The old conceptual tool list is preserved with the archived implementation plan.
 
-| Tool / 工具 | Purpose / 用途 | Safety and business constraints / 安全与业务约束 |
-| --- | --- | --- |
-| `search_inventory` | Query a user's inventory by name, category, or state / 按名称、类别、状态查询库存 | Derive `userId` from authenticated identity / 强制从认证身份获取 `userId` |
-| `create_inventory_draft` | Create a proposed stock-in item / 创建待确认的入库候选项 | Does not take effect immediately; retains source and confidence / 不直接生效；保存来源与置信度 |
-| `confirm_inventory_draft` | Confirm a proposal and formally add stock / 确认候选项并正式入库 | Requires explicit confirmation and server-side field validation / 必须用户确认，且服务端校验字段 |
-| `record_consumption` | Record consumption and reduce stock / 记录消耗、减少库存 | Never allow negative quantity; batch selection must be traceable / 不允许负库存，批次选择可追溯 |
-| `update_inventory_item` | Correct quantity, date, location, etc. / 更正数量、日期、位置等 | Field allowlist, authorisation, and audit / 字段白名单、权限校验、审计 |
-| `delete_inventory_item` | Remove or archive an erroneous item / 删除或归档错误记录 | Second confirmation or soft delete, plus audit / 二次确认或软删除及审计 |
-| `get_expiry_summary` | Retrieve expiry summary / 获取临期和过期摘要 | Return only data visible to the current user / 仅返回当前用户可见数据 |
-
-For consequential actions, use a **draft first, user confirmation second** pattern. Model output must conform to a structured schema; the backend must never concatenate model text into SQL or execute arbitrary commands.
-
-对高影响操作采用“**先生成草稿，再由用户确认执行**”的模式。模型输出必须遵循结构化 schema；后端绝不能将模型文本拼接为 SQL 或执行任意命令。
+Agent 负责理解请求、选择目标和提出候选；后端负责身份、归属、数量校验、余额计算和正式事务。
+当前节点、工具与记忆设计只在架构文档维护，接口只在 API 参考维护。
+缺少信息需要补充；估算及新建关联需要确认；完整的确定性操作不增加固定确认。
+模型输出使用受控结构，不能将模型文字拼接为 SQL 或执行任意命令。
 
 ## 7. Current Basic Data Model / 当前数据库基础模型
 
-The MVP currently designs eight tables: user, storage_space, item_category, item_definition, inventory_item, inventory_operation, conversation, and conversation_message. See [`DATABASE_DESIGN.md`](./DATABASE_DESIGN.md) for the complete fields, constraints, and explicit non-goals. / MVP 当前设计八张表：user、storage_space、item_category、item_definition、inventory_item、inventory_operation、conversation、conversation_message。完整字段、约束和不建表边界见 [`DATABASE_DESIGN.md`](./DATABASE_DESIGN.md)。
+The current business schema contains nine tables: the original user, storage_space, item_category, item_definition, inventory_item, inventory_operation, conversation and conversation_message, plus agent_inventory_action. LangGraph checkpoint/Store tables are maintained separately in the Agent schema. See [database design](DATABASE_DESIGN.md). / 当前业务结构为原八表加 agent_inventory_action，共九表；LangGraph 检查点和 Store 表在 Agent schema 中单独维护，不计入业务九表。字段与约束见数据库设计。
 
 | Entity / 实体 | Key fields / 关键字段 | Description / 说明 |
 | --- | --- | --- |
