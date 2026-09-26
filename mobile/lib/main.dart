@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'auth/auth_dependencies.dart';
 import 'auth/auth_gate.dart';
+import 'models/inventory_item.dart';
+import 'repositories/catalog_repository.dart';
 import 'repositories/storage_space_repository.dart';
 import 'repositories/inventory_repository.dart';
 import 'screens/ai_assistant_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/manual_stock_in_screen.dart';
 import 'screens/sign_in_screen.dart';
+import 'services/catalog_api_service.dart';
 import 'services/inventory_api_service.dart';
 import 'services/storage_space_api_service.dart';
 import 'state/expiry_summary_controller.dart';
 import 'state/inventory_controller.dart';
+import 'state/manual_stock_in_controller.dart';
 import 'state/storage_space_controller.dart';
 import 'theme/app_theme.dart';
 
@@ -29,6 +34,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
   late final StorageSpaceController _storageSpaceController;
   late final InventoryController _inventoryController;
   late final ExpirySummaryController _expirySummaryController;
+  late final ManualStockInController _manualStockInController;
 
   @override
   void initState() {
@@ -56,10 +62,20 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
 
     _inventoryController = InventoryController(inventoryRepository);
     _expirySummaryController = ExpirySummaryController(inventoryRepository);
+    final catalogRepository = CatalogRepository(
+      CatalogApiService(_authDependencies.apiClient),
+      _authDependencies.tokenStorage,
+    );
+    _manualStockInController = ManualStockInController(
+      catalogRepository,
+      inventoryRepository,
+      storageSpaceRepository,
+    );
   }
 
   @override
   void dispose() {
+    _manualStockInController.dispose();
     _expirySummaryController.dispose();
     _inventoryController.dispose();
     _storageSpaceController.dispose();
@@ -93,7 +109,12 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
             onAssistantTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const AiAssistantScreen(isGuest: true),
+                  builder: (assistantContext) => AiAssistantScreen(
+                    isGuest: true,
+                    onHomeTap: () {
+                      Navigator.of(assistantContext).pop();
+                    },
+                  ),
                 ),
               );
             },
@@ -115,6 +136,21 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
                     expirySummaryController: _expirySummaryController,
                     inventoryController: _inventoryController,
                     storageSpaceController: _storageSpaceController,
+                    onAddItemTap: () async {
+                      final createdItem = await Navigator.of(homeContext)
+                          .push<InventoryItem>(
+                            MaterialPageRoute<InventoryItem>(
+                              builder: (_) => ManualStockInScreen(
+                                controller: _manualStockInController,
+                              ),
+                            ),
+                          );
+                      if (createdItem == null) return;
+                      await Future.wait([
+                        _inventoryController.reload(),
+                        _expirySummaryController.reload(),
+                      ]);
+                    },
                     onAssistantTap: () {
                       Navigator.of(homeContext).pop();
                     },

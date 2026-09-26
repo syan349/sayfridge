@@ -24,6 +24,7 @@ class HomeScreen extends StatelessWidget {
     this.onSearchTap,
     this.onExpiringTap,
     this.onInventoryTap,
+    this.onAddItemTap,
     this.isGuest = false,
     super.key,
   });
@@ -38,6 +39,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onSearchTap;
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
+  final VoidCallback? onAddItemTap;
   final bool isGuest;
 
   @override
@@ -80,6 +82,7 @@ class HomeScreen extends StatelessWidget {
                               onSearchTap: onSearchTap,
                               onExpiringTap: onExpiringTap,
                               onInventoryTap: onInventoryTap,
+                              onAddItemTap: onAddItemTap,
                             ),
                         ],
                       ),
@@ -193,6 +196,7 @@ class _UserHomeContent extends StatefulWidget {
     required this.onSearchTap,
     required this.onExpiringTap,
     required this.onInventoryTap,
+    required this.onAddItemTap,
   });
 
   final ExpirySummaryController? expirySummaryController;
@@ -202,6 +206,7 @@ class _UserHomeContent extends StatefulWidget {
   final VoidCallback? onSearchTap;
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
+  final VoidCallback? onAddItemTap;
 
   @override
   State<_UserHomeContent> createState() => _UserHomeContentState();
@@ -410,9 +415,20 @@ class _UserHomeContentState extends State<_UserHomeContent> {
               'Inventory',
               style: TextStyle(fontSize: 29, fontWeight: FontWeight.w500),
             ),
-            Text(
-              '$total ${total == 1 ? 'item' : 'items'}',
-              style: const TextStyle(fontSize: 21),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$total ${total == 1 ? 'item' : 'items'}',
+                  style: const TextStyle(fontSize: 21),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: widget.onAddItemTap,
+                  tooltip: 'Add inventory item',
+                  icon: const Icon(Icons.add),
+                ),
+              ],
             ),
           ],
         ),
