@@ -1,0 +1,43 @@
+.body {
+  padding: 24px var(--sf-page-pad-x);
+}
+
+.card {
+  border: 1.2px solid var(--sf-border-card);
+  border-radius: var(--sf-radius-card);
+  background: var(--sf-surface);
+}
+
+.path {
+  font-family: var(--sf-font-mono);
+  font-size: var(--sf-text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* A crash can happen before the shell exists, so this page brings its own background. */
+.crashPage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 24px;
+  background: var(--sf-bg);
+}
+
+.crashPage .card {
+  width: 100%;
+  max-width: 560px;
+}
+
+.details {
+  margin-top: 12px;
+  font-size: var(--sf-text-sm);
+  color: var(--sf-text-muted);
+  text-align: left;
+}
+
+.details pre {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
