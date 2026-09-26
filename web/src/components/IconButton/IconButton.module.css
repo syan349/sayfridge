@@ -1,0 +1,37 @@
+.button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  height: 31px;
+  padding: 0;
+  border: 1px solid var(--sf-border-input);
+  border-radius: var(--sf-radius-md);
+  background: var(--sf-surface);
+  color: var(--sf-text-body);
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--sf-green-tint);
+  color: var(--sf-text);
+}
+
+.button svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* aria-disabled (not the disabled attribute): it still looks and reads as disabled,
+   but it can be focused and clicked, so the page can explain WHY it's disabled. */
+.button[aria-disabled='true'],
+.button:disabled {
+  border-color: var(--sf-divider);
+  background: var(--sf-surface);
+  color: var(--sf-text-faint);
+  cursor: not-allowed;
+}

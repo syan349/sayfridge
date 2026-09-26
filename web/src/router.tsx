@@ -10,6 +10,8 @@ import { ItemDetailsPage } from './pages/itemDetails/ItemDetailsPage'
 import { LoginPage } from './pages/LoginPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { SpacesPage } from './pages/spaces/SpacesPage'
+import { StockInPage } from './pages/stockIn/StockInPage'
 
 // Page names and issue numbers follow the design handoff (sub-issues of #14).
 const notBuilt = (page: string) => `Not built yet — ${page}.`
@@ -31,11 +33,10 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <DashboardPage /> },
           { path: 'inventory', element: <InventoryPage /> },
-          // "Add items" on the inventory page leads here; the real page is W06 (Day 6).
-          { path: 'inventory/new', element: <PlaceholderPage title="Add items" message={notBuilt('W06, issue #49')} /> },
+          { path: 'inventory/new', element: <StockInPage /> },
           { path: 'inventory/:id', element: <ItemDetailsPage /> },
           { path: 'expiry', element: <ExpiryPage /> },
-          { path: 'spaces', element: <PlaceholderPage title="Storage spaces" message={notBuilt('W04, issue #47')} /> },
+          { path: 'spaces', element: <SpacesPage /> },
           { path: 'assistant', element: <PlaceholderPage title="AI assistant" message={notBuilt('W07, issue #50')} /> },
           {
             path: 'conversations',
