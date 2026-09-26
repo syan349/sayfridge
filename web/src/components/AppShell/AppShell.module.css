@@ -1,0 +1,38 @@
+.shell {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  background: var(--sf-bg);
+}
+
+.main {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* <main> is only focused by the skip link; it is not a control, so no ring. */
+.main:focus {
+  outline: none;
+}
+
+/* Hidden until a keyboard user tabs to it. */
+.skipLink {
+  position: absolute;
+  top: -60px;
+  left: 12px;
+  z-index: 10;
+  padding: 10px 14px;
+  border-radius: var(--sf-radius-input);
+  background: var(--sf-green-600);
+  color: var(--sf-surface);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skipLink:focus {
+  top: 12px;
+  color: var(--sf-surface);
+}

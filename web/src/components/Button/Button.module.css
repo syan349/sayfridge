@@ -1,0 +1,39 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--sf-control-h);
+  padding: 0 15px;
+  border-radius: var(--sf-radius-input);
+  font-size: var(--sf-text-md);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.primary {
+  border: 0;
+  background: var(--sf-green-600);
+  color: var(--sf-surface);
+  font-weight: 600;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--sf-green-700);
+}
+
+.secondary {
+  border: 1px solid var(--sf-border-input);
+  background: var(--sf-surface);
+  color: var(--sf-text-body);
+  font-weight: 500;
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--sf-green-tint);
+}
