@@ -45,6 +45,14 @@
   background: var(--sf-green-tint);
 }
 
+/* A row with a problem: red background and a red bar on the left (not colour alone —
+   the row also shows the error message in words). */
+.invalidRow,
+.invalidRow:hover {
+  background: var(--sf-overdue-bg);
+  box-shadow: inset 3px 0 0 var(--sf-overdue);
+}
+
 .clickable {
   cursor: pointer;
 }

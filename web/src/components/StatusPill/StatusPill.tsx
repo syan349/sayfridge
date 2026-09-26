@@ -6,6 +6,9 @@ type Tone = 'fresh' | 'urgent' | 'soon' | 'overdue' | 'neutral' | 'info'
 const STATUSES: Record<string, { label: string; tone: Tone }> = {
   ADMIN: { label: 'Admin', tone: 'info' },
   USER: { label: 'User', tone: 'neutral' },
+  // Item definitions: shared by everyone, or created by this user.
+  PUBLIC: { label: 'Public', tone: 'neutral' },
+  PRIVATE: { label: 'Yours', tone: 'fresh' },
   IN_STOCK: { label: 'In stock', tone: 'fresh' },
   ACTIVE: { label: 'Active', tone: 'fresh' },
   EMPTY: { label: 'Empty', tone: 'neutral' },
