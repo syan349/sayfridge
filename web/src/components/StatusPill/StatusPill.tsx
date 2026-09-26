@@ -1,9 +1,11 @@
 import styles from './StatusPill.module.css'
 
-type Tone = 'fresh' | 'urgent' | 'soon' | 'overdue' | 'neutral'
+type Tone = 'fresh' | 'urgent' | 'soon' | 'overdue' | 'neutral' | 'info'
 
-// Every status the backend uses, with its label and colour (design handoff: StatusPill).
+// Every status (and account role) the backend uses, with its label and colour (design handoff: StatusPill).
 const STATUSES: Record<string, { label: string; tone: Tone }> = {
+  ADMIN: { label: 'Admin', tone: 'info' },
+  USER: { label: 'User', tone: 'neutral' },
   IN_STOCK: { label: 'In stock', tone: 'fresh' },
   ACTIVE: { label: 'Active', tone: 'fresh' },
   EMPTY: { label: 'Empty', tone: 'neutral' },
