@@ -6,6 +6,8 @@ import '../state/storage_space_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/inventory_visuals.dart';
+import '../widgets/business_forms.dart';
+import '../repositories/workspace_repository.dart';
 
 class StorageSpaceScreen extends StatelessWidget {
   const StorageSpaceScreen({
@@ -58,11 +60,7 @@ class StorageSpaceScreen extends StatelessWidget {
     return switch (controller.status) {
       StorageSpaceLoadStatus.initial || StorageSpaceLoadStatus.loading =>
         const Center(child: CircularProgressIndicator()),
-      StorageSpaceLoadStatus.empty => _Message(
-        title: 'No storage spaces yet',
-        message: 'Your storage spaces will appear here.',
-        onRetry: controller.loadStorageSpaces,
-      ),
+      StorageSpaceLoadStatus.empty => _buildLoadedContent(context),
       StorageSpaceLoadStatus.error => _Message(
         title: 'Unable to load storage spaces',
         message: controller.errorMessage ?? 'Please try again.',
@@ -97,15 +95,20 @@ class StorageSpaceScreen extends StatelessWidget {
                 count: _countFor(space),
                 icon: _iconFor(space.type),
                 onTap: onSelected == null ? null : () => onSelected!(space),
-                onEdit: () => _notConnected(context),
-                onDelete: () => _notConnected(context),
+                onEdit: () => _edit(context, space),
+                onDelete: () => _archive(context, space),
               ),
             ),
           const SizedBox(height: 32),
+          if (controller.workspace != null)
+            TextButton(
+              onPressed: () => _restore(context),
+              child: const Text('Restore an archived space'),
+            ),
           SizedBox(
             height: 53,
             child: FilledButton.icon(
-              onPressed: () => _notConnected(context),
+              onPressed: () => _edit(context),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.black,
@@ -180,6 +183,80 @@ class StorageSpaceScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _edit(BuildContext context, [StorageSpace? space]) async {
+    final workspace = controller.workspace;
+    if (workspace == null) {
+      _notConnected(context);
+      return;
+    }
+    await editSpace(
+      context,
+      workspace,
+      id: space?.id,
+      name: space?.name ?? '',
+      type: space?.type ?? 'FRIDGE',
+    );
+    if (!context.mounted) return;
+    await controller.loadStorageSpaces();
+  }
+
+  Future<void> _archive(BuildContext context, StorageSpace space) async {
+    final workspace = controller.workspace;
+    if (workspace == null) {
+      _notConnected(context);
+      return;
+    }
+    await businessForm(
+      context,
+      title: 'Archive ${space.name}?',
+      fields: const [],
+      explanation:
+          'This does not delete inventory. A space containing in-stock items cannot be archived.',
+      submit: (_) => workspace.spaceState(space.id, 'archive'),
+    );
+    if (!context.mounted) return;
+    await controller.loadStorageSpaces();
+  }
+
+  Future<void> _restore(BuildContext context) async {
+    final workspace = controller.workspace!;
+    try {
+      final spaces = await workspace.choices(
+        'storage-spaces',
+        status: 'ARCHIVED',
+      );
+      if (!context.mounted) return;
+      if (spaces.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No archived spaces.')));
+        return;
+      }
+      await businessForm(
+        context,
+        title: 'Restore storage space',
+        fields: [
+          BusinessField(
+            'id',
+            'Archived space',
+            validator: requiredValue,
+            options: {
+              for (final s in spaces) s['id'] as String: s['name'] as String,
+            },
+          ),
+        ],
+        submit: (values) => workspace.spaceState(values['id']!, 'restore'),
+      );
+      if (context.mounted) await controller.loadStorageSpaces();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(businessError(e))));
+      }
+    }
+  }
 }
 
 class _SpaceCard extends StatelessWidget {
@@ -247,8 +324,8 @@ class _SpaceCard extends StatelessWidget {
               if (onDelete != null)
                 IconButton(
                   onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Delete $label',
+                  icon: const Icon(Icons.archive_outlined),
+                  tooltip: 'Archive $label',
                 ),
               if (onEdit == null && onTap != null)
                 const Icon(Icons.chevron_right),

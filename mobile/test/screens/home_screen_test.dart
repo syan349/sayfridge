@@ -95,19 +95,14 @@ void main() {
     expect(find.text('Edit item'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Edit item'));
-    await tester.pumpAndSettle();
-    await tester.dragUntilVisible(
-      find.text('Save changes'),
-      find.byType(ListView).last,
-      const Offset(0, -200),
+    // This read-only fixture has no write repository. It must not pretend
+    // that offline edits were saved; the actual form is tested separately.
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Edit item'))
+          .onPressed,
+      isNull,
     );
-    await tester.pumpAndSettle();
-    expect(find.text('Save changes'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-
-    await tester.pageBack();
-    await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.pageBack();

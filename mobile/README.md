@@ -24,6 +24,35 @@ flutter test
 
 应用包名：`com.appix.sayfridge`。
 
+## 真实 API 入口与联调
+
+```bash
+flutter run -t lib/main.dart --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
+```
+
+- 默认地址适用于 Android 模拟器访问本机后端。云端/真机需替换为可达的后端地址（云端使用 HTTPS），保留 `/api/v1`；不要填写 GitHub 或 Neon 连接地址。改变构建参数后重新启动。
+- 保留注册/登录/当前用户、库存/空间查询、搜索与临期汇总；已增加空间创建/编辑/归档/恢复、私人物品定义创建、入库、元数据编辑/移动、ADD/CONSUME/RECONCILE、库存归档/丢弃与单件操作历史。
+- 新账号可从空间管理创建首个空间，从 Inventory Overview 的 Add inventory 入库。创建私有定义依赖后端已有有效公共分类。
+- 登录后的 AI Assistant 使用真实文本 Agent chat/resume/state，支持 SSE、逐项确认/补充/编辑/取消。精确操作可能直接执行，估算/新关联按后端要求确认。
+- Agent 最近会话及未确认请求按用户保存在安全存储，断线后先查询再使用同一请求身份重试；没有完整聊天历史列表接口。普通非幂等写入丢失响应后先关闭表单并重新核对数据，不能盲目重复入库。
+- 退出/换账号会重置业务列表与会话状态。没有自动刷新令牌；过期后重新登录。
+- **代码接线不等于云端已通**：共享数据库此前发现缺字段/回执表，模型 Key 及联调环境仍需后端准备。本轮没有对共享 Neon 写入、创建真实演示账号或部署。
+
+详细范围、文档差异、验证记录与端到端步骤见 [API 接入更新](../docs/API_INTEGRATION_2026-09-27.md)。
+
+## 离线登录后 UI 预览（仅 Debug）
+
+```bash
+flutter run --debug -t lib/main_preview.dart
+```
+
+- 独立入口默认打开 Demo User 的登录后 Profile，右上角持续显示 `UI PREVIEW · OFFLINE`。
+- 可检查 Home、AI Assistant、Profile 及其子页；语音 12 / 50 为示例，Home 默认有 8 件示例库存，包含 3 件临期商品及 Fridge / Freezer / Pantry 三个空间。日期相对本次启动当天生成。
+- 登录预览状态下，点击右上角 `UI PREVIEW · OFFLINE` 可切换 `Sample inventory (8 items)` / `Empty inventory`，会回到 Home 并重置筛选。库存列表、空间筛选、搜索、临期概览和商品详情均使用同一份离线数据；库存写入不提供模拟成功反馈。
+- 姓名、头像和提醒设置仅保存在本次运行的内存中。Log out 可切换游客状态，再点 Log in / Sign up → Enter preview 重新进入，无需密码。
+- 预览不读取或修改真实登录令牌和本机个人资料，不发起网络请求；邮件、密码修改和通知发送仍未接入。
+- 正常入口 `lib/main.dart` 未接入任何预览逻辑。回到真实登录版本运行 `flutter run -t lib/main.dart`。预览入口在 release/profile 构建中拒绝启动。
+
 ## Profile 页面
 
 - 游客和登录用户均可从 Home / AI Assistant 的底部导航进入 Profile。

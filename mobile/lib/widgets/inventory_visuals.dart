@@ -267,24 +267,36 @@ class OverviewHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 76,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
-          ),
-          Positioned(
-            left: 17,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back_ios_new, size: 23),
-              tooltip: 'Back',
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 76),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 8),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 48,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back_ios_new, size: 23),
+                tooltip: 'Back',
+              ),
             ),
-          ),
-        ],
+            Expanded(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            // Match the back button's width so the title stays page-centred.
+            const SizedBox(width: 48),
+          ],
+        ),
       ),
     );
   }

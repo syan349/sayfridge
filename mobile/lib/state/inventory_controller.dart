@@ -2,13 +2,15 @@ import 'package:flutter/foundation.dart';
 
 import '../models/inventory_item.dart';
 import '../repositories/inventory_repository.dart';
+import '../repositories/workspace_repository.dart';
 import '../services/api_exception.dart';
 import 'inventory_detail_controller.dart';
 
 enum InventoryLoadStatus { initial, loading, loaded, empty, error }
 
 class InventoryController extends ChangeNotifier {
-  InventoryController(this._repository);
+  InventoryController(this._repository, {this.workspace});
+  final WorkspaceRepository? workspace;
 
   final InventoryRepository _repository;
 
@@ -41,7 +43,28 @@ class InventoryController extends ChangeNotifier {
   String? get storageSpaceId => _storageSpaceId;
 
   InventoryDetailController createDetailController() {
-    return InventoryDetailController(_repository);
+    return InventoryDetailController(_repository, workspace: workspace);
+  }
+
+  void reset() {
+    ++_requestSequence;
+    _items = [];
+    _total = 0;
+    _page = 1;
+    _hasNextPage = false;
+    _query = '';
+    _inventoryStatus = 'IN_STOCK';
+    _storageSpaceId = _categoryId = null;
+    _purchaseFrom = _purchaseTo = _expiryFrom = _expiryTo = null;
+    _errorMessage = null;
+    _status = InventoryLoadStatus.initial;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    ++_requestSequence;
+    super.dispose();
   }
 
   Future<void> loadInventory({

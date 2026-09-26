@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
+import '../widgets/app_page_footer.dart';
 import '../widgets/assistant_widgets.dart';
 import 'camera_input_screen.dart';
 import 'conversation_history_screen.dart';
+import 'agent_conversation_screen.dart';
+import '../state/agent_controller.dart';
 
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({
@@ -13,6 +16,7 @@ class AiAssistantScreen extends StatefulWidget {
     this.onHomeTap,
     this.onProfileTap,
     this.onLoginTap,
+    this.agentController,
     super.key,
   });
 
@@ -20,6 +24,7 @@ class AiAssistantScreen extends StatefulWidget {
   final VoidCallback? onHomeTap;
   final VoidCallback? onProfileTap;
   final VoidCallback? onLoginTap;
+  final AgentController? agentController;
 
   @override
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
@@ -121,6 +126,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.isGuest && widget.agentController != null) {
+      return AgentConversationScreen(
+        controller: widget.agentController!,
+        onHomeTap: widget.onHomeTap,
+        onProfileTap: widget.onProfileTap,
+      );
+    }
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: AppBackground(
@@ -128,41 +140,63 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: Stack(
-                children: [
-                  Positioned.fill(child: _buildScrollableContent()),
-                  if (!widget.isGuest)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: 255,
-                      child: const IgnorePointer(child: _BottomListMask()),
+              child: widget.isGuest
+                  ? Column(
+                      children: [
+                        Expanded(child: _buildScrollableContent()),
+                        AppPageFooter(
+                          action: GuestLoginButton(
+                            onPressed:
+                                widget.onLoginTap ??
+                                () => Navigator.of(context).maybePop(),
+                          ),
+                          showLoginHint: true,
+                          selectedDestination:
+                              AppNavigationDestination.assistant,
+                          onHomeTap:
+                              widget.onHomeTap ??
+                              () => Navigator.of(context).maybePop(),
+                          onProfileTap: widget.onProfileTap,
+                        ),
+                      ],
+                    )
+                  : Stack(
+                      children: [
+                        Positioned.fill(child: _buildScrollableContent()),
+                        if (!widget.isGuest)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            height: 255,
+                            child: const IgnorePointer(
+                              child: _BottomListMask(),
+                            ),
+                          ),
+                        if (!widget.isGuest)
+                          Positioned(
+                            left: 22,
+                            right: 22,
+                            bottom: 116,
+                            child: AssistantComposer(
+                              controller: _messageController,
+                              onPhotoPressed: _openCamera,
+                              onSendPressed: _showExpiryResults,
+                            ),
+                          ),
+                        Positioned(
+                          left: 35,
+                          right: 35,
+                          bottom: 4,
+                          child: AppBottomNavigation(
+                            onHomeTap:
+                                widget.onHomeTap ??
+                                () => Navigator.of(context).maybePop(),
+                            onProfileTap: widget.onProfileTap,
+                          ),
+                        ),
+                      ],
                     ),
-                  if (!widget.isGuest)
-                    Positioned(
-                      left: 22,
-                      right: 22,
-                      bottom: 116,
-                      child: AssistantComposer(
-                        controller: _messageController,
-                        onPhotoPressed: _openCamera,
-                        onSendPressed: _showExpiryResults,
-                      ),
-                    ),
-                  Positioned(
-                    left: 35,
-                    right: 35,
-                    bottom: 4,
-                    child: AppBottomNavigation(
-                      onHomeTap:
-                          widget.onHomeTap ??
-                          () => Navigator.of(context).maybePop(),
-                      onProfileTap: widget.onProfileTap,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
@@ -173,7 +207,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget _buildScrollableContent() {
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.fromLTRB(25, 27, 25, widget.isGuest ? 112 : 238),
+      padding: EdgeInsets.fromLTRB(25, 27, 25, widget.isGuest ? 0 : 238),
       children: [
         AssistantHeader(
           onNewConversation: _startNewConversation,
@@ -333,33 +367,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 style: TextStyle(color: Color(0xFF666666), fontSize: 15),
               ),
               SizedBox(height: 18),
-              UserMessageBubble(message: 'I bought 1 kg of  tomatoes.'),
+              UserMessageBubble(
+                message: 'I bought 1 kg of tomatoes.',
+                textStyle: exampleMessageStyle,
+              ),
               SizedBox(height: 17),
               _GuestAssistantReply(),
               SizedBox(height: 18),
               InventoryItemCard(item: sampleItem, compact: true),
             ],
-          ),
-        ),
-        const SizedBox(height: 32),
-        const Text(
-          'Log in to start your own inventory.',
-          style: TextStyle(color: AppColors.muted, fontSize: 17),
-        ),
-        const SizedBox(height: 18),
-        SizedBox(
-          width: double.infinity,
-          height: 58,
-          child: FilledButton(
-            onPressed:
-                widget.onLoginTap ?? () => Navigator.of(context).maybePop(),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.text,
-              shape: const StadiumBorder(),
-              textStyle: const TextStyle(fontSize: 20),
-            ),
-            child: const Text('Log in / Sign up'),
           ),
         ),
       ],
@@ -410,21 +426,10 @@ class _GuestAssistantReply extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 11),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.primarySoft,
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: const FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'I’ll organise that for you.',
-                style: TextStyle(fontSize: 16),
-              ),
-            ),
+        const Flexible(
+          child: AssistantMessageBubble(
+            message: 'I’ll organise that for you.',
+            textStyle: exampleMessageStyle,
           ),
         ),
       ],

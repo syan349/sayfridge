@@ -7,6 +7,7 @@ import '../state/profile_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
+import '../widgets/app_page_footer.dart';
 import '../widgets/profile_widgets.dart';
 import 'password_reset_screen.dart';
 import 'personal_information_screen.dart';
@@ -60,7 +61,6 @@ class ProfileScreen extends StatelessWidget {
       return Scaffold(
         body: AppBackground(
           child: SafeArea(
-            bottom: false,
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
@@ -127,7 +127,6 @@ class ProfileScreen extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  const Spacer(),
                                   const SizedBox(height: 15),
                                   if (!isGuest && profileController.isLoading)
                                     const LinearProgressIndicator(minHeight: 2),
@@ -173,8 +172,7 @@ class ProfileScreen extends StatelessWidget {
                                       ),
                                     ],
                                   ),
-                                  const Spacer(),
-                                  const SizedBox(height: 28),
+                                  const SizedBox(height: 20),
                                   _MenuSection(
                                     title: 'Preferences',
                                     children: [
@@ -219,12 +217,16 @@ class ProfileScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(26, 24, 26, 22),
-                      child: isGuest
-                          ? ProfileActionButton(
+                    AppPageFooter(
+                      selectedDestination: AppNavigationDestination.profile,
+                      navigationKey: const Key('profile-navigation'),
+                      onHomeTap: () => Navigator.of(
+                        context,
+                      ).popUntil((route) => route.isFirst),
+                      onAssistantTap: onAssistantTap,
+                      action: isGuest
+                          ? GuestLoginButton(
                               key: const Key('profile-login'),
-                              label: 'Log in / Sign up',
                               onPressed: onLoginTap,
                             )
                           : SizedBox(
@@ -253,39 +255,6 @@ class ProfileScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-                    ),
-                    Padding(
-                      // The reference pill sits just above the gesture area.
-                      // Keep the action and its 22px gap outside the scroll view.
-                      padding: EdgeInsets.fromLTRB(
-                        43,
-                        0,
-                        43,
-                        MediaQuery.paddingOf(
-                          context,
-                        ).bottom.clamp(20.0, double.infinity),
-                      ),
-                      child: SizedBox(
-                        key: const Key('profile-navigation'),
-                        height: 78,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) => FittedBox(
-                            fit: BoxFit.contain,
-                            child: SizedBox(
-                              // Preserve the reference navigation's proportions.
-                              width: constraints.maxWidth * 86 / 78,
-                              child: AppBottomNavigation(
-                                selectedDestination:
-                                    AppNavigationDestination.profile,
-                                onHomeTap: () => Navigator.of(
-                                  context,
-                                ).popUntil((route) => route.isFirst),
-                                onAssistantTap: onAssistantTap,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                     ),
                   ],
                 ),

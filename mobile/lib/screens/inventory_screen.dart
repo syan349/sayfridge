@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/inventory_visuals.dart';
 import 'inventory_detail_screen.dart';
+import 'stock_editor_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({
@@ -38,6 +39,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
               child: Column(
                 children: [
                   const OverviewHeader(title: 'Inventory Overview'),
+                  if (widget.controller.workspace != null)
+                    TextButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add inventory'),
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<bool>(
+                            builder: (_) => StockEditorScreen(
+                              workspace: widget.controller.workspace!,
+                            ),
+                          ),
+                        );
+                        if (!mounted) return;
+                        await widget.controller.reload();
+                        await widget.storageSpaceController
+                            ?.loadStorageSpaces();
+                      },
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(25, 8, 25, 13),
                     child: Row(

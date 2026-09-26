@@ -26,6 +26,26 @@ class ExpirySummaryController extends ChangeNotifier {
   String? _bucket;
   int _requestSequence = 0;
 
+  void reset() {
+    ++_requestSequence;
+    _items = [];
+    _counts = const ExpiryCounts(overdue: 0, today: 0, upcoming: 0);
+    _total = 0;
+    _page = 1;
+    _hasNextPage = false;
+    _asOf = null;
+    _storageSpaceId = _categoryId = _bucket = null;
+    _errorMessage = null;
+    _status = ExpirySummaryLoadStatus.initial;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    ++_requestSequence;
+    super.dispose();
+  }
+
   ExpirySummaryLoadStatus get status => _status;
   ExpiryCounts get counts => _counts;
   List<ExpirySummaryItem> get items => _items;

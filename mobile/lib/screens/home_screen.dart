@@ -9,6 +9,7 @@ import '../state/storage_space_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
+import '../widgets/app_page_footer.dart';
 import '../widgets/inventory_visuals.dart';
 import 'expiring_items_screen.dart';
 import 'inventory_detail_screen.dart';
@@ -51,44 +52,68 @@ class HomeScreen extends StatelessWidget {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(26, 30, 26, 120),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const _Greeting(),
-                          SizedBox(height: isGuest ? 14 : 19),
-                          if (isGuest)
-                            _GuestHomeContent(onLoginTap: onLoginTap)
-                          else
-                            _UserHomeContent(
-                              expirySummaryController: expirySummaryController,
-                              inventoryController: inventoryController,
-                              storageSpaceController: storageSpaceController,
-                              onStorageSpacesTap: onStorageSpacesTap,
-                              onSearchTap: onSearchTap,
-                              onExpiringTap: onExpiringTap,
-                              onInventoryTap: onInventoryTap,
+              child: isGuest
+                  ? Column(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(26, 30, 26, 0),
+                            child: const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _Greeting(),
+                                SizedBox(height: 14),
+                                _GuestHomeContent(),
+                              ],
                             ),
-                        ],
-                      ),
+                          ),
+                        ),
+                        AppPageFooter(
+                          action: GuestLoginButton(onPressed: onLoginTap),
+                          showLoginHint: true,
+                          selectedDestination: AppNavigationDestination.home,
+                          onAssistantTap: onAssistantTap,
+                          onProfileTap: onProfileTap,
+                        ),
+                      ],
+                    )
+                  : Stack(
+                      children: [
+                        Positioned.fill(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(26, 30, 26, 120),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Greeting(),
+                                const SizedBox(height: 19),
+                                _UserHomeContent(
+                                  expirySummaryController:
+                                      expirySummaryController,
+                                  inventoryController: inventoryController,
+                                  storageSpaceController:
+                                      storageSpaceController,
+                                  onStorageSpacesTap: onStorageSpacesTap,
+                                  onSearchTap: onSearchTap,
+                                  onExpiringTap: onExpiringTap,
+                                  onInventoryTap: onInventoryTap,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 35,
+                          right: 35,
+                          bottom: 4,
+                          child: AppBottomNavigation(
+                            selectedDestination: AppNavigationDestination.home,
+                            onAssistantTap: onAssistantTap,
+                            onProfileTap: onProfileTap,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Positioned(
-                    left: 35,
-                    right: 35,
-                    bottom: 4,
-                    child: AppBottomNavigation(
-                      selectedDestination: AppNavigationDestination.home,
-                      onAssistantTap: onAssistantTap,
-                      onProfileTap: onProfileTap,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
@@ -123,9 +148,7 @@ class _Greeting extends StatelessWidget {
 }
 
 class _GuestHomeContent extends StatelessWidget {
-  const _GuestHomeContent({required this.onLoginTap});
-
-  final VoidCallback? onLoginTap;
+  const _GuestHomeContent();
 
   @override
   Widget build(BuildContext context) {
@@ -199,24 +222,6 @@ class _GuestHomeContent extends StatelessWidget {
         ),
         const SizedBox(height: 17),
         const _GreenDivider(),
-        const SizedBox(height: 14),
-        const Text(
-          'Log in to start your own inventory.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 15, color: AppColors.muted),
-        ),
-        const SizedBox(height: 17),
-        SizedBox(
-          height: 52,
-          child: FilledButton(
-            onPressed: onLoginTap,
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text(
-              'Log in / Sign up',
-              style: TextStyle(fontSize: 18, color: Colors.black),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -348,10 +353,12 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           builder: (context, child) => _buildInventorySummary(),
         ),
         const SizedBox(height: 23),
-        _GreenAction(
-          label: 'View all items',
-          onPressed: _openInventory,
-          width: 238,
+        Center(
+          child: _GreenAction(
+            label: 'View all items',
+            onPressed: _openInventory,
+            width: 238,
+          ),
         ),
       ],
     );
@@ -827,22 +834,25 @@ class _EmptyExpiry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Image.asset(HomeAssets.noExpiry, width: 105, height: 105),
-        const SizedBox(height: 9),
-        const Text(
-          'No items expiring soon',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 9),
-        const Text(
-          'Nothing is due to expire\nin the next 3 days',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 15, color: AppColors.muted),
-        ),
-      ],
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          Image.asset(HomeAssets.noExpiry, width: 105, height: 105),
+          const SizedBox(height: 9),
+          const Text(
+            'No items expiring soon',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 9),
+          const Text(
+            'Nothing is due to expire\nin the next 3 days',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, color: AppColors.muted),
+          ),
+        ],
+      ),
     );
   }
 }

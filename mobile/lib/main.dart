@@ -3,6 +3,8 @@ import 'auth/auth_dependencies.dart';
 import 'auth/auth_gate.dart';
 import 'repositories/storage_space_repository.dart';
 import 'repositories/inventory_repository.dart';
+import 'repositories/workspace_repository.dart';
+import 'state/agent_controller.dart';
 import 'screens/ai_assistant_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/profile_screen.dart';
@@ -33,6 +35,10 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
   late final StorageSpaceController _storageSpaceController;
   late final InventoryController _inventoryController;
   late final ExpirySummaryController _expirySummaryController;
+  late final WorkspaceRepository _workspace;
+  late final AgentController _agentController;
+  final _navigator = GlobalKey<NavigatorState>();
+  String? _sessionUser;
 
   @override
   void initState() {
@@ -40,6 +46,11 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
 
     _authDependencies = AuthDependencies.create();
     _profileController = ProfileController(_authDependencies.authController);
+    _workspace = WorkspaceRepository(
+      _authDependencies.apiClient,
+      _authDependencies.tokenStorage,
+      onChanged: _refreshBusiness,
+    );
 
     final storageSpaceApiService = StorageSpaceApiService(
       _authDependencies.apiClient,
@@ -49,7 +60,10 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       _authDependencies.tokenStorage,
     );
 
-    _storageSpaceController = StorageSpaceController(storageSpaceRepository);
+    _storageSpaceController = StorageSpaceController(
+      storageSpaceRepository,
+      workspace: _workspace,
+    );
 
     final inventoryApiService = InventoryApiService(
       _authDependencies.apiClient,
@@ -59,12 +73,50 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       _authDependencies.tokenStorage,
     );
 
-    _inventoryController = InventoryController(inventoryRepository);
+    _inventoryController = InventoryController(
+      inventoryRepository,
+      workspace: _workspace,
+    );
     _expirySummaryController = ExpirySummaryController(inventoryRepository);
+    _agentController = AgentController(
+      _workspace,
+      onInventoryChanged: _refreshBusiness,
+    );
+    _authDependencies.authController.addListener(_syncSession);
+  }
+
+  void _syncSession() {
+    final auth = _authDependencies.authController;
+    final nextUser = auth.isAuthenticated ? auth.user?.id : null;
+    if (nextUser == _sessionUser) return;
+    final previousUser = _sessionUser;
+    _sessionUser = nextUser;
+    _inventoryController.reset();
+    _storageSpaceController.reset();
+    _expirySummaryController.reset();
+    _agentController.bindUser(nextUser);
+    if (previousUser != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _navigator.currentState?.popUntil((route) => route.isFirst);
+        }
+      });
+    }
+  }
+
+  Future<void> _refreshBusiness() async {
+    if (!_authDependencies.authController.isAuthenticated) return;
+    await Future.wait([
+      _inventoryController.reload(),
+      _storageSpaceController.loadStorageSpaces(),
+      _expirySummaryController.reload(),
+    ]);
   }
 
   @override
   void dispose() {
+    _authDependencies.authController.removeListener(_syncSession);
+    _agentController.dispose();
     _expirySummaryController.dispose();
     _inventoryController.dispose();
     _storageSpaceController.dispose();
@@ -94,6 +146,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       MaterialPageRoute<void>(
         builder: (assistantContext) => AiAssistantScreen(
           isGuest: isGuest,
+          agentController: _agentController,
           onHomeTap: () =>
               Navigator.of(assistantContext).popUntil((route) => route.isFirst),
           onProfileTap: () => _openProfile(assistantContext, authController),
@@ -131,6 +184,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigator,
       title: 'SayFridge',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
@@ -152,6 +206,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
         },
         authenticatedBuilder: (context, authController) {
           return HomeScreen(
+            key: ValueKey(authController.user!.id),
             expirySummaryController: _expirySummaryController,
             inventoryController: _inventoryController,
             storageSpaceController: _storageSpaceController,
