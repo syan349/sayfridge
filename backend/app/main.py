@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes.auth import router as auth_router
@@ -20,6 +21,7 @@ from app.api.routes.admin import router as admin_router, admin_error_handler
 from app.services.admin import AdminError
 from app.agents.persistence import close_agent_resources
 from app.api.routes.agent import router as agent_router
+from app.core.config import get_settings
 
 
 @asynccontextmanager
@@ -31,6 +33,13 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="SayFridge Backend", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+)
 app.include_router(auth_router)
 app.include_router(storage_spaces_router)
 app.include_router(catalog_router)
