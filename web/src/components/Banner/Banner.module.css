@@ -1,0 +1,60 @@
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 1.2px solid;
+  border-radius: var(--sf-radius-lg);
+  font-size: var(--sf-text-sm);
+  line-height: 1.45;
+}
+
+.icon {
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.body {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 2px;
+  font-size: var(--sf-text-md);
+  font-weight: 600;
+}
+
+.text p {
+  margin: 0;
+}
+
+.action {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.info {
+  border-color: var(--sf-border-strong);
+  background: var(--sf-green-soft);
+  color: var(--sf-green-800);
+}
+
+.estimate {
+  border-color: var(--sf-estimated-border);
+  background: var(--sf-estimated-bg);
+  color: var(--sf-estimated-text);
+}
+
+.warning {
+  border-color: var(--sf-urgent-border);
+  background: var(--sf-urgent-bg);
+  color: var(--sf-urgent);
+}
+
+.danger {
+  border-color: var(--sf-overdue-border);
+  background: var(--sf-overdue-bg);
+  color: var(--sf-overdue);
+}
