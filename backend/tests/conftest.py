@@ -17,6 +17,7 @@ os.environ["DATABASE_URL_DIRECT"] = (
 )
 os.environ["JWT_SECRET_KEY"] = "s" * 40
 os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "15"
+os.environ["CORS_ORIGINS"] = '["http://localhost:5173"]'
 
 
 # Database tests require an explicit, separate test connection; never fall back to the application .env.

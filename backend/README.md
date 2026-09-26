@@ -68,6 +68,20 @@ Once the server starts, the following endpoints are available:
 
 Authentication supports local email/password accounts and short-lived Bearer access tokens. Refresh tokens, server-side sessions, logout, third-party login, email verification, password recovery, and MFA are not currently available.
 
+## Web browser access (CORS)
+
+Set `CORS_ORIGINS` to the exact browser origins allowed to call the API. The value
+is a JSON list; the local template allows Vite at `http://localhost:5173`:
+
+```dotenv
+CORS_ORIGINS=["http://localhost:5173"]
+```
+
+The backend permits browser requests using `GET`, `POST`, `PATCH`, and `OPTIONS`
+with the `Authorization`, `Content-Type`, and `Idempotency-Key` headers. It uses
+Bearer tokens without cookie credentials. Wildcards, URL paths, and unlisted
+origins are rejected; add the deployed Web origin explicitly in its environment.
+
 ## Development database setup
 
 Copy `.env.example` to `.env` and enter real connection details only in the local file:
