@@ -31,3 +31,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Looks like the plain name until hovered, so the table stays calm. */
+.link {
+  color: var(--sf-text);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--sf-green-700);
+  text-decoration: underline;
+}
