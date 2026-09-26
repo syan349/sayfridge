@@ -1,0 +1,195 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px var(--sf-page-pad-x) 24px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  align-items: start;
+  gap: 16px;
+}
+
+/* Below this width the table gets too narrow: the open conversation moves under it. */
+@media (max-width: 1360px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- Table ---------- */
+
+.titleCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.inputTile {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--sf-radius-md);
+  background: var(--sf-neutral-bg);
+}
+
+.titleText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.titleButton {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--sf-text-md);
+  font-weight: 600;
+  color: var(--sf-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.titleButton:hover {
+  color: var(--sf-green-700);
+  text-decoration: underline;
+}
+
+.titleButton[aria-current='true'] {
+  color: var(--sf-green-700);
+}
+
+.quote {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--sf-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.count {
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--sf-radius-sm);
+  font-size: var(--sf-text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.saved {
+  border-color: var(--sf-fresh-border);
+  background: var(--sf-fresh-bg);
+  color: var(--sf-fresh);
+}
+
+.pending {
+  border-color: var(--sf-soon-border);
+  background: var(--sf-soon-bg);
+  color: var(--sf-soon);
+}
+
+.none {
+  font-size: var(--sf-text-sm);
+  color: var(--sf-text-muted);
+}
+
+/* ---------- The selected conversation ---------- */
+
+.detail {
+  padding: 18px 20px;
+  border: 1.2px solid var(--sf-border-card);
+  border-radius: var(--sf-radius-card);
+  background: var(--sf-surface);
+}
+
+.detailHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detailHead img {
+  border-radius: 50%;
+}
+
+.detailTitle {
+  margin: 0;
+  font-family: var(--sf-font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.meta {
+  margin: 6px 0 16px;
+  font-size: var(--sf-text-sm);
+  color: var(--sf-text-muted);
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.operations {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1.2px solid var(--sf-border-strong);
+  border-radius: var(--sf-radius-lg);
+}
+
+.operationsTitle {
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--sf-divider);
+  background: var(--sf-green-wash);
+  font-size: var(--sf-text-sm);
+  font-weight: 600;
+  color: var(--sf-green-800);
+}
+
+.operationList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--sf-divider-row);
+}
+
+.operation:last-child {
+  border-bottom: 0;
+}
+
+.operationItem {
+  flex-grow: 1;
+  font-size: var(--sf-text-md);
+}
+
+.change {
+  font-family: var(--sf-font-mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.estimated {
+  color: var(--sf-estimated-text);
+}
