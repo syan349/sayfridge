@@ -41,12 +41,24 @@ npm test           # Vitest + Testing Library; the API is mocked with MSW
 There is no UI component library: components live in `src/components/`, styled
 with CSS Modules and the design tokens in `src/styles/tokens.css`.
 
-## Sign-in
+## Sign-in and accounts
 
-`POST /auth/login` returns a bearer token. It is kept in memory and in
-`sessionStorage` (so a reload keeps you signed in; closing the tab signs you
-out) and expires after `expires_in` seconds — the backend has no refresh
-tokens. Any `401` from an authenticated request signs the user out.
+- **Sign in** (`/login`, W01): `POST /auth/login` returns a bearer token. It is
+  kept in memory and in `sessionStorage` (so a reload keeps you signed in;
+  closing the tab signs you out) and expires after `expires_in` seconds — the
+  backend has no refresh tokens. Any `401` from an authenticated request signs
+  the user out.
+- **Create account** (`/register`, W02): `POST /auth/register` with **email and
+  password only**, then an automatic sign-in. By team decision (26 Sep) there is
+  no display name or avatar: the app shows the account by its email, and
+  everyone gets the default avatar.
+- **Log out** (sidebar): forgets the token in the browser. The backend has no
+  logout endpoint, so the token itself stays valid until it expires.
+- **Continue as guest** (`/guest`): a placeholder only — the backend has no guest
+  access yet.
+- Left out of W01 for now: "Forgot password?" (the backend has no password
+  reset) and "Keep me signed in" (tokens last 15 minutes and there are no
+  refresh tokens, so there is nothing to keep).
 
 ## Assets
 
