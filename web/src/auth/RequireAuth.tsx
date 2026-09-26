@@ -1,12 +1,13 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import type { UserRole } from '../api/types'
 import { Button } from '../components/Button/Button'
+import { NoPermissionPage } from '../pages/status/NoPermissionPage'
 import { useAuth } from './AuthContext'
 import type { LoginLocationState } from './loginState'
 import styles from './RequireAuth.module.css'
 
 interface RequireAuthProps {
-  /** Also require this role, e.g. 'ADMIN'. Others are sent to the dashboard. */
+  /** Also require this role, e.g. 'ADMIN'. Others see a "no permission" page. */
   role?: UserRole
 }
 
@@ -48,7 +49,8 @@ export function RequireAuth({ role }: RequireAuthProps) {
   }
 
   if (role && user.role !== role) {
-    return <Navigate to="/" replace />
+    // Say why, instead of silently jumping to another page.
+    return <NoPermissionPage />
   }
 
   return <Outlet />

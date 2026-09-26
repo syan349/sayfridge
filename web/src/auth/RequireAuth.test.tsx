@@ -24,12 +24,14 @@ describe('RequireAuth (route guard)', () => {
     expect(router.state.location.pathname).toBe('/inventory')
   })
 
-  it('keeps ordinary users out of admin pages', async () => {
+  it('keeps ordinary users out of admin pages, and says why', async () => {
     signInAs(testUser)
     const { router } = renderApp('/admin/accounts')
 
-    expect(await screen.findByRole('heading', { level: 1, name: DASHBOARD_HEADING })).toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/')
+    expect(await screen.findByRole('heading', { level: 1, name: 'No permission' })).toBeInTheDocument()
+    expect(screen.getByText('You don’t have permission to see this page.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Accounts' })).not.toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/admin/accounts')
   })
 
   it('lets administrators open admin pages', async () => {
