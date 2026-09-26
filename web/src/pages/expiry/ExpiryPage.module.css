@@ -1,0 +1,107 @@
+/* ---------- Tiles under the header ---------- */
+
+.tileBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 16px var(--sf-page-pad-x);
+  border-bottom: 1px solid var(--sf-divider);
+  background: var(--sf-surface);
+}
+
+.tiles {
+  display: flex;
+  gap: 12px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 124px;
+  padding: 12px 16px;
+  border: 1.2px solid;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tileValue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--sf-font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tileLabel {
+  font-size: 12.5px;
+  color: var(--sf-text-body);
+}
+
+.overdue {
+  border-color: var(--sf-overdue-border);
+  background: var(--sf-overdue-bg);
+  color: var(--sf-overdue);
+}
+
+.today {
+  border-color: var(--sf-urgent-border);
+  background: var(--sf-urgent-bg);
+  color: var(--sf-urgent);
+}
+
+.upcoming {
+  border-color: var(--sf-soon-border);
+  background: var(--sf-soon-bg);
+  color: var(--sf-soon);
+}
+
+/* The chosen tile gets a thick outline in its own colour (not colour alone: aria-pressed tells screen readers). */
+.tile[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.tileHint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--sf-text-muted);
+}
+
+/* ---------- Table ---------- */
+
+.content {
+  padding: 15px var(--sf-page-pad-x) 24px;
+}
+
+.notice {
+  margin-bottom: 15px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.stateBox p {
+  margin: 0;
+}
+
+.stateTitle {
+  font-family: var(--sf-font-display);
+  font-size: var(--sf-text-lg);
+  font-weight: 600;
+  color: var(--sf-text);
+}
