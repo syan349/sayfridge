@@ -56,6 +56,14 @@
   --sf-info: #37536B;     --sf-info-bg: #EDF2F7;     --sf-info-border: #CFDBE6;    /* RECONCILE tag, ADMIN role */
   --sf-neutral: #575757;  --sf-neutral-bg: #F2F2F0;  --sf-neutral-border: #E0E0DA; /* UNDONE, DISABLED, ARCHIVED */
 
+  /* ---------- Auth brand panel (W01/W02, on --sf-green-800) ---------- */
+  /* Contrast against the panel in brackets. */
+  --sf-panel-text-strong: #D9EBC5; /* list items, links, step numbers (7.4:1) */
+  --sf-panel-text: #C2DDA3;        /* lead paragraph (6.3:1) */
+  --sf-panel-text-muted: #9DC079;  /* footer line, step hints (4.6:1) — the design's #9BBE77 was 4.49:1 */
+  --sf-panel-line: #426E22;        /* divider, badge backgrounds */
+  --sf-panel-accent: #B5DC8E;      /* check marks (icon, 3.9:1 on the badge) */
+
   /* ---------- Typography ---------- */
   --sf-font-display: 'Outfit', system-ui, sans-serif;        /* page titles, card titles, big numbers */
   --sf-font-body: 'IBM Plex Sans', system-ui, sans-serif;     /* everything else */

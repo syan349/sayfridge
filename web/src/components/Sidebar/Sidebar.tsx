@@ -11,8 +11,6 @@ export type NavKey =
   | 'conversations'
   | 'settings'
   | 'accounts'
-  | 'tasks'
-  | 'audit'
 
 interface NavItem {
   key: NavKey
@@ -35,10 +33,9 @@ const HOUSEHOLD: NavItem[] = [
   { key: 'settings', to: '/settings', label: 'Profile & settings', icon: icon('profile') },
 ]
 
+// Task ledger (W12) and Operation audit (W13) are left out for now (team decision, 26 Sep).
 const ADMINISTRATION: NavItem[] = [
   { key: 'accounts', to: '/admin/accounts', label: 'Accounts', icon: icon('profile') },
-  { key: 'tasks', to: '/admin/tasks', label: 'Task ledger', icon: icon('update') },
-  { key: 'audit', to: '/admin/audit', label: 'Operation audit', icon: icon('history') },
 ]
 
 export interface SidebarProps {
@@ -46,7 +43,7 @@ export interface SidebarProps {
   isAdmin: boolean
   /** Optional number shown at the right of an item, e.g. { inventory: 16 }. */
   counts?: Partial<Record<NavKey, number>>
-  /** Optional card pinned to the bottom (e.g. the voice quota on W03/W07). */
+  /** Optional card pinned to the bottom (the signed-in account and Log out). */
   footer?: ReactNode
 }
 

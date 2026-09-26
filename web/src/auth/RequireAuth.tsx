@@ -2,6 +2,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import type { UserRole } from '../api/types'
 import { Button } from '../components/Button/Button'
 import { useAuth } from './AuthContext'
+import type { LoginLocationState } from './loginState'
 import styles from './RequireAuth.module.css'
 
 interface RequireAuthProps {
@@ -42,7 +43,8 @@ export function RequireAuth({ role }: RequireAuthProps) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+    const state: LoginLocationState = { from: location.pathname + location.search }
+    return <Navigate to="/login" replace state={state} />
   }
 
   if (role && user.role !== role) {

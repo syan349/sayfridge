@@ -1,0 +1,124 @@
+.layout {
+  display: flex;
+  min-height: 100%;
+}
+
+/* ---------- Green brand panel ---------- */
+
+.panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--sf-green-800);
+  color: var(--sf-panel-text-strong);
+}
+
+.wide {
+  width: 580px;
+  padding: 54px 54px 46px;
+}
+
+.narrow {
+  width: 500px;
+  padding: 50px 46px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.brandMark {
+  border-radius: 50%;
+}
+
+.brandName {
+  font-family: var(--sf-font-display);
+  font-size: var(--sf-text-xl);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--sf-surface);
+}
+
+.intro {
+  margin-top: 84px;
+}
+
+.narrow .intro {
+  margin-top: 70px;
+}
+
+.headline {
+  margin: 0 0 18px;
+  font-family: var(--sf-font-display);
+  font-size: 42px;
+  font-weight: 600;
+  line-height: 1.14;
+  letter-spacing: -0.028em;
+  color: var(--sf-surface);
+}
+
+.narrow .headline {
+  margin-bottom: 16px;
+  font-size: 36px;
+}
+
+.lead {
+  max-width: 400px;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--sf-panel-text);
+}
+
+.panelFooter {
+  margin-top: auto;
+  padding-top: 32px;
+  border-top: 1px solid var(--sf-panel-line);
+  font-size: 13px;
+  color: var(--sf-panel-text-muted);
+}
+
+.panelFooter a {
+  color: var(--sf-panel-text-strong);
+  font-weight: 600;
+}
+
+.panelFooter a:hover {
+  color: var(--sf-surface);
+}
+
+/* The global focus ring is green-on-green here; use a light ring on the panel. */
+.panel :focus-visible {
+  outline-color: var(--sf-panel-text-strong);
+}
+
+/* ---------- Form column ---------- */
+
+.formColumn {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 46px;
+}
+
+/* W02: the wider form starts at the left of its column, as in the design. */
+.formColumnStart {
+  align-items: flex-start;
+  padding: 40px 64px;
+}
+
+/* Narrow windows: hide the panel so the form keeps its width. */
+@media (max-width: 960px) {
+  .panel {
+    display: none;
+  }
+
+  .formColumn {
+    padding: 32px 20px;
+  }
+}

@@ -1,0 +1,60 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1.2px solid var(--sf-border-card);
+  border-radius: 14px;
+  background: var(--sf-green-tint);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.avatar {
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--sf-text);
+}
+
+.role {
+  padding: 1px 6px;
+  border: 1px solid var(--sf-info-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--sf-info-bg);
+  color: var(--sf-info);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.email {
+  overflow: hidden;
+  font-size: var(--sf-text-sm);
+  color: var(--sf-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logout {
+  width: 100%;
+}

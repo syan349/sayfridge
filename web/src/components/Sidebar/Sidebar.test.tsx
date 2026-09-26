@@ -51,10 +51,9 @@ describe('Sidebar', () => {
   it('shows the administration menu to administrators', () => {
     renderSidebar({ isAdmin: true })
 
+    // Only Accounts: the task ledger and audit pages are left out for now.
     expect(linkTargets(screen.getByRole('list', { name: 'Administration' }))).toEqual([
       ['Accounts', '/admin/accounts'],
-      ['Task ledger', '/admin/tasks'],
-      ['Operation audit', '/admin/audit'],
     ])
   })
 

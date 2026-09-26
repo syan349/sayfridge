@@ -1,0 +1,80 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.label {
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.control {
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--sf-border-input);
+  border-radius: var(--sf-radius-input);
+  background: var(--sf-surface);
+  color: var(--sf-text);
+  font-size: var(--sf-text-lg);
+}
+
+.input::placeholder {
+  color: var(--sf-text-faint);
+}
+
+/* Room for the button inside the right edge. */
+.withTrailing {
+  padding-right: 48px;
+}
+
+/* The design's focus look: a 1.5px green border instead of the default ring. */
+.input:focus-visible {
+  outline: none;
+  border-color: var(--sf-green-400);
+  box-shadow: 0 0 0 0.5px var(--sf-green-400);
+}
+
+.invalid,
+.invalid:focus-visible {
+  border-color: var(--sf-overdue);
+  box-shadow: 0 0 0 0.5px var(--sf-overdue);
+}
+
+.trailing {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.hint,
+.error {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.hint {
+  color: var(--sf-text-muted);
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: var(--sf-overdue);
+}
+
+.errorIcon {
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
