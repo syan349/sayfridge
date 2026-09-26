@@ -1,0 +1,78 @@
+.dialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: 0;
+  border: 1.2px solid var(--sf-border-card);
+  border-radius: var(--sf-radius-card);
+  background: var(--sf-surface);
+  color: var(--sf-text);
+  box-shadow: 0 12px 40px rgba(17, 17, 17, 0.18);
+}
+
+/* The dimmed page behind the dialog. */
+.dialog::backdrop {
+  background: rgba(17, 17, 17, 0.35);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px 0;
+}
+
+.title {
+  flex-grow: 1;
+  margin: 0;
+  font-family: var(--sf-font-display);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.close {
+  display: flex;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--sf-radius-md);
+  background: none;
+  color: var(--sf-text-muted);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--sf-green-tint);
+  color: var(--sf-text);
+}
+
+.close svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.body {
+  padding: 14px 20px 20px;
+}
+
+/* ---------- Shared by the dialogs' contents ---------- */
+
+.text {
+  font-size: var(--sf-text-base);
+  line-height: 1.5;
+  color: var(--sf-text-body);
+}
+
+.text p {
+  margin: 0 0 8px;
+}
+
+.errorSlot {
+  margin-top: 14px;
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}

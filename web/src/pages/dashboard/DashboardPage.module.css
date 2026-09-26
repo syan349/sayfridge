@@ -1,0 +1,173 @@
+.avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1.2px solid var(--sf-border-card);
+  border-radius: var(--sf-radius-lg);
+  background: var(--sf-green-tint);
+}
+
+.avatar img {
+  border-radius: 50%;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px var(--sf-page-pad-x) 24px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.sideColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--sf-text-md);
+  color: var(--sf-text-muted);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--sf-text-md);
+  color: var(--sf-overdue);
+}
+
+/* ---------- Needs attention ---------- */
+
+.attentionList,
+.spaceList,
+.activityList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attentionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 118px auto;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--sf-divider-row);
+}
+
+.attentionRow:last-child {
+  border-bottom: 0;
+}
+
+.attentionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rowMeta {
+  padding-left: 49px; /* lines up under the name, past the icon tile */
+  font-size: 12px;
+  color: var(--sf-text-muted);
+}
+
+/* ---------- Storage spaces ---------- */
+
+.spaceRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+}
+
+.spaceName {
+  flex-shrink: 0;
+  width: 90px;
+  overflow: hidden;
+  font-size: var(--sf-text-md);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar {
+  flex-grow: 1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--sf-divider-row);
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--sf-green-400);
+}
+
+.spaceCount {
+  flex-shrink: 0;
+  width: 64px;
+  font-family: var(--sf-font-mono);
+  font-size: 12.5px;
+  text-align: right;
+  color: var(--sf-text-body);
+}
+
+/* ---------- Recent activity ---------- */
+
+.activityRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--sf-divider-row);
+}
+
+.activityRow:last-child {
+  border-bottom: 0;
+}
+
+.activityText {
+  flex-grow: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sf-text);
+  font-size: var(--sf-text-md);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activityText:hover {
+  text-decoration: underline;
+}
+
+.activityTime {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--sf-text-muted);
+}

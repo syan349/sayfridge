@@ -1,14 +1,16 @@
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { listCategories } from '../../api/categories'
 import { listInventory, type InventoryItem, type InventoryQuery } from '../../api/inventory'
-import { listStorageSpaces } from '../../api/storageSpaces'
+import { inventoryCountQuery, storageSpacesQuery } from '../../api/queries'
 import { Button } from '../../components/Button/Button'
 import { ButtonLink } from '../../components/Button/ButtonLink'
 import { DataTable, type Column } from '../../components/DataTable/DataTable'
 import { ExpiryChip } from '../../components/ExpiryChip/ExpiryChip'
 import { ItemCell } from '../../components/ItemCell/ItemCell'
 import { PageHeader } from '../../components/PageHeader/PageHeader'
+import { Pagination } from '../../components/Pagination/Pagination'
 import { QuantityCell } from '../../components/QuantityCell/QuantityCell'
 import { SearchField } from '../../components/SearchField/SearchField'
 import { StatusPill } from '../../components/StatusPill/StatusPill'
@@ -38,17 +40,10 @@ function toQuery(filters: InventoryFilters, search: string, page: number, pageSi
   }
 }
 
-/** A request that only wants the number of matches: one row per page, and we read `total`. */
-function countQuery(query: InventoryQuery) {
-  return {
-    queryKey: ['inventory', 'count', query],
-    queryFn: ({ signal }: { signal: AbortSignal }) => listInventory(query, signal).then((page) => page.total),
-  }
-}
-
 /** W03 — Inventory workspace: filters, a paged table, and bulk actions on selected rows. */
 export function InventoryPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const today = todayLocal()
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
@@ -67,7 +62,7 @@ export function InventoryPage() {
     queryFn: ({ signal }) => listInventory(listQuery, signal),
     placeholderData: keepPreviousData, // keep showing the old rows while the next page loads
   })
-  const spaces = useQuery({ queryKey: ['storage-spaces'], queryFn: ({ signal }) => listStorageSpaces(signal) })
+  const spaces = useQuery(storageSpacesQuery)
   const categories = useQuery({ queryKey: ['item-categories'], queryFn: ({ signal }) => listCategories(signal) })
   const spaceList = spaces.data?.items ?? []
 
@@ -86,7 +81,8 @@ export function InventoryPage() {
       [chipQueries.allSpaces, chipQueries.expiringSoon, ...chipQueries.bySpace].map((query) => [keyOf(query), query]),
     ).values(),
   ]
-  const countResults = useQueries({ queries: distinctQueries.map(countQuery) })
+  // With the default filters, "All spaces" is the same question the sidebar asks, so they share one answer.
+  const countResults = useQueries({ queries: distinctQueries.map(inventoryCountQuery) })
   const countFor = (query: InventoryQuery) =>
     countResults[distinctQueries.findIndex((distinct) => keyOf(distinct) === keyOf(query))]?.data
 
@@ -148,7 +144,11 @@ export function InventoryPage() {
 
   // ---------- Table ----------
   const columns: Column<InventoryItem>[] = [
-    { key: 'item', header: 'Item', render: (item) => <ItemCell name={item.item_definition_name} /> },
+    {
+      key: 'item',
+      header: 'Item',
+      render: (item) => <ItemCell name={item.item_definition_name} to={`/inventory/${item.id}`} />,
+    },
     { key: 'category', header: 'Category', width: '130px', render: (item) => item.category_name },
     { key: 'space', header: 'Space', width: '120px', render: (item) => item.storage_space_name },
     { key: 'quantity', header: 'Quantity', width: '200px', render: (item) => <QuantityCell item={item} /> },
@@ -213,8 +213,6 @@ export function InventoryPage() {
     )
   }
 
-  const firstShown = (page - 1) * PAGE_SIZE + 1
-  const lastShown = Math.min(page * PAGE_SIZE, total)
   const allSpacesTotal = countFor(chipQueries.allSpaces)
 
   return (
@@ -275,21 +273,12 @@ export function InventoryPage() {
             selection={{ selectedIds: new Set(selected.keys()), onToggleRow: toggleRow, onToggleAll: toggleAll }}
             message={message}
             busy={inventory.isFetching && !inventory.isPending}
+            onRowClick={(item) => navigate(`/inventory/${item.id}`)}
           />
         </div>
 
         {total > 0 && rows.length > 0 && (
-          <nav aria-label="Pages" className={styles.pagination}>
-            <span className={styles.showing}>
-              Showing {firstShown}–{lastShown} of {total} items
-            </span>
-            <Button variant="secondary" size="sm" disabled={page === 1} onClick={() => goToPage(page - 1)}>
-              Previous
-            </Button>
-            <Button variant="secondary" size="sm" disabled={lastShown >= total} onClick={() => goToPage(page + 1)}>
-              Next
-            </Button>
-          </nav>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} noun="items" onPageChange={goToPage} />
         )}
       </div>
     </>

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { getToken } from '../api/tokenStore'
-import { loginResponse } from '../test/fixtures'
+import { DASHBOARD_HEADING, loginResponse } from '../test/fixtures'
 import { renderApp } from '../test/renderApp'
 import { server } from '../test/server'
 
@@ -23,7 +23,7 @@ describe('LoginPage (W01)', () => {
     await user.type(screen.getByLabelText('Password'), 'correct-horse')
     await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: DASHBOARD_HEADING })).toBeInTheDocument()
     expect(sentBody).toEqual({ email: 'tim@example.com', password: 'correct-horse' }) // email trimmed
     expect(getToken()).toBe('test-token')
   })

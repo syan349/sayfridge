@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { setToken } from '../api/tokenStore'
-import { loginResponse, signInAs, testAdmin, testUser } from '../test/fixtures'
+import { DASHBOARD_HEADING, loginResponse, signInAs, testAdmin, testUser } from '../test/fixtures'
 import { renderApp } from '../test/renderApp'
 import { server } from '../test/server'
 
@@ -28,7 +28,7 @@ describe('RequireAuth (route guard)', () => {
     signInAs(testUser)
     const { router } = renderApp('/admin/accounts')
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: DASHBOARD_HEADING })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/')
   })
 
@@ -56,6 +56,6 @@ describe('RequireAuth (route guard)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('We couldn’t load your account')
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: DASHBOARD_HEADING })).toBeInTheDocument()
   })
 })

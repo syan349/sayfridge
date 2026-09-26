@@ -26,16 +26,3 @@
   font-size: var(--sf-text-md);
   color: var(--sf-text-muted);
 }
-
-.pagination {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 4px;
-}
-
-.showing {
-  margin-right: auto;
-  font-size: var(--sf-text-sm);
-  color: var(--sf-text-muted);
-}

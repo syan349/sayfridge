@@ -1,0 +1,39 @@
+.tile {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--sf-border-card);
+  border-radius: var(--sf-radius-lg);
+  background: var(--sf-green-tint);
+  color: var(--sf-green-700);
+}
+
+.tile svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.freezer {
+  border-color: var(--sf-info-border);
+  background: var(--sf-info-bg);
+  color: var(--sf-info);
+}
+
+.pantry {
+  border-color: var(--sf-soon-border);
+  background: var(--sf-soon-bg);
+  color: var(--sf-soon);
+}
+
+.warehouse,
+.other {
+  border-color: var(--sf-neutral-border);
+  background: var(--sf-neutral-bg);
+  color: var(--sf-neutral);
+}

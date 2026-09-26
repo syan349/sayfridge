@@ -1,0 +1,93 @@
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry {
+  position: relative;
+  display: flex;
+  gap: 13px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--sf-divider-row);
+}
+
+.entry:last-child {
+  border-bottom: 0;
+}
+
+/* The vertical line joining the dots. */
+.entry:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 25px;
+  bottom: -11px;
+  left: 8px;
+  width: 1px;
+  background: var(--sf-border-card);
+}
+
+.dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  margin: 5px 4px 0;
+  border-radius: 50%;
+}
+
+.dotExact {
+  background: var(--sf-green-400);
+}
+
+.dotConfirmed {
+  background: var(--sf-exact);
+}
+
+.dotEstimated {
+  background: var(--sf-estimated);
+}
+
+.dotBatch {
+  background: var(--sf-neutral);
+}
+
+.dotInactive {
+  border: 1.5px solid var(--sf-text-faint);
+  background: var(--sf-surface);
+}
+
+.main {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.title {
+  font-size: var(--sf-text-md);
+  font-weight: 600;
+}
+
+.meta {
+  margin: 4px 0 0;
+  font-size: var(--sf-text-sm);
+  color: var(--sf-text-muted);
+}
+
+.time {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--sf-text-muted);
+  white-space: nowrap;
+}
+
+.inactive .title {
+  color: var(--sf-text-muted);
+  text-decoration: line-through;
+}
