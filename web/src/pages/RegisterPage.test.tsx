@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
-import { loginResponse, testUser } from '../test/fixtures'
+import { DASHBOARD_HEADING, loginResponse, testUser } from '../test/fixtures'
 import { renderApp } from '../test/renderApp'
 import { server } from '../test/server'
 
@@ -48,7 +48,7 @@ describe('RegisterPage (W02)', () => {
 
     await fillForm('tim@example.com', 'correct-horse', 'correct-horse')
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: DASHBOARD_HEADING })).toBeInTheDocument()
     // No name, no avatar, no confirmPassword: the backend rejects any extra field.
     expect(registerBody).toEqual({ email: 'tim@example.com', password: 'correct-horse' })
   })
