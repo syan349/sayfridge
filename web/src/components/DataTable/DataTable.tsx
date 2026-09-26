@@ -29,6 +29,11 @@ interface DataTableProps<Row> {
   message?: ReactNode
   /** True while new rows are loading over the old ones. */
   busy?: boolean
+  /**
+   * Clicking anywhere on a row (except its checkbox, links or buttons) calls this.
+   * A mouse shortcut only: keyboard users need a real link inside the row too.
+   */
+  onRowClick?: (row: Row) => void
 }
 
 /** A real <table> in the design's style, with an optional checkbox per row. */
@@ -41,6 +46,7 @@ export function DataTable<Row>({
   selection,
   message,
   busy = false,
+  onRowClick,
 }: DataTableProps<Row>) {
   const columnCount = columns.length + (selection ? 1 : 0)
   const selectedOnPage = selection ? rows.filter((row) => selection.selectedIds.has(getRowId(row))).length : 0
@@ -87,7 +93,18 @@ export function DataTable<Row>({
               const id = getRowId(row)
               const selected = selection?.selectedIds.has(id) ?? false
               return (
-                <tr key={id} className={selected ? styles.selectedRow : undefined}>
+                <tr
+                  key={id}
+                  className={[selected ? styles.selectedRow : '', onRowClick ? styles.clickable : ''].filter(Boolean).join(' ') || undefined}
+                  onClick={
+                    onRowClick &&
+                    ((event) => {
+                      // Clicks on the checkbox, a link or a button do their own job.
+                      if ((event.target as HTMLElement).closest('a, button, input, select, label')) return
+                      onRowClick(row)
+                    })
+                  }
+                >
                   {selection && (
                     <td className={styles.checkCell}>
                       <input

@@ -1,5 +1,5 @@
 import type { ItemCategory } from '../api/categories'
-import type { InventoryItem } from '../api/inventory'
+import type { InventoryItem, InventoryOperation } from '../api/inventory'
 import type { StorageSpace } from '../api/storageSpaces'
 import type { Page } from '../api/types'
 
@@ -83,6 +83,28 @@ export const tomatoes = makeItem({
   is_estimated: true,
   version: 2,
 })
+
+/** A successful manual operation; override what a test needs. */
+export function makeOperation(overrides: Partial<InventoryOperation>): InventoryOperation {
+  return {
+    id: 'operation-id',
+    inventory_item_id: 'item-id',
+    operation_type: 'CONSUME',
+    quantity_kind: 'AMOUNT',
+    quantity_value: '1',
+    quantity_unit: 'each',
+    input_method: 'MANUAL',
+    calculation_method: 'EXACT',
+    affects_state: 'CONFIRMED',
+    applied_change_amount: '1.000',
+    applied_change_unit: 'each',
+    status: 'SUCCESS',
+    created_at: '2026-09-22T07:32:00Z',
+    updated_at: '2026-09-22T07:32:00Z',
+    undone_at: null,
+    ...overrides,
+  }
+}
 
 export function page<T>(items: T[], total = items.length): Page<T> {
   return { items, total, page: 1, page_size: 20 }

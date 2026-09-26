@@ -3,6 +3,7 @@ import { RequireAuth } from './auth/RequireAuth'
 import { AppShell } from './components/AppShell/AppShell'
 import { GuestPage } from './pages/GuestPage'
 import { InventoryPage } from './pages/inventory/InventoryPage'
+import { ItemDetailsPage } from './pages/itemDetails/ItemDetailsPage'
 import { LoginPage } from './pages/LoginPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 import { RegisterPage } from './pages/RegisterPage'
@@ -29,6 +30,7 @@ export const routes: RouteObject[] = [
           { path: 'inventory', element: <InventoryPage /> },
           // "Add items" on the inventory page leads here; the real page is W06 (Day 6).
           { path: 'inventory/new', element: <PlaceholderPage title="Add items" message={notBuilt('W06, issue #49')} /> },
+          { path: 'inventory/:id', element: <ItemDetailsPage /> },
           { path: 'expiry', element: <PlaceholderPage title="Expiry overview" message={notBuilt('W09, issue #52')} /> },
           { path: 'spaces', element: <PlaceholderPage title="Storage spaces" message={notBuilt('W04, issue #47')} /> },
           { path: 'assistant', element: <PlaceholderPage title="AI assistant" message={notBuilt('W07, issue #50')} /> },

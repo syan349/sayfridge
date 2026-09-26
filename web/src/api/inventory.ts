@@ -63,32 +63,107 @@ export function listInventory(query: InventoryQuery, signal?: AbortSignal): Prom
   })
 }
 
+/** GET /inventory-items/{id} — one item, in any status. */
+export function getInventoryItem(id: string, signal?: AbortSignal): Promise<InventoryItem> {
+  return apiFetch<InventoryItem>(`/inventory-items/${id}`, { signal })
+}
+
+export type OperationType = 'ADD' | 'CONSUME' | 'RECONCILE'
+
+/** InventoryOperationRead (backend/app/schemas/inventory_operations.py). */
+export interface InventoryOperation {
+  id: string
+  inventory_item_id: string
+  operation_type: OperationType
+  quantity_kind: 'AMOUNT' | 'FRACTION' | 'QUALITATIVE'
+  /** What the user entered, word for word: "500", "1/2". */
+  quantity_value: string
+  quantity_unit: string | null
+  input_method: 'TEXT' | 'VOICE' | 'PHOTO' | 'RECEIPT' | 'MANUAL'
+  calculation_method: 'EXACT' | 'CONVERTED' | 'AI_ESTIMATED'
+  affects_state: 'CONFIRMED' | 'ESTIMATED'
+  /** How much was actually added or taken away, in the item's unit. Null for RECONCILE. */
+  applied_change_amount: string | null
+  applied_change_unit: string | null
+  /** Only SUCCESS changed the quantity; the other states are history. */
+  status: 'PENDING_CONFIRMATION' | 'SUCCESS' | 'FAILED' | 'UNDONE'
+  created_at: string
+  updated_at: string
+  undone_at: string | null
+}
+
+/** GET /inventory-items/{id}/operations — the item's whole history, newest first. */
+export function listItemOperations(id: string, signal?: AbortSignal): Promise<InventoryOperation[]> {
+  return apiFetch<InventoryOperation[]>(`/inventory-items/${id}/operations`, { signal })
+}
+
 /** The item as the user last saw it. If someone changed it since, the backend answers 409 VERSION_CONFLICT. */
 function versionRef(item: InventoryItem) {
   return { id: item.id, expected_version: item.version }
 }
 
+export interface OperationInput {
+  type: OperationType
+  kind: 'AMOUNT' | 'FRACTION'
+  /** Decimal text ("0.5", at most 3 decimals) or a fraction ("1/2"). */
+  value: string
+  /** A unit such as "g" or "L"; "remaining" for fractions. */
+  unit: string
+}
+
 /**
- * POST /inventory-items/{id}/operations — CONSUME a fraction of what is left
- * ("1/2" = half). A fraction works whatever the item's unit is.
+ * POST /inventory-items/{id}/operations — the only way a quantity changes.
+ * The Idempotency-Key makes a repeat of the same action (a retry) count once.
  */
-export function consumeFraction(item: InventoryItem, fraction: string, idempotencyKey: string) {
-  return apiFetch<{ inventory: InventoryItem; replayed: boolean }>(`/inventory-items/${item.id}/operations`, {
-    method: 'POST',
-    headers: { 'Idempotency-Key': idempotencyKey },
-    body: {
-      expected_version: item.version,
-      operation_type: 'CONSUME',
-      quantity_kind: 'FRACTION',
-      quantity_value: fraction,
-      quantity_unit: 'remaining',
+export function recordOperation(item: InventoryItem, input: OperationInput, idempotencyKey: string) {
+  return apiFetch<{ operation: InventoryOperation; inventory: InventoryItem; replayed: boolean }>(
+    `/inventory-items/${item.id}/operations`,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: {
+        expected_version: item.version,
+        operation_type: input.type,
+        quantity_kind: input.kind,
+        quantity_value: input.value,
+        quantity_unit: input.unit,
+      },
     },
+  )
+}
+
+/** CONSUME a fraction of what is left ("1/2" = half). A fraction works whatever the item's unit is. */
+export function consumeFraction(item: InventoryItem, fraction: string, idempotencyKey: string) {
+  return recordOperation(item, { type: 'CONSUME', kind: 'FRACTION', value: fraction, unit: 'remaining' }, idempotencyKey)
+}
+
+/** The fields PATCH may change. null clears a date or the notes. */
+export interface ItemChanges {
+  storage_space_id?: string
+  purchase_date?: string | null
+  expiry_date?: string | null
+  notes?: string | null
+}
+
+/** PATCH /inventory-items/{id} — only the fields sent change; quantities can't be changed here. */
+export function updateItem(item: InventoryItem, changes: ItemChanges): Promise<InventoryItem> {
+  return apiFetch<InventoryItem>(`/inventory-items/${item.id}`, {
+    method: 'PATCH',
+    body: { expected_version: item.version, ...changes },
   })
 }
 
 /** POST /inventory-items/{id}/discard — only for IN_STOCK items. Keeps the item's history. */
 export function discardItem(item: InventoryItem): Promise<InventoryItem> {
   return apiFetch<InventoryItem>(`/inventory-items/${item.id}/discard`, {
+    method: 'POST',
+    body: { expected_version: item.version },
+  })
+}
+
+/** POST /inventory-items/{id}/archive — for IN_STOCK or EMPTY items. Keeps the item's history. */
+export function archiveItem(item: InventoryItem): Promise<InventoryItem> {
+  return apiFetch<InventoryItem>(`/inventory-items/${item.id}/archive`, {
     method: 'POST',
     body: { expected_version: item.version },
   })

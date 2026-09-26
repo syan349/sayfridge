@@ -1,0 +1,31 @@
+.card {
+  padding: 18px 20px;
+  border: 1.2px solid var(--sf-border-card);
+  border-radius: var(--sf-radius-card);
+  background: var(--sf-surface);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--sf-font-display);
+  font-size: var(--sf-text-lg);
+  font-weight: 600;
+}
+
+.aside {
+  font-size: var(--sf-text-sm);
+  color: var(--sf-text-muted);
+}
+
+.action {
+  margin-left: auto;
+  font-size: var(--sf-text-sm);
+}

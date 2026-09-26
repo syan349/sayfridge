@@ -1,5 +1,6 @@
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { listCategories } from '../../api/categories'
 import { listInventory, type InventoryItem, type InventoryQuery } from '../../api/inventory'
 import { listStorageSpaces } from '../../api/storageSpaces'
@@ -49,6 +50,7 @@ function countQuery(query: InventoryQuery) {
 /** W03 — Inventory workspace: filters, a paged table, and bulk actions on selected rows. */
 export function InventoryPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const today = todayLocal()
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
@@ -148,7 +150,11 @@ export function InventoryPage() {
 
   // ---------- Table ----------
   const columns: Column<InventoryItem>[] = [
-    { key: 'item', header: 'Item', render: (item) => <ItemCell name={item.item_definition_name} /> },
+    {
+      key: 'item',
+      header: 'Item',
+      render: (item) => <ItemCell name={item.item_definition_name} to={`/inventory/${item.id}`} />,
+    },
     { key: 'category', header: 'Category', width: '130px', render: (item) => item.category_name },
     { key: 'space', header: 'Space', width: '120px', render: (item) => item.storage_space_name },
     { key: 'quantity', header: 'Quantity', width: '200px', render: (item) => <QuantityCell item={item} /> },
@@ -275,6 +281,7 @@ export function InventoryPage() {
             selection={{ selectedIds: new Set(selected.keys()), onToggleRow: toggleRow, onToggleAll: toggleAll }}
             message={message}
             busy={inventory.isFetching && !inventory.isPending}
+            onRowClick={(item) => navigate(`/inventory/${item.id}`)}
           />
         </div>
 

@@ -7,24 +7,30 @@ interface ExpiryChipProps {
   expiryDate: string | null
   /** Today's date (YYYY-MM-DD) — passed in so tests can fix "today". */
   today: string
+  /** false = the chip only, without the date line (e.g. next to a page title). */
+  showDate?: boolean
 }
 
 /** A coloured chip with the time left ("2 days left"), and the date underneath. */
-export function ExpiryChip({ expiryDate, today }: ExpiryChipProps) {
-  if (!expiryDate) return <span className={styles.none}>No date</span>
+export function ExpiryChip({ expiryDate, today, showDate = true }: ExpiryChipProps) {
+  if (!expiryDate) return showDate ? <span className={styles.none}>No date</span> : null
 
   const daysLeft = daysBetween(today, expiryDate)
   const tone = expiryTone(daysLeft)
+  const chip = (
+    <span className={`${styles.chip} ${styles[tone]}`} data-tone={tone}>
+      {/* Overdue also gets the warning icon, so it isn't shown by colour alone. */}
+      {tone === 'overdue' && (
+        <img src="/assets/icons/assistant/warn.png" alt="" width={14} height={14} className={styles.icon} />
+      )}
+      {expiryLabel(daysLeft)}
+    </span>
+  )
 
+  if (!showDate) return chip
   return (
     <div>
-      <span className={`${styles.chip} ${styles[tone]}`} data-tone={tone}>
-        {/* Overdue also gets the warning icon, so it isn't shown by colour alone. */}
-        {tone === 'overdue' && (
-          <img src="/assets/icons/assistant/warn.png" alt="" width={14} height={14} className={styles.icon} />
-        )}
-        {expiryLabel(daysLeft)}
-      </span>
+      {chip}
       <div className={styles.date}>{formatDate(expiryDate)}</div>
     </div>
   )
