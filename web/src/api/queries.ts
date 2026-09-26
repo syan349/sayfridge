@@ -1,6 +1,7 @@
 // Query definitions used by more than one screen. The same key means the same
 // cache entry: the sidebar count, the dashboard and the inventory page all read
 // "how many items are in stock" from ONE request, not three.
+import { listCategories } from './categories'
 import { getExpirySummary, listInventory, type ExpiryQuery, type InventoryQuery } from './inventory'
 import { listStorageSpaces } from './storageSpaces'
 
@@ -38,4 +39,11 @@ export function attentionQuery(today: string) {
 export const storageSpacesQuery = {
   queryKey: ['storage-spaces'],
   queryFn: ({ signal }: { signal: AbortSignal }) => listStorageSpaces(signal),
+}
+
+// Categories never change while the app is open (there is no API to change them).
+export const categoriesQuery = {
+  queryKey: ['item-categories'],
+  queryFn: ({ signal }: { signal: AbortSignal }) => listCategories(signal),
+  staleTime: Infinity,
 }

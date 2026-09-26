@@ -222,6 +222,24 @@ interface BatchResult {
   count: number
 }
 
+/** One new batch of food: InventoryCreate. Amounts are decimal TEXT ("2.5"), never numbers. */
+export interface NewInventoryItem {
+  storage_space_id: string
+  item_definition_id: string
+  amount: string
+  unit: string
+  purchase_date?: string
+  expiry_date?: string
+}
+
+/**
+ * POST /inventory-items/batch-create — up to 100 new items in one transaction:
+ * all are saved, or none. On failure the error's itemIndex names the first bad row.
+ */
+export function batchCreate(items: NewInventoryItem[]): Promise<BatchResult> {
+  return apiFetch<BatchResult>('/inventory-items/batch-create', { method: 'POST', body: { items } })
+}
+
 /** POST /inventory-items/batch-move — all or nothing: if one item fails, none move. */
 export function batchMove(items: InventoryItem[], targetSpaceId: string): Promise<BatchResult> {
   return apiFetch<BatchResult>('/inventory-items/batch-move', {
