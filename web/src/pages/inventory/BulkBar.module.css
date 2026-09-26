@@ -1,0 +1,137 @@
+.bar {
+  border-bottom: 1px solid var(--sf-border-strong);
+  background: var(--sf-green-soft);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 11px;
+  padding: 10px var(--sf-page-pad-x);
+}
+
+.count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sf-green-800);
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: var(--sf-border-strong);
+}
+
+.action {
+  height: 31px;
+  padding: 0 12px;
+  border: 1.2px solid var(--sf-border-strong);
+  border-radius: var(--sf-radius-md);
+  background: var(--sf-surface);
+  color: var(--sf-green-800);
+  font-size: var(--sf-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--sf-green-tint);
+}
+
+.open,
+.open:hover {
+  border-color: var(--sf-green-600);
+  background: var(--sf-green-tint);
+  font-weight: 600;
+}
+
+.clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sf-green-700);
+  font-size: var(--sf-text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.note {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--sf-green-700);
+}
+
+/* ---------- The panel under the bar ---------- */
+
+.panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  padding: 12px var(--sf-page-pad-x) 14px;
+  border-top: 1px solid var(--sf-border-strong);
+  background: var(--sf-green-tint);
+  font-size: var(--sf-text-md);
+  color: var(--sf-text);
+}
+
+.fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  float: left; /* keeps the legend on the same line as the radio buttons */
+  margin-right: 6px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.radio input {
+  margin: 0;
+  accent-color: var(--sf-green-600);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sf-text-muted);
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.select {
+  height: 31px;
+  padding: 0 10px;
+  border: 1px solid var(--sf-border-input);
+  border-radius: var(--sf-radius-md);
+  background: var(--sf-surface);
+  font-weight: 400;
+}
+
+.question {
+  margin: 0;
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+}
