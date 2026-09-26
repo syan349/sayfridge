@@ -1,0 +1,105 @@
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px 16px;
+  padding: 13px var(--sf-page-pad-x);
+  border-bottom: 1px solid var(--sf-divider);
+  background: var(--sf-surface);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.content {
+  padding: 15px var(--sf-page-pad-x) 24px;
+}
+
+.notice {
+  margin-bottom: 15px;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.avatar {
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.userText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.userName {
+  font-size: var(--sf-text-base);
+  font-weight: 500;
+  color: var(--sf-text);
+}
+
+.userEmail {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--sf-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.muted {
+  display: block;
+  font-size: 12px;
+  text-align: right;
+  color: var(--sf-text-muted);
+}
+
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.stateBox p {
+  margin: 0;
+}
+
+.stateTitle {
+  margin: 0;
+  font-family: var(--sf-font-display);
+  font-size: var(--sf-text-lg);
+  font-weight: 600;
+  color: var(--sf-text);
+}
+
+.noPermission {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 520px;
+  margin: 32px var(--sf-page-pad-x);
+  padding: 22px;
+  border: 1.2px solid var(--sf-overdue-border);
+  border-radius: var(--sf-radius-card);
+  background: var(--sf-overdue-bg);
+  color: var(--sf-text-body);
+}
+
+.noPermission p {
+  margin: 0;
+}

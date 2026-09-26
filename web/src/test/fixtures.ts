@@ -22,6 +22,9 @@ export function loginResponse(user: User = testUser): LoginResponse {
   return { access_token: 'test-token', token_type: 'bearer', expires_in: 900, user }
 }
 
+/** The dashboard's heading greets the user by the time of day: "Good morning, tim". */
+export const DASHBOARD_HEADING = /^Good (morning|afternoon|evening), /
+
 /** Starts the test already signed in: a stored token, and GET /auth/me answering with `user`. */
 export function signInAs(user: User) {
   setToken('test-token', 900)

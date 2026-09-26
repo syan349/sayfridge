@@ -19,14 +19,16 @@ interface PageHeaderProps {
   leading?: ReactNode
   /** Small chips right after the title, e.g. status and expiry. */
   titleExtras?: ReactNode
+  /** Text for the browser tab when it should differ from the title (e.g. "Dashboard" vs "Good morning, tim"). */
+  documentTitle?: string
 }
 
 /** White bar at the top of every signed-in page. Holds the page's only <h1>. */
-export function PageHeader({ title, subtitle, actions, breadcrumb, leading, titleExtras }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, breadcrumb, leading, titleExtras, documentTitle }: PageHeaderProps) {
   return (
     <header className={styles.header}>
       {/* React puts <title> into the document head: the browser tab shows the page name. */}
-      <title>{`${title} · SayFridge`}</title>
+      <title>{`${documentTitle ?? title} · SayFridge`}</title>
 
       {breadcrumb && (
         <nav aria-label="Breadcrumb">

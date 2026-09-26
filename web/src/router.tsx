@@ -1,6 +1,9 @@
 import type { RouteObject } from 'react-router-dom'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppShell } from './components/AppShell/AppShell'
+import { AccountsPage } from './pages/admin/AccountsPage'
+import { DashboardPage } from './pages/dashboard/DashboardPage'
+import { ExpiryPage } from './pages/expiry/ExpiryPage'
 import { GuestPage } from './pages/GuestPage'
 import { InventoryPage } from './pages/inventory/InventoryPage'
 import { ItemDetailsPage } from './pages/itemDetails/ItemDetailsPage'
@@ -26,12 +29,12 @@ export const routes: RouteObject[] = [
       {
         element: <AppShell />,
         children: [
-          { index: true, element: <PlaceholderPage title="Dashboard" message={notBuilt('Dashboard')} /> },
+          { index: true, element: <DashboardPage /> },
           { path: 'inventory', element: <InventoryPage /> },
           // "Add items" on the inventory page leads here; the real page is W06 (Day 6).
           { path: 'inventory/new', element: <PlaceholderPage title="Add items" message={notBuilt('W06, issue #49')} /> },
           { path: 'inventory/:id', element: <ItemDetailsPage /> },
-          { path: 'expiry', element: <PlaceholderPage title="Expiry overview" message={notBuilt('W09, issue #52')} /> },
+          { path: 'expiry', element: <ExpiryPage /> },
           { path: 'spaces', element: <PlaceholderPage title="Storage spaces" message={notBuilt('W04, issue #47')} /> },
           { path: 'assistant', element: <PlaceholderPage title="AI assistant" message={notBuilt('W07, issue #50')} /> },
           {
@@ -47,7 +50,7 @@ export const routes: RouteObject[] = [
             element: <RequireAuth role="ADMIN" />,
             // W12 (task ledger) and W13 (operation audit) are left out for now (team decision, 26 Sep).
             children: [
-              { path: 'accounts', element: <PlaceholderPage title="Accounts" message={notBuilt('W11, issue #54')} /> },
+              { path: 'accounts', element: <AccountsPage /> },
             ],
           },
           {

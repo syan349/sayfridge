@@ -33,6 +33,12 @@
   color: var(--sf-overdue);
 }
 
+.info {
+  border-color: var(--sf-info-border);
+  background: var(--sf-info-bg);
+  color: var(--sf-info);
+}
+
 .neutral {
   border-color: var(--sf-neutral-border);
   background: var(--sf-neutral-bg);

@@ -29,3 +29,12 @@
   margin-left: auto;
   font-size: var(--sf-text-sm);
 }
+
+.action a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.action a:hover {
+  text-decoration: underline;
+}
