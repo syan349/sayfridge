@@ -1,0 +1,132 @@
+/* Shared by LoginPage (W01) and RegisterPage (W02). */
+
+.form {
+  width: 100%;
+  max-width: 416px;
+}
+
+.wideForm {
+  max-width: 620px;
+}
+
+.title {
+  margin: 0 0 7px;
+  font-family: var(--sf-font-display);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+}
+
+.subtitle {
+  margin: 0 0 28px;
+  font-size: var(--sf-text-base);
+  color: var(--sf-text-muted);
+}
+
+.notice {
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border: 1.2px solid var(--sf-border-strong);
+  border-radius: var(--sf-radius-lg);
+  background: var(--sf-green-soft);
+  color: var(--sf-green-800);
+  font-size: var(--sf-text-md);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+/* W02: email across the top, the two passwords side by side. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 16px;
+  margin-bottom: 22px;
+}
+
+.span2 {
+  grid-column: span 2;
+}
+
+.errorSlot {
+  margin-bottom: 16px;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+.actions > :first-child {
+  flex-grow: 1;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  font-size: 12px;
+  color: var(--sf-text-muted);
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex-grow: 1;
+  height: 1px;
+  background: var(--sf-divider);
+}
+
+.switch {
+  margin: 24px 0 22px;
+  font-size: 13.5px;
+  color: var(--sf-text-body);
+  text-align: center;
+}
+
+.switch a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.switch a:hover {
+  text-decoration: underline;
+}
+
+.guestNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 0;
+  padding: 13px 14px;
+  border: 1.2px solid var(--sf-border-strong);
+  border-radius: var(--sf-radius-lg);
+  background: var(--sf-green-soft);
+  color: var(--sf-green-800);
+  font-size: var(--sf-text-sm);
+  line-height: 1.5;
+}
+
+.guestNote img {
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .span2 {
+    grid-column: auto;
+  }
+}
