@@ -63,6 +63,49 @@ export function listInventory(query: InventoryQuery, signal?: AbortSignal): Prom
   })
 }
 
+export type ExpiryBucket = 'overdue' | 'today' | 'upcoming'
+
+/** An in-stock item plus which expiry group it falls in. */
+export interface ExpiryItem extends InventoryItem {
+  bucket: ExpiryBucket
+}
+
+/** GET /inventory-items/expiry-summary: counts for all three groups, plus one page of items. */
+export interface ExpirySummary extends Page<ExpiryItem> {
+  counts: Record<ExpiryBucket, number>
+}
+
+export interface ExpiryQuery {
+  /** "Today" as the user sees it (YYYY-MM-DD). The server doesn't know the user's time zone. */
+  asOf: string
+  /** How many days after today count as "upcoming". */
+  daysBefore: number
+  storageSpaceId: string | null
+  /** Only this group in `items` (the counts always cover all three). */
+  bucket: ExpiryBucket | null
+  page: number
+  pageSize: number
+}
+
+/**
+ * GET /inventory-items/expiry-summary — IN_STOCK items that are overdue, expire
+ * today, or expire within `daysBefore` days, soonest first. Items without a date,
+ * or expiring later, are left out.
+ */
+export function getExpirySummary(query: ExpiryQuery, signal?: AbortSignal): Promise<ExpirySummary> {
+  return apiFetch<ExpirySummary>('/inventory-items/expiry-summary', {
+    query: {
+      as_of: query.asOf,
+      days_before: query.daysBefore,
+      storage_space_id: query.storageSpaceId,
+      bucket: query.bucket,
+      page: query.page,
+      page_size: query.pageSize,
+    },
+    signal,
+  })
+}
+
 /** GET /inventory-items/{id} — one item, in any status. */
 export function getInventoryItem(id: string, signal?: AbortSignal): Promise<InventoryItem> {
   return apiFetch<InventoryItem>(`/inventory-items/${id}`, { signal })
@@ -95,6 +138,11 @@ export interface InventoryOperation {
 /** GET /inventory-items/{id}/operations — the item's whole history, newest first. */
 export function listItemOperations(id: string, signal?: AbortSignal): Promise<InventoryOperation[]> {
   return apiFetch<InventoryOperation[]>(`/inventory-items/${id}/operations`, { signal })
+}
+
+/** GET /inventory-operations — the newest changes across all of the user's items. */
+export function listRecentOperations(pageSize: number, signal?: AbortSignal): Promise<Page<InventoryOperation>> {
+  return apiFetch<Page<InventoryOperation>>('/inventory-operations', { query: { page_size: pageSize }, signal })
 }
 
 /** The item as the user last saw it. If someone changed it since, the backend answers 409 VERSION_CONFLICT. */
