@@ -31,3 +31,20 @@ export function formatDate(isoDate: string): string {
   const [year, month, day] = isoDate.split('-').map(Number)
   return `${day} ${MONTHS[month - 1]} ${year}`
 }
+
+// Timestamps ("2026-09-22T07:32:00Z") are moments in time, so unlike the
+// calendar dates above they are shown in the user's own time zone.
+
+/** "2026-09-22T07:32:00Z" → "22 Sep" (local time) */
+export function formatDayMonth(timestamp: string): string {
+  const date = new Date(timestamp)
+  return `${date.getDate()} ${MONTHS[date.getMonth()]}`
+}
+
+/** "2026-09-22T07:32:00Z" → "22 Sep, 7:32 PM" (local time) — the timeline format. */
+export function formatDateTime(timestamp: string): string {
+  const date = new Date(timestamp)
+  const hours = date.getHours()
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${formatDayMonth(timestamp)}, ${hours % 12 || 12}:${minutes} ${hours < 12 ? 'AM' : 'PM'}`
+}

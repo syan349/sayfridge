@@ -42,6 +42,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 409 VERSION_CONFLICT: the item was changed by someone else (or the phone)
+ * after we loaded it, so the backend refused to overwrite that change.
+ */
+export function isVersionConflict(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'VERSION_CONFLICT'
+}
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   /** Query parameters; undefined, null and '' values are left out. */
