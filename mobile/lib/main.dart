@@ -13,6 +13,7 @@ import 'state/expiry_summary_controller.dart';
 import 'state/inventory_controller.dart';
 import 'state/storage_space_controller.dart';
 import 'state/auth_controller.dart';
+import 'state/profile_controller.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -28,6 +29,7 @@ class SayFridgeApp extends StatefulWidget {
 
 class _SayFridgeAppState extends State<SayFridgeApp> {
   late final AuthDependencies _authDependencies;
+  late final ProfileController _profileController;
   late final StorageSpaceController _storageSpaceController;
   late final InventoryController _inventoryController;
   late final ExpirySummaryController _expirySummaryController;
@@ -37,6 +39,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
     super.initState();
 
     _authDependencies = AuthDependencies.create();
+    _profileController = ProfileController(_authDependencies.authController);
 
     final storageSpaceApiService = StorageSpaceApiService(
       _authDependencies.apiClient,
@@ -65,6 +68,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
     _expirySummaryController.dispose();
     _inventoryController.dispose();
     _storageSpaceController.dispose();
+    _profileController.dispose();
     _authDependencies.dispose();
     super.dispose();
   }
@@ -92,9 +96,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
           isGuest: isGuest,
           onHomeTap: () =>
               Navigator.of(assistantContext).popUntil((route) => route.isFirst),
-          onProfileTap: isGuest
-              ? () => _openSignIn(assistantContext, authController)
-              : () => _openProfile(assistantContext, authController),
+          onProfileTap: () => _openProfile(assistantContext, authController),
           onLoginTap: isGuest
               ? () => _openSignIn(assistantContext, authController)
               : null,
@@ -110,8 +112,17 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       MaterialPageRoute<void>(
         builder: (profileContext) => ProfileScreen(
           authController: authController,
-          onAssistantTap: () =>
-              _openAssistant(profileContext, authController, isGuest: false),
+          profileController: _profileController,
+          onAssistantTap: () => _openAssistant(
+            profileContext,
+            authController,
+            isGuest: !authController.isAuthenticated,
+          ),
+          onLoginTap: () => Navigator.of(profileContext).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SignInScreen(authController: authController),
+            ),
+          ),
         ),
       ),
     );
@@ -136,7 +147,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
             onLoginTap: () => _openSignIn(context, authController),
             onAssistantTap: () =>
                 _openAssistant(context, authController, isGuest: true),
-            onProfileTap: () => _openSignIn(context, authController),
+            onProfileTap: () => _openProfile(context, authController),
           );
         },
         authenticatedBuilder: (context, authController) {
