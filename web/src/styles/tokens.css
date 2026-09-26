@@ -1,0 +1,88 @@
+/*
+ * SayFridge web — design tokens
+ *
+ * Source of truth for colour, type, radius and spacing in the web app.
+ * Values marked [app] are copied from mobile/lib/theme/app_theme.dart and
+ * mobile/lib/widgets/assistant_widgets.dart so the two apps stay one product.
+ * Values marked [a11y] are darker steps added for WCAG AA contrast — the
+ * app's own greens are too light to carry white or small text.
+ *
+ * Imported once, at the top of src/index.css.
+ * Use var(--sf-…) everywhere. Do not hard-code hex values in components.
+ */
+
+:root {
+  /* ---------- Brand greens ---------- */
+  --sf-green-300: #91C35E;   /* [app] AppColors.primary — decorative fills, meters. White text fails (2.06:1). */
+  --sf-green-400: #679C35;   /* [app] AppColors.primaryDark — focus rings, progress bars, checkbox accent. */
+  --sf-green-600: #4E7A26;   /* [a11y] primary BUTTON fill with white text (5.08:1). */
+  --sf-green-700: #3E6B1F;   /* [a11y] green link / text on light backgrounds (6.07:1). */
+  --sf-green-800: #2C4F14;   /* [a11y] active nav text, headings on green tints; brand panel on auth pages. */
+  --sf-green-soft: #DDF0C6;  /* [app] AppColors.primarySoft — active nav bg, chat bubbles, bulk bar. */
+  --sf-green-tint: #F1F8E7;  /* icon tiles, selected rows */
+  --sf-green-wash: #F4FAEA;  /* table header row */
+
+  /* ---------- Neutrals ---------- */
+  --sf-bg: #F7FDED;          /* [app] AppColors.background — page ground */
+  --sf-surface: #FFFFFF;     /* cards, sidebar, header */
+  --sf-text: #111111;        /* [app] AppColors.text */
+  --sf-text-body: #444444;   /* secondary body text */
+  --sf-text-muted: #6E6E6E;  /* [a11y] replaces app muted #929292 for small text (4.95:1 vs 3.00:1) */
+  --sf-text-faint: #929292;  /* [app] AppColors.muted — timestamps and placeholders only, never body copy */
+
+  /* ---------- Lines ---------- */
+  --sf-border-input: #DADADA;   /* [app] AppColors.fieldBorder */
+  --sf-border-card: #CDE3B4;    /* card outline (1.2px) */
+  --sf-border-strong: #A8D37F;  /* [app] InventoryItemCard border — emphasised cards, secondary green buttons */
+  --sf-divider: #E3EFD4;        /* shell dividers */
+  --sf-divider-row: #EDF5E2;    /* table row separators */
+
+  /* ---------- Quantity state (mirrors the app) ---------- */
+  --sf-exact: #3F9E36;          /* [app] inventoryExactColor — confirmed quantity */
+  --sf-estimated: #E95A18;      /* [app] inventoryEstimatedColor — AI-estimated quantity (marks, dots, bars) */
+  --sf-estimated-text: #B8460F; /* [a11y] estimated quantity as TEXT */
+  --sf-estimated-bg: #FDEEE4;
+  --sf-estimated-border: #F5CFB4;
+  /* The exact/estimated pair is only ΔE 5.7 apart for deuteranopes, so an estimate
+     ALWAYS also carries the ≈ prefix and the assistant icon (<AiBadge/>). Never colour alone. */
+
+  /* ---------- Expiry tones (text / background / border) ---------- */
+  --sf-overdue: #A32319;  --sf-overdue-bg: #FDECEA;  --sf-overdue-border: #F2CBC6;   /* days < 0 — plus warn icon */
+  --sf-urgent:  #B8460F;  --sf-urgent-bg:  #FDEEE4;  --sf-urgent-border:  #F5CFB4;   /* 0–1 days */
+  --sf-soon:    #7A5A00;  --sf-soon-bg:    #FFF6DC;  --sf-soon-border:    #F2E2A8;   /* 2–3 days (yellowSoft family) */
+  --sf-fresh:   #2F7A28;  --sf-fresh-bg:   #E9F5DF;  --sf-fresh-border:   #CDE3B4;   /* > 3 days */
+
+  /* ---------- Other semantic ---------- */
+  --sf-info: #37536B;     --sf-info-bg: #EDF2F7;     --sf-info-border: #CFDBE6;    /* RECONCILE tag, ADMIN role */
+  --sf-neutral: #575757;  --sf-neutral-bg: #F2F2F0;  --sf-neutral-border: #E0E0DA; /* UNDONE, DISABLED, ARCHIVED */
+
+  /* ---------- Typography ---------- */
+  --sf-font-display: 'Outfit', system-ui, sans-serif;        /* page titles, card titles, big numbers */
+  --sf-font-body: 'IBM Plex Sans', system-ui, sans-serif;     /* everything else */
+  --sf-font-mono: 'IBM Plex Mono', ui-monospace, monospace;   /* quantities, ids, timestamps */
+
+  --sf-text-xs: 11px;    /* table headers (uppercase, 0.06em tracking), tags */
+  --sf-text-sm: 12.5px;  /* meta lines */
+  --sf-text-md: 13.5px;  /* table cells, buttons */
+  --sf-text-base: 14px;  /* body, nav */
+  --sf-text-lg: 15px;    /* card titles */
+  --sf-text-xl: 23px;    /* page title */
+  --sf-text-2xl: 27px;   /* auth titles */
+  --sf-text-stat: 31px;  /* stat tiles */
+
+  /* ---------- Radius (from the app) ---------- */
+  --sf-radius-sm: 6px;    /* tags */
+  --sf-radius-md: 9px;    /* small buttons, chips */
+  --sf-radius-input: 10px;/* [app] inputs, primary buttons */
+  --sf-radius-lg: 12px;   /* icon tiles, banners */
+  --sf-radius-card: 16px; /* [app] cards and tables */
+  --sf-radius-pill: 30px; /* [app] composer */
+
+  /* ---------- Layout ---------- */
+  --sf-sidebar-width: 252px;
+  --sf-page-pad-x: 30px;
+  --sf-control-h: 40px;      /* header buttons, search */
+  --sf-control-h-sm: 33px;   /* filter chips */
+  --sf-row-pad-y: 12px;
+  --sf-shadow-composer: 0 2px 8px rgba(17, 17, 17, 0.06);
+}
