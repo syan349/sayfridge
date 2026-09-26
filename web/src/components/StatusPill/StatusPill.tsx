@@ -19,6 +19,13 @@ const STATUSES: Record<string, { label: string; tone: Tone }> = {
   SUSPENDED: { label: 'Suspended', tone: 'urgent' },
   PENDING_CONFIRMATION: { label: 'Needs confirmation', tone: 'soon' },
   FAILED: { label: 'Failed', tone: 'overdue' },
+  // What happened to each thing the assistant proposed.
+  DRAFT: { label: 'Pending', tone: 'soon' },
+  READY: { label: 'Pending', tone: 'soon' },
+  NEEDS_CONFIRMATION: { label: 'Needs confirmation', tone: 'soon' },
+  NEEDS_INPUT: { label: 'Needs an answer', tone: 'soon' },
+  SUCCEEDED: { label: 'Saved', tone: 'fresh' },
+  CANCELLED: { label: 'Cancelled', tone: 'neutral' },
 }
 
 /** A small coloured label for a status such as IN_STOCK or ARCHIVED. */
