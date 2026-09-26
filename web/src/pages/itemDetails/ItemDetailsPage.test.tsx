@@ -45,6 +45,10 @@ beforeEach(() => {
   itemReads = 0
   signInAs(testUser)
   server.use(
+    // The sidebar asks for this; answer it before ":id" below, which would match it too.
+    http.get('/api/v1/inventory-items/expiry-summary', () =>
+      HttpResponse.json({ ...page([]), counts: { overdue: 0, today: 0, upcoming: 0 } }),
+    ),
     http.get('/api/v1/inventory-items/:id', () => {
       itemReads += 1
       return HttpResponse.json(current)
