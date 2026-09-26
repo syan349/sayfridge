@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,6 +28,7 @@ class Settings(BaseSettings):
         ge=1,
         le=1440,
     )
+    cors_origins: list[str] = Field(default_factory=list, alias="CORS_ORIGINS")
 
     @field_validator("database_url", "database_url_direct")
     @classmethod
@@ -42,6 +44,32 @@ class Settings(BaseSettings):
         if len(value.get_secret_value()) < 32:
             raise ValueError("JWT_SECRET_KEY must contain at least 32 characters")
         return value
+
+    @field_validator("cors_origins")
+    @classmethod
+    def require_explicit_http_origins(cls, values: list[str]) -> list[str]:
+        """Accept browser origins only; paths and wildcard access are not valid origins."""
+
+        normalized: list[str] = []
+        for value in values:
+            origin = value.strip().rstrip("/")
+            parsed = urlsplit(origin)
+            if (
+                origin == "*"
+                or parsed.scheme not in {"http", "https"}
+                or not parsed.netloc
+                or parsed.path
+                or parsed.query
+                or parsed.fragment
+                or parsed.username is not None
+                or parsed.password is not None
+            ):
+                raise ValueError(
+                    "CORS_ORIGINS entries must be explicit HTTP(S) origins without paths"
+                )
+            if origin not in normalized:
+                normalized.append(origin)
+        return normalized
 
 
 @lru_cache
