@@ -1,14 +1,23 @@
-import { createBrowserRouter, type RouteObject } from 'react-router-dom'
+import type { RouteObject } from 'react-router-dom'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppShell } from './components/AppShell/AppShell'
-import { LoginPlaceholderPage } from './pages/LoginPlaceholderPage'
+import { GuestPage } from './pages/GuestPage'
+import { LoginPage } from './pages/LoginPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
+import { RegisterPage } from './pages/RegisterPage'
 
 // Page names and issue numbers follow the design handoff (sub-issues of #14).
 const notBuilt = (page: string) => `Not built yet — ${page}.`
 
+// The route table only. main.tsx turns it into a browser router; tests use a
+// memory router with the same table, so they exercise the real routes.
 export const routes: RouteObject[] = [
-  { path: '/login', element: <LoginPlaceholderPage /> },
+  // Public pages: no sidebar, no sign-in needed.
+  { path: '/login', element: <LoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
+  { path: '/guest', element: <GuestPage /> },
+
+  // Everything else needs a signed-in user and sits inside the shell.
   {
     element: <RequireAuth />,
     children: [
@@ -31,10 +40,9 @@ export const routes: RouteObject[] = [
           {
             path: 'admin',
             element: <RequireAuth role="ADMIN" />,
+            // W12 (task ledger) and W13 (operation audit) are left out for now (team decision, 26 Sep).
             children: [
               { path: 'accounts', element: <PlaceholderPage title="Accounts" message={notBuilt('W11, issue #54')} /> },
-              { path: 'tasks', element: <PlaceholderPage title="Task ledger" message={notBuilt('W12, issue #55')} /> },
-              { path: 'audit', element: <PlaceholderPage title="Operation audit" message={notBuilt('W13, issue #56')} /> },
             ],
           },
           {
@@ -46,5 +54,3 @@ export const routes: RouteObject[] = [
     ],
   },
 ]
-
-export const router = createBrowserRouter(routes)

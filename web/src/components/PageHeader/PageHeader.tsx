@@ -12,6 +12,8 @@ interface PageHeaderProps {
 export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   return (
     <header className={styles.header}>
+      {/* React puts <title> into the document head: the browser tab shows the page name. */}
+      <title>{`${title} · SayFridge`}</title>
       <div className={styles.text}>
         <h1 className={styles.title}>{title}</h1>
         {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
