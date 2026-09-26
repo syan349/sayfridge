@@ -1,0 +1,22 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px 2px 3px;
+  border: 1px solid var(--sf-estimated-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--sf-estimated-bg);
+  vertical-align: middle;
+}
+
+.icon {
+  display: inline-block;
+  border-radius: 50%;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--sf-estimated-text);
+}

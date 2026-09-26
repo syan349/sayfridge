@@ -1,0 +1,39 @@
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 282px;
+  height: var(--sf-control-h);
+  padding: 0 13px;
+  border: 1px solid var(--sf-border-input);
+  border-radius: var(--sf-radius-input);
+  background: var(--sf-surface);
+}
+
+/* Focus ring on the whole box, not only the bare input inside it. */
+.field:focus-within {
+  border-color: var(--sf-green-400);
+  box-shadow: 0 0 0 0.5px var(--sf-green-400);
+}
+
+.icon {
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--sf-text-faint);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.input {
+  flex-grow: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--sf-text);
+  font-size: var(--sf-text-md);
+}
+
+.input::placeholder {
+  color: var(--sf-text-faint);
+}
