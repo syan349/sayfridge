@@ -26,6 +26,7 @@ import { StatusPill } from '../../components/StatusPill/StatusPill'
 import { formatDate, todayLocal } from '../../lib/dates'
 import { EditItemDialog } from './EditItemDialog'
 import { RecordChangeDialog } from './RecordChangeDialog'
+import { CHANGED_NOTICE, type ActionNotice } from './useItemActions'
 import styles from './ItemDetailsPage.module.css'
 
 type OpenDialog =
@@ -35,17 +36,7 @@ type OpenDialog =
   | { kind: 'archive' }
   | null
 
-interface Notice {
-  tone: 'info' | 'warning'
-  title: string
-  text?: string
-}
-
-const CHANGED_NOTICE: Notice = {
-  tone: 'warning',
-  title: 'This item changed since you opened it',
-  text: 'Someone (or the phone app) changed it first, so nothing was saved. The latest version is shown now — check it and try again.',
-}
+type Notice = ActionNotice
 
 /** W05 — one inventory item: its three amounts, its full history, and every change you can make to it. */
 export function ItemDetailsPage() {
