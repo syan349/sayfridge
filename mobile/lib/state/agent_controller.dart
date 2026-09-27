@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
+import '../models/agent_image.dart';
 import '../repositories/workspace_repository.dart';
 import '../services/agent_session_store.dart';
 import '../services/api_exception.dart';
@@ -101,11 +102,18 @@ class AgentController extends ChangeNotifier {
     }
   }
 
-  Future<void> send(String text) async {
+  Future<void> send(String text, {List<AgentImage> images = const []}) async {
     final message = text.trim();
-    if (!canSend || message.isEmpty) return;
+    if (!canSend || (message.isEmpty && images.isEmpty)) return;
     if (message.length > 8000) {
       error = 'Maximum 8000 characters.';
+      _notify();
+      return;
+    }
+    try {
+      AgentImage.validateBatch(images);
+    } on FormatException catch (e) {
+      error = e.message;
       _notify();
       return;
     }
@@ -113,11 +121,13 @@ class AgentController extends ChangeNotifier {
     conversationId ??= requestId();
     _items.clear();
     interruptId = null;
-    messages['user:$id'] = message;
+    messages['user:$id'] = message.isEmpty ? 'Photo attached' : message;
     _pending = {
       'path': '/agent/chat',
       'body': {
         'message': message,
+        if (images.isNotEmpty)
+          'images': images.map((image) => image.toJson()).toList(),
         'conversation_id': conversationId,
         'request_id': id,
         'as_of': dateInput(DateTime.now()),
@@ -131,6 +141,7 @@ class AgentController extends ChangeNotifier {
     String decision, {
     String? message,
     String? selectedId,
+    List<AgentImage> images = const [],
   }) async {
     if (!canRespond) return;
     final current = _items[item['item_id']];
@@ -143,10 +154,20 @@ class AgentController extends ChangeNotifier {
       'decision': decision,
     };
     if (decision == 'answer' || decision == 'edit') {
+      try {
+        AgentImage.validateBatch(images);
+      } on FormatException catch (e) {
+        error = e.message;
+        _notify();
+        return;
+      }
       if ((message ?? '').trim().isNotEmpty) {
         answer['message'] = message!.trim();
       }
       if (selectedId != null) answer['selected_inventory_item_id'] = selectedId;
+      if (images.isNotEmpty) {
+        answer['images'] = images.map((image) => image.toJson()).toList();
+      }
       if (answer.length == 3) return;
     }
     _pending = {
