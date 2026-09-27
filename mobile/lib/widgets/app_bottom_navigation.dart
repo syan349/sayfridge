@@ -21,6 +21,8 @@ abstract final class AssistantAssets {
 
 enum AppNavigationDestination { home, assistant, profile }
 
+/// Place at the bottom of a page's SafeArea without additional outer insets.
+/// Every tab shares the same geometry; only the selected state changes.
 class AppBottomNavigation extends StatelessWidget {
   const AppBottomNavigation({
     this.selectedDestination = AppNavigationDestination.assistant,
@@ -35,101 +37,119 @@ class AppBottomNavigation extends StatelessWidget {
   final VoidCallback? onAssistantTap;
   final VoidCallback? onProfileTap;
 
+  static const double bottomSpacing = 28;
+  static const double horizontalSpacing = 35;
+  static const double height = 86;
+  static const double extent = height + bottomSpacing;
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 86,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomCenter,
-        children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 66,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(34),
-                border: Border.all(color: const Color(0x10000000), width: 0.7),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x24000000),
-                    blurRadius: 9,
-                    offset: Offset(0, 3),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        horizontalSpacing,
+        0,
+        horizontalSpacing,
+        bottomSpacing,
+      ),
+      child: SizedBox(
+        height: height,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.bottomCenter,
+          children: [
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 66,
+              child: DecoratedBox(
+                key: const Key('app-navigation-bar'),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(34),
+                  border: Border.all(
+                    color: const Color(0x10000000),
+                    width: 0.7,
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _NavigationItem(
-                      label: 'Home',
-                      asset: AssistantAssets.home,
-                      onTap: onHomeTap,
-                      isSelected:
-                          selectedDestination == AppNavigationDestination.home,
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x24000000),
+                      blurRadius: 9,
+                      offset: Offset(0, 3),
                     ),
-                  ),
-                  const Expanded(child: SizedBox()),
-                  Expanded(
-                    child: _NavigationItem(
-                      label: 'Profile',
-                      asset: AssistantAssets.profile,
-                      onTap: onProfileTap,
-                      isSelected:
-                          selectedDestination ==
-                          AppNavigationDestination.profile,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _NavigationItem(
+                        label: 'Home',
+                        asset: AssistantAssets.home,
+                        onTap: onHomeTap,
+                        isSelected:
+                            selectedDestination ==
+                            AppNavigationDestination.home,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            // Keep the centre label on the same baseline as Home and Profile.
-            top: 8,
-            child: GestureDetector(
-              onTap: onAssistantTap,
-              behavior: HitTestBehavior.opaque,
-              child: Column(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    padding: const EdgeInsets.all(11),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Color(0xFFDCEBD3), spreadRadius: 7),
-                      ],
+                    const Expanded(child: SizedBox()),
+                    Expanded(
+                      child: _NavigationItem(
+                        label: 'Profile',
+                        asset: AssistantAssets.profile,
+                        onTap: onProfileTap,
+                        isSelected:
+                            selectedDestination ==
+                            AppNavigationDestination.profile,
+                      ),
                     ),
-                    child: Image.asset(
-                      AssistantAssets.chat,
-                      fit: BoxFit.contain,
-                      cacheWidth: 80,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'AI Assistant',
-                    style: TextStyle(
-                      color:
-                          selectedDestination ==
-                              AppNavigationDestination.assistant
-                          ? AppColors.primary
-                          : Colors.black,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+            Positioned(
+              // Keep the centre label on the same baseline as Home and Profile.
+              top: 8,
+              child: GestureDetector(
+                onTap: onAssistantTap,
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      padding: const EdgeInsets.all(11),
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: Color(0xFFDCEBD3), spreadRadius: 7),
+                        ],
+                      ),
+                      child: Image.asset(
+                        AssistantAssets.chat,
+                        fit: BoxFit.contain,
+                        cacheWidth: 80,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'AI Assistant',
+                      style: TextStyle(
+                        color:
+                            selectedDestination ==
+                                AppNavigationDestination.assistant
+                            ? AppColors.primary
+                            : Colors.black,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

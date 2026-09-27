@@ -2,6 +2,8 @@
 
 SayFridge 的 Flutter 手机端，面向 Android 和 iOS，包含登录注册、首页、库存、AI Assistant 和 Profile 页面。
 
+底部导航统一使用 `AppBottomNavigation`，固定放在页面 `SafeArea` 的底端、滚动内容之外。组件自行保留左右 35、底部 28 个逻辑像素的间距，页面不要再添加导航外边距。游客和登录状态使用相同布局，只切换选中状态；输入框和内容的预留空间使用组件的 `extent`。
+
 ## 环境要求
 
 - Flutter SDK

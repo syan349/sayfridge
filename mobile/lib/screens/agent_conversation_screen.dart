@@ -401,14 +401,11 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                         ],
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(35, 0, 35, 4),
-                      child: AppBottomNavigation(
-                        onHomeTap:
-                            widget.onHomeTap ??
-                            () => Navigator.of(context).maybePop(),
-                        onProfileTap: widget.onProfileTap,
-                      ),
+                    AppBottomNavigation(
+                      onHomeTap:
+                          widget.onHomeTap ??
+                          () => Navigator.of(context).maybePop(),
+                      onProfileTap: widget.onProfileTap,
                     ),
                   ],
                 );

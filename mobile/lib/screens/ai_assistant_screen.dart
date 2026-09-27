@@ -168,7 +168,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            height: 255,
+                            height: AppBottomNavigation.extent + 165,
                             child: const IgnorePointer(
                               child: _BottomListMask(),
                             ),
@@ -177,7 +177,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                           Positioned(
                             left: 22,
                             right: 22,
-                            bottom: 116,
+                            bottom: AppBottomNavigation.extent + 26,
                             child: AssistantComposer(
                               controller: _messageController,
                               onPhotoPressed: _openCamera,
@@ -185,9 +185,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                             ),
                           ),
                         Positioned(
-                          left: 35,
-                          right: 35,
-                          bottom: 4,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
                           child: AppBottomNavigation(
                             onHomeTap:
                                 widget.onHomeTap ??
@@ -207,7 +207,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget _buildScrollableContent() {
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.fromLTRB(25, 27, 25, widget.isGuest ? 0 : 238),
+      padding: EdgeInsets.fromLTRB(
+        25,
+        27,
+        25,
+        widget.isGuest ? 0 : AppBottomNavigation.extent + 148,
+      ),
       children: [
         AssistantHeader(
           onNewConversation: _startNewConversation,

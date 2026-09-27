@@ -84,7 +84,12 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         Positioned.fill(
                           child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(26, 30, 26, 120),
+                            padding: const EdgeInsets.fromLTRB(
+                              26,
+                              30,
+                              26,
+                              AppBottomNavigation.extent + 30,
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -107,9 +112,9 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                         Positioned(
-                          left: 35,
-                          right: 35,
-                          bottom: 4,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
                           child: AppBottomNavigation(
                             selectedDestination: AppNavigationDestination.home,
                             onAssistantTap: onAssistantTap,

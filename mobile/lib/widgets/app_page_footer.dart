@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'app_bottom_navigation.dart';
 
-/// Shared bottom layout for the guest tabs, measured from the Home design.
+/// Shared action and navigation layout for guest tabs and Profile.
 /// Place inside a SafeArea so the action and navigation stay above system UI.
 class AppPageFooter extends StatelessWidget {
   const AppPageFooter({
@@ -47,16 +47,12 @@ class AppPageFooter extends StatelessWidget {
           ],
         ),
       ),
-      Padding(
-        // Keep the footer 28 logical pixels above the enclosing bottom safe area.
-        padding: const EdgeInsets.fromLTRB(35, 0, 35, 28),
-        child: AppBottomNavigation(
-          key: navigationKey,
-          selectedDestination: selectedDestination,
-          onHomeTap: onHomeTap,
-          onAssistantTap: onAssistantTap,
-          onProfileTap: onProfileTap,
-        ),
+      AppBottomNavigation(
+        key: navigationKey,
+        selectedDestination: selectedDestination,
+        onHomeTap: onHomeTap,
+        onAssistantTap: onAssistantTap,
+        onProfileTap: onProfileTap,
       ),
     ],
   );
