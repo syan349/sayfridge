@@ -166,6 +166,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
         builder: (assistantContext) => AiAssistantScreen(
           isGuest: isGuest,
           agentController: _agentController,
+          displayName: isGuest ? null : _profileController.displayName,
           onHomeTap: () =>
               Navigator.of(assistantContext).popUntil((route) => route.isFirst),
           onProfileTap: () => _openProfile(assistantContext, authController),

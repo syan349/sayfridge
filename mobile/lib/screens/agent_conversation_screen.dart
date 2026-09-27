@@ -5,9 +5,12 @@ import 'package:image_picker/image_picker.dart';
 import '../models/agent_image.dart';
 import '../services/voice_input_service.dart';
 import '../state/agent_controller.dart';
+import '../theme/app_theme.dart';
+import '../widgets/agent_composer.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../widgets/assistant_widgets.dart';
+import '../widgets/assistant_welcome.dart';
 import '../widgets/business_forms.dart';
 import 'camera_input_screen.dart';
 
@@ -18,12 +21,14 @@ class AgentConversationScreen extends StatefulWidget {
     this.onProfileTap,
     this.pickImages,
     this.voiceInput,
+    this.displayName,
     super.key,
   });
   final AgentController controller;
   final VoidCallback? onHomeTap, onProfileTap;
   final Future<List<XFile>> Function()? pickImages;
   final VoiceInputService? voiceInput;
+  final String? displayName;
   @override
   State<AgentConversationScreen> createState() =>
       _AgentConversationScreenState();
@@ -191,60 +196,73 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
               listenable: widget.controller,
               builder: (context, _) {
                 final agent = widget.controller;
+                final name = widget.displayName
+                    ?.trim()
+                    .split(RegExp(r'\s+'))
+                    .first;
+                final showWelcome =
+                    agent.messages.isEmpty &&
+                    agent.items.isEmpty &&
+                    !agent.waiting &&
+                    !agent.unresolved &&
+                    agent.error == null;
                 return Column(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(25, 27, 25, 12),
-                      child: AssistantHeader(
-                        onNewConversation: () {
-                          if (agent.canSend) {
-                            agent.newConversation();
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Resolve or cancel pending items, or recover the current request first.',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        onHistory: () {
-                          agent.recover();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Recovering the latest conversation. Full conversation history is not provided by the current API.',
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
                     Expanded(
                       child: ListView(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 25,
-                          vertical: 12,
-                        ),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: const EdgeInsets.fromLTRB(25, 27, 25, 16),
                         children: [
-                          if (agent.messages.isEmpty &&
-                              agent.items.isEmpty) ...[
-                            const AssistantGreeting(
-                              message: 'Hi! How can I help you?',
+                          AssistantHeader(
+                            onNewConversation: () {
+                              if (agent.canSend) {
+                                agent.newConversation();
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Resolve or cancel pending items, or recover the current request first.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            onHistory: () {
+                              agent.recover();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Recovering the latest conversation. Full conversation history is not provided by the current API.',
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 15),
+                          const Center(
+                            child: Text(
+                              'Add information using voice, photos, or text.',
+                              style: TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 13.5,
+                              ),
                             ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Ask about your inventory or describe an action. Clear, exact actions may be applied immediately. Estimates and new spaces/items require confirmation.',
-                            ),
-                            const SizedBox(height: 12),
-                            TextButton(
-                              onPressed: agent.canSend
-                                  ? () => agent.send('What is expiring soon?')
+                          ),
+                          const SizedBox(height: 18),
+                          AssistantGreeting(
+                            message: name == null || name.isEmpty
+                                ? 'Hey! How can I help you?'
+                                : 'Hey, $name! How can I help you?',
+                          ),
+                          if (showWelcome)
+                            AssistantWelcome(
+                              onSuggestionSelected: agent.canSend
+                                  ? (message) => agent.send(message)
                                   : null,
-                              child: const Text('What is expiring soon?'),
-                            ),
-                          ],
+                            )
+                          else
+                            const SizedBox(height: 24),
                           for (final message in agent.messages.entries)
                             if (message.value.isNotEmpty)
                               Padding(
@@ -303,7 +321,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(25, 8, 25, 22),
+                      padding: const EdgeInsets.fromLTRB(22, 8, 22, 26),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -333,51 +351,28 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                 ],
                               ),
                             ),
-                          Row(
-                            children: [
-                              IconButton(
-                                onPressed:
-                                    agent.canSend &&
-                                        _images.length < AgentImage.maxImages
-                                    ? _pickImages
-                                    : null,
-                                tooltip: 'Add photos',
-                                icon: const Icon(
-                                  Icons.add_photo_alternate_outlined,
-                                ),
-                              ),
-                              Expanded(
-                                child: TextField(
-                                  controller: _message,
-                                  enabled: agent.canSend,
-                                  maxLines: 3,
-                                  minLines: 1,
-                                  maxLength: 8000,
-                                  decoration: InputDecoration(
-                                    counterText: '',
-                                    hintText: agent.waiting
-                                        ? 'Answer the pending items above'
-                                        : 'Message your assistant…',
-                                  ),
-                                  onSubmitted: (_) => _send(),
-                                ),
-                              ),
-                              _VoiceHoldButton(
-                                enabled: agent.canSend,
-                                recording: _recordingVoice,
-                                cancelling: _cancelVoice,
-                                onLongPressStart: _startVoiceInput,
-                                onLongPressMoveUpdate: _updateVoiceCancel,
-                                onLongPressEnd: () => _finishVoiceInput(),
-                                onLongPressCancel: () =>
-                                    _finishVoiceInput(forceCancel: true),
-                              ),
-                              IconButton(
-                                onPressed: agent.canSend ? _send : null,
-                                tooltip: 'Send message',
-                                icon: const Icon(Icons.send_outlined),
-                              ),
-                            ],
+                          AgentComposer(
+                            controller: _message,
+                            enabled: agent.canSend,
+                            waiting: agent.waiting,
+                            hasImages: _images.isNotEmpty,
+                            onPhotoPressed:
+                                agent.canSend &&
+                                    _images.length < AgentImage.maxImages
+                                ? _pickImages
+                                : null,
+                            onSendPressed: agent.canSend ? _send : null,
+                            voiceButtonBuilder: (expanded) => _VoiceHoldButton(
+                              expanded: expanded,
+                              enabled: agent.canSend,
+                              recording: _recordingVoice,
+                              cancelling: _cancelVoice,
+                              onLongPressStart: _startVoiceInput,
+                              onLongPressMoveUpdate: _updateVoiceCancel,
+                              onLongPressEnd: () => _finishVoiceInput(),
+                              onLongPressCancel: () =>
+                                  _finishVoiceInput(forceCancel: true),
+                            ),
                           ),
                           if (_recordingVoice)
                             Padding(
@@ -427,11 +422,13 @@ class _VoiceHoldButton extends StatelessWidget {
     required this.onLongPressMoveUpdate,
     required this.onLongPressEnd,
     required this.onLongPressCancel,
+    this.expanded = false,
   });
 
   final bool enabled;
   final bool recording;
   final bool cancelling;
+  final bool expanded;
   final Future<void> Function() onLongPressStart;
   final void Function(LongPressMoveUpdateDetails details) onLongPressMoveUpdate;
   final Future<void> Function() onLongPressEnd;
@@ -456,24 +453,41 @@ class _VoiceHoldButton extends StatelessWidget {
             : 'Hold to speak',
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          width: 46,
+          width: expanded ? double.infinity : 46,
           height: 46,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(23),
             color: !recording
                 ? Colors.transparent
                 : cancelling
                 ? Colors.red.withValues(alpha: 0.16)
                 : Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
           ),
-          child: Icon(
-            cancelling ? Icons.close : Icons.mic_outlined,
-            color: enabled
-                ? cancelling
-                      ? Colors.red
-                      : Theme.of(context).colorScheme.onSurface
-                : Theme.of(context).disabledColor,
-          ),
+          child: expanded
+              ? Center(
+                  child: Text(
+                    recording
+                        ? cancelling
+                              ? 'Release to cancel'
+                              : 'Release to insert text'
+                        : 'Press and hold to speak',
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.15,
+                      color: cancelling ? Colors.red : const Color(0xFFA4A4AE),
+                    ),
+                  ),
+                )
+              : Icon(
+                  cancelling ? Icons.close : Icons.mic_outlined,
+                  color: enabled
+                      ? cancelling
+                            ? Colors.red
+                            : Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context).disabledColor,
+                ),
         ),
       ),
     ),

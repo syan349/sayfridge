@@ -15,6 +15,116 @@ import 'package:sayfridge/theme/app_theme.dart';
 import '../support/integration_fixtures.dart';
 
 void main() {
+  testWidgets('welcome shortcuts send their own text through the real Agent', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1290, 2796);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    for (final suggestion in [
+      'I want to update my inventory',
+      'Add items to my inventory',
+      'Show me an inventory report',
+    ]) {
+      Map<String, dynamic>? sent;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          expect(request.url.path, endsWith('/agent/chat'));
+          sent = jsonDecode(request.body) as Map<String, dynamic>;
+          return eventResponse([
+            {
+              'type': 'done',
+              'status': 'COMPLETED',
+              'data': {'status': 'COMPLETED', 'items': []},
+            },
+          ]);
+        }),
+      );
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: MemoryAgentStore(),
+      );
+      addTearDown(agent.dispose);
+      await agent.bindUser('alice');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: AgentConversationScreen(
+            key: ValueKey(suggestion),
+            controller: agent,
+            displayName: 'Alice Chen',
+          ),
+        ),
+      );
+      expect(find.text('Hey, Alice! How can I help you?'), findsOneWidget);
+      expect(find.text('Press and hold to speak'), findsOneWidget);
+      expect(sent, isNull);
+      await tester.ensureVisible(find.text(suggestion));
+      await _tapAndFinish(tester, agent, find.text(suggestion));
+      await tester.pumpAndSettle();
+      expect(sent?['message'], suggestion);
+      expect(sent?['request_id'], isNotEmpty);
+      expect(agent.messages.values, contains(suggestion));
+      expect(find.text('Try saying'), findsNothing);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('welcome voice bar inserts editable text and only sends on tap', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    Map<String, dynamic>? sent;
+    final api = ApiClient(
+      client: MockClient((request) async {
+        sent = jsonDecode(request.body) as Map<String, dynamic>;
+        return eventResponse([
+          {
+            'type': 'done',
+            'status': 'COMPLETED',
+            'data': {'status': 'COMPLETED', 'items': []},
+          },
+        ]);
+      }),
+    );
+    addTearDown(api.close);
+    final agent = AgentController(
+      WorkspaceRepository(api, MemoryTokens()),
+      store: MemoryAgentStore(),
+    );
+    addTearDown(agent.dispose);
+    await agent.bindUser('alice');
+    final voice = _FakeVoiceInput('add two bottles of milk');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: AgentConversationScreen(controller: agent, voiceInput: voice),
+      ),
+    );
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Press and hold to speak')),
+    );
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(voice.stopped, isTrue);
+    expect(sent, isNull);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'add two bottles of milk',
+    );
+    await tester.enterText(find.byType(TextField), 'add three bottles of milk');
+    await _tapAndFinish(tester, agent, find.byTooltip('Send message'));
+    await tester.pumpAndSettle();
+    expect(sent?['message'], 'add three bottles of milk');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'holding the microphone inserts recognized text without sending',
     (tester) async {
@@ -44,6 +154,8 @@ void main() {
         ),
       );
 
+      await tester.tap(find.byTooltip('Type a message'));
+      await tester.pumpAndSettle();
       final field = find.byType(TextField);
       await tester.enterText(field, 'Please');
       final gesture = await tester.startGesture(
@@ -90,10 +202,12 @@ void main() {
     await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
     await gesture.moveBy(const Offset(0, -80));
     await tester.pump();
-    expect(find.text('Release to cancel'), findsOneWidget);
+    expect(find.text('Release to cancel'), findsWidgets);
     await gesture.up();
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byTooltip('Type a message'));
+    await tester.pumpAndSettle();
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller!.text,
       '',
@@ -136,6 +250,8 @@ void main() {
 
       expect(voice.startedListening, isFalse);
       expect(voice.stopped, isTrue);
+      await tester.tap(find.byTooltip('Type a message'));
+      await tester.pumpAndSettle();
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
         '',
@@ -192,6 +308,11 @@ void main() {
     expect(find.bySemanticsLabel('Selected photo'), findsOneWidget);
     expect(find.byTooltip('Remove photo'), findsOneWidget);
 
+    await tester.tap(find.byTooltip('Remove photo'));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Selected photo'), findsNothing);
+    await tester.tap(find.byTooltip('Add photos'));
+    await tester.pumpAndSettle();
     await _tapAndFinish(tester, agent, find.byTooltip('Send message'));
     await tester.pumpAndSettle();
     expect(sent?['message'], '');
@@ -249,6 +370,11 @@ void main() {
 
     expect(agent.canRetry, isTrue);
     expect(find.bySemanticsLabel('Selected photo'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Retry same request'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Retry same request'), findsOneWidget);
   });
 
@@ -352,6 +478,8 @@ void main() {
       ),
     );
 
+    await tester.tap(find.byTooltip('Type a message'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'What is this?');
     await _tapAndFinish(tester, agent, find.byTooltip('Send message'));
     await tester.pumpAndSettle();
@@ -447,6 +575,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Hey, Tim!  How can I help you?'), findsNothing);
+      await tester.tap(find.byTooltip('Type a message'));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Use one cup');
       await _tapAndFinish(tester, agent, find.byTooltip('Send message'));
       await tester.pumpAndSettle();

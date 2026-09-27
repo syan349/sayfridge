@@ -334,7 +334,7 @@ class AssistantSuggestionTile extends StatelessWidget {
 
   final String label;
   final String asset;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
