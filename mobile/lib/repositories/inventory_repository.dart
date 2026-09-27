@@ -1,6 +1,7 @@
 import '../models/expiry_summary.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_page.dart';
+import '../models/inventory_create_request.dart';
 import '../services/api_exception.dart';
 import '../services/inventory_api_service.dart';
 import '../services/token_storage.dart';
@@ -10,6 +11,15 @@ class InventoryRepository {
 
   final InventoryApiService _inventoryApiService;
   final TokenStorage _tokenStorage;
+
+  Future<InventoryItem> createInventoryItem(
+    InventoryCreateRequest request,
+  ) async {
+    return _inventoryApiService.createInventoryItem(
+      accessToken: await _requireAccessToken(),
+      request: request,
+    );
+  }
 
   Future<ExpirySummary> getExpirySummary({
     required DateTime asOf,

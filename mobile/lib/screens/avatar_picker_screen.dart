@@ -65,11 +65,15 @@ class AvatarPickerScreen extends StatefulWidget {
   const AvatarPickerScreen({
     required this.initialAvatar,
     this.isFinalStep = false,
+    this.title = 'Create Account',
+    this.showUploadOption = true,
     super.key,
   });
 
   final AvatarChoice initialAvatar;
   final bool isFinalStep;
+  final String title;
+  final bool showUploadOption;
 
   @override
   State<AvatarPickerScreen> createState() => _AvatarPickerScreenState();
@@ -110,7 +114,7 @@ class _AvatarPickerScreenState extends State<AvatarPickerScreen> {
           children: [
             Center(
               child: Text(
-                'Create Account',
+                widget.title,
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
             ),
@@ -145,23 +149,24 @@ class _AvatarPickerScreenState extends State<AvatarPickerScreen> {
               },
             ),
             const SizedBox(height: 32),
-            Wrap(
-              alignment: WrapAlignment.center,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Text('or ', style: TextStyle(fontSize: 16)),
-                UnderlinedAction(
-                  label: 'upload your own avatar',
-                  onPressed: _showUploadMessage,
-                  fontWeight: FontWeight.w500,
-                ),
-                IconButton(
-                  onPressed: _showUploadMessage,
-                  icon: const Icon(Icons.ios_share_rounded, size: 20),
-                  tooltip: 'Upload your own avatar',
-                ),
-              ],
-            ),
+            if (widget.showUploadOption)
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text('or ', style: TextStyle(fontSize: 16)),
+                  UnderlinedAction(
+                    label: 'upload your own avatar',
+                    onPressed: _showUploadMessage,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  IconButton(
+                    onPressed: _showUploadMessage,
+                    icon: const Icon(Icons.ios_share_rounded, size: 20),
+                    tooltip: 'Upload your own avatar',
+                  ),
+                ],
+              ),
             const SizedBox(height: 18),
             PrimaryAuthButton(
               key: const Key('use-avatar-button'),

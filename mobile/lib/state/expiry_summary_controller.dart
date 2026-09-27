@@ -24,6 +24,27 @@ class ExpirySummaryController extends ChangeNotifier {
   String? _storageSpaceId;
   String? _categoryId;
   String? _bucket;
+  int _requestSequence = 0;
+
+  void reset() {
+    ++_requestSequence;
+    _items = [];
+    _counts = const ExpiryCounts(overdue: 0, today: 0, upcoming: 0);
+    _total = 0;
+    _page = 1;
+    _hasNextPage = false;
+    _asOf = null;
+    _storageSpaceId = _categoryId = _bucket = null;
+    _errorMessage = null;
+    _status = ExpirySummaryLoadStatus.initial;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    ++_requestSequence;
+    super.dispose();
+  }
 
   ExpirySummaryLoadStatus get status => _status;
   ExpiryCounts get counts => _counts;
@@ -34,6 +55,20 @@ class ExpirySummaryController extends ChangeNotifier {
   int get pageSize => _pageSize;
   bool get hasNextPage => _hasNextPage;
   String? get bucket => _bucket;
+  String? get storageSpaceId => _storageSpaceId;
+
+  Future<void> selectStorageSpace(String? storageSpaceId) {
+    final asOf = _asOf;
+    if (asOf == null) return Future<void>.value();
+    return loadSummary(
+      asOf: asOf,
+      daysBefore: _daysBefore,
+      storageSpaceId: storageSpaceId,
+      categoryId: _categoryId,
+      bucket: _bucket,
+      pageSize: _pageSize,
+    );
+  }
 
   Future<void> selectBucket(String? bucket) {
     final asOf = _asOf;
@@ -73,6 +108,7 @@ class ExpirySummaryController extends ChangeNotifier {
     int page = 1,
     int pageSize = 20,
   }) async {
+    final requestSequence = ++_requestSequence;
     _status = ExpirySummaryLoadStatus.loading;
     _errorMessage = null;
     _asOf = asOf;
@@ -93,6 +129,8 @@ class ExpirySummaryController extends ChangeNotifier {
         pageSize: pageSize,
       );
 
+      if (requestSequence != _requestSequence) return;
+
       _counts = result.counts;
       _items = result.items;
       _total = result.total;
@@ -103,6 +141,7 @@ class ExpirySummaryController extends ChangeNotifier {
           ? ExpirySummaryLoadStatus.empty
           : ExpirySummaryLoadStatus.loaded;
     } catch (error) {
+      if (requestSequence != _requestSequence) return;
       _counts = const ExpiryCounts(overdue: 0, today: 0, upcoming: 0);
       _items = [];
       _total = 0;

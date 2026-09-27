@@ -6,9 +6,13 @@ import '../models/storage_space.dart';
 import '../state/expiry_summary_controller.dart';
 import '../state/inventory_controller.dart';
 import '../state/storage_space_controller.dart';
+import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
+import '../widgets/app_page_footer.dart';
+import '../widgets/inventory_visuals.dart';
 import 'expiring_items_screen.dart';
+import 'inventory_detail_screen.dart';
 import 'inventory_screen.dart';
 import 'storage_space_screen.dart';
 
@@ -24,6 +28,7 @@ class HomeScreen extends StatelessWidget {
     this.onSearchTap,
     this.onExpiringTap,
     this.onInventoryTap,
+    this.onAddItemTap,
     this.isGuest = false,
     super.key,
   });
@@ -38,6 +43,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onSearchTap;
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
+  final VoidCallback? onAddItemTap;
   final bool isGuest;
 
   @override
@@ -48,55 +54,69 @@ class HomeScreen extends StatelessWidget {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(25, 40, 25, 120),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Good afternoon!',
-                            style: Theme.of(context).textTheme.displaySmall,
-                          ),
-                          const SizedBox(height: 32),
-                          Text(
-                            isGuest ? 'Guest Mode' : 'All Spaces',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+              child: isGuest
+                  ? Column(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(26, 30, 26, 0),
+                            child: const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _Greeting(),
+                                SizedBox(height: 14),
+                                _GuestHomeContent(),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 32),
-                          if (isGuest)
-                            _GuestHomeContent(onLoginTap: onLoginTap)
-                          else
-                            _UserHomeContent(
-                              expirySummaryController: expirySummaryController,
-                              inventoryController: inventoryController,
-                              storageSpaceController: storageSpaceController,
-                              onStorageSpacesTap: onStorageSpacesTap,
-                              onSearchTap: onSearchTap,
-                              onExpiringTap: onExpiringTap,
-                              onInventoryTap: onInventoryTap,
+                        ),
+                        AppPageFooter(
+                          action: GuestLoginButton(onPressed: onLoginTap),
+                          showLoginHint: true,
+                          selectedDestination: AppNavigationDestination.home,
+                          onAssistantTap: onAssistantTap,
+                          onProfileTap: onProfileTap,
+                        ),
+                      ],
+                    )
+                  : Stack(
+                      children: [
+                        Positioned.fill(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(26, 30, 26, 120),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Greeting(),
+                                const SizedBox(height: 19),
+                                _UserHomeContent(
+                                  expirySummaryController:
+                                      expirySummaryController,
+                                  inventoryController: inventoryController,
+                                  storageSpaceController:
+                                      storageSpaceController,
+                                  onStorageSpacesTap: onStorageSpacesTap,
+                                  onSearchTap: onSearchTap,
+                                  onExpiringTap: onExpiringTap,
+                                  onInventoryTap: onInventoryTap,
+                                  onAddItemTap: onAddItemTap,
+                                ),
+                              ],
                             ),
-                        ],
-                      ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 35,
+                          right: 35,
+                          bottom: 4,
+                          child: AppBottomNavigation(
+                            selectedDestination: AppNavigationDestination.home,
+                            onAssistantTap: onAssistantTap,
+                            onProfileTap: onProfileTap,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Positioned(
-                    left: 35,
-                    right: 35,
-                    bottom: 4,
-                    child: AppBottomNavigation(
-                      selectedDestination: AppNavigationDestination.home,
-                      onAssistantTap: onAssistantTap,
-                      onProfileTap: onProfileTap,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
@@ -105,80 +125,106 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _GuestHomeContent extends StatelessWidget {
-  const _GuestHomeContent({required this.onLoginTap});
-
-  final VoidCallback? onLoginTap;
+class _Greeting extends StatelessWidget {
+  const _Greeting();
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Good afternoon!',
+          style: TextStyle(
+            fontSize: 29,
+            fontWeight: FontWeight.w500,
+            height: 1.1,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 78, top: 1),
+          child: Image.asset(HomeAssets.titleLine, width: 145, height: 10),
+        ),
+      ],
+    );
+  }
+}
 
+class _GuestHomeContent extends StatelessWidget {
+  const _GuestHomeContent();
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Expiring soon',
-          style: TextStyle(fontSize: 29, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 22),
-        Icon(Icons.calendar_month_outlined, size: 72, color: primaryColor),
-        const SizedBox(height: 14),
-        const Text(
-          'No item added yet',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Expiry reminders will appear here.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey, fontSize: 16),
-        ),
-        const SizedBox(height: 28),
-        Divider(color: primaryColor),
-        const SizedBox(height: 24),
-        const Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Inventory',
-              style: TextStyle(fontSize: 29, fontWeight: FontWeight.w500),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F5F0),
+              borderRadius: BorderRadius.circular(30),
             ),
-            Text('0 items', style: TextStyle(fontSize: 21)),
-          ],
-        ),
-        const SizedBox(height: 22),
-        Icon(Icons.kitchen_outlined, size: 76, color: primaryColor),
-        const SizedBox(height: 12),
-        const Text(
-          'Your inventory is empty',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Add items to keep track of what you have.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey, fontSize: 16),
-        ),
-        const SizedBox(height: 28),
-        const Text(
-          'Log in to start your own inventory.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey, fontSize: 16),
-        ),
-        const SizedBox(height: 18),
-        SizedBox(
-          height: 56,
-          child: FilledButton(
-            onPressed: onLoginTap,
-            child: const Text(
-              'Log in / Sign up',
-              style: TextStyle(fontSize: 19),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.person_outline, size: 19),
+                SizedBox(width: 6),
+                Text(
+                  'Guest Mode',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+              ],
             ),
           ),
         ),
+        const SizedBox(height: 22),
+        const _SectionTitle('Expiring soon'),
+        const SizedBox(height: 8),
+        const Center(
+          child: HomeEmptyIllustration(asset: HomeAssets.guestExpiry, size: 94),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'No item added yet',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 5),
+        const Text(
+          'Expiry reminders will appear here.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 15, color: AppColors.muted),
+        ),
+        const SizedBox(height: 18),
+        const _GreenDivider(),
+        const SizedBox(height: 17),
+        const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: _SectionTitle('Inventory')),
+            Text('0 items', style: TextStyle(fontSize: 17)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        const Center(
+          child: HomeEmptyIllustration(asset: HomeAssets.avatar, size: 108),
+        ),
+        const SizedBox(height: 7),
+        const Text(
+          'Your inventory is empty',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 5),
+        const Text(
+          'Add item to keep track of what you have.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 15, color: AppColors.muted),
+        ),
+        const SizedBox(height: 17),
+        const _GreenDivider(),
       ],
     );
   }
@@ -193,6 +239,7 @@ class _UserHomeContent extends StatefulWidget {
     required this.onSearchTap,
     required this.onExpiringTap,
     required this.onInventoryTap,
+    required this.onAddItemTap,
   });
 
   final ExpirySummaryController? expirySummaryController;
@@ -202,6 +249,7 @@ class _UserHomeContent extends StatefulWidget {
   final VoidCallback? onSearchTap;
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
+  final VoidCallback? onAddItemTap;
 
   @override
   State<_UserHomeContent> createState() => _UserHomeContentState();
@@ -213,186 +261,183 @@ class _UserHomeContentState extends State<_UserHomeContent> {
   @override
   void initState() {
     super.initState();
-
-    final controller = widget.storageSpaceController;
-    if (controller != null &&
-        controller.status == StorageSpaceLoadStatus.initial) {
-      controller.loadStorageSpaces();
+    final spaces = widget.storageSpaceController;
+    if (spaces != null && spaces.status == StorageSpaceLoadStatus.initial) {
+      spaces.loadStorageSpaces();
     }
-
-    final inventoryController = widget.inventoryController;
-    if (inventoryController != null &&
-        inventoryController.status == InventoryLoadStatus.initial) {
-      inventoryController.loadInventory();
+    final inventory = widget.inventoryController;
+    if (inventory != null && inventory.status == InventoryLoadStatus.initial) {
+      inventory.loadInventory();
     }
-
-    final expirySummaryController = widget.expirySummaryController;
-    if (expirySummaryController != null &&
-        expirySummaryController.status == ExpirySummaryLoadStatus.initial) {
-      expirySummaryController.loadSummary(
-        asOf: DateUtils.dateOnly(DateTime.now()),
-      );
+    final expiry = widget.expirySummaryController;
+    if (expiry != null && expiry.status == ExpirySummaryLoadStatus.initial) {
+      expiry.loadSummary(asOf: DateUtils.dateOnly(DateTime.now()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _openStorageSpaces,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.black,
-                  backgroundColor: Colors.white,
-                  side: BorderSide.none,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
+            _HomePill(
+              onTap: _openStorageSpaces,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 105),
+                    child: Text(
+                      _selectedStorageSpace?.name ?? 'All Spaces',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14),
+                    ),
                   ),
-                ),
-                child: AnimatedBuilder(
-                  animation:
-                      widget.storageSpaceController ?? const _IdleListenable(),
-                  builder: (context, child) => Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(child: Text(_storageSpaceLabel)),
-                      const Icon(Icons.keyboard_arrow_down),
-                    ],
-                  ),
-                ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.keyboard_arrow_down, size: 21),
+                ],
               ),
             ),
             const SizedBox(width: 14),
             Expanded(
-              flex: 2,
-              child: InkWell(
-                onTap: widget.onSearchTap ?? _openInventory,
-                borderRadius: BorderRadius.circular(28),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.search, size: 26),
-                      SizedBox(width: 10),
-                      Text(
+              child: _HomePill(
+                onTap: widget.onSearchTap ?? _openSearch,
+                child: Row(
+                  children: [
+                    Image.asset(HomeAssets.search, width: 21, height: 21),
+                    const SizedBox(width: 8),
+                    const Flexible(
+                      child: Text(
                         'Search items ...',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 14, color: AppColors.muted),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 42),
-        const Text(
-          'Expiring soon',
-          style: TextStyle(fontSize: 29, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 24),
+        const _SectionTitle('Expiring soon'),
+        const SizedBox(height: 15),
         AnimatedBuilder(
           animation: widget.expirySummaryController ?? const _IdleListenable(),
-          builder: (context, child) => _buildExpirySummary(primaryColor),
+          builder: (context, child) => _buildExpirySummary(),
         ),
-        const SizedBox(height: 18),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            onPressed: _openExpiringItems,
-            iconAlignment: IconAlignment.end,
-            icon: const Icon(Icons.chevron_right),
-            label: const Text('View all expiring items'),
-          ),
+        AnimatedBuilder(
+          animation: widget.expirySummaryController ?? const _IdleListenable(),
+          builder: (context, child) {
+            final controller = widget.expirySummaryController;
+            if (controller?.status != ExpirySummaryLoadStatus.loaded ||
+                controller!.counts.total == 0) {
+              return const SizedBox(height: 32);
+            }
+            return Column(
+              children: [
+                const SizedBox(height: 14),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _GreenAction(
+                    label: 'View all expiring items',
+                    onPressed: _openExpiringItems,
+                  ),
+                ),
+                const SizedBox(height: 38),
+              ],
+            );
+          },
         ),
-        const SizedBox(height: 50),
         AnimatedBuilder(
           animation: widget.inventoryController ?? const _IdleListenable(),
           builder: (context, child) => _buildInventorySummary(),
         ),
-        const SizedBox(height: 30),
-        SizedBox(
-          width: 260,
-          child: FilledButton.icon(
+        const SizedBox(height: 23),
+        Center(
+          child: _GreenAction(
+            label: 'View all items',
             onPressed: _openInventory,
-            iconAlignment: IconAlignment.end,
-            icon: const Icon(Icons.chevron_right),
-            label: const Text('View all items'),
+            width: 238,
           ),
         ),
       ],
     );
   }
 
-  String get _storageSpaceLabel {
-    final controller = widget.storageSpaceController;
-    if (controller == null) return 'All Spaces';
-
-    final selectedStorageSpace = _selectedStorageSpace;
-    if (selectedStorageSpace != null) return selectedStorageSpace.name;
-
-    return switch (controller.status) {
-      StorageSpaceLoadStatus.initial => 'All Spaces',
-      StorageSpaceLoadStatus.loading => 'Loading...',
-      StorageSpaceLoadStatus.loaded => 'All Spaces (${controller.total})',
-      StorageSpaceLoadStatus.empty => 'No spaces',
-      StorageSpaceLoadStatus.error => 'Try again',
-    };
-  }
-
-  Widget _buildExpirySummary(Color primaryColor) {
+  Widget _buildExpirySummary() {
     final controller = widget.expirySummaryController;
     if (controller == null) {
-      return const _ExpiryStatusMessage(message: 'Expiry data unavailable.');
+      return const _StatusMessage('Expiry data unavailable.');
     }
-
     return switch (controller.status) {
       ExpirySummaryLoadStatus.initial ||
       ExpirySummaryLoadStatus.loading => const SizedBox(
-        height: 150,
+        height: 135,
         child: Center(child: CircularProgressIndicator()),
       ),
-      ExpirySummaryLoadStatus.empty => const _ExpiryCountAndContent(
-        count: 0,
-        child: _ExpiryStatusMessage(message: 'No items expiring soon.'),
+      ExpirySummaryLoadStatus.error => _StatusMessage(
+        controller.errorMessage ?? 'Unable to load expiry data.',
+        onRetry: controller.reload,
       ),
-      ExpirySummaryLoadStatus.error => _ExpiryCountAndContent(
-        count: 0,
-        child: _ExpiryStatusMessage(
-          message: controller.errorMessage ?? 'Unable to load expiry data.',
-          onRetry: controller.reload,
-        ),
-      ),
-      ExpirySummaryLoadStatus.loaded => _ExpiryCountAndContent(
-        count: controller.counts.total,
-        dividerColor: primaryColor,
-        child: Column(
-          children: [
-            for (
-              var index = 0;
-              index < controller.items.length && index < 2;
-              index++
-            ) ...[
-              if (index > 0) const Divider(),
-              _ExpiryItemRow(summaryItem: controller.items[index]),
-            ],
-          ],
-        ),
-      ),
+      ExpirySummaryLoadStatus.empty => const _EmptyExpiry(),
+      ExpirySummaryLoadStatus.loaded =>
+        controller.counts.total == 0
+            ? const _EmptyExpiry()
+            : Row(
+                children: [
+                  SizedBox(
+                    width: 112,
+                    child: Column(
+                      children: [
+                        Text(
+                          '${controller.counts.total}',
+                          style: const TextStyle(
+                            color: Color(0xFFC8532C),
+                            fontSize: 77,
+                            height: 0.95,
+                          ),
+                        ),
+                        const Text(
+                          'Items',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 128,
+                    color: const Color(0xFFA8D589),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        for (
+                          var i = 0;
+                          i < controller.items.length && i < 2;
+                          i++
+                        ) ...[
+                          if (i > 0)
+                            const Divider(color: Color(0xFFA8D589), height: 13),
+                          _ExpiryPreviewRow(
+                            summaryItem: controller.items[i],
+                            onTap: () => _openDetail(controller.items[i].item),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
     };
   }
 
@@ -400,40 +445,59 @@ class _UserHomeContentState extends State<_UserHomeContent> {
     final controller = widget.inventoryController;
     final status = controller?.status ?? InventoryLoadStatus.initial;
     final total = status == InventoryLoadStatus.loaded ? controller!.total : 0;
-
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Inventory',
-              style: TextStyle(fontSize: 29, fontWeight: FontWeight.w500),
-            ),
-            Text(
-              '$total ${total == 1 ? 'item' : 'items'}',
-              style: const TextStyle(fontSize: 21),
+            const Expanded(child: _SectionTitle('Inventory')),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$total ${total == 1 ? 'item' : 'items'}',
+                  style: const TextStyle(fontSize: 17),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: widget.onAddItemTap,
+                  tooltip: 'Add inventory item',
+                  icon: const Icon(Icons.add),
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 18),
         switch (status) {
           InventoryLoadStatus.initial ||
           InventoryLoadStatus.loading => const SizedBox(
-            height: 80,
+            height: 92,
             child: Center(child: CircularProgressIndicator()),
           ),
-          InventoryLoadStatus.empty => const _InventoryStatusMessage(
-            icon: Icons.inventory_2_outlined,
-            message: 'Your inventory is empty.',
-          ),
-          InventoryLoadStatus.error => _InventoryStatusMessage(
-            icon: Icons.cloud_off_outlined,
-            message: controller?.errorMessage ?? 'Unable to load inventory.',
+          InventoryLoadStatus.error => _StatusMessage(
+            controller?.errorMessage ?? 'Unable to load inventory.',
             onRetry: controller?.reload,
           ),
-          InventoryLoadStatus.loaded => _InventoryPreview(
-            items: controller!.items.take(3).toList(growable: false),
+          InventoryLoadStatus.empty => Column(
+            children: [
+              Image.asset(HomeAssets.avatar, width: 96, height: 96),
+              const SizedBox(height: 8),
+              const Text(
+                'Your inventory is empty',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                'Add item to keep track of what you have.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, color: AppColors.muted),
+              ),
+            ],
+          ),
+          InventoryLoadStatus.loaded => _CategoryCounts(
+            items: controller!.items,
+            partial: controller.hasNextPage,
           ),
         },
       ],
@@ -441,33 +505,169 @@ class _UserHomeContentState extends State<_UserHomeContent> {
   }
 
   void _openStorageSpaces() {
-    final customAction = widget.onStorageSpacesTap;
-    if (customAction != null) {
-      customAction();
+    final custom = widget.onStorageSpacesTap;
+    if (custom != null) {
+      custom();
       return;
     }
-
     final controller = widget.storageSpaceController;
     if (controller == null) return;
-
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (storageContext) => StorageSpaceScreen(
-          controller: controller,
-          onSelected: (space) {
-            Navigator.of(storageContext).pop();
-            _selectStorageSpace(space);
-          },
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 11, 20, 28),
+          child: AnimatedBuilder(
+            animation: controller,
+            builder: (context, child) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 58,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.muted,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Choose storage space',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 15),
+                _spaceOption(
+                  sheetContext,
+                  null,
+                  'All spaces',
+                  widget.inventoryController?.storageSpaceId == null
+                      ? widget.inventoryController?.total
+                      : null,
+                ),
+                if (controller.status == StorageSpaceLoadStatus.loading)
+                  const Center(child: CircularProgressIndicator()),
+                if (controller.status == StorageSpaceLoadStatus.error)
+                  TextButton(
+                    onPressed: controller.loadStorageSpaces,
+                    child: const Text('Could not load spaces. Try again'),
+                  ),
+                for (final space in controller.storageSpaces)
+                  _spaceOption(
+                    sheetContext,
+                    space,
+                    space.name,
+                    _countForSpace(space),
+                  ),
+                const Divider(color: Color(0xFFA8D589)),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 5),
+                  leading: Image.asset(
+                    HomeAssets.setting,
+                    width: 26,
+                    height: 26,
+                  ),
+                  title: const Text(
+                    'Manage storage spaces',
+                    style: TextStyle(fontSize: 17),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => StorageSpaceScreen(
+                          controller: controller,
+                          inventoryController: widget.inventoryController,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  void _selectStorageSpace(StorageSpace? space) {
-    setState(() {
-      _selectedStorageSpace = space;
-    });
+  Widget _spaceOption(
+    BuildContext sheetContext,
+    StorageSpace? space,
+    String label,
+    int? count,
+  ) {
+    final selected = _selectedStorageSpace?.id == space?.id;
+    return InkWell(
+      onTap: () {
+        Navigator.pop(sheetContext);
+        _selectStorageSpace(space);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFE1F5D2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    count == null
+                        ? 'Items'
+                        : '$count ${count == 1 ? 'item' : 'items'}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: Colors.black,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  int? _countForSpace(StorageSpace space) {
+    final inventory = widget.inventoryController;
+    if (inventory == null || inventory.status != InventoryLoadStatus.loaded) {
+      return null;
+    }
+    if (inventory.hasNextPage || inventory.storageSpaceId != null) return null;
+    return inventory.items
+        .where((item) => item.storageSpaceId == space.id)
+        .length;
+  }
+
+  void _selectStorageSpace(StorageSpace? space) {
+    setState(() => _selectedStorageSpace = space);
     widget.inventoryController?.loadInventory(storageSpaceId: space?.id);
     widget.expirySummaryController?.loadSummary(
       asOf: DateUtils.dateOnly(DateTime.now()),
@@ -475,39 +675,330 @@ class _UserHomeContentState extends State<_UserHomeContent> {
     );
   }
 
-  void _openInventory() {
-    final customAction = widget.onInventoryTap;
-    if (customAction != null) {
-      customAction();
-      return;
-    }
-
+  Future<void> _openSearch() async {
     final controller = widget.inventoryController;
     if (controller == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => InventorySearchScreen(
+          controller: controller,
+          storageSpaceController: widget.storageSpaceController,
+        ),
+      ),
+    );
+    if (mounted) {
+      controller.loadInventory(storageSpaceId: _selectedStorageSpace?.id);
+    }
+  }
 
+  Future<void> _openInventory() async {
+    final custom = widget.onInventoryTap;
+    if (custom != null) {
+      custom();
+      return;
+    }
+    final controller = widget.inventoryController;
+    if (controller == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => InventoryScreen(
+          controller: controller,
+          storageSpaceController: widget.storageSpaceController,
+          onAddItemTap: widget.onAddItemTap,
+        ),
+      ),
+    );
+    if (mounted) {
+      controller.loadInventory(storageSpaceId: _selectedStorageSpace?.id);
+    }
+  }
+
+  Future<void> _openExpiringItems() async {
+    final custom = widget.onExpiringTap;
+    if (custom != null) {
+      custom();
+      return;
+    }
+    final expiry = widget.expirySummaryController;
+    final inventory = widget.inventoryController;
+    if (expiry == null || inventory == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ExpiringItemsScreen(
+          controller: expiry,
+          inventoryController: inventory,
+          storageSpaceController: widget.storageSpaceController,
+        ),
+      ),
+    );
+    if (mounted) {
+      expiry.loadSummary(
+        asOf: DateUtils.dateOnly(DateTime.now()),
+        storageSpaceId: _selectedStorageSpace?.id,
+      );
+      inventory.loadInventory(storageSpaceId: _selectedStorageSpace?.id);
+    }
+  }
+
+  void _openDetail(InventoryItem item) {
+    final inventory = widget.inventoryController;
+    if (inventory == null) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => InventoryScreen(controller: controller),
+        builder: (_) => InventoryDetailScreen(
+          itemId: item.id,
+          controller: inventory.createDetailController(),
+        ),
       ),
     );
   }
+}
 
-  void _openExpiringItems() {
-    final customAction = widget.onExpiringTap;
-    if (customAction != null) {
-      customAction();
-      return;
-    }
+class _HomePill extends StatelessWidget {
+  const _HomePill({required this.onTap, required this.child});
 
-    final expiryController = widget.expirySummaryController;
-    final inventoryController = widget.inventoryController;
-    if (expiryController == null || inventoryController == null) return;
+  final VoidCallback onTap;
+  final Widget child;
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ExpiringItemsScreen(
-          controller: expiryController,
-          inventoryController: inventoryController,
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(28),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(28),
+        child: Container(
+          height: 37,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.centerLeft,
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE6EDDF)),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label,
+    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w500),
+  );
+}
+
+class _GreenDivider extends StatelessWidget {
+  const _GreenDivider();
+
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(color: Color(0xFFA8D589), thickness: 0.8, height: 1);
+}
+
+class _GreenAction extends StatelessWidget {
+  const _GreenAction({
+    required this.label,
+    required this.onPressed,
+    this.width,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final double? width;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: 45,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.chevron_right, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyExpiry extends StatelessWidget {
+  const _EmptyExpiry();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          Image.asset(HomeAssets.noExpiry, width: 105, height: 105),
+          const SizedBox(height: 9),
+          const Text(
+            'No items expiring soon',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 9),
+          const Text(
+            'Nothing is due to expire\nin the next 3 days',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, color: AppColors.muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExpiryPreviewRow extends StatelessWidget {
+  const _ExpiryPreviewRow({required this.summaryItem, required this.onTap});
+
+  final ExpirySummaryItem summaryItem;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = summaryItem.item;
+    return InkWell(
+      onTap: onTap,
+      child: Row(
+        children: [
+          InventoryArtwork(item: item, size: 47),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.itemDefinitionName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 15),
+                ),
+                Text(
+                  '${quantityLabel(item)} | ${item.storageSpaceName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: item.isEstimated
+                        ? const Color(0xFFD75A20)
+                        : AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              expiryLabel(item.expiryDate),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: expiryColor(item.expiryDate),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryCounts extends StatelessWidget {
+  const _CategoryCounts({required this.items, required this.partial});
+
+  final List<InventoryItem> items;
+  final bool partial;
+
+  @override
+  Widget build(BuildContext context) {
+    int count(String group) => items.where((item) {
+      final category = item.categoryName.toLowerCase();
+      if (group == 'Meat') {
+        return category.contains('meat') ||
+            category.contains('poultry') ||
+            category.contains('seafood');
+      }
+      if (group == 'Vegetables') {
+        return category.contains('vegetable') || category.contains('produce');
+      }
+      return !category.contains('meat') &&
+          !category.contains('poultry') &&
+          !category.contains('seafood') &&
+          !category.contains('vegetable') &&
+          !category.contains('produce');
+    }).length;
+
+    return Row(
+      children: [
+        for (final group in const ['Meat', 'Vegetables', 'Others']) ...[
+          if (group != 'Meat')
+            Container(width: 1, height: 78, color: const Color(0xFFA8D589)),
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  '${count(group)}${partial ? '+' : ''}',
+                  style: const TextStyle(fontSize: 40, height: 1.1),
+                ),
+                Text(
+                  group,
+                  style: const TextStyle(fontSize: 15, color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StatusMessage extends StatelessWidget {
+  const _StatusMessage(this.message, {this.onRetry});
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 115,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            if (onRetry != null)
+              TextButton(onPressed: onRetry, child: const Text('Try again')),
+          ],
         ),
       ),
     );
@@ -516,197 +1007,8 @@ class _UserHomeContentState extends State<_UserHomeContent> {
 
 class _IdleListenable implements Listenable {
   const _IdleListenable();
-
   @override
   void addListener(VoidCallback listener) {}
-
   @override
   void removeListener(VoidCallback listener) {}
-}
-
-class _ExpiryCountAndContent extends StatelessWidget {
-  const _ExpiryCountAndContent({
-    required this.count,
-    required this.child,
-    this.dividerColor,
-  });
-
-  final int count;
-  final Widget child;
-  final Color? dividerColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(
-          width: 120,
-          child: Column(
-            children: [
-              Text(
-                '$count',
-                style: const TextStyle(
-                  color: Color(0xFFD95228),
-                  fontSize: 78,
-                  height: 0.9,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                count == 1 ? 'Item' : 'Items',
-                style: const TextStyle(color: Colors.grey, fontSize: 20),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          width: 1,
-          height: 150,
-          color: dividerColor ?? Theme.of(context).colorScheme.primary,
-        ),
-        const SizedBox(width: 16),
-        Expanded(child: child),
-      ],
-    );
-  }
-}
-
-class _ExpiryItemRow extends StatelessWidget {
-  const _ExpiryItemRow({required this.summaryItem});
-
-  final ExpirySummaryItem summaryItem;
-
-  @override
-  Widget build(BuildContext context) {
-    final item = summaryItem.item;
-
-    return Row(
-      children: [
-        const Icon(Icons.inventory_2_outlined, size: 42),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.itemDefinitionName,
-                style: const TextStyle(fontSize: 17),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '${item.displayQuantity} | ${item.storageSpaceName}',
-                style: const TextStyle(color: Colors.grey, fontSize: 14),
-              ),
-            ],
-          ),
-        ),
-        Text(
-          _bucketLabel(summaryItem.bucket),
-          style: const TextStyle(color: Color(0xFFC66500), fontSize: 14),
-        ),
-      ],
-    );
-  }
-
-  String _bucketLabel(String bucket) {
-    return switch (bucket) {
-      'overdue' => 'Overdue',
-      'today' => 'Today',
-      'upcoming' => 'Soon',
-      _ => bucket,
-    };
-  }
-}
-
-class _ExpiryStatusMessage extends StatelessWidget {
-  const _ExpiryStatusMessage({required this.message, this.onRetry});
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(message, textAlign: TextAlign.center),
-        if (onRetry != null) ...[
-          const SizedBox(height: 8),
-          TextButton(onPressed: onRetry, child: const Text('Try again')),
-        ],
-      ],
-    );
-  }
-}
-
-class _InventoryPreview extends StatelessWidget {
-  const _InventoryPreview({required this.items});
-
-  final List<InventoryItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: items
-          .map(
-            (item) => Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  children: [
-                    const Icon(Icons.inventory_2_outlined, size: 34),
-                    const SizedBox(height: 8),
-                    Text(
-                      item.itemDefinitionName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.displayQuantity,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
-class _InventoryStatusMessage extends StatelessWidget {
-  const _InventoryStatusMessage({
-    required this.icon,
-    required this.message,
-    this.onRetry,
-  });
-
-  final IconData icon;
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 80,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 10),
-          Flexible(child: Text(message)),
-          if (onRetry != null) ...[
-            const SizedBox(width: 8),
-            TextButton(onPressed: onRetry, child: const Text('Try again')),
-          ],
-        ],
-      ),
-    );
-  }
 }

@@ -2,18 +2,32 @@ import 'package:flutter/foundation.dart';
 
 import '../models/storage_space.dart';
 import '../repositories/storage_space_repository.dart';
+import '../repositories/workspace_repository.dart';
 import '../services/api_exception.dart';
 
-enum StorageSpaceLoadStatus {
-  initial,
-  loading,
-  loaded,
-  empty,
-  error,
-}
+enum StorageSpaceLoadStatus { initial, loading, loaded, empty, error }
 
 class StorageSpaceController extends ChangeNotifier {
-  StorageSpaceController(this._repository);
+  StorageSpaceController(this._repository, {this.workspace});
+  final WorkspaceRepository? workspace;
+  int _sequence = 0;
+
+  void reset() {
+    ++_sequence;
+    _storageSpaces = [];
+    _total = 0;
+    _page = 1;
+    _hasNextPage = false;
+    _errorMessage = null;
+    _status = StorageSpaceLoadStatus.initial;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    ++_sequence;
+    super.dispose();
+  }
 
   final StorageSpaceRepository _repository;
 
@@ -44,6 +58,7 @@ class StorageSpaceController extends ChangeNotifier {
     int page = 1,
     int pageSize = 20,
   }) async {
+    final sequence = ++_sequence;
     _status = StorageSpaceLoadStatus.loading;
     _errorMessage = null;
     notifyListeners();
@@ -55,6 +70,8 @@ class StorageSpaceController extends ChangeNotifier {
         pageSize: pageSize,
       );
 
+      if (sequence != _sequence) return;
+
       _storageSpaces = result.items;
       _total = result.total;
       _page = result.page;
@@ -64,6 +81,7 @@ class StorageSpaceController extends ChangeNotifier {
           ? StorageSpaceLoadStatus.empty
           : StorageSpaceLoadStatus.loaded;
     } catch (error) {
+      if (sequence != _sequence) return;
       _storageSpaces = [];
       _total = 0;
       _hasNextPage = false;
