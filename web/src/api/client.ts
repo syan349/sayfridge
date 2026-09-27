@@ -1,7 +1,8 @@
 // The one place the web app talks to the backend.
 //
 // apiFetch() adds the bearer token, sends/reads JSON, and turns every failed
-// response into an ApiError so pages only handle one error type. The backend
+// response into an ApiError so pages only handle one error type (apiStream()
+// does the same for the assistant's streamed answers). The backend
 // uses three error body shapes (docs/API_REFERENCE.md, "Errors"):
 //
 //   business:        {"detail": {"code": "NOT_FOUND", "message": "...", "errors"?: [...]}}
@@ -77,6 +78,21 @@ export function onUnauthorized(listener: () => void): () => void {
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await send(path, options)
+  return (await readBody(response)) as T
+}
+
+/**
+ * For answers that arrive as a stream (the assistant's Server-Sent Events).
+ * Same token and same errors as apiFetch, but the body is NOT read here:
+ * the caller reads it piece by piece with response.body.getReader().
+ */
+export function apiStream(path: string, options: Pick<RequestOptions, 'body' | 'signal'> = {}): Promise<Response> {
+  return send(path, { ...options, method: 'POST', headers: { Accept: 'text/event-stream' } })
+}
+
+/** Sends the request; throws ApiError for a network failure or any non-2xx answer. */
+async function send(path: string, options: RequestOptions): Promise<Response> {
   const { method = 'GET', query, body, headers, signal, auth = true } = options
   const token = auth ? getToken() : null
 
@@ -97,9 +113,8 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     throw new ApiError(0, 'NETWORK_ERROR', 'Could not reach the server. Check your connection and try again.')
   }
 
-  const data = await readBody(response)
-
   if (!response.ok) {
+    const data = await readBody(response)
     if (response.status === 401 && auth) {
       clearToken()
       unauthorizedListeners.forEach((listener) => listener())
@@ -107,7 +122,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     throw toApiError(response.status, data)
   }
 
-  return data as T
+  return response
 }
 
 function buildUrl(path: string, query: RequestOptions['query']): string {

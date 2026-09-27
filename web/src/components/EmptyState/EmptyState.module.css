@@ -1,0 +1,46 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 36px 24px;
+  text-align: center;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 6px;
+  border: 1.2px solid var(--sf-border-card);
+  border-radius: 20px;
+  background: var(--sf-green-tint);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--sf-font-display);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.text {
+  max-width: 440px;
+  font-size: var(--sf-text-md);
+  line-height: 1.5;
+  color: var(--sf-text-body);
+}
+
+.text p {
+  margin: 0;
+}
+
+.action {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
