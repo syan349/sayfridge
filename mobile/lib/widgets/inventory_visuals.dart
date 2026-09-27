@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/inventory_item.dart';
 import '../theme/app_theme.dart';
+import 'inventory_card_trailing.dart';
 
 abstract final class HomeAssets {
   static const root = 'assets/icons/home';
@@ -41,7 +42,8 @@ class HomeEmptyIllustration extends StatelessWidget {
               asset,
               width: size,
               height: size,
-              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).ceil(),
+              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                  .ceil(),
               // Mipmaps retain smooth edges when reducing the large source art.
               filterQuality: FilterQuality.medium,
             ),
@@ -252,25 +254,9 @@ class InventoryItemTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    expiryLabel(item.expiryDate),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: expiryColor(item.expiryDate),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('View item', style: TextStyle(fontSize: 13)),
-                      Icon(Icons.chevron_right, size: 18),
-                    ],
-                  ),
-                ],
+              InventoryCardTrailing(
+                expiryText: expiryLabel(item.expiryDate),
+                expiryColor: expiryColor(item.expiryDate),
               ),
             ],
           ),

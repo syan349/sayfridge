@@ -5,7 +5,7 @@ import '../theme/app_theme.dart';
 abstract final class AssistantAssets {
   static const root = 'assets/icons/assistant';
   static const add = '$root/add.png';
-  static const aiAssistant = '$root/ai_assistant.png';
+  static const aiAssistant = 'assets/icons/home/default_avatar.png';
   static const chat = '$root/chat.png';
   static const home = '$root/home.png';
   static const history = '$root/history.png';

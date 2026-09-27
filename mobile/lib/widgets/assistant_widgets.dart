@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import 'app_bottom_navigation.dart';
+import 'inventory_card_trailing.dart';
 
 const inventoryExactColor = Color(0xFF3F9E36);
 const inventoryEstimatedColor = Color(0xFFE95A18);
@@ -9,6 +10,10 @@ const exampleMessageStyle = TextStyle(
   fontSize: 16,
   fontWeight: FontWeight.w400,
 );
+
+// Measure text insets from the rounded body, excluding the speech tail.
+const _bubbleTextInset = 12.0;
+const _bubbleTailWidth = 13.0;
 
 class AssistantHeader extends StatelessWidget {
   const AssistantHeader({
@@ -102,6 +107,34 @@ class _HeaderAction extends StatelessWidget {
   }
 }
 
+class AssistantAvatar extends StatelessWidget {
+  const AssistantAvatar({this.size = 47, super.key});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      foregroundDecoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFBCD0A9)),
+      ),
+      child: ClipOval(
+        child: Image.asset(
+          AssistantAssets.aiAssistant,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).ceil(),
+          filterQuality: FilterQuality.medium,
+        ),
+      ),
+    );
+  }
+}
+
 class AssistantGreeting extends StatelessWidget {
   const AssistantGreeting({
     this.message = 'Hey, Tim!  How can I help you?',
@@ -115,15 +148,7 @@ class AssistantGreeting extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        ClipOval(
-          child: Image.asset(
-            AssistantAssets.aiAssistant,
-            width: 47,
-            height: 47,
-            fit: BoxFit.cover,
-            cacheWidth: 120,
-          ),
-        ),
+        const AssistantAvatar(),
         const SizedBox(width: 11),
         Flexible(
           fit: FlexFit.loose,
@@ -131,7 +156,10 @@ class AssistantGreeting extends StatelessWidget {
             clipper: const _SpeechBubbleClipper(tailOnLeft: true),
             child: Container(
               height: 47,
-              padding: const EdgeInsets.only(left: 25, right: 16),
+              padding: const EdgeInsets.only(
+                left: _bubbleTailWidth + _bubbleTextInset,
+                right: _bubbleTextInset,
+              ),
               color: AppColors.primarySoft,
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -169,11 +197,17 @@ class UserMessageBubble extends StatelessWidget {
         clipper: const _SpeechBubbleClipper(tailOnLeft: false),
         child: Container(
           constraints: const BoxConstraints(maxWidth: 300),
-          padding: const EdgeInsets.fromLTRB(23, 13, 25, 13),
+          padding: const EdgeInsets.fromLTRB(
+            _bubbleTextInset,
+            13,
+            _bubbleTextInset + _bubbleTailWidth,
+            13,
+          ),
           color: AppColors.primarySoft,
           child: Text(
             message,
             textAlign: TextAlign.center,
+            textWidthBasis: TextWidthBasis.longestLine,
             style:
                 textStyle ??
                 const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
@@ -195,12 +229,25 @@ class AssistantMessageBubble extends StatelessWidget {
   final TextStyle textStyle;
 
   @override
-  Widget build(BuildContext context) => ClipPath(
-    clipper: const _SpeechBubbleClipper(tailOnLeft: true),
-    child: Container(
-      padding: const EdgeInsets.fromLTRB(25, 12, 16, 12),
-      color: AppColors.primarySoft,
-      child: Text(message, style: textStyle),
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    widthFactor: 1,
+    child: ClipPath(
+      clipper: const _SpeechBubbleClipper(tailOnLeft: true),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(
+          _bubbleTailWidth + _bubbleTextInset,
+          12,
+          _bubbleTextInset,
+          12,
+        ),
+        color: AppColors.primarySoft,
+        child: Text(
+          message,
+          style: textStyle,
+          textWidthBasis: TextWidthBasis.longestLine,
+        ),
+      ),
     ),
   );
 }
@@ -213,7 +260,7 @@ class _SpeechBubbleClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     const radius = 14.0;
-    const tail = 13.0;
+    const tail = _bubbleTailWidth;
     final bodyLeft = tailOnLeft ? tail : 0.0;
     final bodyRight = tailOnLeft ? size.width : size.width - tail;
     final centerY = size.height / 2;
@@ -426,55 +473,13 @@ class InventoryItemCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 7),
-          SizedBox(
-            width: compact ? 100 : 112,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  children: [
-                    Image.asset(
-                      AssistantAssets.warn,
-                      width: 19,
-                      height: 19,
-                      fit: BoxFit.contain,
-                      cacheWidth: 64,
-                    ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        item.daysLeft,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          color: item.expiryIsEstimate
-                              ? inventoryEstimatedColor
-                              : inventoryExactColor,
-                          fontSize: 14.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 13),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        'View item',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13.5),
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, size: 22),
-                  ],
-                ),
-              ],
-            ),
+          InventoryCardTrailing(
+            expiryText: item.daysLeft,
+            expiryColor: item.expiryIsEstimate
+                ? inventoryEstimatedColor
+                : inventoryExactColor,
+            showWarning: true,
+            maxWidth: compact ? 100 : 112,
           ),
         ],
       ),

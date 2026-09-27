@@ -221,7 +221,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        const AssistantGreeting(),
+        AssistantGreeting(
+          message: widget.isGuest
+              ? 'Hey! How can I help you?'
+              : 'Hey, Tim!  How can I help you?',
+        ),
         if (widget.isGuest)
           _buildGuestContent()
         else if (_showResults)
@@ -340,7 +344,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     return Column(
       children: [
-        const SizedBox(height: 28),
+        const SizedBox(height: 40),
         const Text(
           'Your inventory, organised\nwith a conversation.',
           textAlign: TextAlign.center,
@@ -350,7 +354,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             height: 1.18,
           ),
         ),
-        const SizedBox(height: 25),
+        const SizedBox(height: 40),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(17, 20, 17, 20),
@@ -416,15 +420,7 @@ class _GuestAssistantReply extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        ClipOval(
-          child: Image.asset(
-            AssistantAssets.aiAssistant,
-            width: 42,
-            height: 42,
-            fit: BoxFit.cover,
-            cacheWidth: 100,
-          ),
-        ),
+        const AssistantAvatar(size: 42),
         const SizedBox(width: 11),
         const Flexible(
           child: AssistantMessageBubble(
