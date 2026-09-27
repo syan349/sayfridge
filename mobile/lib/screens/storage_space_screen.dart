@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../models/storage_space.dart';
+import '../state/inventory_controller.dart';
 import '../state/storage_space_controller.dart';
+import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/inventory_visuals.dart';
+import '../widgets/business_forms.dart';
+import '../repositories/workspace_repository.dart';
 
 class StorageSpaceScreen extends StatelessWidget {
   const StorageSpaceScreen({
     required this.controller,
+    this.inventoryController,
     this.onSelected,
     super.key,
   });
 
   final StorageSpaceController controller;
+  final InventoryController? inventoryController;
   final ValueChanged<StorageSpace?>? onSelected;
 
   @override
@@ -24,28 +31,16 @@ class StorageSpaceScreen extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 20, 12),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.arrow_back),
-                          tooltip: 'Back',
-                        ),
-                        const SizedBox(width: 4),
-                        const Expanded(
-                          child: Text(
-                            'Storage Spaces',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
+                  const OverviewHeader(title: 'Storage spaces'),
+                  const Text(
+                    'Manage where you store items.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 24),
                   Expanded(
                     child: AnimatedBuilder(
                       animation: controller,
@@ -65,19 +60,11 @@ class StorageSpaceScreen extends StatelessWidget {
     return switch (controller.status) {
       StorageSpaceLoadStatus.initial || StorageSpaceLoadStatus.loading =>
         const Center(child: CircularProgressIndicator()),
-      StorageSpaceLoadStatus.empty => _StorageSpaceMessage(
-        icon: Icons.kitchen_outlined,
-        title: 'No storage spaces yet',
-        message: 'Your active storage spaces will appear here.',
-        actionLabel: 'Refresh',
-        onAction: controller.loadStorageSpaces,
-      ),
-      StorageSpaceLoadStatus.error => _StorageSpaceMessage(
-        icon: Icons.cloud_off_outlined,
+      StorageSpaceLoadStatus.empty => _buildLoadedContent(context),
+      StorageSpaceLoadStatus.error => _Message(
         title: 'Unable to load storage spaces',
         message: controller.errorMessage ?? 'Please try again.',
-        actionLabel: 'Try again',
-        onAction: controller.loadStorageSpaces,
+        onRetry: controller.loadStorageSpaces,
       ),
       StorageSpaceLoadStatus.loaded => _buildLoadedContent(context),
     };
@@ -88,65 +75,74 @@ class StorageSpaceScreen extends StatelessWidget {
       onRefresh: controller.loadStorageSpaces,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        padding: const EdgeInsets.fromLTRB(25, 0, 25, 32),
         children: [
-          Text(
-            '${controller.total} active ${controller.total == 1 ? 'space' : 'spaces'}',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 16),
-          if (onSelected != null) ...[
-            Card(
-              child: ListTile(
+          if (onSelected != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _SpaceCard(
+                label: 'All Spaces',
+                count: inventoryController?.total,
+                icon: Icons.apps,
                 onTap: () => onSelected!(null),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 8,
-                ),
-                leading: const CircleAvatar(child: Icon(Icons.apps)),
-                title: const Text(
-                  'All Spaces',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                trailing: const Icon(Icons.chevron_right),
               ),
             ),
-            const SizedBox(height: 12),
-          ],
           for (final space in controller.storageSpaces)
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _StorageSpaceCard(
-                space: space,
+              padding: const EdgeInsets.only(bottom: 17),
+              child: _SpaceCard(
+                label: space.name,
+                count: _countFor(space),
+                icon: _iconFor(space.type),
                 onTap: onSelected == null ? null : () => onSelected!(space),
+                onEdit: () => _edit(context, space),
+                onDelete: () => _archive(context, space),
               ),
             ),
+          const SizedBox(height: 32),
+          if (controller.workspace != null)
+            TextButton(
+              onPressed: () => _restore(context),
+              child: const Text('Restore an archived space'),
+            ),
+          SizedBox(
+            height: 53,
+            child: FilledButton.icon(
+              onPressed: () => _edit(context),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.black,
+              ),
+              icon: const Icon(Icons.add, size: 27),
+              label: const Text(
+                'Add storage space',
+                style: TextStyle(fontSize: 19),
+              ),
+            ),
+          ),
           if (controller.page > 1 || controller.hasNextPage) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                TextButton.icon(
+                TextButton(
                   onPressed: controller.page > 1
                       ? () => controller.loadStorageSpaces(
                           page: controller.page - 1,
                           pageSize: controller.pageSize,
                         )
                       : null,
-                  icon: const Icon(Icons.chevron_left),
-                  label: const Text('Previous'),
+                  child: const Text('Previous'),
                 ),
                 Text('Page ${controller.page}'),
-                TextButton.icon(
+                TextButton(
                   onPressed: controller.hasNextPage
                       ? () => controller.loadStorageSpaces(
                           page: controller.page + 1,
                           pageSize: controller.pageSize,
                         )
                       : null,
-                  iconAlignment: IconAlignment.end,
-                  icon: const Icon(Icons.chevron_right),
-                  label: const Text('Next'),
+                  child: const Text('Next'),
                 ),
               ],
             ),
@@ -155,78 +151,220 @@ class StorageSpaceScreen extends StatelessWidget {
       ),
     );
   }
-}
 
-class _StorageSpaceCard extends StatelessWidget {
-  const _StorageSpaceCard({required this.space, this.onTap});
-
-  final StorageSpace space;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        leading: CircleAvatar(child: Icon(_iconForType(space.type))),
-        title: Text(
-          space.name,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(space.type),
-        trailing: const Icon(Icons.chevron_right),
-      ),
-    );
+  int? _countFor(StorageSpace space) {
+    final inventory = inventoryController;
+    if (inventory == null ||
+        inventory.status != InventoryLoadStatus.loaded ||
+        inventory.hasNextPage ||
+        inventory.storageSpaceId != null) {
+      return null;
+    }
+    return inventory.items
+        .where((item) => item.storageSpaceId == space.id)
+        .length;
   }
 
-  IconData _iconForType(String type) {
+  IconData _iconFor(String type) {
     return switch (type.toUpperCase()) {
       'FRIDGE' || 'REFRIGERATOR' => Icons.kitchen_outlined,
       'FREEZER' => Icons.ac_unit,
-      'PANTRY' => Icons.inventory_2_outlined,
+      'PANTRY' => Icons.warehouse_outlined,
       _ => Icons.shelves,
     };
   }
-}
 
-class _StorageSpaceMessage extends StatelessWidget {
-  const _StorageSpaceMessage({
-    required this.icon,
-    required this.title,
-    required this.message,
-    required this.actionLabel,
-    required this.onAction,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-  final String actionLabel;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 64, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 20),
-            FilledButton(onPressed: onAction, child: Text(actionLabel)),
-          ],
+  void _notConnected(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Storage editing will be available after backend integration.',
         ),
       ),
     );
   }
+
+  Future<void> _edit(BuildContext context, [StorageSpace? space]) async {
+    final workspace = controller.workspace;
+    if (workspace == null) {
+      _notConnected(context);
+      return;
+    }
+    await editSpace(
+      context,
+      workspace,
+      id: space?.id,
+      name: space?.name ?? '',
+      type: space?.type ?? 'FRIDGE',
+    );
+    if (!context.mounted) return;
+    await controller.loadStorageSpaces();
+  }
+
+  Future<void> _archive(BuildContext context, StorageSpace space) async {
+    final workspace = controller.workspace;
+    if (workspace == null) {
+      _notConnected(context);
+      return;
+    }
+    await businessForm(
+      context,
+      title: 'Archive ${space.name}?',
+      fields: const [],
+      explanation:
+          'This does not delete inventory. A space containing in-stock items cannot be archived.',
+      submit: (_) => workspace.spaceState(space.id, 'archive'),
+    );
+    if (!context.mounted) return;
+    await controller.loadStorageSpaces();
+  }
+
+  Future<void> _restore(BuildContext context) async {
+    final workspace = controller.workspace!;
+    try {
+      final spaces = await workspace.choices(
+        'storage-spaces',
+        status: 'ARCHIVED',
+      );
+      if (!context.mounted) return;
+      if (spaces.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No archived spaces.')));
+        return;
+      }
+      await businessForm(
+        context,
+        title: 'Restore storage space',
+        fields: [
+          BusinessField(
+            'id',
+            'Archived space',
+            validator: requiredValue,
+            options: {
+              for (final s in spaces) s['id'] as String: s['name'] as String,
+            },
+          ),
+        ],
+        submit: (values) => workspace.spaceState(values['id']!, 'restore'),
+      );
+      if (context.mounted) await controller.loadStorageSpaces();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(businessError(e))));
+      }
+    }
+  }
+}
+
+class _SpaceCard extends StatelessWidget {
+  const _SpaceCard({
+    required this.label,
+    required this.icon,
+    this.count,
+    this.onTap,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  final String label;
+  final int? count;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: Container(
+          height: 77,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFA8D589)),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Row(
+            children: [
+              SizedBox(width: 48, child: Icon(icon, size: 37)),
+              const SizedBox(width: 10),
+              Container(width: 1, height: 58, color: const Color(0xFFA8D589)),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: const TextStyle(fontSize: 17)),
+                    const SizedBox(height: 5),
+                    Text(
+                      count == null
+                          ? 'Items'
+                          : '$count ${count == 1 ? 'item' : 'items'}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onEdit != null)
+                IconButton(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Edit $label',
+                ),
+              if (onDelete != null)
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.archive_outlined),
+                  tooltip: 'Archive $label',
+                ),
+              if (onEdit == null && onTap != null)
+                const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Message extends StatelessWidget {
+  const _Message({
+    required this.title,
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String title;
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(30),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 7),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 14),
+          FilledButton(onPressed: onRetry, child: const Text('Try again')),
+        ],
+      ),
+    ),
+  );
 }

@@ -63,13 +63,14 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   void _showResetDialog() {
-    final resetController = TextEditingController(text: _emailController.text);
+    final initialEmail = _emailController.text;
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Reset password'),
-        content: TextField(
-          controller: resetController,
+        // The field owns its controller until the dialog's exit animation ends.
+        content: TextFormField(
+          initialValue: initialEmail,
           keyboardType: TextInputType.emailAddress,
           autofocus: true,
           decoration: const InputDecoration(
@@ -88,7 +89,7 @@ class _SignInScreenState extends State<SignInScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Password reset is ready to connect to the API.',
+                    'Password reset is not available yet. No email has been sent.',
                   ),
                 ),
               );
@@ -97,7 +98,7 @@ class _SignInScreenState extends State<SignInScreen> {
           ),
         ],
       ),
-    ).whenComplete(resetController.dispose);
+    );
   }
 
   @override

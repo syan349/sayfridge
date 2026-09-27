@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
+
 import 'auth/auth_dependencies.dart';
 import 'auth/auth_gate.dart';
 import 'models/inventory_item.dart';
 import 'repositories/catalog_repository.dart';
-import 'repositories/storage_space_repository.dart';
 import 'repositories/inventory_repository.dart';
+import 'repositories/storage_space_repository.dart';
+import 'repositories/workspace_repository.dart';
 import 'screens/ai_assistant_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/manual_stock_in_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/sign_in_screen.dart';
 import 'services/catalog_api_service.dart';
 import 'services/inventory_api_service.dart';
 import 'services/storage_space_api_service.dart';
+import 'state/agent_controller.dart';
+import 'state/auth_controller.dart';
 import 'state/expiry_summary_controller.dart';
 import 'state/inventory_controller.dart';
 import 'state/manual_stock_in_controller.dart';
+import 'state/profile_controller.dart';
 import 'state/storage_space_controller.dart';
 import 'theme/app_theme.dart';
 
@@ -31,16 +37,27 @@ class SayFridgeApp extends StatefulWidget {
 
 class _SayFridgeAppState extends State<SayFridgeApp> {
   late final AuthDependencies _authDependencies;
+  late final ProfileController _profileController;
   late final StorageSpaceController _storageSpaceController;
   late final InventoryController _inventoryController;
   late final ExpirySummaryController _expirySummaryController;
   late final ManualStockInController _manualStockInController;
+  late final WorkspaceRepository _workspace;
+  late final AgentController _agentController;
+  final _navigator = GlobalKey<NavigatorState>();
+  String? _sessionUser;
 
   @override
   void initState() {
     super.initState();
 
     _authDependencies = AuthDependencies.create();
+    _profileController = ProfileController(_authDependencies.authController);
+    _workspace = WorkspaceRepository(
+      _authDependencies.apiClient,
+      _authDependencies.tokenStorage,
+      onChanged: _refreshBusiness,
+    );
 
     final storageSpaceApiService = StorageSpaceApiService(
       _authDependencies.apiClient,
@@ -49,8 +66,10 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       storageSpaceApiService,
       _authDependencies.tokenStorage,
     );
-
-    _storageSpaceController = StorageSpaceController(storageSpaceRepository);
+    _storageSpaceController = StorageSpaceController(
+      storageSpaceRepository,
+      workspace: _workspace,
+    );
 
     final inventoryApiService = InventoryApiService(
       _authDependencies.apiClient,
@@ -59,9 +78,12 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       inventoryApiService,
       _authDependencies.tokenStorage,
     );
-
-    _inventoryController = InventoryController(inventoryRepository);
+    _inventoryController = InventoryController(
+      inventoryRepository,
+      workspace: _workspace,
+    );
     _expirySummaryController = ExpirySummaryController(inventoryRepository);
+
     final catalogRepository = CatalogRepository(
       CatalogApiService(_authDependencies.apiClient),
       _authDependencies.tokenStorage,
@@ -71,21 +93,128 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       inventoryRepository,
       storageSpaceRepository,
     );
+
+    _agentController = AgentController(
+      _workspace,
+      onInventoryChanged: _refreshBusiness,
+    );
+    _authDependencies.authController.addListener(_syncSession);
+  }
+
+  void _syncSession() {
+    final auth = _authDependencies.authController;
+    final nextUser = auth.isAuthenticated ? auth.user?.id : null;
+    if (nextUser == _sessionUser) return;
+
+    final previousUser = _sessionUser;
+    _sessionUser = nextUser;
+    _inventoryController.reset();
+    _storageSpaceController.reset();
+    _expirySummaryController.reset();
+    _agentController.bindUser(nextUser);
+
+    if (previousUser != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _navigator.currentState?.popUntil((route) => route.isFirst);
+        }
+      });
+    }
+  }
+
+  Future<void> _refreshBusiness() async {
+    if (!_authDependencies.authController.isAuthenticated) return;
+    await Future.wait([
+      _inventoryController.reload(),
+      _storageSpaceController.loadStorageSpaces(),
+      _expirySummaryController.reload(),
+    ]);
   }
 
   @override
   void dispose() {
+    _authDependencies.authController.removeListener(_syncSession);
+    _agentController.dispose();
     _manualStockInController.dispose();
     _expirySummaryController.dispose();
     _inventoryController.dispose();
     _storageSpaceController.dispose();
+    _profileController.dispose();
     _authDependencies.dispose();
     super.dispose();
+  }
+
+  void _openSignIn(BuildContext context, AuthController authController) {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => SignInScreen(authController: authController),
+      ),
+    );
+  }
+
+  void _openAssistant(
+    BuildContext context,
+    AuthController authController, {
+    required bool isGuest,
+  }) {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (assistantContext) => AiAssistantScreen(
+          isGuest: isGuest,
+          agentController: _agentController,
+          onHomeTap: () =>
+              Navigator.of(assistantContext).popUntil((route) => route.isFirst),
+          onProfileTap: () => _openProfile(assistantContext, authController),
+          onLoginTap: isGuest
+              ? () => _openSignIn(assistantContext, authController)
+              : null,
+        ),
+      ),
+    );
+  }
+
+  void _openProfile(BuildContext context, AuthController authController) {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (profileContext) => ProfileScreen(
+          authController: authController,
+          profileController: _profileController,
+          onAssistantTap: () => _openAssistant(
+            profileContext,
+            authController,
+            isGuest: !authController.isAuthenticated,
+          ),
+          onLoginTap: () => Navigator.of(profileContext).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SignInScreen(authController: authController),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openManualStockIn(BuildContext context) async {
+    final createdItem = await Navigator.of(context).push<InventoryItem>(
+      MaterialPageRoute<InventoryItem>(
+        builder: (_) =>
+            ManualStockInScreen(controller: _manualStockInController),
+      ),
+    );
+    if (createdItem == null) return;
+    await _refreshBusiness();
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigator,
       title: 'SayFridge',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
@@ -99,65 +228,22 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
         unauthenticatedBuilder: (context, authController) {
           return HomeScreen(
             isGuest: true,
-            onLoginTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => SignInScreen(authController: authController),
-                ),
-              );
-            },
-            onAssistantTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (assistantContext) => AiAssistantScreen(
-                    isGuest: true,
-                    onHomeTap: () {
-                      Navigator.of(assistantContext).pop();
-                    },
-                  ),
-                ),
-              );
-            },
-            onProfileTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => SignInScreen(authController: authController),
-                ),
-              );
-            },
+            onLoginTap: () => _openSignIn(context, authController),
+            onAssistantTap: () =>
+                _openAssistant(context, authController, isGuest: true),
+            onProfileTap: () => _openProfile(context, authController),
           );
         },
         authenticatedBuilder: (context, authController) {
-          return AiAssistantScreen(
-            onHomeTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (homeContext) => HomeScreen(
-                    expirySummaryController: _expirySummaryController,
-                    inventoryController: _inventoryController,
-                    storageSpaceController: _storageSpaceController,
-                    onAddItemTap: () async {
-                      final createdItem = await Navigator.of(homeContext)
-                          .push<InventoryItem>(
-                            MaterialPageRoute<InventoryItem>(
-                              builder: (_) => ManualStockInScreen(
-                                controller: _manualStockInController,
-                              ),
-                            ),
-                          );
-                      if (createdItem == null) return;
-                      await Future.wait([
-                        _inventoryController.reload(),
-                        _expirySummaryController.reload(),
-                      ]);
-                    },
-                    onAssistantTap: () {
-                      Navigator.of(homeContext).pop();
-                    },
-                  ),
-                ),
-              );
-            },
+          return HomeScreen(
+            key: ValueKey(authController.user!.id),
+            expirySummaryController: _expirySummaryController,
+            inventoryController: _inventoryController,
+            storageSpaceController: _storageSpaceController,
+            onAddItemTap: () => _openManualStockIn(context),
+            onAssistantTap: () =>
+                _openAssistant(context, authController, isGuest: false),
+            onProfileTap: () => _openProfile(context, authController),
           );
         },
         errorBuilder: (context, authController) {
