@@ -51,8 +51,19 @@ void main() {
     expect(find.byTooltip('Close camera'), findsOneWidget);
     await tester.tap(find.byTooltip('Choose photos from library'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('camera-selected-preview')), findsOneWidget);
-    expect(find.text('2 photos selected'), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('camera-main-preview-1-${png.length}')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('camera-selected-thumbnails')), findsOneWidget);
+    expect(find.byKey(const ValueKey('camera-thumbnail-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('camera-thumbnail-1')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('camera-thumbnail-0')));
+    await tester.pump();
+    expect(
+      find.byKey(ValueKey('camera-main-preview-0-${png.length}')),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const Key('camera-shutter-or-confirm')));
     await tester.pumpAndSettle();
     expect(result, hasLength(2));
@@ -104,7 +115,10 @@ void main() {
     await tester.tap(find.byKey(const Key('camera-shutter-or-confirm')));
     await tester.pumpAndSettle();
     expect(captureCalls, 1);
-    expect(find.byKey(const Key('camera-selected-preview')), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('camera-main-preview-0-${png.length}')),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const Key('camera-shutter-or-confirm')));
     await tester.pumpAndSettle();
     expect(result, hasLength(1));

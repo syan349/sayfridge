@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -33,7 +32,8 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
   List<CameraDescription> _cameras = const [];
   int _cameraIndex = 0;
   List<XFile> _selected = const [];
-  Uint8List? _previewBytes;
+  List<Uint8List> _selectedBytes = const [];
+  int _previewIndex = 0;
   bool _loading = false;
   String? _cameraError;
 
@@ -148,11 +148,14 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
             );
       if (files.isEmpty) return;
       final selected = files.take(_maxImages).toList(growable: false);
-      final bytes = await selected.first.readAsBytes();
+      final bytes = await Future.wait(
+        selected.map((file) => file.readAsBytes()),
+      );
       if (!mounted) return;
       setState(() {
         _selected = selected;
-        _previewBytes = bytes;
+        _selectedBytes = bytes;
+        _previewIndex = selected.length - 1;
       });
       if (files.length > _maxImages) {
         _message('You can attach at most 4 photos.');
@@ -178,7 +181,8 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
       if (!mounted) return;
       setState(() {
         _selected = [file];
-        _previewBytes = bytes;
+        _selectedBytes = [bytes];
+        _previewIndex = 0;
       });
     } on CameraException catch (error) {
       if (mounted) _message(_cameraMessage(error));
@@ -216,7 +220,26 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
   void _retake() {
     setState(() {
       _selected = const [];
-      _previewBytes = null;
+      _selectedBytes = const [];
+      _previewIndex = 0;
+    });
+  }
+
+  void _removePhoto(int index) {
+    final files = _selected.toList();
+    final bytes = _selectedBytes.toList();
+    files.removeAt(index);
+    bytes.removeAt(index);
+    setState(() {
+      _selected = files;
+      _selectedBytes = bytes;
+      if (files.isEmpty) {
+        _previewIndex = 0;
+      } else if (_previewIndex >= files.length) {
+        _previewIndex = files.length - 1;
+      } else if (index < _previewIndex) {
+        _previewIndex--;
+      }
     });
   }
 
@@ -230,6 +253,32 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
 
   void _message(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Widget _selectedImage(int index, {required BoxFit fit, Key? key}) {
+    Widget memoryFallback() => Image.memory(
+      _selectedBytes[index],
+      fit: fit,
+      gaplessPlayback: false,
+      errorBuilder: (_, _, _) => const ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: Icon(Icons.broken_image_outlined, color: Colors.white70),
+        ),
+      ),
+    );
+
+    return KeyedSubtree(
+      key: key,
+      child: kIsWeb && _selected[index].path.isNotEmpty
+          ? Image.network(
+              _selected[index].path,
+              fit: fit,
+              gaplessPlayback: false,
+              errorBuilder: (_, _, _) => memoryFallback(),
+            )
+          : memoryFallback(),
+    );
   }
 
   @override
@@ -272,10 +321,12 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
                   fit: StackFit.expand,
                   children: [
                     const ColoredBox(color: Colors.black),
-                    if (_previewBytes != null)
-                      Image.memory(
-                        _previewBytes!,
-                        key: const Key('camera-selected-preview'),
+                    if (_selectedBytes.isNotEmpty)
+                      _selectedImage(
+                        _previewIndex,
+                        key: ValueKey(
+                          'camera-main-preview-$_previewIndex-${_selectedBytes[_previewIndex].length}',
+                        ),
                         fit: BoxFit.cover,
                       )
                     else if (widget.cameraPreview != null)
@@ -311,14 +362,6 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
                           ),
                         ),
                       ),
-                    if (_selected.length > 1)
-                      Positioned(
-                        right: 14,
-                        bottom: 14,
-                        child: Chip(
-                          label: Text('${_selected.length} photos selected'),
-                        ),
-                      ),
                     if (_loading)
                       const ColoredBox(
                         color: Color(0x66000000),
@@ -328,6 +371,61 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
                 ),
               ),
             ),
+            if (_selectedBytes.isNotEmpty)
+              SizedBox(
+                height: 84,
+                child: ListView.separated(
+                  key: const Key('camera-selected-thumbnails'),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedBytes.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) => Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      InkWell(
+                        onTap: () => setState(() => _previewIndex = index),
+                        child: Container(
+                          key: ValueKey('camera-thumbnail-$index'),
+                          width: 68,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: index == _previewIndex
+                                  ? const Color(0xFF8FC957)
+                                  : Colors.white54,
+                              width: index == _previewIndex ? 3 : 1,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: _selectedImage(index, fit: BoxFit.cover),
+                        ),
+                      ),
+                      Positioned(
+                        right: -7,
+                        top: -7,
+                        child: Semantics(
+                          label: 'Remove selected photo ${index + 1}',
+                          button: true,
+                          child: InkWell(
+                            onTap: () => _removePhoto(index),
+                            customBorder: const CircleBorder(),
+                            child: const CircleAvatar(
+                              radius: 10,
+                              backgroundColor: Colors.white,
+                              child: Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 29),
