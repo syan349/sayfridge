@@ -28,6 +28,8 @@ flutter test
 
 本工程现在包含 Flutter Web 平台文件。它展示手机端 Flutter 界面，与仓库根目录的 React `web/` 是两个独立站点。
 
+电脑浏览器在足够大的窗口中自动显示居中的手机外框，内部宽度为 390px，高度最多 844px；窗口变窄或变矮时使用全部可用区域。手机触摸浏览器使用 Flutter 原有的全屏模式与键盘处理。外框覆盖所有页面和弹窗，只影响浏览器展示，不改变 Android/iOS 原生应用。
+
 ```bash
 flutter run -d chrome --web-port=5174 -t lib/main.dart --dart-define=API_BASE_URL=https://YOUR-BACKEND-HOST/api/v1
 flutter build web --release -t lib/main.dart --no-web-resources-cdn --dart-define=API_BASE_URL=https://YOUR-BACKEND-HOST/api/v1
@@ -35,7 +37,7 @@ flutter build web --release -t lib/main.dart --no-web-resources-cdn --dart-defin
 
 替换示例域名后运行。网页未配置 `API_BASE_URL` 时使用同源 `/api/v1`；在只托管静态文件的 Render 上，这只能用于先查看游客界面，登录、库存和 AI 需接通后端后再验收。Android 模拟器的默认地址保持不变。
 
-先将 `mobile-render` 的部署改动合入 GitHub 上的 `main`。Render 创建 **Static Site**，Branch 选择 `main`，Root Directory 填 `mobile`，Build Command 填 `bash scripts/render-build.sh`，Publish Directory 填 `build/web`。脚本准备 Flutter 3.44.8，并把 Render 的 `API_BASE_URL` 变量传给 Dart 编译器；不使用 React 的 `VITE_API_BASE_URL`。详细步骤和上线检查见 [手机端 Render 部署](RENDER_DEPLOY.md)。
+Render 正式站跟踪 `main`；另建测试站跟踪 `mobile-render`，每次向测试分支提交并推送即可更新测试站，稳定后再通过 PR 合入 `main`。两个站点都使用 **Static Site**，Root Directory 填 `mobile`，Build Command 填 `bash scripts/render-build.sh`，Publish Directory 填 `build/web`，Auto-Deploy 选 `On Commit`。脚本准备 Flutter 3.44.8，并把各站点的 `API_BASE_URL` 变量传给 Dart 编译器；不使用 React 的 `VITE_API_BASE_URL`。详细步骤和上线检查见 [手机端 Render 部署](RENDER_DEPLOY.md)。
 
 ## 真实 API 入口与联调
 
