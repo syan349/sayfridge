@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/agent_image.dart';
+import '../services/voice_input_service.dart';
 import '../state/agent_controller.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
@@ -16,11 +17,13 @@ class AgentConversationScreen extends StatefulWidget {
     this.onHomeTap,
     this.onProfileTap,
     this.pickImages,
+    this.voiceInput,
     super.key,
   });
   final AgentController controller;
   final VoidCallback? onHomeTap, onProfileTap;
   final Future<List<XFile>> Function()? pickImages;
+  final VoiceInputService? voiceInput;
   @override
   State<AgentConversationScreen> createState() =>
       _AgentConversationScreenState();
@@ -29,10 +32,87 @@ class AgentConversationScreen extends StatefulWidget {
 class _AgentConversationScreenState extends State<AgentConversationScreen> {
   final _message = TextEditingController();
   final List<AgentImage> _images = [];
+  late final VoiceInputService _voiceInput;
+  bool _recordingVoice = false;
+  bool _cancelVoice = false;
+  String _recognizedWords = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _voiceInput = widget.voiceInput ?? DeviceVoiceInputService();
+  }
+
   @override
   void dispose() {
+    if (_recordingVoice) _voiceInput.cancel();
     _message.dispose();
     super.dispose();
+  }
+
+  Future<void> _startVoiceInput() async {
+    if (!widget.controller.canSend || _recordingVoice) return;
+    setState(() {
+      _recordingVoice = true;
+      _cancelVoice = false;
+      _recognizedWords = '';
+    });
+    final available = await _voiceInput.start(
+      onWords: (words) {
+        if (!mounted || !_recordingVoice) return;
+        setState(() => _recognizedWords = words.trim());
+      },
+      onError: (message) {
+        if (!mounted) return;
+        setState(() {
+          _recordingVoice = false;
+          _cancelVoice = false;
+          _recognizedWords = '';
+        });
+        _messageFor(message);
+      },
+      shouldContinue: () => mounted && _recordingVoice,
+    );
+    if (!mounted || available || !_recordingVoice) return;
+    setState(() => _recordingVoice = false);
+    _messageFor(
+      'Voice recognition is not available. Check microphone permission or use a supported browser.',
+    );
+  }
+
+  void _updateVoiceCancel(LongPressMoveUpdateDetails details) {
+    if (!_recordingVoice) return;
+    final shouldCancel = details.offsetFromOrigin.dy < -60;
+    if (shouldCancel != _cancelVoice) {
+      setState(() => _cancelVoice = shouldCancel);
+    }
+  }
+
+  Future<void> _finishVoiceInput({bool forceCancel = false}) async {
+    if (!_recordingVoice) return;
+    final cancelled = forceCancel || _cancelVoice;
+    if (cancelled) {
+      await _voiceInput.cancel();
+    } else {
+      await _voiceInput.stop();
+    }
+    if (!mounted) return;
+    final words = _recognizedWords.trim();
+    setState(() {
+      _recordingVoice = false;
+      _cancelVoice = false;
+      _recognizedWords = '';
+      if (!cancelled && words.isNotEmpty) {
+        final existing = _message.text.trimRight();
+        _message.text = existing.isEmpty ? words : '$existing $words';
+        _message.selection = TextSelection.collapsed(
+          offset: _message.text.length,
+        );
+      }
+    });
+    if (!cancelled && words.isEmpty) {
+      _messageFor('No speech was recognized. Please try again.');
+    }
   }
 
   Future<void> _send() async {
@@ -282,6 +362,16 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                   onSubmitted: (_) => _send(),
                                 ),
                               ),
+                              _VoiceHoldButton(
+                                enabled: agent.canSend,
+                                recording: _recordingVoice,
+                                cancelling: _cancelVoice,
+                                onLongPressStart: _startVoiceInput,
+                                onLongPressMoveUpdate: _updateVoiceCancel,
+                                onLongPressEnd: () => _finishVoiceInput(),
+                                onLongPressCancel: () =>
+                                    _finishVoiceInput(forceCancel: true),
+                              ),
                               IconButton(
                                 onPressed: agent.canSend ? _send : null,
                                 tooltip: 'Send message',
@@ -289,6 +379,25 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                               ),
                             ],
                           ),
+                          if (_recordingVoice)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                _cancelVoice
+                                    ? 'Release to cancel'
+                                    : _recognizedWords.isEmpty
+                                    ? 'Listening… Slide up to cancel'
+                                    : '$_recognizedWords\nRelease to insert text · Slide up to cancel',
+                                key: const Key('voice-input-status'),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _cancelVoice
+                                      ? Colors.red
+                                      : Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -305,6 +414,68 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                 );
               },
             ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _VoiceHoldButton extends StatelessWidget {
+  const _VoiceHoldButton({
+    required this.enabled,
+    required this.recording,
+    required this.cancelling,
+    required this.onLongPressStart,
+    required this.onLongPressMoveUpdate,
+    required this.onLongPressEnd,
+    required this.onLongPressCancel,
+  });
+
+  final bool enabled;
+  final bool recording;
+  final bool cancelling;
+  final Future<void> Function() onLongPressStart;
+  final void Function(LongPressMoveUpdateDetails details) onLongPressMoveUpdate;
+  final Future<void> Function() onLongPressEnd;
+  final Future<void> Function() onLongPressCancel;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: 'Hold to speak',
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPressStart: enabled ? (_) => onLongPressStart() : null,
+      onLongPressMoveUpdate: enabled ? onLongPressMoveUpdate : null,
+      onLongPressEnd: enabled ? (_) => onLongPressEnd() : null,
+      onLongPressCancel: enabled ? () => onLongPressCancel() : null,
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        label: recording
+            ? cancelling
+                  ? 'Release to cancel voice input'
+                  : 'Release to finish voice input'
+            : 'Hold to speak',
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: !recording
+                ? Colors.transparent
+                : cancelling
+                ? Colors.red.withValues(alpha: 0.16)
+                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
+          ),
+          child: Icon(
+            cancelling ? Icons.close : Icons.mic_outlined,
+            color: enabled
+                ? cancelling
+                      ? Colors.red
+                      : Theme.of(context).colorScheme.onSurface
+                : Theme.of(context).disabledColor,
           ),
         ),
       ),
