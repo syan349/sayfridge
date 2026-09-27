@@ -61,7 +61,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
       for (final file in selected.take(AgentImage.maxImages - _images.length)) {
         final bytes = await file.readAsBytes();
         final image = AgentImage.fromBytes(bytes, mimeType: _mimeType(file));
-        await image.validateDimensions();
+        image.validateDimensions();
         additions.add(image);
       }
       AgentImage.validateBatch([..._images, ...additions]);
@@ -80,10 +80,10 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   }
 
   Future<List<XFile>> _openCameraInput() async {
-    final selected = await Navigator.of(context).push<XFile>(
-      MaterialPageRoute<XFile>(builder: (_) => const CameraInputScreen()),
+    final selected = await Navigator.of(context).push<List<XFile>>(
+      MaterialPageRoute<List<XFile>>(builder: (_) => const CameraInputScreen()),
     );
-    return selected == null ? [] : [selected];
+    return selected ?? [];
   }
 
   String _mimeType(XFile file) {
@@ -379,19 +379,25 @@ class _AgentItemCard extends StatelessWidget {
       if (pickImages != null) {
         files = await pickImages!.call();
       } else {
-        final selected = await Navigator.of(context).push<XFile>(
-          MaterialPageRoute<XFile>(builder: (_) => const CameraInputScreen()),
+        final selected = await Navigator.of(context).push<List<XFile>>(
+          MaterialPageRoute<List<XFile>>(
+            builder: (_) => const CameraInputScreen(),
+          ),
         );
-        files = selected == null ? [] : [selected];
+        files = selected ?? [];
       }
       if (!context.mounted || files.isEmpty) return;
-      final file = files.first;
-      final image = AgentImage.fromBytes(
-        await file.readAsBytes(),
-        mimeType: _agentImageMimeType(file),
-      );
-      await image.validateDimensions();
-      await controller.respond(item, 'answer', images: [image]);
+      final images = <AgentImage>[];
+      for (final file in files.take(AgentImage.maxImages)) {
+        final image = AgentImage.fromBytes(
+          await file.readAsBytes(),
+          mimeType: _agentImageMimeType(file),
+        );
+        image.validateDimensions();
+        images.add(image);
+      }
+      AgentImage.validateBatch(images);
+      await controller.respond(item, 'answer', images: images);
     } on FormatException catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(

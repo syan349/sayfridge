@@ -118,4 +118,34 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test(
+    'reads camera JPEG dimensions without using a browser image decoder',
+    () {
+      final cameraJpeg = Uint8List.fromList([
+        0xff,
+        0xd8,
+        0xff,
+        0xe1,
+        0x00,
+        0x04,
+        0x00,
+        0x00,
+        0xff,
+        0xc0,
+        0x00,
+        0x07,
+        0x08,
+        0x0f,
+        0xa0,
+        0x13,
+        0x88,
+        0xff,
+        0xd9,
+      ]);
+      final image = AgentImage.fromBytes(cameraJpeg, mimeType: 'image/jpeg');
+
+      expect(image.validateDimensions, returnsNormally);
+    },
+  );
 }
