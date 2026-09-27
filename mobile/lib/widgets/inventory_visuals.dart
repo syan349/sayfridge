@@ -8,7 +8,7 @@ abstract final class HomeAssets {
   static const root = 'assets/icons/home';
   static const avatar = '$root/default_avatar.png';
   static const guestExpiry = '$root/guest_expiry.png';
-  static const noExpiry = '$root/no_expiry.png';
+  static const noExpiry = '$root/expiry_all_clear.png';
   static const filter = '$root/filter.png';
   static const search = '$root/search.png';
   static const setting = '$root/setting.png';
