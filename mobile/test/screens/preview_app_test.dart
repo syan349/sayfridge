@@ -111,7 +111,7 @@ void main() {
       expect(find.text('0 items'), findsOneWidget);
       expect(find.text('Your inventory is empty'), findsOneWidget);
       expect(find.text('View all expiring items'), findsNothing);
-      // These were left-aligned in the reported empty Home screenshot.
+      // Keep the empty-state message centered and the action at the section edge.
       expect(
         tester.getCenter(find.text('No items expiring soon')).dx,
         closeTo(205.5, 1),
@@ -120,7 +120,10 @@ void main() {
         of: find.text('View all items'),
         matching: find.byType(FilledButton),
       );
-      expect(tester.getCenter(action).dx, closeTo(205.5, 1));
+      expect(
+        tester.getTopLeft(action).dx,
+        closeTo(tester.getTopLeft(find.text('Inventory')).dx, 1),
+      );
 
       await tester.tap(find.byKey(const Key('preview-inventory-menu')));
       await tester.pumpAndSettle();

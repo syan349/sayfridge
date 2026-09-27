@@ -340,7 +340,8 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           builder: (context, child) => _buildInventorySummary(),
         ),
         const SizedBox(height: 23),
-        Center(
+        Align(
+          alignment: Alignment.centerLeft,
           child: _GreenAction(
             label: 'View all items',
             onPressed: _openInventory,
@@ -433,20 +434,9 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Expanded(child: _SectionTitle('Inventory')),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$total ${total == 1 ? 'item' : 'items'}',
-                  style: const TextStyle(fontSize: 17),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: widget.onAddItemTap,
-                  tooltip: 'Add inventory item',
-                  icon: const Icon(Icons.add),
-                ),
-              ],
+            Text(
+              '$total ${total == 1 ? 'item' : 'items'}',
+              style: const TextStyle(fontSize: 17),
             ),
           ],
         ),

@@ -70,10 +70,11 @@ void main() {
           ),
         };
 
+        final barWidth = size.width * 0.78;
         final expected = Rect.fromLTWH(
-          35,
+          (size.width - barWidth) / 2,
           size.height - safeArea.bottom - 28 - 66,
-          size.width - 70,
+          barWidth,
           66,
         );
         for (final entry in pages.entries) {
