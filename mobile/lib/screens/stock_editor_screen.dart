@@ -24,6 +24,7 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
   List<Map<String, dynamic>> _spaces = [], _definitions = [];
   String? _space, _definition, _error;
   bool _loading = true, _busy = false, _blocked = false;
+  bool _loadingDefinitionChoices = false;
 
   @override
   void initState() {
@@ -81,7 +82,10 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
   }
 
   Future<void> _newDefinition() async {
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _loadingDefinitionChoices = true;
+    });
     try {
       final categories = await widget.workspace.choices('item-categories');
       if (!mounted) return;
@@ -126,7 +130,12 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
     } catch (e) {
       if (mounted) setState(() => _error = businessError(e));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _loadingDefinitionChoices = false;
+        });
+      }
     }
   }
 
@@ -229,9 +238,27 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
                                     onPressed: _busy || _blocked
                                         ? null
                                         : _newDefinition,
-                                    child: const Text(
-                                      'Create a private item definition',
-                                    ),
+                                    child: _loadingDefinitionChoices
+                                        ? const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              SizedBox.square(
+                                                key: Key(
+                                                  'definition-loading-indicator',
+                                                ),
+                                                dimension: 18,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2.2,
+                                                    ),
+                                              ),
+                                              SizedBox(width: 10),
+                                              Text('Loading categories…'),
+                                            ],
+                                          )
+                                        : const Text(
+                                            'Create a private item definition',
+                                          ),
                                   ),
                                 ] else ...[
                                   Text(

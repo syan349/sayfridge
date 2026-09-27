@@ -19,6 +19,7 @@ class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -39,12 +40,18 @@ class _SignInScreenState extends State<SignInScreen> {
     FocusScope.of(context).unfocus();
 
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (widget.authController.isSubmitting) return;
+    if (_isSubmitting || widget.authController.isSubmitting) return;
 
-    final success = await widget.authController.login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
+    setState(() => _isSubmitting = true);
+    late final bool success;
+    try {
+      success = await widget.authController.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
 
     if (!mounted) return;
 
@@ -167,6 +174,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   key: const Key('sign-in-button'),
                   label: 'Log in',
                   onPressed: _submit,
+                  isLoading: _isSubmitting,
                 ),
                 const SizedBox(height: 24),
                 const _OrDivider(),

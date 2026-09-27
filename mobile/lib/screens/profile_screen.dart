@@ -247,7 +247,16 @@ class ProfileScreen extends StatelessWidget {
                                     fontSize: 19,
                                   ),
                                 ),
-                                icon: const ProfileIcon(ProfileAssets.logout),
+                                icon: authController.isSubmitting
+                                    ? const SizedBox.square(
+                                        key: Key('logout-loading-indicator'),
+                                        dimension: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.3,
+                                          color: Colors.black,
+                                        ),
+                                      )
+                                    : const ProfileIcon(ProfileAssets.logout),
                                 label: Text(
                                   authController.isSubmitting
                                       ? 'Logging out…'
