@@ -188,7 +188,7 @@ Common pagination/state parameters. **200**, page of category objects:
 
 Read public categories filtered by category status; sort by `sort_order`, name,
 then UUID ascending. No writes. An ACTIVE category must already exist before
-creating a definition; this delivery adds no category initialization or write API.
+creating a definition; the explicit seed SQL initializes the maintained catalog; there is no category write API.
 
 ## 5. Item definitions — B06
 
@@ -273,7 +273,6 @@ A valid repeated restore leaves timestamps unchanged.
 ## 6. Inventory — B07–B09, B13, B15, and B22
 
 Inventory requires nullable `inventory_item.notes` in the current table structure.
-See the backend README for development database synchronization; Neon is unchanged.
 
 ### Inventory response and shared rules
 
@@ -704,80 +703,759 @@ progress are not cancelled.
 
 ## 9. Agent V0.2 — chat, resume and recovery
 
-Paths in this section include the full `/api/v1` prefix. Responses from chat and
-resume use `text/event-stream`, not the ordinary JSON response format. A turn may
-contain up to 20 independently handled items. Unlike the manual batch endpoints,
-one failed Agent item does not roll back another successful item.
+The Agent uses the same backend base URL, `/api/v1` prefix and Bearer authentication
+as other APIs. User identity comes from the token, never from client-supplied IDs.
+Swagger is available at `<backend-base>/docs` under `agent`; OpenAPI is at
+`<backend-base>/openapi.json`. POST request bodies are JSON. Successful chat/resume
+responses are SSE (`text/event-stream`); state responses are ordinary JSON.
 
-Graph, memory and approval behavior: [current architecture](ARCHITECTURE.md).
-Configuration and explicit table setup: [backend README](../backend/README.md#agent-configuration-and-storage).
+| User action | Interface | Frontend behavior |
+| --- | --- | --- |
+| Send a new message/photo | `POST /api/v1/agent/chat` | Show the reply or proposed stock entries |
+| Answer, edit, supplement, confirm or cancel a pending item | `POST /api/v1/agent/resume` | Update the existing item using the new response |
+| Refresh or recover after losing a response | `GET /api/v1/agent/conversations/{conversation_id}/state` | Restore current progress before retrying |
 
-All routes require the existing Bearer authentication. User identity is taken from
-authentication. Client-supplied IDs never bypass ownership checks.
+**A photo request and its confirmation are two separate HTTP requests/streams.**
+The first stream ends with `WAITING_INPUT`; the server does not keep it open while
+waiting for the user's click. The frontend then starts a new resume request.
+A turn has at most 20 independently handled items. One failure does not roll back
+other successful items, unlike an atomic manual batch operation.
+
+Start with the [frontend interaction guide](AGENT_FRONTEND_INTEGRATION.md).
+Graph/memory rules: [architecture](ARCHITECTURE.md). Environment and storage:
+[backend README](../backend/README.md#agent-configuration-and-storage).
+
+#### Identifier meanings
+
+| Field | Meaning |
+| --- | --- |
+| conversation_id | Conversation UUID, retained across turns |
+| request_id | UUID for one chat or resume submission; reuse only for identical retries |
+| item_id | Stable Agent work-item UUID; **not** an inventory record ID |
+| proposal_id | Current version of a candidate; changes after edits/supplements |
+| interrupt_id | Opaque current pause token returned by the backend; do not generate it |
+| image_id | Client-generated UUID bound to immutable image bytes/type in this conversation |
+| result.inventory.id | Actual inventory batch UUID, available after successful creation |
+
+`start.request_id` identifies the current HTTP submission. State responses and
+`done.data.request_id` identify the original chat turn, even after a resume request.
 
 ### POST /api/v1/agent/chat
 
-```json
-{"message":"I used two cups of rice","conversation_id":"<uuid>","request_id":"<uuid>","as_of":"2026-09-25"}
-```
+**Purpose:** send a new text/image message when the conversation is not paused.
+Image-only messages can lead to a question about intent; upload is not approval.
 
-Only message is required. Clients should generate request_id before sending and
-reuse it with an identical body for retries. If omitted, the server generates it.
-The start event returns request_id and conversation_id. Supplying request_id without
-conversation_id produces a stable initial conversation for that user/request.
-`as_of` is a client-provided date, not an inferred server-local date.
+**Request fields**
 
-A new message on an interrupted conversation returns 409 AGENT_INPUT_REQUIRED;
-use resume. A running conversation returns 409 AGENT_CONVERSATION_BUSY. An
-unfinished crashed turn returns AGENT_RECOVERY_REQUIRED for a different request;
-retry its original request ID. Reusing an ID with different contents returns
-REQUEST_ID_CONFLICT.
+| Field | Required | Meaning |
+| --- | --- | --- |
+| message | Text or images required | User text, trimmed, up to 8,000 characters; defaults to empty |
+| images | Text or images required | Attachment array; defaults to empty; format and limits below |
+| conversation_id | No | Existing conversation UUID, or omit for a new conversation |
+| request_id | Recommended | Client-generated UUID for safe retries; generated by server if omitted |
+| as_of | No | User's local date, YYYY-MM-DD; do not substitute server-local time |
 
-### POST /api/v1/agent/resume
+Provide nonempty message, images, or both. Unknown fields are rejected. Existing
+text-only clients remain compatible. Supplying request_id without conversation_id
+produces a stable initial conversation for that user/request.
+
+**Request example — two bottles of milk**
+
+All examples below use the same illustrative IDs. They are not production records.
+The definition, category and fridge already exist. Package size is 500ml each;
+stock is entered as 2 bottles. Unknown purchase/expiry dates remain null. Replace
+the base64 placeholder with real image bytes before sending; the example IDs for
+existing resources must also be replaced with your own resources.
 
 ```json
 {
-  "conversation_id":"<uuid>",
-  "interrupt_id":"<current interrupt id>",
-  "request_id":"<new response uuid>",
-  "responses":[{"item_id":"<uuid>","proposal_id":"<uuid>","decision":"confirm"}]
+  "message": "Please enter these two bottles of milk in my fridge; let me review first.",
+  "conversation_id": "00000000-0000-4000-8000-000000000001",
+  "request_id": "00000000-0000-4000-8000-000000000002",
+  "as_of": "2026-09-27",
+  "images": [
+    {
+      "image_id": "00000000-0000-4000-8000-000000000006",
+      "mime_type": "image/jpeg",
+      "data_base64": "<replace with actual JPEG base64; no data-URL prefix>"
+    }
+  ]
 }
 ```
 
-Supported decisions are confirm, answer, edit and cancel. Confirm/cancel carry only
-identifiers. Answer/edit require message, or selected_inventory_item_id from the
-current question's candidate list. Selecting a candidate still revalidates ownership.
-Each item may appear once. Partial answers are allowed; other questions remain pending.
-Text edits are interpreted by the Agent and always invalidate the edited proposal.
-Confirming a stale proposal/interrupt returns 409; confirming missing information
-returns 422. Confirmation never accepts a client-provided balance or estimated delta.
+**Response:** HTTP 200, `Content-Type: text/event-stream`. `start` returns the
+conversation/request IDs. The milk example emits preview, pause and done events;
+the [complete streams](#agent-milk-sse-example) below show their actual structure.
 
-If a commit outcome is unknown, the item reports EXECUTION_UNCERTAIN. Confirm retries
-the same immutable receipt first; editing/cancelling that unresolved item returns
-VERIFY_OUTCOME_FIRST to avoid duplicating an already committed action.
+**Error handling**
+
+| HTTP / code | Meaning and next action |
+| --- | --- |
+| 401 | Missing, expired or invalid Bearer token; use the existing login flow |
+| 409 AGENT_INPUT_REQUIRED | Existing turn is paused; use resume with current identifiers |
+| 409 AGENT_CONVERSATION_BUSY | Another request is running; do not send competing turns |
+| 409 AGENT_RECOVERY_REQUIRED | An unfinished turn exists; recover using its original request |
+| 409 REQUEST_ID_CONFLICT | The request ID was reused with different content |
+| 409 IMAGE_ID_CONFLICT | An existing image ID was reused with different bytes/type |
+| 413 / 422 | Invalid or oversized request; see shared image/validation rules below |
+| 503 AGENT_UNAVAILABLE | Agent persistence/setup is unavailable |
+
+After the stream starts, execution errors arrive as SSE `error`; see Events.
+
+### POST /api/v1/agent/resume
+
+**Purpose:** reply to a current pause; do not use this endpoint for unrelated new work.
+
+**Request fields**
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| conversation_id | Yes | Conversation UUID from chat/start |
+| interrupt_id | Yes | Current pause token from action_required or state |
+| request_id | Yes | New UUID for this user response; reuse for identical retries |
+| responses | Yes | 1–20 replies, each targeting a distinct pending item |
+
+Each response contains item_id, current proposal_id and decision:
+
+| decision | Accepted additional fields | Behavior |
+| --- | --- | --- |
+| confirm | None | Execute this reviewed version; cannot include changes |
+| cancel | None | Cancel this unexecuted item |
+| answer | message, images or selected_inventory_item_id; at least one | Supply missing information |
+| edit | message, images or selected_inventory_item_id; at least one | Revise the item and invalidate the previous proposal |
+
+message is nonempty text up to 2,000 characters. selected_inventory_item_id must
+come from the current question's candidates; ownership is revalidated. Images can
+be the only supplement and apply only to the identified pending item. Partial
+replies are allowed; other questions remain pending. Missing information must be
+answered before confirmation. Never submit a client-calculated balance or delta.
+
+**Request example — confirm the milk candidate**
+
+```json
+{
+  "conversation_id": "00000000-0000-4000-8000-000000000001",
+  "interrupt_id": "f32fc44597354a7f8fe578bf5ba12bed",
+  "request_id": "00000000-0000-4000-8000-000000000003",
+  "responses": [
+    {
+      "item_id": "00000000-0000-4000-8000-000000000004",
+      "proposal_id": "00000000-0000-4000-8000-000000000005",
+      "decision": "confirm"
+    }
+  ]
+}
+```
+
+**Response:** HTTP 200 SSE, on a new connection. The example emits an actual
+operation_result, reply text and done. Confirming several items still commits each
+independently. [Complete confirmation stream](#agent-milk-sse-example).
+
+**Error handling**
+
+| HTTP / code | Meaning and next action |
+| --- | --- |
+| 401 | Use the existing authentication flow |
+| 409 STALE_INTERRUPT / STALE_PROPOSAL | Reload state and use current identifiers |
+| 409 REQUEST_ID_CONFLICT / IMAGE_ID_CONFLICT | Do not reuse IDs with altered content |
+| 409 AGENT_CONVERSATION_BUSY | Another request is still running |
+| 409 VERIFY_OUTCOME_FIRST | Previous commit outcome is unknown; verify via receipt-first confirmation retry |
+| 422 ANSWER_REQUIRED | Supply missing information before confirming |
+| 422 INVALID_TARGET_SELECTION | Select only from the current candidates |
+| 413 / 422 | Request size, image or schema validation failed |
+| 503 AGENT_UNAVAILABLE | Agent persistence/setup is unavailable |
+
+An item marked EXECUTION_UNCERTAIN may already have committed. Confirmation retries
+its unchanged receipt first; editing or cancelling it is rejected with
+VERIFY_OUTCOME_FIRST. After a stream error/disconnection query state before retrying.
 
 ### GET /api/v1/agent/conversations/{conversation_id}/state
 
-Returns request_id, status and sanitized items. When waiting, it also returns the
-current interrupt_id and pending questions. Other users receive 404. It does not
-return raw checkpoint messages, model prompts, credentials or tool internals.
+**Purpose:** restore business progress after refresh, lost response or interruption.
+It does not return full chat history, raw image bytes or internal model messages.
 
-Turn states: COMPLETED, WAITING_INPUT, RECOVERABLE. Item states: DRAFT, READY,
-NEEDS_INPUT, NEEDS_CONFIRMATION, SUCCEEDED, FAILED, CANCELLED.
+**Request fields:** required conversation_id UUID in the path and the usual Bearer
+token. No request body.
+
+**Request example**
+
+```http
+GET /api/v1/agent/conversations/00000000-0000-4000-8000-000000000001/state
+Authorization: Bearer <token>
+```
+
+**Response:** HTTP 200, `Content-Type: application/json`.
+
+| Field | Meaning |
+| --- | --- |
+| request_id | Original chat turn UUID, not the latest resume UUID |
+| status | COMPLETED, WAITING_INPUT or RECOVERABLE |
+| items | All work items in this turn, including completed and pending items |
+| interrupt_id | Present while interrupted; use the current value for resume |
+| pending | Current interrupt payload; pending.items contains items awaiting input |
+
+Item states are DRAFT, READY, NEEDS_INPUT, NEEDS_CONFIRMATION, SUCCEEDED, FAILED
+and CANCELLED. Optional fields without values can be omitted. COMPLETED means no
+pending work, **not** that every item succeeded. Check each item's status.
+RECOVERABLE means the previous execution has unfinished steps; retry the original
+chat/resume request with its original ID/body rather than creating new work.
+
+<details>
+<summary>Complete JSON: waiting for milk confirmation</summary>
+
+```json
+{
+  "request_id": "00000000-0000-4000-8000-000000000002",
+  "status": "WAITING_INPUT",
+  "items": [
+    {
+      "item_id": "00000000-0000-4000-8000-000000000004",
+      "item_key": "milk",
+      "proposal_id": "00000000-0000-4000-8000-000000000005",
+      "status": "NEEDS_CONFIRMATION",
+      "original_text": "MILK 2 bottles",
+      "preview": {
+        "draft": {
+          "item_key": "milk",
+          "original_text": "MILK 2 bottles",
+          "action": "CREATE_STOCK",
+          "inventory_item_id": null,
+          "item_query": "Milk",
+          "storage_space_id": "00000000-0000-4000-8000-000000000007",
+          "item_definition_id": "00000000-0000-4000-8000-000000000008",
+          "new_space": null,
+          "new_definition": null,
+          "quantity_kind": "AMOUNT",
+          "quantity_value": "2",
+          "quantity_unit": "bottle",
+          "purchase_date": null,
+          "expiry_date": null,
+          "utensil": null,
+          "estimate": null,
+          "source_image_ids": [
+            "00000000-0000-4000-8000-000000000006"
+          ],
+          "package_description": "500ml per bottle",
+          "review_notes": []
+        },
+        "before": null,
+        "display": {
+          "item_name": "Milk",
+          "space_name": "Fridge",
+          "category_id": "00000000-0000-4000-8000-000000000009",
+          "category_name": "Dairy"
+        },
+        "image_policy": {
+          "create_only": true,
+          "requires_review": true,
+          "source_image_ids": [
+            "00000000-0000-4000-8000-000000000006"
+          ]
+        },
+        "confirmation_reasons": [
+          "IMAGE_REVIEW"
+        ],
+        "after": {
+          "confirmed_current_amount": "2",
+          "confirmed_current_unit": "bottle",
+          "estimated_current_amount": null
+        },
+        "calculation_method": "EXACT",
+        "affects_state": "CONFIRMED",
+        "memory_snapshots": [],
+        "requires_confirmation": true,
+        "expected_version": null
+      },
+      "display": {
+        "item_name": "Milk",
+        "space_name": "Fridge",
+        "category_id": "00000000-0000-4000-8000-000000000009",
+        "category_name": "Dairy",
+        "source_image_ids": [
+          "00000000-0000-4000-8000-000000000006"
+        ],
+        "recognized_text": "MILK 2 bottles",
+        "package_description": "500ml per bottle",
+        "review_notes": [],
+        "missing_fields": [],
+        "confirmation_reasons": [
+          "IMAGE_REVIEW"
+        ]
+      }
+    }
+  ],
+  "interrupt_id": "f32fc44597354a7f8fe578bf5ba12bed",
+  "pending": {
+    "items": [
+      {
+        "item_id": "00000000-0000-4000-8000-000000000004",
+        "item_key": "milk",
+        "proposal_id": "00000000-0000-4000-8000-000000000005",
+        "status": "NEEDS_CONFIRMATION",
+        "original_text": "MILK 2 bottles",
+        "preview": {
+          "draft": {
+            "item_key": "milk",
+            "original_text": "MILK 2 bottles",
+            "action": "CREATE_STOCK",
+            "inventory_item_id": null,
+            "item_query": "Milk",
+            "storage_space_id": "00000000-0000-4000-8000-000000000007",
+            "item_definition_id": "00000000-0000-4000-8000-000000000008",
+            "new_space": null,
+            "new_definition": null,
+            "quantity_kind": "AMOUNT",
+            "quantity_value": "2",
+            "quantity_unit": "bottle",
+            "purchase_date": null,
+            "expiry_date": null,
+            "utensil": null,
+            "estimate": null,
+            "source_image_ids": [
+              "00000000-0000-4000-8000-000000000006"
+            ],
+            "package_description": "500ml per bottle",
+            "review_notes": []
+          },
+          "before": null,
+          "display": {
+            "item_name": "Milk",
+            "space_name": "Fridge",
+            "category_id": "00000000-0000-4000-8000-000000000009",
+            "category_name": "Dairy"
+          },
+          "image_policy": {
+            "create_only": true,
+            "requires_review": true,
+            "source_image_ids": [
+              "00000000-0000-4000-8000-000000000006"
+            ]
+          },
+          "confirmation_reasons": [
+            "IMAGE_REVIEW"
+          ],
+          "after": {
+            "confirmed_current_amount": "2",
+            "confirmed_current_unit": "bottle",
+            "estimated_current_amount": null
+          },
+          "calculation_method": "EXACT",
+          "affects_state": "CONFIRMED",
+          "memory_snapshots": [],
+          "requires_confirmation": true,
+          "expected_version": null
+        },
+        "display": {
+          "item_name": "Milk",
+          "space_name": "Fridge",
+          "category_id": "00000000-0000-4000-8000-000000000009",
+          "category_name": "Dairy",
+          "source_image_ids": [
+            "00000000-0000-4000-8000-000000000006"
+          ],
+          "recognized_text": "MILK 2 bottles",
+          "package_description": "500ml per bottle",
+          "review_notes": [],
+          "missing_fields": [],
+          "confirmation_reasons": [
+            "IMAGE_REVIEW"
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
+</details>
+
+In this example items and pending.items repeat the same item because it is the only
+pending entry. In a multi-item turn, items can also include successful/failed items.
+
+<details>
+<summary>Complete JSON: milk successfully created</summary>
+
+```json
+{
+  "request_id": "00000000-0000-4000-8000-000000000002",
+  "status": "COMPLETED",
+  "items": [
+    {
+      "item_id": "00000000-0000-4000-8000-000000000004",
+      "item_key": "milk",
+      "proposal_id": "00000000-0000-4000-8000-000000000005",
+      "status": "SUCCEEDED",
+      "original_text": "MILK 2 bottles",
+      "preview": {
+        "draft": {
+          "item_key": "milk",
+          "original_text": "MILK 2 bottles",
+          "action": "CREATE_STOCK",
+          "inventory_item_id": null,
+          "item_query": "Milk",
+          "storage_space_id": "00000000-0000-4000-8000-000000000007",
+          "item_definition_id": "00000000-0000-4000-8000-000000000008",
+          "new_space": null,
+          "new_definition": null,
+          "quantity_kind": "AMOUNT",
+          "quantity_value": "2",
+          "quantity_unit": "bottle",
+          "purchase_date": null,
+          "expiry_date": null,
+          "utensil": null,
+          "estimate": null,
+          "source_image_ids": [
+            "00000000-0000-4000-8000-000000000006"
+          ],
+          "package_description": "500ml per bottle",
+          "review_notes": []
+        },
+        "before": null,
+        "display": {
+          "item_name": "Milk",
+          "space_name": "Fridge",
+          "category_id": "00000000-0000-4000-8000-000000000009",
+          "category_name": "Dairy"
+        },
+        "image_policy": {
+          "create_only": true,
+          "requires_review": true,
+          "source_image_ids": [
+            "00000000-0000-4000-8000-000000000006"
+          ]
+        },
+        "confirmation_reasons": [
+          "IMAGE_REVIEW"
+        ],
+        "after": {
+          "confirmed_current_amount": "2",
+          "confirmed_current_unit": "bottle",
+          "estimated_current_amount": null
+        },
+        "calculation_method": "EXACT",
+        "affects_state": "CONFIRMED",
+        "memory_snapshots": [],
+        "requires_confirmation": true,
+        "expected_version": null
+      },
+      "result": {
+        "inventory": {
+          "id": "00000000-0000-4000-8000-000000000010",
+          "storage_space_id": "00000000-0000-4000-8000-000000000007",
+          "storage_space_name": "Fridge",
+          "item_definition_id": "00000000-0000-4000-8000-000000000008",
+          "item_definition_name": "Milk",
+          "category_id": "00000000-0000-4000-8000-000000000009",
+          "category_name": "Dairy",
+          "purchase_date": null,
+          "expiry_date": null,
+          "notes": null,
+          "status": "IN_STOCK",
+          "initial_amount": "2.000",
+          "initial_unit": "bottle",
+          "confirmed_current_amount": "2.000",
+          "confirmed_current_unit": "bottle",
+          "confirmed_at": "2026-09-27T01:00:00Z",
+          "estimated_current_amount": null,
+          "estimated_current_unit": null,
+          "estimated_at": null,
+          "display_amount": "2.000",
+          "display_unit": "bottle",
+          "is_estimated": false,
+          "version": 1,
+          "created_at": "2026-09-27T01:00:00Z",
+          "updated_at": "2026-09-27T01:00:00Z"
+        },
+        "operation": null,
+        "replayed": false
+      },
+      "display": {
+        "item_name": "Milk",
+        "space_name": "Fridge",
+        "category_id": "00000000-0000-4000-8000-000000000009",
+        "category_name": "Dairy",
+        "source_image_ids": [
+          "00000000-0000-4000-8000-000000000006"
+        ],
+        "recognized_text": "MILK 2 bottles",
+        "package_description": "500ml per bottle",
+        "review_notes": [],
+        "missing_fields": [],
+        "confirmation_reasons": [
+          "IMAGE_REVIEW"
+        ]
+      }
+    }
+  ]
+}
+```
+
+</details>
+
+The completed response has no interrupt_id/pending. A successful item retains its
+old preview: preview.requires_confirmation=true describes the proposal that was
+reviewed, not a new request for approval. Render buttons based on item status and
+the current interrupt, not this historical flag.
+
+**Error handling:** 401 for invalid identity; 404 NOT_FOUND for an unknown or
+another user's conversation; 422 for invalid path UUID; 503 AGENT_UNAVAILABLE when
+state cannot be read. Do not display another user's conversation based on client IDs.
 
 ### Events
 
-| Event | Payload |
-|---|---|
-| start | conversation_id, request_id |
-| text_delta | delta; only final user-facing answer text |
-| operation_preview | data: item/proposal identifiers, before/after, method, estimate basis |
-| action_required | data: interrupt_id and pending items |
-| operation_result | data: item status, actual result or error |
-| done | status and data containing current public state |
-| error | stable code and sanitized message; query state before retrying |
+| Event | Payload | Frontend action |
+| --- | --- | --- |
+| start | conversation_id, request_id | Save request/conversation identifiers |
+| text_delta | delta | Append user-facing reply text |
+| operation_preview | data: public item, preview and display | Update the candidate card; no write has succeeded yet |
+| action_required | data: interrupt_id and items; replay may return full state | Show inputs/confirmation; retain current pause token |
+| operation_result | data: item status, actual result or error | Update that item's outcome |
+| done | status and data: current public state | End loading; WAITING_INPUT still needs user action |
+| error | code and sanitized message | Query state before choosing how to recover |
 
-Read the SSE stream until done, error or connection loss. A WAITING_INPUT done
-event is not successful completion of the inventory actions. Clients render each
-item's status and use the state endpoint after refresh/disconnection. Retried
-responses may repeat result events; reconcile UI items by item_id/proposal_id.
+Only final user-facing content is exposed. Text may arrive in chunks or in one
+text_delta after generation; chunk boundaries and wording are not contractual.
+Some ordinary replies emit only start/text_delta/done. A request may contain
+multiple previews/results, and a retry can replay them. Reconcile by item_id and
+replace proposal_id when a candidate changes.
+
+<a id="agent-milk-sse-example"></a>
+
+#### Complete example: photo, review, confirmation
+
+```text
+POST chat -> start -> operation_preview -> action_required -> done(WAITING_INPUT)
+[First HTTP response closes; the user reviews the candidate]
+POST resume -> start -> operation_result -> text_delta -> done(COMPLETED)
+```
+
+Each raw event below has an event line and a single JSON data line followed by a
+blank line. The objects are complete, not abbreviated. Long lines are intentionally
+inside collapsible examples to keep the main flow readable.
+
+<details>
+<summary>First HTTP response: chat waits for confirmation</summary>
+
+```text
+event: start
+data: {"type":"start","conversation_id":"00000000-0000-4000-8000-000000000001","request_id":"00000000-0000-4000-8000-000000000002"}
+
+event: operation_preview
+data: {"type":"operation_preview","data":{"item_id":"00000000-0000-4000-8000-000000000004","item_key":"milk","proposal_id":"00000000-0000-4000-8000-000000000005","status":"NEEDS_CONFIRMATION","original_text":"MILK 2 bottles","preview":{"draft":{"item_key":"milk","original_text":"MILK 2 bottles","action":"CREATE_STOCK","inventory_item_id":null,"item_query":"Milk","storage_space_id":"00000000-0000-4000-8000-000000000007","item_definition_id":"00000000-0000-4000-8000-000000000008","new_space":null,"new_definition":null,"quantity_kind":"AMOUNT","quantity_value":"2","quantity_unit":"bottle","purchase_date":null,"expiry_date":null,"utensil":null,"estimate":null,"source_image_ids":["00000000-0000-4000-8000-000000000006"],"package_description":"500ml per bottle","review_notes":[]},"before":null,"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy"},"image_policy":{"create_only":true,"requires_review":true,"source_image_ids":["00000000-0000-4000-8000-000000000006"]},"confirmation_reasons":["IMAGE_REVIEW"],"after":{"confirmed_current_amount":"2","confirmed_current_unit":"bottle","estimated_current_amount":null},"calculation_method":"EXACT","affects_state":"CONFIRMED","memory_snapshots":[],"requires_confirmation":true,"expected_version":null},"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy","source_image_ids":["00000000-0000-4000-8000-000000000006"],"recognized_text":"MILK 2 bottles","package_description":"500ml per bottle","review_notes":[],"missing_fields":[],"confirmation_reasons":["IMAGE_REVIEW"]}}}
+
+event: action_required
+data: {"type":"action_required","data":{"interrupt_id":"f32fc44597354a7f8fe578bf5ba12bed","items":[{"item_id":"00000000-0000-4000-8000-000000000004","item_key":"milk","proposal_id":"00000000-0000-4000-8000-000000000005","status":"NEEDS_CONFIRMATION","original_text":"MILK 2 bottles","preview":{"draft":{"item_key":"milk","original_text":"MILK 2 bottles","action":"CREATE_STOCK","inventory_item_id":null,"item_query":"Milk","storage_space_id":"00000000-0000-4000-8000-000000000007","item_definition_id":"00000000-0000-4000-8000-000000000008","new_space":null,"new_definition":null,"quantity_kind":"AMOUNT","quantity_value":"2","quantity_unit":"bottle","purchase_date":null,"expiry_date":null,"utensil":null,"estimate":null,"source_image_ids":["00000000-0000-4000-8000-000000000006"],"package_description":"500ml per bottle","review_notes":[]},"before":null,"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy"},"image_policy":{"create_only":true,"requires_review":true,"source_image_ids":["00000000-0000-4000-8000-000000000006"]},"confirmation_reasons":["IMAGE_REVIEW"],"after":{"confirmed_current_amount":"2","confirmed_current_unit":"bottle","estimated_current_amount":null},"calculation_method":"EXACT","affects_state":"CONFIRMED","memory_snapshots":[],"requires_confirmation":true,"expected_version":null},"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy","source_image_ids":["00000000-0000-4000-8000-000000000006"],"recognized_text":"MILK 2 bottles","package_description":"500ml per bottle","review_notes":[],"missing_fields":[],"confirmation_reasons":["IMAGE_REVIEW"]}}]}}
+
+event: done
+data: {"type":"done","status":"WAITING_INPUT","data":{"request_id":"00000000-0000-4000-8000-000000000002","status":"WAITING_INPUT","items":[{"item_id":"00000000-0000-4000-8000-000000000004","item_key":"milk","proposal_id":"00000000-0000-4000-8000-000000000005","status":"NEEDS_CONFIRMATION","original_text":"MILK 2 bottles","preview":{"draft":{"item_key":"milk","original_text":"MILK 2 bottles","action":"CREATE_STOCK","inventory_item_id":null,"item_query":"Milk","storage_space_id":"00000000-0000-4000-8000-000000000007","item_definition_id":"00000000-0000-4000-8000-000000000008","new_space":null,"new_definition":null,"quantity_kind":"AMOUNT","quantity_value":"2","quantity_unit":"bottle","purchase_date":null,"expiry_date":null,"utensil":null,"estimate":null,"source_image_ids":["00000000-0000-4000-8000-000000000006"],"package_description":"500ml per bottle","review_notes":[]},"before":null,"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy"},"image_policy":{"create_only":true,"requires_review":true,"source_image_ids":["00000000-0000-4000-8000-000000000006"]},"confirmation_reasons":["IMAGE_REVIEW"],"after":{"confirmed_current_amount":"2","confirmed_current_unit":"bottle","estimated_current_amount":null},"calculation_method":"EXACT","affects_state":"CONFIRMED","memory_snapshots":[],"requires_confirmation":true,"expected_version":null},"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy","source_image_ids":["00000000-0000-4000-8000-000000000006"],"recognized_text":"MILK 2 bottles","package_description":"500ml per bottle","review_notes":[],"missing_fields":[],"confirmation_reasons":["IMAGE_REVIEW"]}}],"interrupt_id":"f32fc44597354a7f8fe578bf5ba12bed","pending":{"items":[{"item_id":"00000000-0000-4000-8000-000000000004","item_key":"milk","proposal_id":"00000000-0000-4000-8000-000000000005","status":"NEEDS_CONFIRMATION","original_text":"MILK 2 bottles","preview":{"draft":{"item_key":"milk","original_text":"MILK 2 bottles","action":"CREATE_STOCK","inventory_item_id":null,"item_query":"Milk","storage_space_id":"00000000-0000-4000-8000-000000000007","item_definition_id":"00000000-0000-4000-8000-000000000008","new_space":null,"new_definition":null,"quantity_kind":"AMOUNT","quantity_value":"2","quantity_unit":"bottle","purchase_date":null,"expiry_date":null,"utensil":null,"estimate":null,"source_image_ids":["00000000-0000-4000-8000-000000000006"],"package_description":"500ml per bottle","review_notes":[]},"before":null,"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy"},"image_policy":{"create_only":true,"requires_review":true,"source_image_ids":["00000000-0000-4000-8000-000000000006"]},"confirmation_reasons":["IMAGE_REVIEW"],"after":{"confirmed_current_amount":"2","confirmed_current_unit":"bottle","estimated_current_amount":null},"calculation_method":"EXACT","affects_state":"CONFIRMED","memory_snapshots":[],"requires_confirmation":true,"expected_version":null},"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy","source_image_ids":["00000000-0000-4000-8000-000000000006"],"recognized_text":"MILK 2 bottles","package_description":"500ml per bottle","review_notes":[],"missing_fields":[],"confirmation_reasons":["IMAGE_REVIEW"]}}]}}}
+
+```
+
+</details>
+
+<details>
+<summary>Second HTTP response: resume creates the milk batch</summary>
+
+```text
+event: start
+data: {"type":"start","conversation_id":"00000000-0000-4000-8000-000000000001","request_id":"00000000-0000-4000-8000-000000000003"}
+
+event: operation_result
+data: {"type":"operation_result","data":{"item_id":"00000000-0000-4000-8000-000000000004","item_key":"milk","proposal_id":"00000000-0000-4000-8000-000000000005","status":"SUCCEEDED","original_text":"MILK 2 bottles","preview":{"draft":{"item_key":"milk","original_text":"MILK 2 bottles","action":"CREATE_STOCK","inventory_item_id":null,"item_query":"Milk","storage_space_id":"00000000-0000-4000-8000-000000000007","item_definition_id":"00000000-0000-4000-8000-000000000008","new_space":null,"new_definition":null,"quantity_kind":"AMOUNT","quantity_value":"2","quantity_unit":"bottle","purchase_date":null,"expiry_date":null,"utensil":null,"estimate":null,"source_image_ids":["00000000-0000-4000-8000-000000000006"],"package_description":"500ml per bottle","review_notes":[]},"before":null,"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy"},"image_policy":{"create_only":true,"requires_review":true,"source_image_ids":["00000000-0000-4000-8000-000000000006"]},"confirmation_reasons":["IMAGE_REVIEW"],"after":{"confirmed_current_amount":"2","confirmed_current_unit":"bottle","estimated_current_amount":null},"calculation_method":"EXACT","affects_state":"CONFIRMED","memory_snapshots":[],"requires_confirmation":true,"expected_version":null},"result":{"inventory":{"id":"00000000-0000-4000-8000-000000000010","storage_space_id":"00000000-0000-4000-8000-000000000007","storage_space_name":"Fridge","item_definition_id":"00000000-0000-4000-8000-000000000008","item_definition_name":"Milk","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy","purchase_date":null,"expiry_date":null,"notes":null,"status":"IN_STOCK","initial_amount":"2.000","initial_unit":"bottle","confirmed_current_amount":"2.000","confirmed_current_unit":"bottle","confirmed_at":"2026-09-27T01:00:00Z","estimated_current_amount":null,"estimated_current_unit":null,"estimated_at":null,"display_amount":"2.000","display_unit":"bottle","is_estimated":false,"version":1,"created_at":"2026-09-27T01:00:00Z","updated_at":"2026-09-27T01:00:00Z"},"operation":null,"replayed":false},"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy","source_image_ids":["00000000-0000-4000-8000-000000000006"],"recognized_text":"MILK 2 bottles","package_description":"500ml per bottle","review_notes":[],"missing_fields":[],"confirmation_reasons":["IMAGE_REVIEW"]}}}
+
+event: text_delta
+data: {"type":"text_delta","delta":"Added 2 bottles of milk"}
+
+event: text_delta
+data: {"type":"text_delta","delta":" to your fridge."}
+
+event: done
+data: {"type":"done","status":"COMPLETED","data":{"request_id":"00000000-0000-4000-8000-000000000002","status":"COMPLETED","items":[{"item_id":"00000000-0000-4000-8000-000000000004","item_key":"milk","proposal_id":"00000000-0000-4000-8000-000000000005","status":"SUCCEEDED","original_text":"MILK 2 bottles","preview":{"draft":{"item_key":"milk","original_text":"MILK 2 bottles","action":"CREATE_STOCK","inventory_item_id":null,"item_query":"Milk","storage_space_id":"00000000-0000-4000-8000-000000000007","item_definition_id":"00000000-0000-4000-8000-000000000008","new_space":null,"new_definition":null,"quantity_kind":"AMOUNT","quantity_value":"2","quantity_unit":"bottle","purchase_date":null,"expiry_date":null,"utensil":null,"estimate":null,"source_image_ids":["00000000-0000-4000-8000-000000000006"],"package_description":"500ml per bottle","review_notes":[]},"before":null,"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy"},"image_policy":{"create_only":true,"requires_review":true,"source_image_ids":["00000000-0000-4000-8000-000000000006"]},"confirmation_reasons":["IMAGE_REVIEW"],"after":{"confirmed_current_amount":"2","confirmed_current_unit":"bottle","estimated_current_amount":null},"calculation_method":"EXACT","affects_state":"CONFIRMED","memory_snapshots":[],"requires_confirmation":true,"expected_version":null},"result":{"inventory":{"id":"00000000-0000-4000-8000-000000000010","storage_space_id":"00000000-0000-4000-8000-000000000007","storage_space_name":"Fridge","item_definition_id":"00000000-0000-4000-8000-000000000008","item_definition_name":"Milk","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy","purchase_date":null,"expiry_date":null,"notes":null,"status":"IN_STOCK","initial_amount":"2.000","initial_unit":"bottle","confirmed_current_amount":"2.000","confirmed_current_unit":"bottle","confirmed_at":"2026-09-27T01:00:00Z","estimated_current_amount":null,"estimated_current_unit":null,"estimated_at":null,"display_amount":"2.000","display_unit":"bottle","is_estimated":false,"version":1,"created_at":"2026-09-27T01:00:00Z","updated_at":"2026-09-27T01:00:00Z"},"operation":null,"replayed":false},"display":{"item_name":"Milk","space_name":"Fridge","category_id":"00000000-0000-4000-8000-000000000009","category_name":"Dairy","source_image_ids":["00000000-0000-4000-8000-000000000006"],"recognized_text":"MILK 2 bottles","package_description":"500ml per bottle","review_notes":[],"missing_fields":[],"confirmation_reasons":["IMAGE_REVIEW"]}}]}}
+
+```
+
+</details>
+
+**Parsing and recovery rules**
+
+- Check HTTP status and Content-Type first. Authentication/validation failures
+  before streaming return JSON; a successful HTTP 200 stream can still emit error.
+- Use a client supporting POST, headers and a JSON body (for Web, fetch or a POST
+  SSE library). Native EventSource cannot send this request as required.
+- Decode UTF-8 incrementally, buffer incomplete lines/events and parse data only
+  after a complete SSE event. A network chunk may split an event or contain several.
+- Read until done, error or disconnect. An error ends the response and need not
+  be followed by done. Query state after losing a response; a write may have committed.
+- A retry uses the same request ID and identical body/image bytes/order. An edit
+  uses a new request ID; a replaced image uses a new image ID. Keep originals locally.
+
+Example in-stream failure (HTTP status is already 200):
+
+```text
+event: error
+data: {"type":"error","code":"AGENT_EXECUTION_FAILED","message":"Execution interrupted; query conversation state and retry with the same request ID"}
+
+```
+
+### Multimodal messages and frontend contract
+
+The same model receives text and images together. There is no OCR endpoint, second
+vision model, upload endpoint, or client-supplied `image_kind`. Speech recognition
+is a frontend input method: send the text only after the user edits/sends it.
+
+```json
+{
+  "message": "Please enter these in my fridge",
+  "request_id": "<uuid>",
+  "conversation_id": "<uuid>",
+  "as_of": "2026-09-26",
+  "images": [{"image_id": "<uuid>", "mime_type": "image/jpeg", "data_base64": "<raw base64, without data-URL prefix>"}]
+}
+```
+
+`message` defaults to an empty string; image-only messages are accepted. Images
+are data, not authorization: ambiguous uploads prompt a normal conversational
+reply, visual questions are answered without stock creation. Send a normal `/chat`
+reply when there is no interrupt; use `/resume` only after `action_required`.
+
+Limits apply to all images in one HTTP request (including all resume responses):
+at most 4 distinct image IDs, 3 MiB decoded per image, 8 MiB decoded in total,
+20 million pixels per image; JPEG/PNG/WebP still images only. Convert HEIC and
+compress/rotate on the client. The entire JSON body is limited to 12 MiB, including
+base64 expansion; both declared and streamed body sizes are checked.
+
+An image ID is a client-generated UUID bound to immutable bytes/type in this
+conversation. Retries keep request ID, image IDs, image ordering, text and bytes
+unchanged. A new image/replacement gets a new image ID; edited requests get a new
+request ID. Image-only supplement example:
+
+```json
+{
+  "conversation_id": "<uuid>", "interrupt_id": "<current interrupt>", "request_id": "<new uuid>",
+  "responses": [{
+    "item_id": "<pending item uuid>", "proposal_id": "<current proposal uuid>",
+    "decision": "edit",
+    "images": [{"image_id": "<new uuid>", "mime_type": "image/png", "data_base64": "<raw base64>"}]
+  }]
+}
+```
+
+Image tasks support new stock batches only, not modification of existing batches.
+Image-derived creation always waits for review; historic images visible to the
+model also force review of new-stock proposals, even if the model omits source
+references. Sending an image is not confirmation. After completing/cancelling a
+stock task, ordinary text operations retain their previous behavior.
+
+Public items in preview/result/waiting/state responses add a `display` object:
+
+| Field | Meaning |
+| --- | --- |
+| item_name / space_name | Display labels; may be empty before resolving missing information |
+| category_id / category_name | Validated category for a prepared new-stock proposal |
+| source_image_ids | Validated image references; conservative fallback may include all historical images |
+| recognized_text | Model transcription/source wording, not guaranteed OCR truth |
+| package_description | Optional label detail, e.g. 500ml per bottle; not a second stock balance |
+| review_notes | Model-supplied notes requiring user attention |
+| missing_fields | Required fields identified by backend preparation errors |
+| confirmation_reasons | IMAGE_REVIEW and/or NEW_ASSOCIATION for new-stock previews |
+
+Preview `draft` retains quantity_value, quantity_unit, purchase_date, expiry_date,
+and storage/item-definition IDs. `after` contains the actual proposed stock amount.
+Show quantity/units explicitly. Do not convert package counts on the frontend.
+Missing dates remain null. Names and image text must be rendered as text, not HTML.
+
+Up to 20 requested items per turn. A model-reported overflow returns a normal
+reply asking for a smaller group; no partial set is accepted. Detection is not a
+guarantee that every photographed item or receipt row was recognized.
+
+| HTTP status / code | Frontend action |
+| --- | --- |
+| 413 REQUEST_TOO_LARGE | Reduce the entire request size before sending with a new request ID |
+| 422 INVALID_IMAGE / IMAGE_DIMENSIONS_EXCEEDED / ANIMATED_IMAGE_NOT_SUPPORTED | Replace/convert the image |
+| 422 IMAGE_TOO_LARGE / IMAGE_BATCH_TOO_LARGE | Compress images or split the request |
+| 422 DUPLICATE_IMAGE_ID | Give separate attachments separate IDs |
+| 409 IMAGE_ID_CONFLICT | A reused image ID has different bytes/type; assign a new image ID |
+| 409 REQUEST_ID_CONFLICT | Do not reuse an existing request ID with different content |
+| 409 STALE_PROPOSAL / STALE_INTERRUPT | Reload state and operate on the current candidate |
+
+422 validation responses use `detail[]` with `type`, `loc`, `msg`; generic schema
+errors such as unsupported MIME types and list/string length limits also use this
+shape. They never echo image input. HTTP 409/413 errors use `detail.code`. Resume business validation errors such as
+ANSWER_REQUIRED and INVALID_TARGET_SELECTION also use `detail.code` with HTTP 422;
+distinguish these from the schema-validation `detail[]` shape.
+There are no new SSE event names. A `done` event with WAITING_INPUT is not a
+successful write. Batch confirmation uses multiple existing confirm responses;
+each item commits independently, not as one atomic batch.
+
+The state endpoint does not return images or full chat history. Keep thumbnails
+and in-flight request bodies locally for retries; after lost responses fetch
+state before choosing chat/resume. Images persist with checkpoints, have no
+separate automatic expiry, and are not returned in SSE or written into action
+receipt snapshots. The frontend interaction guide is [Agent frontend integration](AGENT_FRONTEND_INTEGRATION.md).
+The runnable request example below is maintained here with the API contract.
+
+
+#### Runnable image request example
+
+<details>
+<summary>Python example: send a photo and print SSE events</summary>
+
+在后端虚拟环境运行以下 Python 代码。环境变量 `SAYFRIDGE_TOKEN` 为已登录用户的 token，
+`SAYFRIDGE_IMAGE` 为本地图片路径，`SAYFRIDGE_API` 默认为本机服务。此示例只生成待核对候选，
+不自动确认；首次调试应使用测试账号。保存 body 以便网络失败后原样重试。
+
+```python
+import base64
+import json
+import mimetypes
+import os
+from datetime import date
+from pathlib import Path
+from uuid import uuid4
+import httpx
+
+path = Path(os.environ["SAYFRIDGE_IMAGE"])
+body = {
+    "message": "请把照片里的食品录入库存，先让我核对。",
+    "request_id": str(uuid4()),
+    "conversation_id": str(uuid4()),
+    "as_of": date.today().isoformat(),  # 使用用户设备当地日期
+    "images": [{
+        "image_id": str(uuid4()),
+        "mime_type": mimetypes.guess_type(path.name)[0],
+        "data_base64": base64.b64encode(path.read_bytes()).decode("ascii"),
+    }],
+}
+with httpx.stream(
+    "POST", os.getenv("SAYFRIDGE_API", "http://127.0.0.1:8000") + "/api/v1/agent/chat",
+    headers={"Authorization": "Bearer " + os.environ["SAYFRIDGE_TOKEN"]},
+    json=body, timeout=180,
+) as response:
+    response.raise_for_status()
+    for line in response.iter_lines():
+        if line.startswith("data: "):
+            print(json.loads(line[6:]))
+```
+</details>
+
+### Category integration and Agent confirmation
+
+Category HTTP response fields are unchanged. Fetch categories from `/item-categories`
+and follow pagination; never hardcode seven or 25 names. Display the item-definition
+name as the primary inventory label, with category as a secondary label/filter.
+A category is not a restriction on the names of items users can create.
+UI recommendation: initially offer categories represented in the user's inventory,
+plus all categories and search. The paginated inventory response alone is not a
+complete category-facet count; do not present one page as the whole inventory.
+
+Agent `list_item_categories` additionally returns `description`, `examples` and
+`exclusions` for each real active category. CREATE_STOCK previews expose
+`display.category_id` and `display.category_name`, propagated into public item display.
+New-definition confirmation must show the item name and proposed category. Category
+corrections use the existing resume request with `decision: "edit"` and a `message`
+identifying the desired category. There is no new category-ID field on the resume
+HTTP request. The Agent revises `new_definition.category_id` in its next proposal,
+which is validated and confirmed through the existing workflow.
+Changing a saved definition's category affects all inventory batches referring to
+that definition, not just one batch. Public definitions remain subject to existing
+ownership restrictions. See [category rules](DATABASE_DESIGN.md#4-public-category-catalog-table-item_category).

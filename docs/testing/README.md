@@ -4,6 +4,7 @@
 
 | Work packages | Report | Scope |
 | --- | --- | --- |
+| Agent multimodal | [Image input and stock review](AGENT_MULTIMODAL_TEST_RESULTS.md) | Inline images, cross-turn context, supplements, mandatory review, checkpoint recovery and live-model acceptance |
 | Agent V0.2 | [Agent workflow verification](AGENT_V02_TEST_RESULTS.md) | Memory, estimates, per-item transactions, resume, recovery, and live-model acceptance |
 | B01–B03 | [Authentication](B01-B03_AUTH_TEST_RESULTS.md) | Registration, login, and current user |
 | B04 | [Storage spaces](B04_STORAGE_SPACES_TEST_RESULTS.md) | Ownership, state, pagination, and concurrency |
@@ -88,3 +89,41 @@ working tree, environment, commands, outcomes, and outstanding acceptance checks
 Keep detailed scenarios and historical timings in the feature reports, not this
 index. Distinguish local results from remote CI. Update current counts here when
 selection changes; test collection is the source of truth.
+
+
+## Category and schema verification — 2026-09-26
+
+The targeted repair/category/receipt tests passed: **8 passed**. The full 598-test
+collection initially reported **588 passed, 8 skipped, 1 failed and 2 errors**
+(one error occurred during teardown of an already counted test). All three
+exceptions were database connection failures; their targeted reruns passed.
+Across these runs all 590 non-skipped cases passed, but the initial run was not
+clean. Original interrupted/failed teardown cleanup was not verified.
+
+Development database writes and authenticated development HTTP acceptance were
+not performed. Live-model classification evaluation was not performed; deterministic
+tests validate database checks and confirmation, not semantic classification accuracy.
+
+### Fixed model-evaluation cases
+
+These are manual/live-model evaluation expectations, not a rule-based classifier or a measured
+accuracy claim. Run with a seeded isolated test database and explicit live-model opt-in; record
+model/version, date, category result, clarification, and confirmation behavior.
+
+| Input | Expected result |
+| --- | --- |
+| 鸡胸肉 / chicken breast / frozen chicken | Meat & Poultry |
+| canned tomatoes / 罐装番茄 | Vegetables & Mushrooms |
+| tomato sauce / 番茄酱 / 老干妈 | Sauces, Condiments & Spreads |
+| frozen pizza / 冷冻披萨 | Prepared Meals & Leftovers |
+| oat milk / 燕麦奶 | Milk & Plant-Based Milk |
+| coconut milk / 椰奶 (no use indicated) | Clarify drinking versus cooking |
+| cooking coconut milk | Sauces, Condiments & Spreads |
+| Anchor (brand only) | Ask for product identity |
+| CHK BRST 500G, user says chicken breast | Meat & Poultry; do not derive stock count from weight |
+| XYZ 2.99 (unexplained receipt text) | Ask; do not silently choose Other |
+| Greek yoghurt / 希腊酸奶 | Yoghurt |
+| tofu / 豆腐 | Tofu & Meat Alternatives |
+| dish soap / 洗洁精 | Household Supplies |
+| clearly identified item outside catalog | Propose Other and require confirmation |
+| existing private definition with user-selected category | Reuse category; do not reclassify |

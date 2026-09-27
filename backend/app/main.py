@@ -20,6 +20,7 @@ from app.api.routes.admin import router as admin_router, admin_error_handler
 from app.services.admin import AdminError
 from app.agents.persistence import close_agent_resources
 from app.api.routes.agent import router as agent_router
+from app.agents.request_limits import AgentBodyLimitMiddleware
 
 
 @asynccontextmanager
@@ -31,6 +32,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="SayFridge Backend", lifespan=lifespan)
+app.add_middleware(AgentBodyLimitMiddleware)
 app.include_router(auth_router)
 app.include_router(storage_spaces_router)
 app.include_router(catalog_router)

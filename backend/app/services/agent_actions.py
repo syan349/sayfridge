@@ -128,7 +128,18 @@ async def _creation_values(session, user_id, draft, *, create=False):
     return space_id, definition_id
 
 
-async def prepare_action(session, user_id, draft: ActionDraft, memory: MemoryService, as_of=None):
+def validate_image_policy(draft, image_policy, *, approved=None):
+    """Policy is supplied by workflow state, never by model tool arguments."""
+    policy = image_policy or {}
+    if policy.get("create_only") or draft.source_image_ids:
+        if draft.action != "CREATE_STOCK" or draft.inventory_item_id is not None:
+            raise PreparationError("IMAGE_ACTION_NOT_SUPPORTED", "Images can only create a new stock batch")
+    if approved is False and policy.get("requires_review"):
+        raise PreparationError("CONFIRMATION_REQUIRED", "Review the current image-derived proposal first")
+
+
+async def prepare_action(session, user_id, draft: ActionDraft, memory: MemoryService, as_of=None, *, image_policy=None):
+    validate_image_policy(draft, image_policy)
     snapshots = []
     if draft.action == "CREATE_STOCK":
         if draft.estimate or draft.quantity_kind != "AMOUNT" or draft.quantity_value is None or not draft.quantity_unit:
@@ -139,11 +150,22 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
         values = InventoryCreate(storage_space_id=space_id or placeholder,
             item_definition_id=definition_id or placeholder, amount=draft.quantity_value,
             unit=draft.quantity_unit, purchase_date=draft.purchase_date, expiry_date=draft.expiry_date)
+        image_review = bool((image_policy or {}).get("requires_review") or draft.source_image_ids)
+        definition = await catalog.get_definition(session, definition_id, user_id) if definition_id else None
+        space = await storage_spaces.get_storage_space_by_id(session, space_id, user_id) if space_id else None
+        category_id = definition.category_id if definition else draft.new_definition.category_id
+        category = await session.get(ItemCategory, category_id)
         return {"draft": draft.model_dump(mode="json"), "before": None,
+            "display": {"item_name": definition.name if definition else draft.new_definition.name,
+                        "space_name": space.name if space else draft.new_space.name,
+                        "category_id": str(category.id), "category_name": category.name},
+            "image_policy": image_policy or {},
+            "confirmation_reasons": (["IMAGE_REVIEW"] if image_review else []) +
+                (["NEW_ASSOCIATION"] if draft.new_space or draft.new_definition else []),
             "after": {"confirmed_current_amount": values.amount, "confirmed_current_unit": values.unit,
                       "estimated_current_amount": None}, "calculation_method": "EXACT",
             "affects_state": "CONFIRMED", "memory_snapshots": [],
-            "requires_confirmation": bool(draft.new_space or draft.new_definition), "expected_version": None}
+            "requires_confirmation": bool(image_review or draft.new_space or draft.new_definition), "expected_version": None}
     if not draft.inventory_item_id:
         if not draft.item_query:
             raise PreparationError("TARGET_REQUIRED", "Identify the inventory item")
@@ -213,7 +235,7 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
         "requires_confirmation": calc["calculation_method"] == "AI_ESTIMATED", "expected_version": item.version}
 
 
-async def execute_action(session, user_id, conversation_id, turn_id, proposal_id, preview, memory, *, approved=False):
+async def execute_action(session, user_id, conversation_id, turn_id, proposal_id, preview, memory, *, approved=False, image_policy=None):
     digest = fingerprint(preview)
     try:
         # The transaction lock serializes identical receipts before any side effect.
@@ -224,11 +246,15 @@ async def execute_action(session, user_id, conversation_id, turn_id, proposal_id
             if prior.user_id != user_id or prior.request_fingerprint != digest:
                 raise PreparationError("IDEMPOTENCY_CONFLICT", "Action identifier already used")
             return {**prior.result_snapshot, "replayed": True}
+        draft = ActionDraft.model_validate(preview["draft"])
+        validate_image_policy(draft, image_policy, approved=approved)
+        validate_image_policy(draft, preview.get("image_policy"), approved=approved)
+        if draft.source_image_ids and not approved:
+            raise PreparationError("CONFIRMATION_REQUIRED", "Review the image-derived proposal first")
         if preview["requires_confirmation"] and not approved:
             raise PreparationError("CONFIRMATION_REQUIRED", "Confirm the current proposal")
         if not await memory.verify_snapshots(preview["memory_snapshots"]):
             raise PreparationError("MEMORY_CHANGED", "Memory changed; prepare a new proposal")
-        draft = ActionDraft.model_validate(preview["draft"])
         if draft.action == "CREATE_STOCK":
             space_id, definition_id = await _creation_values(session, user_id, draft, create=True)
             values = InventoryCreate(storage_space_id=space_id, item_definition_id=definition_id,

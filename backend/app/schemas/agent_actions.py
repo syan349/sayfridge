@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 from app.schemas.business import StorageSpaceCreate, ItemDefinitionCreate
 from app.schemas.inventory import CalendarDate
+from app.schemas.agent_media import AgentImage, validate_image_batch
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
 
@@ -37,6 +38,9 @@ class ActionDraft(BaseModel):
     expiry_date: CalendarDate | None = None
     utensil: str | None = Field(default=None, max_length=200)
     estimate: Estimate | None = None
+    source_image_ids: list[UUID] = Field(default_factory=list, max_length=80)
+    package_description: str | None = Field(default=None, max_length=300)
+    review_notes: list[Text] = Field(default_factory=list, max_length=10)
 
     @model_validator(mode="after")
     def no_conflicting_targets(self):
@@ -51,10 +55,15 @@ class ActionDraft(BaseModel):
 
 class ProposeActions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    actions: list[ActionDraft] = Field(min_length=1, max_length=20)
+    actions: list[ActionDraft] = Field(default_factory=list, max_length=20)
+    exceeds_item_limit: bool = False
 
     @model_validator(mode="after")
     def unique_keys(self):
+        if self.exceeds_item_limit and self.actions:
+            raise ValueError("Report overflow without partial actions")
+        if not self.exceeds_item_limit and not self.actions:
+            raise ValueError("Provide actions or report overflow")
         if len({a.item_key for a in self.actions}) != len(self.actions):
             raise ValueError("item_key must be unique")
         return self
@@ -67,12 +76,13 @@ class ResumeAnswer(BaseModel):
     decision: Literal["confirm", "answer", "edit", "cancel"]
     message: Text | None = None
     selected_inventory_item_id: UUID | None = None
+    images: list[AgentImage] = Field(default_factory=list, max_length=4)
 
     @model_validator(mode="after")
     def require_answer(self):
-        if self.decision in {"answer", "edit"} and not (self.message or self.selected_inventory_item_id):
+        if self.decision in {"answer", "edit"} and not (self.message or self.selected_inventory_item_id or self.images):
             raise ValueError("A message is required for an answer or edit")
-        if self.decision in {"confirm", "cancel"} and (self.message or self.selected_inventory_item_id):
+        if self.decision in {"confirm", "cancel"} and (self.message or self.selected_inventory_item_id or self.images):
             raise ValueError("Confirm/cancel accept identifiers only")
         return self
 
@@ -86,6 +96,7 @@ class AgentResumeRequest(BaseModel):
 
     @model_validator(mode="after")
     def unique_items(self):
+        validate_image_batch([image for r in self.responses for image in r.images])
         if len({r.item_id for r in self.responses}) != len(self.responses):
             raise ValueError("Each item may be answered only once")
         return self
@@ -101,6 +112,7 @@ class AgentItemView(BaseModel):
     preview: dict | None = None
     error: dict | None = None
     result: dict | None = None
+    display: dict | None = None
 
 
 class AgentConversationState(BaseModel):

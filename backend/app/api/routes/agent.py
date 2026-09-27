@@ -9,7 +9,6 @@ from uuid import UUID, uuid4, uuid5
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
-from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
 from app.api.dependencies import get_current_user
@@ -17,7 +16,7 @@ from app.db.models import User
 from app.agents.persistence import get_agent_resources, get_agent_persistence_settings
 from app.agents.locking import conversation_lock, ConversationBusy
 from app.agents.state import AgentContext
-from app.agents.memory import fingerprint
+from app.agents.messages import human_message, chat_fingerprint, resume_fingerprint, validate_image_ids
 from app.agents.workflow import public_state
 from app.schemas.agent import AgentChatRequest
 from app.schemas.agent_actions import AgentResumeRequest, AgentConversationState
@@ -136,7 +135,7 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
     conversation_id = payload.conversation_id or uuid5(user.id, f"agent:{request_id}")
     stack, resources, config, snapshot = await _open(user, conversation_id)
     try:
-        digest = fingerprint({"message": payload.message, "as_of": payload.as_of})
+        digest = chat_fingerprint(payload)
         values = snapshot.values
         previous = values.get("requests", {}).get(str(request_id))
         replay = None
@@ -153,8 +152,12 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
         else:
             if snapshot.next:
                 raise HTTPException(409, detail={"code": "AGENT_INPUT_REQUIRED" if _interrupts(snapshot) else "AGENT_RECOVERY_REQUIRED", "state": _state(snapshot)})
-            command = {"messages": [HumanMessage(content=payload.message, id=str(request_id))],
+            if not validate_image_ids(payload.images, values.get("messages", [])):
+                raise HTTPException(409, detail={"code": "IMAGE_ID_CONFLICT"})
+            command = {"messages": [human_message(payload.message, payload.images, str(request_id))],
                 "turn_id": str(request_id), "as_of": payload.as_of.isoformat() if payload.as_of else None,
+                "turn_has_images": bool(payload.images),
+                "image_task_active": bool(payload.images) or values.get("image_task_active", False),
                 "request_fingerprint": digest, "items": [], "pending_input": [],
                 "execution_results": [], "events": [], "final_only": False, "resume_requests": {}}
         context = AgentContext(user_id=user.id, as_of=payload.as_of, conversation_id=conversation_id, user_message=payload.message)
@@ -172,7 +175,7 @@ async def resume_agent(payload: AgentResumeRequest, request: Request, user: User
         data = payload.model_dump(mode="json")
         prior = snapshot.values.get("resume_requests", {}).get(str(payload.request_id))
         if prior:
-            if prior != fingerprint(data):
+            if prior != resume_fingerprint(payload):
                 raise HTTPException(409, detail={"code": "REQUEST_ID_CONFLICT"})
             replay = _state(snapshot) if _interrupts(snapshot) or not snapshot.next else None
             command = None
@@ -180,6 +183,8 @@ async def resume_agent(payload: AgentResumeRequest, request: Request, user: User
             interrupts = _interrupts(snapshot)
             if len(interrupts) != 1 or interrupts[0].id != payload.interrupt_id:
                 raise HTTPException(409, detail={"code": "STALE_INTERRUPT"})
+            if not validate_image_ids([i for r in payload.responses for i in r.images], snapshot.values.get("messages", [])):
+                raise HTTPException(409, detail={"code": "IMAGE_ID_CONFLICT"})
             items = {i["item_id"]: i for i in snapshot.values.get("items", [])}
             for answer in payload.responses:
                 item = items.get(str(answer.item_id))
