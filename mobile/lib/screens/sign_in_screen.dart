@@ -224,42 +224,47 @@ class _SocialButtons extends StatelessWidget {
       ('X', 'assets/icons/social/twitter_logo.png', 31.0),
     ];
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        for (final provider in providers)
-          Semantics(
-            button: true,
-            label: 'Continue with ${provider.$1}',
-            child: Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '${provider.$1} sign in is ready to connect to the API.',
+    return Center(
+      child: FractionallySizedBox(
+        widthFactor: 0.94,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            for (final provider in providers)
+              Semantics(
+                button: true,
+                label: 'Continue with ${provider.$1}',
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${provider.$1} sign in is ready to connect to the API.',
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: Center(
-                    child: Image.asset(
-                      provider.$2,
-                      width: provider.$3,
-                      height: provider.$3,
-                      fit: BoxFit.contain,
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      width: 60,
+                      height: 60,
+                      child: Center(
+                        child: Image.asset(
+                          provider.$2,
+                          width: provider.$3,
+                          height: provider.$3,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }
