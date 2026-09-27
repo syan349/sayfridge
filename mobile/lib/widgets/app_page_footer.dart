@@ -48,7 +48,8 @@ class AppPageFooter extends StatelessWidget {
         ),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(35, 0, 35, 4),
+        // Keep the footer 28 logical pixels above the enclosing bottom safe area.
+        padding: const EdgeInsets.fromLTRB(35, 0, 35, 28),
         child: AppBottomNavigation(
           key: navigationKey,
           selectedDestination: selectedDestination,
