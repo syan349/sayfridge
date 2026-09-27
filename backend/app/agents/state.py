@@ -24,6 +24,8 @@ class AgentState(TypedDict):
     resume_requests: dict
     events: list[dict]
     final_only: bool
+    image_task_active: bool
+    turn_has_images: bool
 
 
 @dataclass(frozen=True, slots=True)

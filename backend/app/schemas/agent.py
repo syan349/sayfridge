@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.schemas.inventory import CalendarDate, ExpiryBucket, InventoryStatus
+from app.schemas.agent_media import AgentImage, validate_image_batch
 
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -16,10 +17,18 @@ MemoryCategory = Literal["UNIT_RELATIONSHIP", "USAGE_PREFERENCE", "ENTITY_ALIAS"
 class AgentChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=8000)]
+    message: Annotated[str, StringConstraints(strip_whitespace=True, max_length=8000)] = ""
+    images: list[AgentImage] = Field(default_factory=list, max_length=4)
     conversation_id: UUID | None = None
     as_of: CalendarDate | None = None
     request_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def require_content(self):
+        validate_image_batch(self.images)
+        if not self.message and not self.images:
+            raise ValueError("Provide text or images")
+        return self
 
 
 class AgentStreamEvent(BaseModel):

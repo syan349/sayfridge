@@ -281,11 +281,12 @@ async def list_item_categories(runtime: AgentToolRuntime, page: int = 1) -> str:
     """List existing active categories; the Agent cannot create public categories."""
     from app.services import catalog
     from app.schemas.business import ItemCategoryRead
+    from app.core.category_catalog import category_guidance
     if page < 1:
         raise ValueError("page must be positive")
     async with AsyncSessionFactory() as session:
         rows, total = await catalog.list_categories(session, status="ACTIVE", page=page, page_size=50)
-    return _json({"items": [ItemCategoryRead.model_validate(r).model_dump(mode="json") for r in rows],
+    return _json({"items": [{**ItemCategoryRead.model_validate(r).model_dump(mode="json"), **category_guidance(r.name)} for r in rows],
                   "total": total, "page": page, "page_size": 50})
 
 

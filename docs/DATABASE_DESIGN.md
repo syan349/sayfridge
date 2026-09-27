@@ -75,7 +75,7 @@ Key constraints and indexes:
 
 ## 4. Public Category Catalog Table: `item_category`
 
-Each row represents a public category available for filtering. Initial seed categories may include vegetables, fruit, meat, dairy products, staple foods, household supplies, and other items.
+Each row represents a public category available for filtering. The maintained 25-category catalog and boundaries are defined in `backend/app/core/category_catalog.py` and summarized below. Categories describe product identity, independently of storage location or packaging.
 
 | Field | Description |
 | --- | --- |
@@ -89,6 +89,57 @@ Each row represents a public category available for filtering. Initial seed cate
 
 - Categories are not privately owned by ordinary users. Public categories are initialized by the system or maintained by administrators.
 - Categories referenced by item definitions must not be physically deleted; set their status to ARCHIVED instead.
+
+| Category | Includes / examples | Excludes / boundary |
+| --- | --- | --- |
+| Vegetables & Mushrooms | Vegetables, mushrooms and plain preserved vegetables. Examples: carrot / 胡萝卜, canned tomatoes, frozen peas. | Exclude tomato sauce, prepared meals and dried legumes. |
+| Fruit | Whole, cut, dried or plain preserved fruit. Examples: apple / 苹果, frozen berries, raisins. | Exclude juice, jam and fruit desserts. |
+| Fresh Herbs | Fresh culinary herbs. Examples: coriander / 香菜, fresh basil. | Dried herbs belong to Dried Herbs & Spices. |
+| Meat & Poultry | Raw meat and poultry, including frozen or marinated cuts. Examples: chicken breast / 鸡胸肉, beef steak. | Exclude sausages, cured meats and prepared meals. |
+| Fish & Seafood | Fish and seafood, including plain canned, smoked or frozen products. Examples: salmon / 三文鱼, canned tuna, prawns. | Exclude complete prepared meals and seafood sauces. |
+| Eggs | Shell eggs and liquid egg products. Examples: chicken eggs / 鸡蛋, egg whites. | Exclude egg dishes and mayonnaise. |
+| Processed & Deli Meats | Processed, cured and deli meat products. Examples: ham / 火腿, bacon, sausages. | Exclude raw meat cuts, seafood and complete meals. |
+| Milk & Plant-Based Milk | Dairy milk and plant-based drinks intended as milk substitutes. Examples: Anchor milk, oat milk / 燕麦奶, drinking coconut milk. | Cooking coconut milk belongs to Sauces, Condiments & Spreads; ask intended use if unclear. |
+| Yoghurt | Dairy and plant-based yoghurt. Examples: Greek yoghurt / 希腊酸奶, coconut yoghurt. | Exclude milk drinks, ice cream and frozen yoghurt. |
+| Cheese | Dairy and plant-based cheese. Examples: cheddar / 切达奶酪, vegan cheese. | Exclude butter, cream and cheese sauces. |
+| Butter & Cream | Butter, margarine and dairy or plant-based cream. Examples: butter / 黄油, whipping cream, margarine. | Exclude cooking oils and cooking coconut milk. |
+| Tofu & Meat Alternatives | Tofu, tempeh and plant-based meat substitutes. Examples: tofu / 豆腐, vegan mince. | Exclude plant milk, cheese, dried legumes and complete meals. |
+| Rice, Pasta & Grains | Unprepared rice, noodles, pasta, grains and breakfast cereals. Examples: rice / 大米, spaghetti, oats. | Exclude bread, flour, filled dumplings and complete meals. |
+| Bread & Bakery | Baked bread, wraps, buns and pastries. Examples: toast bread / 吐司, croissant, tortilla. | Exclude baking ingredients, biscuits and packaged cakes or desserts. |
+| Dried Legumes, Nuts & Seeds | Dried pulses, plain preserved beans, nuts and edible seeds. Examples: lentils / 小扁豆, canned chickpeas, almonds. | Exclude fresh green beans, tofu, nut spreads and confectionery-coated nuts. |
+| Baking Ingredients | Ingredients primarily used for baking. Examples: flour / 面粉, sugar, yeast, baking cocoa. | Eggs, milk, butter and oils retain their own categories. |
+| Sauces, Condiments & Spreads | Sauces, stocks, condiments, jams and spreads; coconut milk for cooking. Examples: Lao Gan Ma / 老干妈, tomato sauce, peanut butter, cooking coconut milk. | Exclude plain vegetables, oils, vinegar and dry spice powders. |
+| Oils & Vinegars | Edible oils and culinary vinegars. Examples: olive oil / 橄榄油, rice vinegar. | Exclude butter and prepared salad dressings. |
+| Dried Herbs & Spices | Dried herbs, spices, salt and dry seasoning blends. Examples: cumin / 孜然, dried basil, salt. | Exclude fresh herbs, sugar and liquid sauces. |
+| Prepared Meals & Leftovers | Prepared dishes, soups, meal kits and leftovers; includes filled dumplings and pizza. Examples: frozen pizza / 冷冻披萨, leftover curry, dumplings. | Plain single ingredients retain their own category regardless of storage. |
+| Snacks & Desserts | Snack foods, confectionery and non-frozen desserts. Examples: chips / 薯片, biscuits, chocolate, cake. | Exclude plain nuts, fruit, yoghurt, pastries and frozen desserts. |
+| Ice Cream & Frozen Desserts | Ice cream, frozen yoghurt, sorbet and ice pops. Examples: ice cream / 冰淇淋, sorbet. | Other frozen foods retain their product category. |
+| Drinks, Tea & Coffee | Water, juice, soft drinks, alcohol, tea and coffee. Examples: coffee / 咖啡, orange juice, beer. | Milk and plant-based milk drinks retain their own category. |
+| Household Supplies | Non-food household consumables. Examples: dish soap / 洗洁精, paper towels, shampoo. | Do not classify human food here; ask about unrecognized products. |
+| Other | No suitable catalog category after clarification; requires user confirmation. Examples: an identified product outside the listed categories. | Never silently use Other for unreadable names or uncertain product identity. |
+
+### Classification behavior
+
+Search existing definitions first and reuse their category. For new definitions, retrieve
+real active category IDs and guidance. Ask about unknown products or ambiguous use; never
+invent IDs, categories or certainty from a brand/receipt abbreviation. Other is a confirmed
+fallback for an identified out-of-catalog item, not an automatic label for unreadable input.
+New-definition previews display the item and category and retain the existing confirmation
+and correction workflow. Category belongs to a definition; changing it affects related batches.
+
+Product identity and storage are separate: frozen chicken remains meat; canned tomatoes
+remain vegetables; tomato sauce is a condiment; frozen pizza is a prepared meal. Drinking
+coconut milk is plant milk, cooking coconut milk is a cooking ingredient under sauces.
+
+### Classification references
+
+This is a product-design adaptation, not a scientifically validated optimal 25-class taxonomy.
+Sources inform boundaries and retail vocabulary; no standards-compliance claim is made.
+
+- [FAO/WHO GIFT food groups](https://www.fao.org/gift-individual-food-consumption/methodology/food-groups-and-sub-groups): groupings differ by analytic purpose.
+- [EFSA FoodEx2](https://www.efsa.europa.eu/en/data/data-standardisation): food classification and descriptive properties.
+- [GS1 GPC](https://www.gs1.org/standards/gpc/get-started): common product group definitions.
+- [New World fridge categories](https://www.newworld.co.nz/shop/category/fridge-deli-and-eggs) and [pantry categories](https://www.newworld.co.nz/shop/category/pantry): local retail vocabulary, not household usability evidence.
 
 ## 5. Item Definition Catalog Table: `item_definition`
 
@@ -126,6 +177,7 @@ Each row represents a specific inventory item or batch. The same item may have m
 | id | Inventory item primary key |
 | storage_space_id | Owning storage space; foreign key referencing storage_space.id |
 | item_definition_id | Item definition; foreign key referencing item_definition.id |
+| notes | Optional inventory-batch notes; nullable TEXT; API accepts up to 1,000 characters; does not affect quantities |
 | purchase_date | Purchase date; nullable |
 | expiry_date | Expiry date; nullable. The AI model must not infer an unverified date on its own |
 | status | IN_STOCK, EMPTY, DISCARDED, or ARCHIVED |

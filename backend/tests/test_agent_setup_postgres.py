@@ -16,7 +16,7 @@ def test_receipt_setup_check_create_and_incompatible_schema(database):
     env["DATABASE_URL_DIRECT"] = url.set(query={**dict(url.query), "options": f"-csearch_path={schema}"}).render_as_string(hide_password=False)
     backend = Path(__file__).resolve().parents[1]
     def run(mode, answer=None):
-        return subprocess.run([sys.executable, "scripts/setup_agent_actions.py", mode],
+        return subprocess.run([sys.executable, "scripts/setup_agent_actions.py", mode, "--schema", schema],
             cwd=backend, env=env, input=answer, text=True, capture_output=True, timeout=30)
     assert run("--check").returncode == 0
     with engine.begin() as connection:

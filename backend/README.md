@@ -20,11 +20,13 @@ references, not parallel implementation instructions.
 
 ## Requirements
 
-The text Agent now has a six-node workflow, structured memory, independently
+The multimodal Agent has a six-node workflow, structured memory, independently
 committed inventory actions, confirmation/resume, and SSE recovery interfaces.
 See [Agent interfaces](../docs/API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)
 and [Agent configuration and storage](#agent-configuration-and-storage). Existing
 databases require the explicit receipt-table setup before enabling Agent writes.
+The same configured model reads text and inline images; no OCR service or second
+model is used. See [frontend handoff](../docs/AGENT_FRONTEND_INTEGRATION.md).
 
 - Python 3.11
 
@@ -199,15 +201,13 @@ python -m pytest tests/test_storage_spaces_api.py tests/test_storage_spaces_post
 ## Inventory setup and verification
 
 Inventory uses nullable TEXT `inventory_item.notes`, included in the latest initial
-schema and ORM. Existing development databases that lack this column need a
-one-time schema synchronization, for example:
+schema and ORM. Local schema definitions do not establish remote deployment status.
 
-```sql
-ALTER TABLE inventory_item ADD COLUMN IF NOT EXISTS notes TEXT;
-```
-
-This change has not been executed against Neon. No separate notes migration script
-or versioned upgrade/downgrade workflow is required during this development phase.
+The 25 public categories and Agent classification guidance share one configuration:
+`app/core/category_catalog.py`. The reviewed seed SQL is
+`scripts/sql/seed_item_categories.sql`; `python scripts/render_category_seed.py`
+prints SQL for review without connecting to a database. This is not a database
+synchronization service. Fresh schemas also require explicit category seeding.
 
 The inventory routes use `app/schemas/inventory.py` and `app/services/inventory.py`.
 An owned active space and visible active definition/category must exist before
@@ -333,3 +333,26 @@ $env:AGENT_LIVE_MODEL='1'
 
 Live checks use synthetic inventory in the isolated test database and incur model
 API usage; they never use the production inventory connection for test actions.
+
+Multimodal input requires Pillow from requirements.txt and a configured model/API
+that supports image content blocks together with tool calls. Requests accept at
+most 4 JPEG/PNG/WebP still images, 3 MiB decoded each, 8 MiB combined, 20 million
+pixels each. The ASGI layer caps JSON bodies at 12 MiB before validation, including
+chunked uploads. Configure reverse proxies to allow this size (base64 adds about
+one third) or explicitly advertise their smaller deployment limit. Client-side
+HEIC conversion/compression is required. Do not log request bodies.
+
+Images remain in PostgreSQL conversation checkpoints with no separate expiry or
+automatic cleanup. Allow for database/backup growth and increasing model context
+cost as image history grows. There is no new business table or migration in this
+change; existing Agent/checkpoint and action-receipt storage must already exist.
+No application startup DDL is added. Full chat/image history retrieval is not
+provided by the recovery endpoint.
+
+Run image-specific checks with:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests/test_agent_messages.py tests/test_agent_multimodal_workflow.py tests/test_agent_multimodal_postgres.py
+$env:AGENT_LIVE_MODEL='1'
+.\.venv\Scripts\python.exe -m pytest -q tests/test_agent_multimodal_live.py
+```
