@@ -11,15 +11,16 @@ class AgentComposer extends StatefulWidget {
     required this.hasImages,
     required this.onPhotoPressed,
     required this.onSendPressed,
-    required this.voiceButtonBuilder,
+    required this.voiceButton,
     this.waiting = false,
+    this.voiceActive = false,
     super.key,
   });
 
   final TextEditingController controller;
-  final bool enabled, hasImages, waiting;
+  final bool enabled, hasImages, waiting, voiceActive;
   final VoidCallback? onPhotoPressed, onSendPressed;
-  final Widget Function(bool expanded) voiceButtonBuilder;
+  final Widget voiceButton;
 
   @override
   State<AgentComposer> createState() => _AgentComposerState();
@@ -28,11 +29,13 @@ class AgentComposer extends StatefulWidget {
 class _AgentComposerState extends State<AgentComposer> {
   final _focusNode = FocusNode();
   bool _typing = false;
+  late String _lastText;
 
   @override
   void initState() {
     super.initState();
     _typing = widget.controller.text.isNotEmpty;
+    _lastText = widget.controller.text;
     widget.controller.addListener(_refresh);
   }
 
@@ -42,13 +45,18 @@ class _AgentComposerState extends State<AgentComposer> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_refresh);
       widget.controller.addListener(_refresh);
+      _lastText = widget.controller.text;
     }
   }
 
   void _refresh() {
     setState(() {
       // Released speech becomes editable text; it is never sent here.
-      if (widget.controller.text.isNotEmpty) _typing = true;
+      if (widget.controller.text != _lastText &&
+          widget.controller.text.isNotEmpty) {
+        _typing = true;
+      }
+      _lastText = widget.controller.text;
     });
   }
 
@@ -57,6 +65,11 @@ class _AgentComposerState extends State<AgentComposer> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
+  }
+
+  void _voiceMode() {
+    _focusNode.unfocus();
+    setState(() => _typing = false);
   }
 
   @override
@@ -68,11 +81,11 @@ class _AgentComposerState extends State<AgentComposer> {
 
   @override
   Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 63),
+    constraints: const BoxConstraints(minHeight: 60),
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(20),
       boxShadow: const [
         BoxShadow(
           color: Color(0x26000000),
@@ -85,17 +98,21 @@ class _AgentComposerState extends State<AgentComposer> {
       children: [
         _ComposerButton(
           tooltip: 'Add photos',
-          asset: AssistantAssets.photo,
-          onPressed: widget.onPhotoPressed,
+          icon: const Icon(
+            Icons.image_outlined,
+            color: Color(0xFF81848A),
+            size: 25,
+          ),
+          onPressed: widget.voiceActive ? null : widget.onPhotoPressed,
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 12),
         Expanded(
           child: _typing || widget.waiting
               ? TextField(
                   key: const Key('assistant-message-field'),
                   controller: widget.controller,
                   focusNode: _focusNode,
-                  enabled: widget.enabled,
+                  enabled: widget.enabled && !widget.voiceActive,
                   maxLines: 3,
                   minLines: 1,
                   maxLength: 8000,
@@ -119,21 +136,39 @@ class _AgentComposerState extends State<AgentComposer> {
                   ),
                   onSubmitted: (_) => widget.onSendPressed?.call(),
                 )
-              : widget.voiceButtonBuilder(true),
+              : widget.voiceButton,
         ),
-        if (_typing || widget.waiting)
-          widget.voiceButtonBuilder(false)
-        else
+        if (_typing || widget.waiting) ...[
+          _ComposerButton(
+            tooltip: 'Switch to voice input',
+            icon: Image.asset(
+              AssistantAssets.microphone,
+              width: 23,
+              height: 29,
+            ),
+            onPressed: widget.enabled && !widget.voiceActive
+                ? _voiceMode
+                : null,
+          ),
+          Container(
+            width: 1,
+            height: 34,
+            margin: const EdgeInsets.symmetric(horizontal: 7),
+            color: const Color(0xFFC6C6CB),
+          ),
+        ] else
           _ComposerButton(
             tooltip: 'Type a message',
-            asset: AssistantAssets.keyboard,
-            onPressed: widget.enabled ? _typeMessage : null,
+            icon: Image.asset(AssistantAssets.keyboard, width: 28, height: 24),
+            onPressed: widget.enabled && !widget.voiceActive
+                ? _typeMessage
+                : null,
           ),
         if (_typing || widget.waiting || widget.hasImages)
           _ComposerButton(
             tooltip: 'Send message',
-            asset: AssistantAssets.send,
-            onPressed: widget.onSendPressed,
+            icon: Image.asset(AssistantAssets.send, width: 26, height: 24),
+            onPressed: widget.voiceActive ? null : widget.onSendPressed,
           ),
       ],
     ),
@@ -143,11 +178,12 @@ class _AgentComposerState extends State<AgentComposer> {
 class _ComposerButton extends StatelessWidget {
   const _ComposerButton({
     required this.tooltip,
-    required this.asset,
+    required this.icon,
     required this.onPressed,
   });
 
-  final String tooltip, asset;
+  final String tooltip;
+  final Widget icon;
   final VoidCallback? onPressed;
 
   @override
@@ -156,9 +192,6 @@ class _ComposerButton extends StatelessWidget {
     onPressed: onPressed,
     constraints: const BoxConstraints.tightFor(width: 38, height: 42),
     padding: const EdgeInsets.all(5),
-    icon: Opacity(
-      opacity: onPressed == null ? 0.4 : 1,
-      child: Image.asset(asset, width: 28, height: 24, fit: BoxFit.contain),
-    ),
+    icon: Opacity(opacity: onPressed == null ? 0.4 : 1, child: icon),
   );
 }

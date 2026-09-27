@@ -109,7 +109,8 @@ void main() {
     final gesture = await tester.startGesture(
       tester.getCenter(find.text('Press and hold to speak')),
     );
-    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await tester.pump();
+    expect(voice.starts, 1);
     await gesture.up();
     await tester.pumpAndSettle();
     expect(voice.stopped, isTrue);
@@ -126,7 +127,7 @@ void main() {
   });
 
   testWidgets(
-    'holding the microphone inserts recognized text without sending',
+    'microphone only switches modes; holding the voice bar appends speech',
     (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 3;
@@ -158,6 +159,15 @@ void main() {
       await tester.pumpAndSettle();
       final field = find.byType(TextField);
       await tester.enterText(field, 'Please');
+      await tester.longPress(find.byTooltip('Switch to voice input'));
+      await tester.pumpAndSettle();
+      expect(voice.starts, 0);
+      if (find.byTooltip('Switch to voice input').evaluate().isNotEmpty) {
+        await tester.tap(find.byTooltip('Switch to voice input'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('Press and hold to speak'), findsOneWidget);
+      expect(voice.starts, 0);
       final gesture = await tester.startGesture(
         tester.getCenter(find.byTooltip('Hold to speak')),
       );
@@ -600,6 +610,7 @@ class _FakeVoiceInput implements VoiceInputService {
   final String words;
   bool stopped = false;
   bool cancelled = false;
+  int starts = 0;
 
   @override
   Future<bool> start({
@@ -608,6 +619,7 @@ class _FakeVoiceInput implements VoiceInputService {
     required bool Function() shouldContinue,
   }) async {
     if (!shouldContinue()) return false;
+    starts++;
     onWords(words);
     return true;
   }

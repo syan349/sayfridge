@@ -380,17 +380,10 @@ class _GuestAssistantReply extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const AssistantAvatar(size: 42),
-        const SizedBox(width: 11),
-        const Flexible(
-          child: AssistantMessageBubble(
-            message: 'I’ll organise that for you.',
-            textStyle: exampleMessageStyle,
-          ),
-        ),
-      ],
+    return const AssistantReply(
+      avatarSize: 42,
+      message: 'I’ll organise that for you.',
+      textStyle: exampleMessageStyle,
     );
   }
 }

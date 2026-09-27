@@ -218,6 +218,30 @@ class UserMessageBubble extends StatelessWidget {
   }
 }
 
+class AssistantReply extends StatelessWidget {
+  const AssistantReply({
+    required this.message,
+    required this.textStyle,
+    this.avatarSize = 47,
+    super.key,
+  });
+
+  final String message;
+  final TextStyle textStyle;
+  final double avatarSize;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      AssistantAvatar(size: avatarSize),
+      const SizedBox(width: 11),
+      Flexible(
+        child: AssistantMessageBubble(message: message, textStyle: textStyle),
+      ),
+    ],
+  );
+}
+
 class AssistantMessageBubble extends StatelessWidget {
   const AssistantMessageBubble({
     required this.message,

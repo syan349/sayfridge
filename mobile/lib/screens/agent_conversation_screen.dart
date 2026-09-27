@@ -12,6 +12,7 @@ import '../widgets/app_bottom_navigation.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
 import '../widgets/business_forms.dart';
+import '../widgets/hold_to_speak_button.dart';
 import 'camera_input_screen.dart';
 
 class AgentConversationScreen extends StatefulWidget {
@@ -39,8 +40,11 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   final List<AgentImage> _images = [];
   late final VoiceInputService _voiceInput;
   bool _recordingVoice = false;
+  bool _holdingVoice = false;
+  bool _finishingVoice = false;
   bool _cancelVoice = false;
   String _recognizedWords = '';
+  int _voiceSession = 0;
 
   @override
   void initState() {
@@ -50,6 +54,8 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
 
   @override
   void dispose() {
+    ++_voiceSession;
+    _holdingVoice = false;
     if (_recordingVoice) _voiceInput.cancel();
     _message.dispose();
     super.dispose();
@@ -57,54 +63,70 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
 
   Future<void> _startVoiceInput() async {
     if (!widget.controller.canSend || _recordingVoice) return;
+    final session = ++_voiceSession;
     setState(() {
       _recordingVoice = true;
+      _holdingVoice = true;
+      _finishingVoice = false;
       _cancelVoice = false;
       _recognizedWords = '';
     });
     final available = await _voiceInput.start(
       onWords: (words) {
-        if (!mounted || !_recordingVoice) return;
+        if (!mounted || session != _voiceSession || !_recordingVoice) return;
         setState(() => _recognizedWords = words.trim());
       },
       onError: (message) {
-        if (!mounted) return;
+        if (!mounted || session != _voiceSession) return;
         setState(() {
           _recordingVoice = false;
+          _holdingVoice = false;
+          _finishingVoice = false;
           _cancelVoice = false;
           _recognizedWords = '';
         });
         _messageFor(message);
       },
-      shouldContinue: () => mounted && _recordingVoice,
+      shouldContinue: () =>
+          mounted && session == _voiceSession && _holdingVoice,
     );
-    if (!mounted || available || !_recordingVoice) return;
-    setState(() => _recordingVoice = false);
+    if (!mounted || session != _voiceSession || available || !_recordingVoice) {
+      return;
+    }
+    if (!_holdingVoice) return;
+    setState(() {
+      _recordingVoice = false;
+      _holdingVoice = false;
+    });
     _messageFor(
       'Voice recognition is not available. Check microphone permission or use a supported browser.',
     );
   }
 
-  void _updateVoiceCancel(LongPressMoveUpdateDetails details) {
+  void _updateVoiceCancel(Offset offset) {
     if (!_recordingVoice) return;
-    final shouldCancel = details.offsetFromOrigin.dy < -60;
+    final shouldCancel = offset.dy < -60;
     if (shouldCancel != _cancelVoice) {
       setState(() => _cancelVoice = shouldCancel);
     }
   }
 
   Future<void> _finishVoiceInput({bool forceCancel = false}) async {
-    if (!_recordingVoice) return;
+    _holdingVoice = false;
+    if (!_recordingVoice || _finishingVoice) return;
+    final session = _voiceSession;
     final cancelled = forceCancel || _cancelVoice;
+    setState(() => _finishingVoice = true);
     if (cancelled) {
       await _voiceInput.cancel();
     } else {
       await _voiceInput.stop();
     }
-    if (!mounted) return;
+    if (!mounted || session != _voiceSession || !_recordingVoice) return;
     final words = _recognizedWords.trim();
     setState(() {
       _recordingVoice = false;
+      _finishingVoice = false;
       _cancelVoice = false;
       _recognizedWords = '';
       if (!cancelled && words.isNotEmpty) {
@@ -272,7 +294,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                         message: message.value,
                                         textStyle: exampleMessageStyle,
                                       )
-                                    : AssistantMessageBubble(
+                                    : AssistantReply(
                                         textStyle: exampleMessageStyle,
                                         message: message.value,
                                       ),
@@ -351,48 +373,54 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                 ],
                               ),
                             ),
+                          if (_recordingVoice)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.primarySoft,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Text(
+                                _cancelVoice
+                                    ? 'Release to cancel'
+                                    : '${_finishingVoice ? "Converting speech to text…" : "Listening… Release to insert text · Slide up to cancel"}'
+                                          '${_recognizedWords.isEmpty ? "" : "\n$_recognizedWords"}',
+                                key: const Key('voice-input-status'),
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _cancelVoice
+                                      ? Colors.red
+                                      : AppColors.text,
+                                ),
+                              ),
+                            ),
                           AgentComposer(
                             controller: _message,
                             enabled: agent.canSend,
                             waiting: agent.waiting,
                             hasImages: _images.isNotEmpty,
+                            voiceActive: _recordingVoice,
                             onPhotoPressed:
                                 agent.canSend &&
                                     _images.length < AgentImage.maxImages
                                 ? _pickImages
                                 : null,
                             onSendPressed: agent.canSend ? _send : null,
-                            voiceButtonBuilder: (expanded) => _VoiceHoldButton(
-                              expanded: expanded,
-                              enabled: agent.canSend,
+                            voiceButton: HoldToSpeakButton(
+                              enabled: agent.canSend && !_finishingVoice,
                               recording: _recordingVoice,
                               cancelling: _cancelVoice,
-                              onLongPressStart: _startVoiceInput,
-                              onLongPressMoveUpdate: _updateVoiceCancel,
-                              onLongPressEnd: () => _finishVoiceInput(),
-                              onLongPressCancel: () =>
+                              finishing: _finishingVoice,
+                              onStart: _startVoiceInput,
+                              onMove: _updateVoiceCancel,
+                              onEnd: () => _finishVoiceInput(),
+                              onCancel: () =>
                                   _finishVoiceInput(forceCancel: true),
                             ),
                           ),
-                          if (_recordingVoice)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                _cancelVoice
-                                    ? 'Release to cancel'
-                                    : _recognizedWords.isEmpty
-                                    ? 'Listening… Slide up to cancel'
-                                    : '$_recognizedWords\nRelease to insert text · Slide up to cancel',
-                                key: const Key('voice-input-status'),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: _cancelVoice
-                                      ? Colors.red
-                                      : Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
                         ],
                       ),
                     ),
@@ -407,87 +435,6 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
               },
             ),
           ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _VoiceHoldButton extends StatelessWidget {
-  const _VoiceHoldButton({
-    required this.enabled,
-    required this.recording,
-    required this.cancelling,
-    required this.onLongPressStart,
-    required this.onLongPressMoveUpdate,
-    required this.onLongPressEnd,
-    required this.onLongPressCancel,
-    this.expanded = false,
-  });
-
-  final bool enabled;
-  final bool recording;
-  final bool cancelling;
-  final bool expanded;
-  final Future<void> Function() onLongPressStart;
-  final void Function(LongPressMoveUpdateDetails details) onLongPressMoveUpdate;
-  final Future<void> Function() onLongPressEnd;
-  final Future<void> Function() onLongPressCancel;
-
-  @override
-  Widget build(BuildContext context) => Tooltip(
-    message: 'Hold to speak',
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onLongPressStart: enabled ? (_) => onLongPressStart() : null,
-      onLongPressMoveUpdate: enabled ? onLongPressMoveUpdate : null,
-      onLongPressEnd: enabled ? (_) => onLongPressEnd() : null,
-      onLongPressCancel: enabled ? () => onLongPressCancel() : null,
-      child: Semantics(
-        button: true,
-        enabled: enabled,
-        label: recording
-            ? cancelling
-                  ? 'Release to cancel voice input'
-                  : 'Release to finish voice input'
-            : 'Hold to speak',
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          width: expanded ? double.infinity : 46,
-          height: 46,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(23),
-            color: !recording
-                ? Colors.transparent
-                : cancelling
-                ? Colors.red.withValues(alpha: 0.16)
-                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
-          ),
-          child: expanded
-              ? Center(
-                  child: Text(
-                    recording
-                        ? cancelling
-                              ? 'Release to cancel'
-                              : 'Release to insert text'
-                        : 'Press and hold to speak',
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    style: TextStyle(
-                      fontSize: 16,
-                      height: 1.15,
-                      color: cancelling ? Colors.red : const Color(0xFFA4A4AE),
-                    ),
-                  ),
-                )
-              : Icon(
-                  cancelling ? Icons.close : Icons.mic_outlined,
-                  color: enabled
-                      ? cancelling
-                            ? Colors.red
-                            : Theme.of(context).colorScheme.onSurface
-                      : Theme.of(context).disabledColor,
-                ),
         ),
       ),
     ),
