@@ -2,17 +2,147 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
 import 'package:sayfridge/screens/agent_conversation_screen.dart';
 import 'package:sayfridge/services/api_client.dart';
+import 'package:sayfridge/services/voice_input_service.dart';
 import 'package:sayfridge/state/agent_controller.dart';
 import 'package:sayfridge/theme/app_theme.dart';
 import '../support/integration_fixtures.dart';
 
 void main() {
+  testWidgets(
+    'holding the microphone inserts recognized text without sending',
+    (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var requests = 0;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          requests++;
+          return eventResponse([]);
+        }),
+      );
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: MemoryAgentStore(),
+      );
+      addTearDown(agent.dispose);
+      await agent.bindUser('alice');
+      final voice = _FakeVoiceInput('add two bottles of milk');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: AgentConversationScreen(controller: agent, voiceInput: voice),
+        ),
+      );
+
+      final field = find.byType(TextField);
+      await tester.enterText(field, 'Please');
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byTooltip('Hold to speak')),
+      );
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      expect(find.textContaining('Release to insert text'), findsOneWidget);
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(field).controller!.text,
+        'Please add two bottles of milk',
+      );
+      expect(voice.stopped, isTrue);
+      expect(voice.cancelled, isFalse);
+      expect(requests, 0);
+    },
+  );
+
+  testWidgets('sliding up before release cancels voice input', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = ApiClient(client: MockClient((_) async => eventResponse([])));
+    addTearDown(api.close);
+    final agent = AgentController(
+      WorkspaceRepository(api, MemoryTokens()),
+      store: MemoryAgentStore(),
+    );
+    addTearDown(agent.dispose);
+    await agent.bindUser('alice');
+    final voice = _FakeVoiceInput('discard this text');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: AgentConversationScreen(controller: agent, voiceInput: voice),
+      ),
+    );
+
+    final microphone = find.byTooltip('Hold to speak');
+    final gesture = await tester.startGesture(tester.getCenter(microphone));
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await gesture.moveBy(const Offset(0, -80));
+    await tester.pump();
+    expect(find.text('Release to cancel'), findsOneWidget);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      '',
+    );
+    expect(voice.cancelled, isTrue);
+    expect(voice.stopped, isFalse);
+  });
+
+  testWidgets(
+    'releasing during first permission request prevents late listening',
+    (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final api = ApiClient(client: MockClient((_) async => eventResponse([])));
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: MemoryAgentStore(),
+      );
+      addTearDown(agent.dispose);
+      await agent.bindUser('alice');
+      final voice = _DelayedVoiceInput();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: AgentConversationScreen(controller: agent, voiceInput: voice),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byTooltip('Hold to speak')),
+      );
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      await gesture.up();
+      await tester.pump();
+      voice.permissionResolved.complete();
+      await tester.pumpAndSettle();
+
+      expect(voice.startedListening, isFalse);
+      expect(voice.stopped, isTrue);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        '',
+      );
+    },
+  );
+
   testWidgets('authenticated Agent previews, removes and sends gallery images', (
     tester,
   ) async {
@@ -332,6 +462,56 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+class _FakeVoiceInput implements VoiceInputService {
+  _FakeVoiceInput(this.words);
+
+  final String words;
+  bool stopped = false;
+  bool cancelled = false;
+
+  @override
+  Future<bool> start({
+    required void Function(String words) onWords,
+    required void Function(String message) onError,
+    required bool Function() shouldContinue,
+  }) async {
+    if (!shouldContinue()) return false;
+    onWords(words);
+    return true;
+  }
+
+  @override
+  Future<void> stop() async => stopped = true;
+
+  @override
+  Future<void> cancel() async => cancelled = true;
+}
+
+class _DelayedVoiceInput implements VoiceInputService {
+  final permissionResolved = Completer<void>();
+  bool startedListening = false;
+  bool stopped = false;
+
+  @override
+  Future<bool> start({
+    required void Function(String words) onWords,
+    required void Function(String message) onError,
+    required bool Function() shouldContinue,
+  }) async {
+    await permissionResolved.future;
+    if (!shouldContinue()) return false;
+    startedListening = true;
+    onWords('should not be inserted');
+    return true;
+  }
+
+  @override
+  Future<void> stop() async => stopped = true;
+
+  @override
+  Future<void> cancel() async {}
 }
 
 // Run the asynchronous HTTP/SSE lifecycle outside the widget fake clock,
