@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../widgets/app_page_footer.dart';
+import '../widgets/home_greeting.dart';
 import '../widgets/inventory_visuals.dart';
 import 'expiring_items_screen.dart';
 import 'inventory_detail_screen.dart';
@@ -63,7 +64,7 @@ class HomeScreen extends StatelessWidget {
                             child: const Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _Greeting(),
+                                HomeGreeting(),
                                 SizedBox(height: 14),
                                 _GuestHomeContent(),
                               ],
@@ -87,7 +88,7 @@ class HomeScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const _Greeting(),
+                                const HomeGreeting(),
                                 const SizedBox(height: 19),
                                 _UserHomeContent(
                                   expirySummaryController:
@@ -125,31 +126,6 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _Greeting extends StatelessWidget {
-  const _Greeting();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Good afternoon!',
-          style: TextStyle(
-            fontSize: 29,
-            fontWeight: FontWeight.w500,
-            height: 1.1,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(left: 78, top: 1),
-          child: Image.asset(HomeAssets.titleLine, width: 145, height: 10),
-        ),
-      ],
-    );
-  }
-}
-
 class _GuestHomeContent extends StatelessWidget {
   const _GuestHomeContent();
 
@@ -163,8 +139,9 @@ class _GuestHomeContent extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F5F0),
+              color: const Color(0xFFEEF0E9),
               borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: const Color(0xFFCDCDCD)),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,

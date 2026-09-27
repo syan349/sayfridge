@@ -12,6 +12,7 @@ import 'package:sayfridge/models/app_user.dart';
 import 'package:sayfridge/models/profile_preferences.dart';
 import 'package:sayfridge/repositories/auth_repository.dart';
 import 'package:sayfridge/repositories/profile_preferences_repository.dart';
+import 'package:sayfridge/screens/home_screen.dart';
 import 'package:sayfridge/screens/password_reset_screen.dart';
 import 'package:sayfridge/screens/personal_information_screen.dart';
 import 'package:sayfridge/screens/profile_screen.dart';
@@ -83,7 +84,7 @@ void main() {
     expect(find.text('Guest'), findsOneWidget);
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    expect(find.text('Good afternoon!'), findsOneWidget);
+    expect(find.byType(HomeScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
