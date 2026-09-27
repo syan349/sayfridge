@@ -1,0 +1,22 @@
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  padding: 13px var(--sf-page-pad-x);
+  border-bottom: 1px solid var(--sf-divider);
+  background: var(--sf-surface);
+}
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  margin: 0 4px;
+  background: var(--sf-divider);
+}

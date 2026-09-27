@@ -1,0 +1,88 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps {
+  gap: 14px;
+  margin-top: 38px;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+
+/* ---------- Checklist (W01) ---------- */
+
+.check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border-radius: var(--sf-radius-md);
+  background: var(--sf-panel-line);
+}
+
+.check svg {
+  fill: none;
+  stroke: var(--sf-panel-accent);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.checkText {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--sf-panel-text-strong);
+}
+
+/* ---------- Steps (W02) ---------- */
+
+.number {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--sf-panel-line);
+  color: var(--sf-panel-text-strong);
+  font-family: var(--sf-font-display);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.current {
+  background: var(--sf-green-300);
+  color: var(--sf-green-800);
+}
+
+.stepTitle {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--sf-panel-text-strong);
+}
+
+.item[aria-current='step'] .stepTitle {
+  color: var(--sf-surface);
+}
+
+.stepText {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--sf-panel-text-muted);
+}

@@ -1,0 +1,73 @@
+.header {
+  padding: 19px var(--sf-page-pad-x);
+  background: var(--sf-surface);
+  border-bottom: 1px solid var(--sf-divider);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -3px 0 13px;
+  padding: 0;
+  list-style: none;
+  font-size: var(--sf-text-sm);
+  color: var(--sf-text-muted);
+}
+
+/* The "/" between crumbs is decoration, drawn by CSS so screen readers skip it. */
+.breadcrumb li + li::before {
+  content: '/';
+  margin-right: 8px;
+}
+
+.breadcrumb a {
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb [aria-current='page'] {
+  color: var(--sf-text);
+}
+
+.text {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--sf-font-display);
+  font-size: var(--sf-text-xl);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--sf-text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}

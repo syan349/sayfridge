@@ -1,0 +1,60 @@
+.result {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 15px;
+  padding: 12px 14px;
+  border: 1.2px solid;
+  border-radius: var(--sf-radius-lg);
+  font-size: var(--sf-text-md);
+}
+
+.success {
+  border-color: var(--sf-border-strong);
+  background: var(--sf-green-soft);
+  color: var(--sf-green-800);
+}
+
+.partial {
+  border-color: var(--sf-soon-border);
+  background: var(--sf-soon-bg);
+  color: var(--sf-soon);
+}
+
+.error {
+  border-color: var(--sf-overdue-border);
+  background: var(--sf-overdue-bg);
+  color: var(--sf-overdue);
+}
+
+.text {
+  flex-grow: 1;
+}
+
+.message {
+  margin: 0;
+  font-weight: 600;
+}
+
+.list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.dismiss {
+  display: flex;
+  flex-shrink: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--sf-radius-sm);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dismiss svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}

@@ -1,0 +1,50 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.icon {
+  display: inline-block;
+}
+
+.overdue {
+  border-color: var(--sf-overdue-border);
+  background: var(--sf-overdue-bg);
+  color: var(--sf-overdue);
+}
+
+.urgent {
+  border-color: var(--sf-urgent-border);
+  background: var(--sf-urgent-bg);
+  color: var(--sf-urgent);
+}
+
+.soon {
+  border-color: var(--sf-soon-border);
+  background: var(--sf-soon-bg);
+  color: var(--sf-soon);
+}
+
+.fresh {
+  border-color: var(--sf-fresh-border);
+  background: var(--sf-fresh-bg);
+  color: var(--sf-fresh);
+}
+
+.date {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--sf-text-muted);
+}
+
+.none {
+  font-size: 13px;
+  color: var(--sf-text-muted);
+}

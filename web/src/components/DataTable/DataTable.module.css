@@ -1,0 +1,93 @@
+/* The rounded border sits on a wrapper: tables can't clip their own corners reliably. */
+.frame {
+  overflow: hidden;
+  border: 1.2px solid var(--sf-border-card);
+  border-radius: var(--sf-radius-card);
+  background: var(--sf-surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.table[aria-busy='true'] tbody {
+  opacity: 0.6;
+}
+
+/* Element selectors stay under .table: CSS Modules only rename class names, so a
+   bare "thead tr" would style every table in the app. */
+.table thead tr {
+  border-bottom: 1px solid var(--sf-divider);
+  background: var(--sf-green-wash);
+}
+
+.th {
+  padding: 11px 12px;
+  font-size: var(--sf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--sf-text-muted);
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--sf-divider-row);
+}
+
+.table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.selectedRow {
+  background: var(--sf-green-tint);
+}
+
+/* A row with a problem: red background and a red bar on the left (not colour alone —
+   the row also shows the error message in words). */
+.invalidRow,
+.invalidRow:hover {
+  background: var(--sf-overdue-bg);
+  box-shadow: inset 3px 0 0 var(--sf-overdue);
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: var(--sf-green-wash);
+}
+
+.selectedRow.clickable:hover {
+  background: var(--sf-green-tint);
+}
+
+.td {
+  padding: var(--sf-row-pad-y) 12px;
+  font-size: 13px;
+  color: var(--sf-text-body);
+  vertical-align: middle;
+}
+
+.checkCell {
+  padding: var(--sf-row-pad-y) 0 var(--sf-row-pad-y) 16px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.checkbox {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--sf-green-400);
+  cursor: pointer;
+}
+
+.message {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--sf-text-body);
+}

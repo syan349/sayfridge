@@ -1,0 +1,29 @@
+.tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: var(--sf-radius-sm);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.fresh {
+  background: var(--sf-fresh-bg);
+  color: var(--sf-fresh);
+}
+
+.urgent {
+  background: var(--sf-urgent-bg);
+  color: var(--sf-urgent);
+}
+
+.info {
+  background: var(--sf-info-bg);
+  color: var(--sf-info);
+}
+
+.neutral {
+  background: var(--sf-neutral-bg);
+  color: var(--sf-neutral);
+}

@@ -1,0 +1,56 @@
+.cell {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.tile {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--sf-border-card);
+  border-radius: var(--sf-radius-lg);
+  background: var(--sf-green-tint);
+}
+
+.letter {
+  font-family: var(--sf-font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sf-green-700);
+}
+
+.name {
+  overflow: hidden;
+  font-size: var(--sf-text-base);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.detail {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--sf-text-muted);
+}
+
+/* Looks like the plain name until hovered, so the table stays calm. */
+.link {
+  color: var(--sf-text);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--sf-green-700);
+  text-decoration: underline;
+}

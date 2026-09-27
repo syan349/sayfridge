@@ -1,0 +1,90 @@
+.card {
+  max-width: 560px;
+  overflow: hidden;
+  border: 1.2px solid var(--sf-border-strong);
+  border-radius: var(--sf-radius-card);
+  background: var(--sf-surface);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--sf-divider);
+  background: var(--sf-green-wash);
+}
+
+.title {
+  flex-grow: 1;
+  margin: 0;
+  font-size: var(--sf-text-sm);
+  font-weight: 600;
+  color: var(--sf-green-800);
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--sf-divider-row);
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+}
+
+.left {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.amount {
+  font-family: var(--sf-font-mono);
+  font-size: 13px;
+  color: var(--sf-text);
+  white-space: nowrap;
+}
+
+.estimated {
+  color: var(--sf-estimated-text);
+}
+
+.question {
+  margin: 8px 0 0 49px; /* under the name, past the icon tile */
+  font-size: var(--sf-text-sm);
+  color: var(--sf-soon);
+}
+
+.candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0 49px;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 12px 15px;
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 15px 0;
+}
+
+.editForm .buttons {
+  padding: 10px 0 12px;
+}

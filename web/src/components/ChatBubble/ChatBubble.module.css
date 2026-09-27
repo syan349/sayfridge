@@ -1,0 +1,50 @@
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.user {
+  justify-content: flex-end;
+}
+
+.avatar {
+  flex-shrink: 0;
+  margin-top: 2px;
+  border-radius: 50%;
+}
+
+.bubble {
+  min-width: 0;
+  padding: 12px 18px;
+  border-radius: var(--sf-radius-card);
+  line-height: 1.5;
+  white-space: pre-wrap; /* keep the model's line breaks */
+  overflow-wrap: anywhere;
+}
+
+.md .bubble {
+  max-width: 600px;
+  font-size: 15px;
+}
+
+.sm .bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: var(--sf-radius-lg);
+  font-size: 13px;
+}
+
+.user .bubble {
+  background: var(--sf-green-soft);
+  font-weight: 500;
+}
+
+.user.md .bubble {
+  max-width: 560px;
+}
+
+.assistant .bubble {
+  border: 1.2px solid var(--sf-divider);
+  background: var(--sf-surface);
+}

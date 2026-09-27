@@ -1,0 +1,98 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--sf-radius-input);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ---------- Sizes ---------- */
+
+.sm {
+  height: 31px;
+  padding: 0 12px;
+  border-radius: var(--sf-radius-md);
+  font-size: 13px;
+}
+
+.md {
+  height: var(--sf-control-h);
+  padding: 0 15px;
+  font-size: var(--sf-text-md);
+}
+
+.lg {
+  height: 50px;
+  padding: 0 20px;
+  font-size: var(--sf-text-lg);
+}
+
+/* ---------- Variants ---------- */
+
+.primary {
+  border: 0;
+  background: var(--sf-green-600);
+  color: var(--sf-surface);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--sf-green-700);
+  color: var(--sf-surface);
+}
+
+.secondary {
+  border: 1px solid var(--sf-border-input);
+  background: var(--sf-surface);
+  color: var(--sf-text-body);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--sf-green-tint);
+  color: var(--sf-text);
+}
+
+.soft {
+  border: 1.2px solid var(--sf-border-strong);
+  background: var(--sf-green-tint);
+  color: var(--sf-green-800);
+}
+
+.soft:hover:not(:disabled) {
+  background: var(--sf-green-soft);
+  color: var(--sf-green-800);
+}
+
+.danger {
+  border: 1.2px solid var(--sf-overdue-border);
+  background: var(--sf-surface);
+  color: var(--sf-overdue);
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--sf-overdue-bg);
+  color: var(--sf-overdue);
+}
+
+/* ---------- Leading icon ---------- */
+
+.icon {
+  flex-shrink: 0;
+}
+
+.secondary .icon {
+  opacity: 0.7;
+}
+
+/* The icons are dark PNGs; turn them white on the green button. */
+.primary .icon {
+  filter: brightness(0) invert(1);
+}

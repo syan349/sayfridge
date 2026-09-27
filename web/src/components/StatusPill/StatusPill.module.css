@@ -1,0 +1,46 @@
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--sf-radius-sm);
+  font-size: var(--sf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.fresh {
+  border-color: var(--sf-fresh-border);
+  background: var(--sf-fresh-bg);
+  color: var(--sf-fresh);
+}
+
+.urgent {
+  border-color: var(--sf-urgent-border);
+  background: var(--sf-urgent-bg);
+  color: var(--sf-urgent);
+}
+
+.soon {
+  border-color: var(--sf-soon-border);
+  background: var(--sf-soon-bg);
+  color: var(--sf-soon);
+}
+
+.overdue {
+  border-color: var(--sf-overdue-border);
+  background: var(--sf-overdue-bg);
+  color: var(--sf-overdue);
+}
+
+.info {
+  border-color: var(--sf-info-border);
+  background: var(--sf-info-bg);
+  color: var(--sf-info);
+}
+
+.neutral {
+  border-color: var(--sf-neutral-border);
+  background: var(--sf-neutral-bg);
+  color: var(--sf-neutral);
+}

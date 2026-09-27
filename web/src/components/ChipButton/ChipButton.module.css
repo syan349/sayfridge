@@ -1,0 +1,80 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--sf-control-h-sm);
+  padding: 0 13px;
+  border: 1px solid var(--sf-border-input);
+  border-radius: var(--sf-radius-md);
+  background: var(--sf-surface);
+  color: var(--sf-text-body);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--sf-green-tint);
+}
+
+.selected,
+.selected:hover {
+  border-color: var(--sf-green-600);
+  background: var(--sf-green-600);
+  color: var(--sf-surface);
+  font-weight: 600;
+}
+
+.urgent {
+  padding-left: 9px;
+  border-color: var(--sf-urgent-border);
+  background: var(--sf-urgent-bg);
+  color: var(--sf-urgent);
+  font-weight: 600;
+}
+
+.urgent:hover {
+  border-color: var(--sf-urgent);
+  background: var(--sf-urgent-bg);
+}
+
+/* The urgent chip, switched on: dark orange fill, white text. */
+.urgent.selected,
+.urgent.selected:hover {
+  border-color: var(--sf-urgent);
+  background: var(--sf-urgent);
+  color: var(--sf-surface);
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.selected.urgent .icon {
+  filter: brightness(0) invert(1);
+}
+
+/* ---------- ChipSelect ---------- */
+
+.selectWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.select {
+  padding-right: 30px;
+  appearance: none;
+}
+
+.chevron {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  transform: translateY(-50%);
+  fill: none;
+  stroke: var(--sf-text-muted);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}

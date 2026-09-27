@@ -1,0 +1,22 @@
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1.2px solid var(--sf-overdue-border);
+  border-radius: var(--sf-radius-lg);
+  background: var(--sf-overdue-bg);
+  color: var(--sf-overdue);
+  font-size: var(--sf-text-md);
+  line-height: 1.45;
+}
+
+.icon {
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
