@@ -1,53 +1,117 @@
 import 'dart:typed_data';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../widgets/app_bottom_navigation.dart';
 
 class CameraInputScreen extends StatefulWidget {
-  const CameraInputScreen({this.pickImage, super.key});
+  const CameraInputScreen({
+    this.pickGalleryImages,
+    this.takePicture,
+    this.switchCamera,
+    this.cameraPreview,
+    super.key,
+  });
 
-  final Future<XFile?> Function(ImageSource source)? pickImage;
+  final Future<List<XFile>> Function()? pickGalleryImages;
+  final Future<XFile?> Function()? takePicture;
+  final Future<void> Function()? switchCamera;
+  final Widget? cameraPreview;
 
   @override
   State<CameraInputScreen> createState() => _CameraInputScreenState();
 }
 
 class _CameraInputScreenState extends State<CameraInputScreen> {
-  static const _cameraReference =
-      'assets/images/assistant/camera_reference.png';
+  static const _maxImages = 4;
+  static bool _permissionExplanationShown = false;
 
   final _picker = ImagePicker();
-  XFile? _selected;
+  CameraController? _controller;
+  List<CameraDescription> _cameras = const [];
+  int _cameraIndex = 0;
+  List<XFile> _selected = const [];
   Uint8List? _previewBytes;
   bool _loading = false;
+  String? _cameraError;
 
-  Future<void> _select(ImageSource source) async {
-    if (_loading) return;
-    setState(() => _loading = true);
+  bool get _usingTestCamera =>
+      widget.cameraPreview != null ||
+      widget.takePicture != null ||
+      widget.switchCamera != null;
+
+  bool get _cameraReady =>
+      _usingTestCamera || (_controller?.value.isInitialized ?? false);
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_usingTestCamera) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _prepareCamera());
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _prepareCamera() async {
+    if (!mounted || _loading) return;
+    if (!_permissionExplanationShown) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Camera access'),
+          content: const Text(
+            'SayFridge uses your camera only when you choose to photograph an item or label. Your browser will ask for device permission next.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) {
+        if (mounted) {
+          setState(() => _cameraError = 'Camera access has not been enabled.');
+        }
+        return;
+      }
+      _permissionExplanationShown = true;
+    }
+
+    setState(() {
+      _loading = true;
+      _cameraError = null;
+    });
     try {
-      final file =
-          await (widget.pickImage?.call(source) ??
-              _picker.pickImage(
-                source: source,
-                preferredCameraDevice: CameraDevice.rear,
-                maxWidth: 2000,
-                maxHeight: 2000,
-                imageQuality: 85,
-                requestFullMetadata: false,
-              ));
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
-      if (!mounted) return;
-      setState(() {
-        _selected = file;
-        _previewBytes = bytes;
-      });
+      _cameras = await availableCameras();
+      if (_cameras.isEmpty) {
+        throw CameraException('NO_CAMERA', 'No camera was found.');
+      }
+      final rear = _cameras.indexWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.back,
+      );
+      _cameraIndex = rear < 0 ? 0 : rear;
+      await _openCamera(_cameraIndex);
+    } on CameraException catch (error) {
+      if (mounted) setState(() => _cameraError = _cameraMessage(error));
     } catch (_) {
       if (mounted) {
-        _message(
-          'Unable to open the camera or photo library. Please try again.',
+        setState(
+          () => _cameraError =
+              'Unable to start the camera. Check browser permission and try again.',
         );
       }
     } finally {
@@ -55,9 +119,113 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
     }
   }
 
-  void _usePhoto() {
-    final selected = _selected;
-    if (selected != null) Navigator.of(context).pop(selected);
+  Future<void> _openCamera(int index) async {
+    final previous = _controller;
+    _controller = null;
+    await previous?.dispose();
+    final controller = CameraController(
+      _cameras[index],
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
+    _controller = controller;
+    await controller.initialize();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _selectGallery() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final files = widget.pickGalleryImages != null
+          ? await widget.pickGalleryImages!.call()
+          : await _picker.pickMultiImage(
+              maxWidth: 2000,
+              maxHeight: 2000,
+              imageQuality: 85,
+              limit: _maxImages,
+              requestFullMetadata: false,
+            );
+      if (files.isEmpty) return;
+      final selected = files.take(_maxImages).toList(growable: false);
+      final bytes = await selected.first.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _selected = selected;
+        _previewBytes = bytes;
+      });
+      if (files.length > _maxImages) {
+        _message('You can attach at most 4 photos.');
+      }
+    } catch (_) {
+      if (mounted) {
+        _message('Unable to open the photo library. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _capture() async {
+    if (_loading || !_cameraReady) return;
+    setState(() => _loading = true);
+    try {
+      final file = widget.takePicture != null
+          ? await widget.takePicture!.call()
+          : await _controller!.takePicture();
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _selected = [file];
+        _previewBytes = bytes;
+      });
+    } on CameraException catch (error) {
+      if (mounted) _message(_cameraMessage(error));
+    } catch (_) {
+      if (mounted) _message('Unable to take a photo. Please try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _switchCamera() async {
+    if (_loading || _selected.isNotEmpty) return;
+    if (widget.switchCamera != null) {
+      await widget.switchCamera!.call();
+      return;
+    }
+    if (_cameras.length < 2) return;
+    setState(() => _loading = true);
+    try {
+      _cameraIndex = (_cameraIndex + 1) % _cameras.length;
+      await _openCamera(_cameraIndex);
+    } on CameraException catch (error) {
+      if (mounted) _message(_cameraMessage(error));
+    } catch (_) {
+      if (mounted) _message('Unable to switch cameras.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _confirm() {
+    if (_selected.isNotEmpty) Navigator.of(context).pop(_selected);
+  }
+
+  void _retake() {
+    setState(() {
+      _selected = const [];
+      _previewBytes = null;
+    });
+  }
+
+  String _cameraMessage(CameraException error) {
+    if (error.code.toLowerCase().contains('denied') ||
+        error.code.toLowerCase().contains('permission')) {
+      return 'Camera permission was denied. Allow camera access in your browser settings and try again.';
+    }
+    return error.description ?? 'Unable to use the camera.';
   }
 
   void _message(String text) {
@@ -66,6 +234,7 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canSwitch = _usingTestCamera || _cameras.length > 1;
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -98,43 +267,65 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
             ),
             AspectRatio(
               aspectRatio: 864 / 1154,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final scale = constraints.maxWidth / 864;
-                  return ClipRect(
-                    child: Stack(
-                      clipBehavior: Clip.hardEdge,
-                      children: [
-                        if (_previewBytes == null)
-                          Positioned(
-                            left: -57 * scale,
-                            top: -337 * scale,
-                            width: 1066 * scale,
-                            height: 2088 * scale,
-                            child: Image.asset(
-                              _cameraReference,
-                              fit: BoxFit.fill,
-                            ),
-                          )
-                        else
-                          Positioned.fill(
-                            child: Image.memory(
-                              _previewBytes!,
-                              key: const Key('camera-selected-preview'),
-                              fit: BoxFit.cover,
-                            ),
+              child: ClipRect(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    const ColoredBox(color: Colors.black),
+                    if (_previewBytes != null)
+                      Image.memory(
+                        _previewBytes!,
+                        key: const Key('camera-selected-preview'),
+                        fit: BoxFit.cover,
+                      )
+                    else if (widget.cameraPreview != null)
+                      widget.cameraPreview!
+                    else if (_cameraReady)
+                      CameraPreview(_controller!)
+                    else
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(30),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.camera_alt_outlined,
+                                color: Colors.white70,
+                                size: 52,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _cameraError ?? 'Preparing camera…',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                              if (_cameraError != null) ...[
+                                const SizedBox(height: 12),
+                                TextButton(
+                                  onPressed: _prepareCamera,
+                                  child: const Text('Try camera again'),
+                                ),
+                              ],
+                            ],
                           ),
-                        if (_loading)
-                          const Positioned.fill(
-                            child: ColoredBox(
-                              color: Color(0x66000000),
-                              child: Center(child: CircularProgressIndicator()),
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                },
+                        ),
+                      ),
+                    if (_selected.length > 1)
+                      Positioned(
+                        right: 14,
+                        bottom: 14,
+                        child: Chip(
+                          label: Text('${_selected.length} photos selected'),
+                        ),
+                      ),
+                    if (_loading)
+                      const ColoredBox(
+                        color: Color(0x66000000),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
+                ),
               ),
             ),
             Expanded(
@@ -144,10 +335,8 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _RoundCameraButton(
-                      onTap: _loading
-                          ? null
-                          : () => _select(ImageSource.gallery),
-                      tooltip: 'Choose from photo library',
+                      onTap: _loading ? null : _selectGallery,
+                      tooltip: 'Choose photos from library',
                       child: Image.asset(
                         AssistantAssets.photo,
                         width: 28,
@@ -159,9 +348,10 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
                     GestureDetector(
                       onTap: _loading
                           ? null
-                          : _selected == null
-                          ? () => _select(ImageSource.camera)
-                          : _usePhoto,
+                          : _selected.isEmpty
+                          ? _capture
+                          : _confirm,
+                      onLongPress: _selected.isEmpty ? null : _retake,
                       child: Container(
                         key: const Key('camera-shutter-or-confirm'),
                         width: 74,
@@ -174,25 +364,21 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
                         ),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: _selected == null
+                            color: _selected.isEmpty
                                 ? Colors.white
                                 : const Color(0xFF8FC957),
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.black, width: 2),
                           ),
-                          child: _selected == null
+                          child: _selected.isEmpty
                               ? null
                               : const Icon(Icons.check, color: Colors.black),
                         ),
                       ),
                     ),
                     _RoundCameraButton(
-                      onTap: _loading
-                          ? null
-                          : () => _message(
-                              'Camera switching is controlled by your system camera.',
-                            ),
-                      tooltip: 'Switch camera information',
+                      onTap: _loading || !canSwitch ? null : _switchCamera,
+                      tooltip: 'Switch camera',
                       child: const Icon(
                         Icons.cameraswitch_outlined,
                         color: Colors.white,
