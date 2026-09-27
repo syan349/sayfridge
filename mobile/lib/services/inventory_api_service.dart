@@ -1,12 +1,25 @@
 import '../models/expiry_summary.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_page.dart';
+import '../models/inventory_create_request.dart';
 import 'api_client.dart';
 
 class InventoryApiService {
   const InventoryApiService(this._apiClient);
 
   final ApiClient _apiClient;
+
+  Future<InventoryItem> createInventoryItem({
+    required String accessToken,
+    required InventoryCreateRequest request,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/inventory-items',
+      accessToken: accessToken,
+      body: request.toJson(),
+    );
+    return InventoryItem.fromJson(response);
+  }
 
   Future<ExpirySummary> getExpirySummary({
     required String accessToken,

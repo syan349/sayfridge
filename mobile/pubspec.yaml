@@ -64,6 +64,8 @@ flutter:
     - assets/icons/social/
     - assets/icons/assistant/
     - assets/icons/inventory/
+    - assets/icons/home/
+    - assets/icons/profile/
     - assets/images/avatars/
     - assets/images/assistant/
 

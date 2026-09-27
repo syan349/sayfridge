@@ -116,7 +116,7 @@ class PrimaryAuthButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label),
+            Flexible(child: Text(label, textAlign: TextAlign.center)),
             const SizedBox(width: 18),
             const Icon(Icons.arrow_forward_ios_rounded, size: 19),
           ],

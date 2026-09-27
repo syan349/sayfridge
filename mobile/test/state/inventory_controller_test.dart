@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sayfridge/models/expiry_summary.dart';
 import 'package:sayfridge/models/inventory_item.dart';
 import 'package:sayfridge/models/inventory_page.dart';
+import 'package:sayfridge/models/inventory_create_request.dart';
 import 'package:sayfridge/repositories/inventory_repository.dart';
 import 'package:sayfridge/state/inventory_controller.dart';
 
@@ -29,6 +30,11 @@ void main() {
 class _FakeInventoryRepository implements InventoryRepository {
   int? receivedPage;
   int? receivedPageSize;
+
+  @override
+  Future<InventoryItem> createInventoryItem(InventoryCreateRequest request) {
+    throw UnimplementedError();
+  }
 
   @override
   Future<ExpirySummary> getExpirySummary({

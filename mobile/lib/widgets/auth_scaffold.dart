@@ -36,10 +36,20 @@ class AuthScaffold extends StatelessWidget {
                           child: _BackButton(),
                         ),
                       ),
-                      Center(
-                        child: Text(
-                          title!,
-                          style: Theme.of(context).textTheme.headlineMedium,
+                      IgnorePointer(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 60),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                title!,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineMedium,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ],

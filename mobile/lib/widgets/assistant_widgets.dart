@@ -5,6 +5,10 @@ import 'app_bottom_navigation.dart';
 
 const inventoryExactColor = Color(0xFF3F9E36);
 const inventoryEstimatedColor = Color(0xFFE95A18);
+const exampleMessageStyle = TextStyle(
+  fontSize: 16,
+  fontWeight: FontWeight.w400,
+);
 
 class AssistantHeader extends StatelessWidget {
   const AssistantHeader({
@@ -99,7 +103,12 @@ class _HeaderAction extends StatelessWidget {
 }
 
 class AssistantGreeting extends StatelessWidget {
-  const AssistantGreeting({super.key});
+  const AssistantGreeting({
+    this.message = 'Hey, Tim!  How can I help you?',
+    super.key,
+  });
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -124,15 +133,18 @@ class AssistantGreeting extends StatelessWidget {
               height: 47,
               padding: const EdgeInsets.only(left: 25, right: 16),
               color: AppColors.primarySoft,
-              child: const Align(
+              child: Align(
                 alignment: Alignment.centerLeft,
                 widthFactor: 1,
                 child: Text(
-                  'Hey, Tim!  How can I help you?',
+                  message,
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.fade,
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -144,9 +156,10 @@ class AssistantGreeting extends StatelessWidget {
 }
 
 class UserMessageBubble extends StatelessWidget {
-  const UserMessageBubble({required this.message, super.key});
+  const UserMessageBubble({required this.message, this.textStyle, super.key});
 
   final String message;
+  final TextStyle? textStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -161,12 +174,35 @@ class UserMessageBubble extends StatelessWidget {
           child: Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+            style:
+                textStyle ??
+                const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
           ),
         ),
       ),
     );
   }
+}
+
+class AssistantMessageBubble extends StatelessWidget {
+  const AssistantMessageBubble({
+    required this.message,
+    required this.textStyle,
+    super.key,
+  });
+
+  final String message;
+  final TextStyle textStyle;
+
+  @override
+  Widget build(BuildContext context) => ClipPath(
+    clipper: const _SpeechBubbleClipper(tailOnLeft: true),
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(25, 12, 16, 12),
+      color: AppColors.primarySoft,
+      child: Text(message, style: textStyle),
+    ),
+  );
 }
 
 class _SpeechBubbleClipper extends CustomClipper<Path> {
@@ -397,7 +433,6 @@ class InventoryItemCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Image.asset(
                       AssistantAssets.warn,
@@ -406,37 +441,37 @@ class InventoryItemCard extends StatelessWidget {
                       fit: BoxFit.contain,
                       cacheWidth: 64,
                     ),
-                    const SizedBox(width: 11),
-                    Text(
-                      item.daysLeft,
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        color: item.expiryIsEstimate
-                            ? inventoryEstimatedColor
-                            : inventoryExactColor,
-                        fontSize: 14.5,
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        item.daysLeft,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: item.expiryIsEstimate
+                              ? inventoryEstimatedColor
+                              : inventoryExactColor,
+                          fontSize: 14.5,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 13),
-                Transform.translate(
-                  // Move the complete action as one unit. This preserves the
-                  // natural label/icon gap while optically aligning its edge.
-                  offset: const Offset(10, 0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Transform.translate(
-                        offset: const Offset(4, 0),
-                        child: const Text(
-                          'View item',
-                          style: TextStyle(fontSize: 13.5),
-                        ),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'View item',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13.5),
                       ),
-                      const Icon(Icons.chevron_right, size: 22),
-                    ],
-                  ),
+                    ),
+                    Icon(Icons.chevron_right, size: 22),
+                  ],
                 ),
               ],
             ),
