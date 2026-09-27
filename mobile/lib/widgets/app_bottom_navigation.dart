@@ -76,75 +76,43 @@ class AppBottomNavigation extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: FractionallySizedBox(
-                    widthFactor: 0.8,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _NavigationItem(
-                            label: 'Home',
-                            asset: AssistantAssets.home,
-                            onTap: onHomeTap,
-                            isSelected:
-                                selectedDestination ==
-                                AppNavigationDestination.home,
-                          ),
-                        ),
-                        const Expanded(child: SizedBox()),
-                        Expanded(
-                          child: _NavigationItem(
-                            label: 'Profile',
-                            asset: AssistantAssets.profile,
-                            onTap: onProfileTap,
-                            isSelected:
-                                selectedDestination ==
-                                AppNavigationDestination.profile,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
-              Positioned(
-                // Keep the centre label on the same baseline as Home and Profile.
-                top: 8,
-                child: GestureDetector(
-                  onTap: onAssistantTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
+              Positioned.fill(
+                child: FractionallySizedBox(
+                  widthFactor: 0.8,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        padding: const EdgeInsets.all(11),
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0xFFDCEBD3),
-                              spreadRadius: 7,
-                            ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          AssistantAssets.chat,
-                          fit: BoxFit.contain,
-                          cacheWidth: 80,
+                      Expanded(
+                        child: _NavigationItem(
+                          label: 'Home',
+                          asset: AssistantAssets.home,
+                          onTap: onHomeTap,
+                          isSelected:
+                              selectedDestination ==
+                              AppNavigationDestination.home,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'AI Assistant',
-                        style: TextStyle(
-                          color:
+                      Expanded(
+                        child: _NavigationItem(
+                          label: 'AI Assistant',
+                          asset: AssistantAssets.chat,
+                          onTap: onAssistantTap,
+                          isSelected:
                               selectedDestination ==
-                                  AppNavigationDestination.assistant
-                              ? AppColors.primary
-                              : Colors.black,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
+                              AppNavigationDestination.assistant,
+                          isRaised: true,
+                        ),
+                      ),
+                      Expanded(
+                        child: _NavigationItem(
+                          label: 'Profile',
+                          asset: AssistantAssets.profile,
+                          onTap: onProfileTap,
+                          isSelected:
+                              selectedDestination ==
+                              AppNavigationDestination.profile,
                         ),
                       ),
                     ],
@@ -165,38 +133,93 @@ class _NavigationItem extends StatelessWidget {
     required this.asset,
     required this.onTap,
     required this.isSelected,
+    this.isRaised = false,
   });
 
   final String label;
   final String asset;
   final VoidCallback? onTap;
   final bool isSelected;
+  final bool isRaised;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ColorFiltered(
-            colorFilter: ColorFilter.mode(
-              isSelected ? AppColors.primary : Colors.black,
-              BlendMode.srcIn,
-            ),
-            child: Image.asset(asset, width: 22, height: 22, cacheWidth: 72),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: SizedBox(
+          height: 66,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isRaised)
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: OverflowBox(
+                    // Align the entire green disc with the other icons' bottom edge.
+                    alignment: Alignment.bottomCenter,
+                    minWidth: 58,
+                    maxWidth: 58,
+                    minHeight: 58,
+                    maxHeight: 58,
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFDCEBD3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(11),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Image.asset(
+                          asset,
+                          fit: BoxFit.contain,
+                          cacheWidth: 80,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ColorFiltered(
+                  colorFilter: ColorFilter.mode(
+                    isSelected ? AppColors.primary : Colors.black,
+                    BlendMode.srcIn,
+                  ),
+                  child: Image.asset(
+                    asset,
+                    width: 22,
+                    height: 22,
+                    cacheWidth: 72,
+                  ),
+                ),
+              const SizedBox(height: 3),
+              SizedBox(
+                height: MediaQuery.textScalerOf(context).scale(11.5),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.topCenter,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: isSelected ? AppColors.primary : Colors.black,
+                      fontSize: 11.5,
+                      height: 1,
+                      fontWeight: isRaised ? FontWeight.w500 : null,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? AppColors.primary : Colors.black,
-              fontSize: 11.5,
-              height: 1,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
