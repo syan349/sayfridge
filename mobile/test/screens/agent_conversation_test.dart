@@ -276,7 +276,7 @@ void main() {
       expect(find.text('松手编辑'), findsOneWidget);
       final overlay = find.byKey(const Key('voice-recording-overlay'));
       expect(overlay, findsOneWidget);
-      expect(tester.widget<ColoredBox>(overlay).color, const Color(0xE8444444));
+      expect(tester.widget<ColoredBox>(overlay).color, const Color(0x88000000));
       expect(find.text('add two bottles of milk'), findsOneWidget);
       await gesture.up();
       await tester.pumpAndSettle();
@@ -330,6 +330,13 @@ void main() {
     await leftGesture.up();
     await tester.pumpAndSettle();
 
+    final tapGesture = await tester.startGesture(tester.getCenter(microphone));
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('voice-cancel-zone')));
+    await tester.pumpAndSettle();
+    await tapGesture.up();
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byTooltip('Type a message'));
     await tester.pumpAndSettle();
     expect(
@@ -338,7 +345,7 @@ void main() {
     );
     expect(voice.cancelled, isTrue);
     expect(voice.stopped, isFalse);
-    expect(voice.starts, 2);
+    expect(voice.starts, 3);
   });
 
   testWidgets(

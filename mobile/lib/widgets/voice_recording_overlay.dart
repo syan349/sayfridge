@@ -34,7 +34,7 @@ class VoiceRecordingOverlay extends StatelessWidget {
 
     return ColoredBox(
       key: const Key('voice-recording-overlay'),
-      color: const Color(0xE8444444),
+      color: const Color(0x88000000),
       child: Stack(
         children: [
           SafeArea(
@@ -156,8 +156,9 @@ class VoiceRecordingOverlay extends StatelessWidget {
             right: 0,
             bottom: 0,
             height: 220,
-            child: IgnorePointer(
-              child: _VoiceGestureFooter(cancelling: cancelling),
+            child: _VoiceGestureFooter(
+              cancelling: cancelling,
+              onCancel: onClose,
             ),
           ),
         ],
@@ -167,27 +168,31 @@ class VoiceRecordingOverlay extends StatelessWidget {
 }
 
 class _VoiceGestureFooter extends StatelessWidget {
-  const _VoiceGestureFooter({required this.cancelling});
+  const _VoiceGestureFooter({required this.cancelling, required this.onCancel});
 
   final bool cancelling;
+  final VoidCallback onCancel;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final width = constraints.maxWidth;
-      final height = constraints.maxHeight;
-      return Stack(
-        children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _VoiceGesturePainter(cancelling: cancelling),
-            ),
-          ),
-          Positioned(
-            left: width * 0.16,
-            top: height * 0.34,
-            child: Transform.rotate(
-              angle: -0.16,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(15, 54, 15, 0),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: GestureDetector(
+            key: const Key('voice-cancel-zone'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onCancel,
+            child: Container(
+              height: 88,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: cancelling
+                    ? const Color(0xFF9B5757)
+                    : const Color(0xFF666666),
+                borderRadius: BorderRadius.circular(46),
+              ),
               child: const Text(
                 '取消',
                 style: TextStyle(
@@ -203,75 +208,33 @@ class _VoiceGestureFooter extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            left: width * 0.62,
-            top: height * 0.34,
-            child: Transform.rotate(
-              angle: 0.10,
-              child: const Text(
-                '按住识别语音',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 16,
-                  fontFamilyFallback: [
-                    'PingFang SC',
-                    'Noto Sans CJK SC',
-                    'Noto Sans SC',
-                    'Microsoft YaHei',
-                  ],
-                ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Container(
+            height: 88,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3E3E3),
+              borderRadius: BorderRadius.circular(46),
+            ),
+            child: const Text(
+              '按住识别语音',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 16,
+                fontFamilyFallback: [
+                  'PingFang SC',
+                  'Noto Sans CJK SC',
+                  'Noto Sans SC',
+                  'Microsoft YaHei',
+                ],
               ),
             ),
           ),
-        ],
-      );
-    },
+        ),
+      ],
+    ),
   );
-}
-
-class _VoiceGesturePainter extends CustomPainter {
-  const _VoiceGesturePainter({required this.cancelling});
-
-  final bool cancelling;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final base = Path()
-      ..moveTo(0, h * 0.72)
-      ..quadraticBezierTo(w * 0.50, h * 0.40, w, h * 0.72)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-    canvas.drawPath(base, Paint()..color = const Color(0xFF5A5A5A));
-
-    final left = Path()
-      ..moveTo(0, h * 0.32)
-      ..quadraticBezierTo(w * 0.24, h * 0.16, w * 0.43, h * 0.19)
-      ..quadraticBezierTo(w * 0.58, h * 0.20, w * 0.51, h * 0.46)
-      ..quadraticBezierTo(w * 0.47, h * 0.55, 0, h * 0.68)
-      ..close();
-    canvas.drawPath(
-      left,
-      Paint()
-        ..color = cancelling
-            ? const Color(0xFF9B5757)
-            : const Color(0xFF646464),
-    );
-
-    final right = Path()
-      ..moveTo(w * 0.56, h * 0.28)
-      ..quadraticBezierTo(w * 0.64, h * 0.08, w * 0.80, h * 0.16)
-      ..quadraticBezierTo(w * 0.93, h * 0.22, w, h * 0.28)
-      ..lineTo(w, h * 0.70)
-      ..quadraticBezierTo(w * 0.77, h * 0.54, w * 0.57, h * 0.50)
-      ..quadraticBezierTo(w * 0.51, h * 0.44, w * 0.56, h * 0.28)
-      ..close();
-    canvas.drawPath(right, Paint()..color = const Color(0xFFE3E3E3));
-  }
-
-  @override
-  bool shouldRepaint(covariant _VoiceGesturePainter oldDelegate) =>
-      oldDelegate.cancelling != cancelling;
 }
