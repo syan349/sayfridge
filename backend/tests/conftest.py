@@ -32,10 +32,14 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
 
 from app.main import app
+from app.db.database_target import (
+    DatabasePurpose,
+    UnsafeDatabaseTarget,
+    validate_disposable_database_url,
+)
 from app.db.session import get_db_session
 
 
@@ -46,11 +50,10 @@ def database():
     if not value:
         pytest.fail("Set TEST_DATABASE_URL in the environment or backend/.env.test; "
                     "use -m 'not postgres' to run only database-free tests", pytrace=False)
-    url = make_url(value)
-    if url.drivername != "postgresql+psycopg" or not (url.database or "").endswith("_test"):
-        pytest.fail("TEST_DATABASE_URL must use psycopg and an isolated database ending in _test")
-    if "-pooler" in (url.host or ""):
-        pytest.fail("PostgreSQL integration tests require a direct connection")
+    try:
+        url = validate_disposable_database_url(value, DatabasePurpose.TEST)
+    except UnsafeDatabaseTarget as error:
+        pytest.fail(str(error), pytrace=False)
     schema = "auth_test_" + uuid.uuid4().hex
     control = create_engine(url, poolclass=NullPool, hide_parameters=True,
                             connect_args={"connect_timeout": 15})

@@ -55,7 +55,12 @@ def test_batch_create_returns_input_order_and_allows_identical_stock(inventory_c
 @pytest.mark.parametrize(
     ("failure", "expected_status", "expected_code"),
     [
-        pytest.param("missing_space", 404, "NOT_FOUND", marks=pytest.mark.ci),
+        pytest.param(
+            "missing_space",
+            404,
+            "NOT_FOUND",
+            marks=[pytest.mark.ci, pytest.mark.database_acceptance],
+        ),
         ("foreign_space", 404, "NOT_FOUND"),
         ("missing_definition", 404, "NOT_FOUND"),
         pytest.param("archived_definition", 409, "STATE_CONFLICT", marks=pytest.mark.ci),

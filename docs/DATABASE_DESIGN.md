@@ -352,6 +352,21 @@ the schema or category seed. Database restore is separate again: use a Neon bran
 restore/recreation or an approved backup, then run structural and seed checks.
 Application startup performs none of these operations automatically.
 
+### Environment isolation and acceptance evidence
+
+Local development, GitHub/PostgreSQL tests, future E2E tests, and Neon predeploy
+use different database targets. Test databases must end in `_test`, E2E databases
+must end in `_e2e`, and both use direct connections. The code-level target guard
+rejects ambiguous names, pooled endpoints, and an E2E target that is also the
+runtime/predeploy target.
+
+`scripts/record_database_acceptance.py` performs a read-only release check and
+writes credential-free JSON evidence containing the environment and initialization
+date, application commit, current and expected Alembic revisions, category seed
+content version, and schema verification counts. The complete procedure and the
+real-PostgreSQL rollback/idempotency matrix are maintained in
+[`testing/DATABASE_ACCEPTANCE.md`](testing/DATABASE_ACCEPTANCE.md).
+
 ## 13. Agent business receipts: `agent_inventory_action`
 
 The Agent extension adds a ninth business table. Each row is a committed, independently

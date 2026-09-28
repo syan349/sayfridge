@@ -303,6 +303,23 @@ See the [CI selection policy](../docs/testing/README.md#ci-selection-policy) for
 selected scenarios and maintenance rules. The core subset reduces test execution,
 not the fixed time needed for GitHub runner setup and dependency installation.
 
+### Database environments and acceptance
+
+Database purposes are intentionally separate. Local development uses the ignored
+application `.env`; backend tests and GitHub CI use a direct `_test` database;
+future end-to-end CI must use a direct `_e2e` database configured from
+`.env.e2e.example`; Vercel/manual acceptance uses the dedicated Neon predeploy
+branch. Disposable test or E2E jobs must never reset the predeploy database.
+
+The reusable target guards, read-only evidence command, and transaction/rollback
+acceptance matrix are documented in
+[Database isolation and acceptance evidence](../docs/testing/DATABASE_ACCEPTANCE.md).
+The transaction matrix can be run independently with:
+
+```bash
+python -m pytest -v -m database_acceptance --strict-markers
+```
+
 
 ## Backend organization
 
