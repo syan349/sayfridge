@@ -721,6 +721,22 @@ waiting for the user's click. The frontend then starts a new resume request.
 A turn has at most 20 independently handled items. One failure does not roll back
 other successful items, unlike an atomic manual batch operation.
 
+Text stock requests are recorded as unfinished work before normal model/tool replies.
+A purchase with missing storage returns WAITING_INPUT and an action_required item,
+plus a short text_delta question. The same question is in display.question on state
+and replay. After the user supplies a clear location, exact stock may execute directly
+without another confirmation, including first-time product/space creation.
+
+Chat/resume request schemas and event names are unchanged. Internal drafts add
+optional clarification_question and new_space_source_text; clients do not supply
+these as request fields. Missing new checkpoint fields have defaults. Old confirmation
+proposals remain waiting until explicitly answered; completed requests are not rerun.
+No database migration is needed.
+
+Stock completion text is derived from actual per-item results (English/Chinese),
+not a second model interpretation of whether approval is needed. Estimated remaining
+quantities stay labeled as estimates. Queries still use model-generated plain text.
+
 Start with the [frontend interaction guide](AGENT_FRONTEND_INTEGRATION.md).
 Graph/memory rules: [architecture](ARCHITECTURE.md). Environment and storage:
 [backend README](../backend/README.md#agent-configuration-and-storage).
@@ -1357,7 +1373,8 @@ Public items in preview/result/waiting/state responses add a `display` object:
 | package_description | Optional label detail, e.g. 500ml per bottle; not a second stock balance |
 | review_notes | Model-supplied notes requiring user attention |
 | missing_fields | Required fields identified by backend preparation errors |
-| confirmation_reasons | IMAGE_REVIEW and/or NEW_ASSOCIATION for new-stock previews |
+| confirmation_reasons | IMAGE_REVIEW for new-stock previews; legacy pending proposals may retain NEW_ASSOCIATION |
+| question | Optional short plain-text question, checkpointed for waiting items and repeated on replay/state recovery |
 
 Preview `draft` retains quantity_value, quantity_unit, purchase_date, expiry_date,
 and storage/item-definition IDs. `after` contains the actual proposed stock amount.
@@ -1451,11 +1468,14 @@ complete category-facet count; do not present one page as the whole inventory.
 Agent `list_item_categories` additionally returns `description`, `examples` and
 `exclusions` for each real active category. CREATE_STOCK previews expose
 `display.category_id` and `display.category_name`, propagated into public item display.
-New-definition confirmation must show the item name and proposed category. Category
-corrections use the existing resume request with `decision: "edit"` and a `message`
-identifying the desired category. There is no new category-ID field on the resume
-HTTP request. The Agent revises `new_definition.category_id` in its next proposal,
-which is validated and confirmed through the existing workflow.
+Clear products automatically reuse an existing visible definition or create a private
+definition in a real active category; a new definition alone does not require approval.
+An explicitly named new storage space with a clear type is also created automatically.
+Missing location/quantity or genuine product ambiguity remains NEEDS_INPUT. The user
+answers through the existing resume request; no new category-ID field is added.
+For an already waiting proposal, `decision: "edit"` can correct the category in a
+message. Image-derived stock and estimates still require review. Completed stock
+is not silently reclassified by subsequent chat.
 Changing a saved definition's category affects all inventory batches referring to
 that definition, not just one batch. Public definitions remain subject to existing
 ownership restrictions. See [category rules](DATABASE_DESIGN.md#4-public-category-catalog-table-item_category).

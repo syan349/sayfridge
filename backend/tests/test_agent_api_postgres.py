@@ -15,7 +15,7 @@ from app.api.routes import agent as api
 from app.agents import locking
 from inventory_test_support import inventory_context, seed_inventory
 from auth_test_support import exercise
-from test_agent_workflow import ScriptModel, call
+from test_agent_workflow import ScriptModel, call, intake
 
 pytestmark = pytest.mark.postgres
 
@@ -33,7 +33,7 @@ def test_api_confirm_stale_replay_and_user_isolation(inventory_context, monkeypa
     async def scenario(client, sessions):
         proposed = {"item_key": "rice", "original_text": "two cups", "action": "CONSUME", "inventory_item_id": str(item.id),
             "quantity_value": "2", "quantity_unit": "cup", "estimate": {"amount": "0.2", "unit": "kg", "source": "MODEL_KNOWLEDGE", "rationale": "about 100g per cup"}}
-        graph = build_agent_graph(ScriptModel([call([proposed])]), checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=sessions, tools=[])
+        graph = build_agent_graph(ScriptModel([call([proposed])], intents=[intake([proposed])]), checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=sessions, tools=[])
         async def resources():
             return SimpleNamespace(graph=graph)
         monkeypatch.setattr(api, "get_agent_resources", resources)
@@ -92,7 +92,7 @@ def test_structured_target_selection_executes_without_extra_confirmation(invento
     monkeypatch.setattr(api, "get_agent_persistence_settings", lambda: SimpleNamespace(workflow_step_limit=128))
     async def scenario(client, sessions):
         action = {"item_key": "rice", "original_text": "use 1 kg rice", "action": "CONSUME", "item_query": "Rice", "quantity_value": "1", "quantity_unit": "kg"}
-        graph = build_agent_graph(ScriptModel([call([action])]), checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=sessions, tools=[])
+        graph = build_agent_graph(ScriptModel([call([action])], intents=[intake([action])]), checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=sessions, tools=[])
         async def resources():
             return SimpleNamespace(graph=graph)
         monkeypatch.setattr(api, "get_agent_resources", resources)
@@ -133,7 +133,7 @@ def test_restart_after_commit_before_checkpoint_does_not_double_apply(inventory_
             await saver.setup()
             store = InMemoryStore()
             proposal = {"item_key": "rice", "original_text": "use 1 kg", "action": "CONSUME", "inventory_item_id": str(item.id), "quantity_value": "1", "quantity_unit": "kg"}
-            graph = build_agent_graph(ScriptModel([call([proposal])]), checkpointer=saver, store=store, session_factory=sessions, tools=[])
+            graph = build_agent_graph(ScriptModel([call([proposal])], intents=[intake([proposal])]), checkpointer=saver, store=store, session_factory=sessions, tools=[])
             config = {"configurable": {"thread_id": "restart"}, "recursion_limit": 128}
             context = AgentContext(c[1].id, None, uuid4())
             monkeypatch.setattr(workflow, "execute_action", commit_then_crash)

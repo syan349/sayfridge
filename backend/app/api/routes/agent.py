@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from langgraph.types import Command
+from langchain_core.messages import AIMessage
 
 from app.api.dependencies import get_current_user
 from app.db.models import User
@@ -58,6 +59,12 @@ def _text(content):
     return "".join(v.get("text", "") for v in content if isinstance(v, dict) and v.get("type") in {"text", "output_text"}) if isinstance(content, list) else ""
 
 
+def _pending_text(items):
+    questions = [(item.get("display") or {}).get("question") for item in items
+                 if item.get("status") in {"NEEDS_INPUT", "NEEDS_CONFIRMATION"}]
+    return "\n".join(dict.fromkeys(q for q in questions if q))
+
+
 async def _open(user, conversation_id):
     stack = AsyncExitStack()
     try:
@@ -88,6 +95,9 @@ def _response(stack, resources, config, command, context, request, request_id, r
                     if item["status"] in {"SUCCEEDED", "FAILED", "CANCELLED"}:
                         yield _sse("operation_result", data=item)
                 if state.get("interrupt_id"):
+                    question = _pending_text(state.get("items", []))
+                    if question:
+                        yield _sse("text_delta", delta=question)
                     yield _sse("action_required", data=state)
                 yield _sse("done", status=state.get("status", "COMPLETED"), data=state)
                 return
@@ -106,13 +116,16 @@ def _response(stack, resources, config, command, context, request, request_id, r
                     for node, update in chunk.items():
                         if node == "__interrupt__":
                             for intr in update:
+                                question = _pending_text(intr.value.get("items", []))
+                                if question:
+                                    yield _sse("text_delta", delta=question)
                                 yield _sse("action_required", data={"interrupt_id": intr.id, **intr.value})
                         elif isinstance(update, dict):
                             for event in update.get("events", []):
                                 yield _sse(event["type"], data=event["data"])
                             if update.get("route") == "END" and not final_streamed:
                                 for message in update.get("messages", []):
-                                    if _text(message.content):
+                                    if isinstance(message, AIMessage) and not message.tool_calls and _text(message.content):
                                         yield _sse("text_delta", delta=_text(message.content))
             snapshot = await resources.graph.aget_state(config)
             state = _state(snapshot)
