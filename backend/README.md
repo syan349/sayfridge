@@ -96,15 +96,24 @@ Both URLs must use the `postgresql+psycopg://` prefix. Git ignores `.env`; never
 Before the first backend release, maintain the latest table definition, ORM,
 and API contracts together; record structural changes in the design handbook.
 Incremental migration histories and deployment rollback procedures are not required.
-The existing Alembic initial script is retained as the fresh-database initializer:
+Initialize a fresh database completely with:
 
 ```bash
-python -m alembic upgrade head
+python scripts/initialize_database.py
 ```
 
-This command initializes a fresh database/schema. Editing the initial script does
-not update an already initialized database. Existing development databases must
-be synchronized explicitly; do not assume the command reapplies the definition.
+This repeatable command applies the Alembic schema, seeds the 25 public categories,
+initializes the isolated Agent checkpoint/store schema, and verifies the result.
+It must run before FastAPI uses an empty database and never runs implicitly during
+application startup. Editing the initial migration does not update an already
+initialized database; existing databases must still be reviewed and synchronized
+explicitly.
+
+Verify the complete process against the configured isolated test database with:
+
+```bash
+python -m pytest tests/test_database_initialization_postgres.py -v --strict-markers
+```
 
 
 ## Tests
@@ -207,7 +216,9 @@ The 25 public categories and Agent classification guidance share one configurati
 `app/core/category_catalog.py`. The reviewed seed SQL is
 `scripts/sql/seed_item_categories.sql`; `python scripts/render_category_seed.py`
 prints SQL for review without connecting to a database. This is not a database
-synchronization service. Fresh schemas also require explicit category seeding.
+synchronization service. The fresh-database initializer applies the reviewed seed
+automatically; existing databases still require review before corrections are
+applied.
 
 The inventory routes use `app/schemas/inventory.py` and `app/services/inventory.py`.
 An owned active space and visible active definition/category must exist before
