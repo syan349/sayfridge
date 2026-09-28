@@ -9,7 +9,7 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
 
@@ -22,6 +22,7 @@ from app.core.category_catalog import CATEGORIES  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db import models  # noqa: E402,F401  # Register ORM metadata.
+from app.db.schema_verification import verify_schema  # noqa: E402
 from scripts.render_category_seed import render_seed_sql  # noqa: E402
 from scripts.setup_agent_storage import initialize_and_verify  # noqa: E402
 
@@ -83,17 +84,12 @@ def initialize_business_database(schema_name: str) -> None:
         finally:
             raw.close()
 
-        expected_tables = set(Base.metadata.tables)
         with engine.connect() as connection:
-            actual_tables = set(
-                inspect(connection).get_table_names(schema=schema_name)
+            schema_report = verify_schema(
+                connection,
+                Base.metadata,
+                schema=schema_name,
             )
-            missing_tables = expected_tables - actual_tables
-            if missing_tables:
-                raise RuntimeError(
-                    "Business initialization is missing ORM tables: "
-                    + ", ".join(sorted(missing_tables))
-                )
             active_categories = set(
                 connection.scalars(
                     text(
@@ -116,7 +112,15 @@ def initialize_business_database(schema_name: str) -> None:
 
     print("Business database initialized and verified:")
     print(f"  schema: {schema_name}")
-    print(f"  ORM tables: {len(expected_tables)} present")
+    print(f"  ORM tables: {schema_report.tables} present")
+    print(f"  ORM columns: {schema_report.columns} present")
+    print(f"  ORM foreign keys: {schema_report.foreign_keys} present")
+    print(
+        "  ORM constraints: "
+        f"{schema_report.primary_keys + schema_report.unique_constraints + schema_report.check_constraints} "
+        "present"
+    )
+    print(f"  ORM indexes: {schema_report.indexes} present")
     print(f"  public categories: {len(CATEGORIES)} present")
 
 

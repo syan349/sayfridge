@@ -132,6 +132,19 @@ Verify the complete process against the configured isolated test database with:
 python -m pytest tests/test_database_initialization_postgres.py -v --strict-markers
 ```
 
+For an existing Neon or PostgreSQL environment, run the read-only structural check:
+
+```bash
+python scripts/verify_database_schema.py
+python scripts/setup_agent_storage.py --check
+```
+
+The first command compares the business schema with the current ORM tables,
+columns, primary/foreign/unique/check constraints, and indexes. The second checks
+the separate LangGraph Agent schema. Neither command creates, alters, seeds, or
+deletes database objects. A successful migration of a new empty database is also
+covered by `test_database_initialization_postgres.py` and included in core CI.
+
 ## Post-deployment smoke test
 
 After deploying the Backend and initializing its database, run the smoke test from

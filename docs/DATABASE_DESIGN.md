@@ -331,6 +331,13 @@ Transactions must guarantee that:
 
 This document maintains business fields and constraints. See [backend design](BACKEND_DESIGN.md) for service/transaction rules, [architecture](ARCHITECTURE.md) for Agent orchestration and [API reference](API_REFERENCE.md) for HTTP/SSE contracts. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
 
+Database structure is acceptance-tested from an empty PostgreSQL schema by running
+`alembic upgrade head` through `test_database_initialization_postgres.py`. The same
+test verifies all ORM-required tables, columns, primary/foreign/unique/check
+constraints, and indexes. Existing Neon environments can be checked without
+mutation using `python scripts/verify_database_schema.py`; the separate LangGraph
+schema is checked with `python scripts/setup_agent_storage.py --check`.
+
 ## 13. Agent business receipts: `agent_inventory_action`
 
 The Agent extension adds a ninth business table. Each row is a committed, independently
