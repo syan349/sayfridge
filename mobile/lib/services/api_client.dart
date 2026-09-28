@@ -16,15 +16,12 @@ class ApiClient {
     String? accessToken,
     Map<String, String>? queryParameters,
   }) async {
-    final uri = ApiConfig.buildUri(path).replace(
-      queryParameters: queryParameters,
-    );
+    final uri = ApiConfig.buildUri(
+      path,
+    ).replace(queryParameters: queryParameters);
 
     final response = await _send(
-      () => _client.get(
-        uri,
-        headers: _headers(accessToken: accessToken),
-      ),
+      () => _client.get(uri, headers: _headers(accessToken: accessToken)),
     );
 
     return _decodeSuccessfulResponse(response);
@@ -34,30 +31,110 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
     String? accessToken,
+    Map<String, String> headers = const {},
   }) async {
     final response = await _send(
       () => _client.post(
         ApiConfig.buildUri(path),
-        headers: _headers(accessToken: accessToken),
-        body: jsonEncode(body ?? <String, dynamic>{}),
+        headers: {
+          ..._headers(accessToken: accessToken),
+          ...headers,
+        },
+        body: body == null ? null : jsonEncode(body),
       ),
     );
 
     return _decodeSuccessfulResponse(response);
   }
 
+  Future<Map<String, dynamic>> patchJson(
+    String path, {
+    required Map<String, dynamic> body,
+    required String accessToken,
+  }) async => _decodeSuccessfulResponse(
+    await _send(
+      () => _client.patch(
+        ApiConfig.buildUri(path),
+        headers: _headers(accessToken: accessToken),
+        body: jsonEncode(body),
+      ),
+    ),
+  );
+
+  Future<List<Map<String, dynamic>>> getList(
+    String path, {
+    required String accessToken,
+  }) async {
+    final response = await _send(
+      () => _client.get(
+        ApiConfig.buildUri(path),
+        headers: _headers(accessToken: accessToken),
+      ),
+    );
+    final value = jsonDecode(response.body);
+    if (value is! List) throw const FormatException('Expected a JSON list');
+    return value.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
+  /// Decode complete SSE records, including multi-line data and split UTF-8.
+  /// A disconnected stream is NOT an acknowledgement of a successful write.
+  Stream<Map<String, dynamic>> events(
+    String path, {
+    required Map<String, dynamic> body,
+    required String accessToken,
+  }) async* {
+    final request = http.Request('POST', ApiConfig.buildUri(path))
+      ..headers.addAll({
+        ..._headers(accessToken: accessToken),
+        'Accept': 'text/event-stream',
+      })
+      ..body = jsonEncode(body);
+    final response = await _client
+        .send(request)
+        .timeout(ApiConfig.requestTimeout);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _parseApiException(
+        await http.Response.fromStream(
+          response,
+        ).timeout(ApiConfig.requestTimeout),
+      );
+    }
+    if (!(response.headers['content-type'] ?? '').contains(
+      'text/event-stream',
+    )) {
+      throw const FormatException('Expected an Agent event stream');
+    }
+    final data = <String>[];
+    await for (final line
+        in response.stream
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .timeout(const Duration(seconds: 120))) {
+      if (line.isEmpty) {
+        if (data.isNotEmpty) {
+          final event = jsonDecode(data.join('\n'));
+          data.clear();
+          if (event is! Map<String, dynamic>) {
+            throw const FormatException('Invalid Agent event');
+          }
+          yield event;
+        }
+      } else if (line.startsWith('data:')) {
+        final value = line.substring(5);
+        data.add(value.startsWith(' ') ? value.substring(1) : value);
+      }
+    }
+  }
+
   Map<String, String> _headers({String? accessToken}) {
     return {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
-      if (accessToken != null)
-        'Authorization': 'Bearer $accessToken',
+      if (accessToken != null) 'Authorization': 'Bearer $accessToken',
     };
   }
 
-  Future<http.Response> _send(
-    Future<http.Response> Function() request,
-  ) async {
+  Future<http.Response> _send(Future<http.Response> Function() request) async {
     try {
       final response = await request().timeout(ApiConfig.requestTimeout);
 
@@ -81,9 +158,7 @@ class ApiClient {
     }
   }
 
-  Map<String, dynamic> _decodeSuccessfulResponse(
-    http.Response response,
-  ) {
+  Map<String, dynamic> _decodeSuccessfulResponse(http.Response response) {
     try {
       final decoded = jsonDecode(response.body);
 
@@ -134,6 +209,7 @@ class ApiClient {
 
           if (detailCode is String) {
             code = detailCode;
+            message = detailCode;
           }
 
           if (detailMessage is String) {
