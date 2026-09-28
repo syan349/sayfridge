@@ -28,6 +28,17 @@ class AgentImage {
   final int sizeBytes;
   final Uint8List bytes;
 
+  /// Picker files on the web can have a blob URL without a name or MIME type.
+  /// Identify supported formats from the bytes that will actually be sent.
+  factory AgentImage.fromPickedBytes(Uint8List bytes) {
+    for (final mimeType in supportedMimeTypes) {
+      if (_matchesSignature(bytes, mimeType)) {
+        return AgentImage.fromBytes(bytes, mimeType: mimeType);
+      }
+    }
+    throw const FormatException('Use a JPEG, PNG or WebP image.');
+  }
+
   factory AgentImage.fromBytes(
     Uint8List bytes, {
     required String mimeType,

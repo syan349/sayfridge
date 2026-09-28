@@ -168,7 +168,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
       final additions = <AgentImage>[];
       for (final file in selected.take(AgentImage.maxImages - _images.length)) {
         final bytes = await file.readAsBytes();
-        final image = AgentImage.fromBytes(bytes, mimeType: _mimeType(file));
+        final image = AgentImage.fromPickedBytes(bytes);
         image.validateDimensions();
         additions.add(image);
       }
@@ -192,16 +192,6 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
       MaterialPageRoute<List<XFile>>(builder: (_) => const CameraInputScreen()),
     );
     return selected ?? [];
-  }
-
-  String _mimeType(XFile file) {
-    final declared = file.mimeType?.toLowerCase();
-    if (declared != null && declared.isNotEmpty) return declared;
-    final name = file.name.toLowerCase();
-    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
-    if (name.endsWith('.png')) return 'image/png';
-    if (name.endsWith('.webp')) return 'image/webp';
-    return 'application/octet-stream';
   }
 
   void _messageFor(String text) {
@@ -516,10 +506,7 @@ class _AgentItemCard extends StatelessWidget {
       if (!context.mounted || files.isEmpty) return;
       final images = <AgentImage>[];
       for (final file in files.take(AgentImage.maxImages)) {
-        final image = AgentImage.fromBytes(
-          await file.readAsBytes(),
-          mimeType: _agentImageMimeType(file),
-        );
+        final image = AgentImage.fromPickedBytes(await file.readAsBytes());
         image.validateDimensions();
         images.add(image);
       }
@@ -826,14 +813,4 @@ class _NoticeBox extends StatelessWidget {
       ],
     ),
   );
-}
-
-String _agentImageMimeType(XFile file) {
-  final declared = file.mimeType?.toLowerCase();
-  if (declared != null && declared.isNotEmpty) return declared;
-  final name = file.name.toLowerCase();
-  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
-  if (name.endsWith('.png')) return 'image/png';
-  if (name.endsWith('.webp')) return 'image/webp';
-  return 'application/octet-stream';
 }

@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:sayfridge/models/agent_image.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
 import 'package:sayfridge/screens/agent_conversation_screen.dart';
 import 'package:sayfridge/services/api_client.dart';
@@ -321,7 +322,7 @@ void main() {
     },
   );
 
-  testWidgets('authenticated Agent previews, removes and sends gallery images', (
+  testWidgets('Agent attaches and sends a camera JPEG without file metadata', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1080, 2400);
@@ -329,10 +330,12 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     Map<String, dynamic>? sent;
-    final png = Uint8List.fromList(
-      base64Decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLJhgAAAABJRU5ErkJggg==',
-      ),
+    final cameraJpeg = base64Decode(
+      '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD5yooor8PP5vP/2Q==',
+    );
+    expect(
+      AgentImage.fromPickedBytes(cameraJpeg).validateDimensions,
+      returnsNormally,
     );
     final api = ApiClient(
       client: MockClient((request) async {
@@ -358,9 +361,7 @@ void main() {
         theme: AppTheme.light,
         home: AgentConversationScreen(
           controller: agent,
-          pickImages: () async => [
-            XFile.fromData(png, mimeType: 'image/png', name: 'milk.png'),
-          ],
+          pickImages: () async => [XFile.fromData(cameraJpeg, name: 'blob')],
         ),
       ),
     );
@@ -379,7 +380,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(sent?['message'], '');
     expect(sent?['images'], hasLength(1));
-    expect(sent?['images'][0]['mime_type'], 'image/png');
+    expect(sent?['images'][0]['mime_type'], 'image/jpeg');
     expect(find.bySemanticsLabel('Selected photo'), findsNothing);
   });
 

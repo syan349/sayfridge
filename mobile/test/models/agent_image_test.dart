@@ -21,6 +21,35 @@ void main() {
     });
   });
 
+  test('recognizes a camera JPEG from bytes without file metadata', () {
+    final cameraJpeg = Uint8List.fromList([
+      0xff,
+      0xd8,
+      0xff,
+      0xe1,
+      0x00,
+      0x04,
+      0x00,
+      0x00,
+      0xff,
+      0xc0,
+      0x00,
+      0x07,
+      0x08,
+      0x00,
+      0x01,
+      0x00,
+      0x01,
+      0xff,
+      0xd9,
+    ]);
+
+    final image = AgentImage.fromPickedBytes(cameraJpeg);
+
+    expect(image.mimeType, 'image/jpeg');
+    expect(image.validateDimensions, returnsNormally);
+  });
+
   test('rejects unsupported and mismatched image types', () {
     expect(
       () => AgentImage.fromBytes(jpeg(), mimeType: 'image/heic'),
