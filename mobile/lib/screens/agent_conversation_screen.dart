@@ -286,7 +286,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                           for (final message in agent.messages.entries)
                             if (message.value.isNotEmpty)
                               Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.only(bottom: 24),
                                 child: message.key.startsWith('user:')
                                     ? UserMessageBubble(
                                         message: message.value,

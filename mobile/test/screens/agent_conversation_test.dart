@@ -715,6 +715,9 @@ Future<void> _tapAndFinish(
   AgentController agent,
   Finder button,
 ) async {
+  // Keep scrollable actions above the fixed composer before tapping them.
+  await Scrollable.ensureVisible(button.evaluate().single, alignment: 0.15);
+  await tester.pumpAndSettle();
   await tester.runAsync(() async {
     final finished = Completer<void>();
     var started = false;

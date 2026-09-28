@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -7,6 +9,7 @@ import 'inventory_card_trailing.dart';
 const inventoryExactColor = Color(0xFF3F9E36);
 const inventoryEstimatedColor = Color(0xFFE95A18);
 const exampleMessageStyle = TextStyle(
+  color: AppColors.text,
   fontSize: 16,
   fontWeight: FontWeight.w400,
 );
@@ -14,6 +17,7 @@ const exampleMessageStyle = TextStyle(
 // Measure text insets from the rounded body, excluding the speech tail.
 const _bubbleTextInset = 12.0;
 const _bubbleTailWidth = 13.0;
+const _bubbleMaxWidth = 320.0;
 
 class AssistantHeader extends StatelessWidget {
   const AssistantHeader({
@@ -152,28 +156,20 @@ class AssistantGreeting extends StatelessWidget {
         const SizedBox(width: 11),
         Flexible(
           fit: FlexFit.loose,
-          child: ClipPath(
-            clipper: const _SpeechBubbleClipper(tailOnLeft: true),
-            child: Container(
-              height: 47,
-              padding: const EdgeInsets.only(
-                left: _bubbleTailWidth + _bubbleTextInset,
-                right: _bubbleTextInset,
-              ),
-              color: AppColors.primarySoft,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                widthFactor: 1,
-                child: Text(
-                  message,
-                  maxLines: 1,
-                  softWrap: false,
-                  overflow: TextOverflow.fade,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w500,
-                  ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _bubbleMaxWidth),
+            child: ClipPath(
+              clipper: const _SpeechBubbleClipper(tailOnLeft: true),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 47),
+                padding: const EdgeInsets.fromLTRB(
+                  _bubbleTailWidth + _bubbleTextInset,
+                  12,
+                  _bubbleTextInset,
+                  12,
                 ),
+                color: AppColors.primarySoft,
+                child: Text(message, style: exampleMessageStyle),
               ),
             ),
           ),
@@ -191,26 +187,36 @@ class UserMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: ClipPath(
-        clipper: const _SpeechBubbleClipper(tailOnLeft: false),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 300),
-          padding: const EdgeInsets.fromLTRB(
-            _bubbleTextInset,
-            13,
-            _bubbleTextInset + _bubbleTailWidth,
-            13,
+    return LayoutBuilder(
+      builder: (context, constraints) => Align(
+        alignment: Alignment.centerRight,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: math.min(_bubbleMaxWidth, constraints.maxWidth * 0.9),
           ),
-          color: AppColors.primarySoft,
-          child: Text(
-            message,
-            textAlign: TextAlign.center,
-            textWidthBasis: TextWidthBasis.longestLine,
-            style:
-                textStyle ??
-                const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+          child: ClipPath(
+            clipper: const _SpeechBubbleClipper(tailOnLeft: false),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(
+                _bubbleTextInset,
+                13,
+                _bubbleTextInset + _bubbleTailWidth,
+                13,
+              ),
+              color: AppColors.userMessage,
+              child: Text(
+                message,
+                textAlign: TextAlign.center,
+                textWidthBasis: TextWidthBasis.longestLine,
+                style:
+                    (textStyle ??
+                            const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w500,
+                            ))
+                        .copyWith(color: AppColors.text),
+              ),
+            ),
           ),
         ),
       ),
@@ -259,6 +265,7 @@ class AssistantMessageBubble extends StatelessWidget {
     child: ClipPath(
       clipper: const _SpeechBubbleClipper(tailOnLeft: true),
       child: Container(
+        constraints: const BoxConstraints(maxWidth: _bubbleMaxWidth),
         padding: const EdgeInsets.fromLTRB(
           _bubbleTailWidth + _bubbleTextInset,
           12,
