@@ -68,12 +68,20 @@ def parse_args() -> argparse.Namespace:
         "--confirm",
         help=f"Use {SEED_CONFIRMATION} for seed or {RESET_CONFIRMATION} for reset.",
     )
+    parser.add_argument(
+        "--rotate-passwords",
+        action="store_true",
+        help=(
+            "Replace passwords for existing deterministic demo accounts. "
+            "Only valid with the seed action."
+        ),
+    )
     return parser.parse_args()
 
 
 def _validate_password(name: str, value: str | None) -> str:
-    if value is None or len(value) < 12 or len(value) > 128:
-        raise SystemExit(f"{name} must contain 12 to 128 characters")
+    if value is None or len(value) < 10 or len(value) > 128:
+        raise SystemExit(f"{name} must contain 10 to 128 characters")
     return value
 
 
@@ -139,6 +147,8 @@ def _seed_users(
     session: Session,
     user_password: str,
     admin_password: str,
+    *,
+    rotate_passwords: bool = False,
 ) -> dict[str, User]:
     emails = [entry.email for entry in DEMO_USERS]
     existing = {
@@ -170,6 +180,8 @@ def _seed_users(
             raise RuntimeError(
                 f"Existing demo account is not an active local-password account: {entry.email}"
             )
+        elif rotate_passwords:
+            row.password_hash = admin_hash if entry.role == "ADMIN" else user_hash
         result[entry.email] = row
     session.flush()
     return result
@@ -365,10 +377,16 @@ def seed_demo_data(
     user_password: str,
     admin_password: str,
     today: date | None = None,
+    rotate_passwords: bool = False,
 ) -> DemoDataReport:
     categories = _category_map(session)
     definitions = _seed_definitions(session, categories)
-    users = _seed_users(session, user_password, admin_password)
+    users = _seed_users(
+        session,
+        user_password,
+        admin_password,
+        rotate_passwords=rotate_passwords,
+    )
     spaces = _seed_spaces(session, users)
     now = datetime.now(timezone.utc)
     _seed_inventory(
@@ -464,6 +482,8 @@ def main() -> None:
         raise SystemExit(f"Seed requires --confirm {SEED_CONFIRMATION}")
     if args.action == "reset" and args.confirm != RESET_CONFIRMATION:
         raise SystemExit(f"Reset requires --confirm {RESET_CONFIRMATION}")
+    if args.rotate_passwords and args.action != "seed":
+        raise SystemExit("--rotate-passwords is only valid with the seed action")
 
     settings = get_settings()
     engine = create_engine(
@@ -486,6 +506,7 @@ def main() -> None:
                         admin_password=_validate_password(
                             "DEMO_ADMIN_PASSWORD", os.getenv("DEMO_ADMIN_PASSWORD")
                         ),
+                        rotate_passwords=args.rotate_passwords,
                     )
                     _print_report("seeded and verified", args.target, report)
                 elif args.action == "check":

@@ -13,7 +13,7 @@ from app.core.demo_catalog import (
     INVENTORY_SCENARIOS,
     PUBLIC_ITEM_DEFINITIONS,
 )
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.db.models import (
     InventoryItem,
     InventoryOperation,
@@ -84,10 +84,32 @@ def test_demo_seed_is_complete_idempotent_and_resettable(database):
         assert preserved.id == existing_id
         assert preserved.password_hash == existing_hash
 
+    with Session(engine) as session, session.begin():
+        rotated = seed_demo_data(
+            session,
+            user_password="rotated-user-password-for-test",
+            admin_password="rotated-admin-password-for-test",
+            today=date(2026, 10, 1),
+            rotate_passwords=True,
+        )
+        users = {
+            row.email: row
+            for row in session.scalars(
+                select(User).where(User.email.in_([entry.email for entry in DEMO_USERS]))
+            ).all()
+        }
+        for entry in DEMO_USERS:
+            expected_password = (
+                "rotated-admin-password-for-test"
+                if entry.role == "ADMIN"
+                else "rotated-user-password-for-test"
+            )
+            assert verify_password(expected_password, users[entry.email].password_hash)
+
     expected_operations_per_user = sum(
         scenario.operation is not None for scenario in INVENTORY_SCENARIOS
     )
-    assert first == second
+    assert first == second == rotated
     assert first.users == len(DEMO_USERS) == 11
     assert first.storage_spaces == len(DEMO_USERS) * 3 == 33
     assert first.public_definitions == len(PUBLIC_ITEM_DEFINITIONS) == 25

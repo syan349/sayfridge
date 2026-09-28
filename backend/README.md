@@ -168,8 +168,8 @@ Set two uncommitted operator passwords, then explicitly identify and confirm the
 non-production target:
 
 ```bash
-export DEMO_USER_PASSWORD='replace-with-a-strong-demo-user-password'
-export DEMO_ADMIN_PASSWORD='replace-with-a-different-strong-admin-password'
+export DEMO_USER_PASSWORD='replace-with-shared-demo-user-password'
+export DEMO_ADMIN_PASSWORD='replace-with-shared-demo-admin-password'
 
 python scripts/manage_demo_data.py seed \
   --target predeploy \
@@ -180,6 +180,18 @@ python scripts/manage_demo_data.py check --target predeploy
 The seed is repeatable. Existing accounts with one of the configured email
 addresses retain their ID, password, role, and data; incompatible account or
 catalog records stop the entire transaction instead of being overwritten.
+
+Distribute the real non-production passwords through a secure team channel; do
+not commit them to this repository or reuse them in production.
+To update existing deterministic demo accounts without deleting their inventory,
+spaces, or operation history, run:
+
+```bash
+python scripts/manage_demo_data.py seed \
+  --target predeploy \
+  --confirm SEED-DEMO-DATA \
+  --rotate-passwords
+```
 
 To remove deterministic demo rows while retaining the required categories:
 
