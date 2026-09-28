@@ -338,6 +338,20 @@ constraints, and indexes. Existing Neon environments can be checked without
 mutation using `python scripts/verify_database_schema.py`; the separate LangGraph
 schema is checked with `python scripts/setup_agent_storage.py --check`.
 
+### Required and demonstration seed data
+
+`scripts/initialize_database.py` owns structural migration and the required,
+idempotent 25-category seed. `scripts/manage_demo_data.py` is a separate,
+non-production acceptance-data tool: it creates deterministic users, shared item
+definitions, spaces, inventory states, and operation history only after an
+explicit target and confirmation are supplied. Real passwords are injected by
+the operator and are never stored in the repository.
+
+Demo reset deletes known deterministic rows in dependency order and never drops
+the schema or category seed. Database restore is separate again: use a Neon branch
+restore/recreation or an approved backup, then run structural and seed checks.
+Application startup performs none of these operations automatically.
+
 ## 13. Agent business receipts: `agent_inventory_action`
 
 The Agent extension adds a ninth business table. Each row is a committed, independently

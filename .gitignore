@@ -20,3 +20,4 @@ Thumbs.db
 .env.*
 !.env.example
 !.env.test.example
+!.env.demo.example

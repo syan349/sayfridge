@@ -145,6 +145,54 @@ the separate LangGraph Agent schema. Neither command creates, alters, seeds, or
 deletes database objects. A successful migration of a new empty database is also
 covered by `test_database_initialization_postgres.py` and included in core CI.
 
+### Migration, seed, reset, and restore
+
+These operations have separate purposes and must not be treated as interchangeable:
+
+| Operation | Command/process | Effect |
+| --- | --- | --- |
+| Migration | `python scripts/initialize_database.py` | Applies `alembic upgrade head` to an empty/current database and initializes the separate Agent schema. |
+| Required seed | Included in `initialize_database.py` | Idempotently adds the 25 public item categories required by the application. |
+| Demo seed | `scripts/manage_demo_data.py seed` | Explicitly adds non-production acceptance accounts and sample business data. |
+| Demo reset | `scripts/manage_demo_data.py reset` | Removes only deterministic demo rows; it does not drop the schema or categories. |
+| Restore | Neon branch restore/recreation or an approved database backup | Recovers an environment; it is an operator action, not application startup behavior. |
+
+The optional demo dataset contains 11 accounts (the five configured team emails,
+five virtual users, and one virtual administrator), 33 storage spaces, 25 public
+item definitions, 77 inventory items, and 66 inventory operations. It covers
+in-stock, estimated, empty, expired, discarded, archived, notes, expiry dates,
+and ADD/CONSUME/RECONCILE history. It is not part of application startup and must
+never be run against production.
+
+Set two uncommitted operator passwords, then explicitly identify and confirm the
+non-production target:
+
+```bash
+export DEMO_USER_PASSWORD='replace-with-a-strong-demo-user-password'
+export DEMO_ADMIN_PASSWORD='replace-with-a-different-strong-admin-password'
+
+python scripts/manage_demo_data.py seed \
+  --target predeploy \
+  --confirm SEED-DEMO-DATA
+python scripts/manage_demo_data.py check --target predeploy
+```
+
+The seed is repeatable. Existing accounts with one of the configured email
+addresses retain their ID, password, role, and data; incompatible account or
+catalog records stop the entire transaction instead of being overwritten.
+
+To remove deterministic demo rows while retaining the required categories:
+
+```bash
+python scripts/manage_demo_data.py reset \
+  --target predeploy \
+  --confirm RESET-DEMO-DATA
+```
+
+The reset preserves pre-existing accounts and definitions. A seeded account is
+also preserved if it has acquired non-demo spaces, private definitions,
+conversations, or Agent receipts, avoiding cascading deletion of later work.
+
 ## Post-deployment smoke test
 
 After deploying the Backend and initializing its database, run the smoke test from
