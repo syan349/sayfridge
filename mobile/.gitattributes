@@ -1,0 +1,2 @@
+# Render runs this script on Linux, including when committed from Windows.
+scripts/*.sh text eol=lf

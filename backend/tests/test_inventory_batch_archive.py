@@ -76,7 +76,12 @@ def test_batch_archive_preserves_input_order_facts_and_history(inventory_context
     [
         ("missing", 404, "NOT_FOUND"),
         ("foreign", 404, "NOT_FOUND"),
-        pytest.param("stale", 409, "VERSION_CONFLICT", marks=pytest.mark.ci),
+        pytest.param(
+            "stale",
+            409,
+            "VERSION_CONFLICT",
+            marks=[pytest.mark.ci, pytest.mark.database_acceptance],
+        ),
         ("discarded", 409, "STATE_CONFLICT"),
         ("archived", 409, "STATE_CONFLICT"),
     ],

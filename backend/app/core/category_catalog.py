@@ -1,4 +1,7 @@
 """Public category seed and Agent guidance; no database writes at import time."""
+import hashlib
+import json
+
 from app.core.catalog import normalize_catalog_name
 
 
@@ -37,6 +40,26 @@ CATEGORIES = tuple(
     for index, (name, description, examples, exclusions) in enumerate(_ROWS, 1)
 )
 _GUIDANCE = {row["normalized_name"]: row for row in CATEGORIES}
+
+
+def category_seed_version(rows=CATEGORIES) -> str:
+    """Return a stable, content-addressed version for category seed evidence."""
+
+    payload = [
+        {
+            "name": row["name"],
+            "normalized_name": row["normalized_name"],
+            "sort_order": row["sort_order"],
+        }
+        for row in rows
+    ]
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return "sha256:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def category_guidance(name: str) -> dict:

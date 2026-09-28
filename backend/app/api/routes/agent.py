@@ -19,10 +19,28 @@ from app.agents.locking import conversation_lock, ConversationBusy
 from app.agents.state import AgentContext
 from app.agents.messages import human_message, chat_fingerprint, resume_fingerprint, validate_image_ids
 from app.agents.workflow import public_state
-from app.schemas.agent import AgentChatRequest
+from app.schemas.agent import AgentChatRequest, AgentErrorResponse
+from app.schemas.auth import AuthErrorResponse
 from app.schemas.agent_actions import AgentResumeRequest, AgentConversationState
 
-router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
+router = APIRouter(
+    prefix="/api/v1/agent",
+    tags=["agent"],
+    responses={
+        401: {
+            "model": AuthErrorResponse,
+            "description": "Missing, invalid, expired, or unavailable identity",
+        },
+        409: {
+            "model": AgentErrorResponse,
+            "description": "Conversation state or idempotency conflict",
+        },
+        503: {
+            "model": AgentErrorResponse,
+            "description": "Agent persistence or execution service is unavailable",
+        },
+    },
+)
 logger = logging.getLogger(__name__)
 
 
@@ -144,6 +162,7 @@ def _response(stack, resources, config, command, context, request, request_id, r
 @router.post("/chat", summary="Stream an Agent turn", response_class=StreamingResponse,
              responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}})
 async def chat_with_agent(payload: AgentChatRequest, request: Request, user: User = Depends(get_current_user)):
+    """Start or replay one Agent turn and stream typed server-sent events."""
     request_id = payload.request_id or uuid4()
     conversation_id = payload.conversation_id or uuid5(user.id, f"agent:{request_id}")
     stack, resources, config, snapshot = await _open(user, conversation_id)
@@ -183,6 +202,7 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
 @router.post("/resume", summary="Answer, edit, confirm or cancel pending Agent items", response_class=StreamingResponse,
              responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}})
 async def resume_agent(payload: AgentResumeRequest, request: Request, user: User = Depends(get_current_user)):
+    """Resume one paused conversation with validated answers or confirmations."""
     stack, resources, config, snapshot = await _open(user, payload.conversation_id)
     try:
         data = payload.model_dump(mode="json")
@@ -223,6 +243,7 @@ async def resume_agent(payload: AgentResumeRequest, request: Request, user: User
 @router.get("/conversations/{conversation_id}/state", summary="Read sanitized Agent recovery state",
             response_model=AgentConversationState, response_model_exclude_none=True)
 async def conversation_state(conversation_id: UUID, user: User = Depends(get_current_user)):
+    """Return the current user's sanitized conversation state for recovery."""
     try:
         resources = await get_agent_resources()
         snapshot = await resources.graph.aget_state(_config(user.id, conversation_id))

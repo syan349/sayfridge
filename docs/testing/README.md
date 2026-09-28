@@ -18,6 +18,7 @@
 | B15 | [Inventory batches](B15_INVENTORY_BATCH_TEST_RESULTS.md) | Atomic batch creation, movement, and archival |
 | B22 | [Expiry summary](B22_EXPIRY_SUMMARY_TEST_RESULTS.md) | On-demand expiry buckets, filters, pagination, and ownership |
 | B25 | [Administrator accounts](B25_ADMIN_USERS_TEST_RESULTS.md) | Permission, safe reads, filtering, status changes, and no-op writes |
+| Database release readiness | [Database isolation and acceptance evidence](DATABASE_ACCEPTANCE.md) | Environment guards, migration/seed evidence, transaction rollback, and idempotency |
 
 Manual requests: [Postman guide](POSTMAN_GUIDE.md).
 Setup and database configuration: [backend README](../../backend/README.md).
@@ -29,7 +30,7 @@ Run commands from `backend`. Uvicorn does not need to be running.
 | Execution | Selection | Command |
 | --- | --- | --- |
 | Local full regression | Current suite; live-model tests require explicit opt-in | `python -m pytest -v` |
-| Local core check | 79 scenarios | `python -m pytest -v -m ci` |
+| Local core check | 100 scenarios | `python -m pytest -v -m ci` |
 | Automatic PR/main CI | Same core set | `python -m pytest -v -m ci --strict-markers` |
 | Manual workflow dispatch | Full suite | `python -m pytest -v --strict-markers` |
 | Database-free check | Current database-free selection | `python -m pytest -v -m "not postgres"` |
@@ -48,7 +49,7 @@ limitations of that run.
 
 Use one test implementation for local and CI runs. Mark a small set covering
 permissions, representative workflows, atomic failures, and concurrency risks.
-Keep boundary variants in the full suite. The remaining 548 scenarios (including opt-in live-model cases) still run
+Keep boundary variants in the full suite. The remaining 555 scenarios (including opt-in live-model cases) still run
 in full regression; a core pass alone is not evidence of a full-suite pass.
 
 | Feature | Core scenarios |
@@ -70,7 +71,8 @@ in full regression; a core pass alone is not evidence of a full-suite pass.
 | Inventory expiry summary | 3 |
 | Administrator accounts | 3 |
 | Agent stock intake and resume | 3 |
-| **Total** | **79** |
+| Release readiness and database acceptance | 21 |
+| **Total** | **100** |
 
 Use `@pytest.mark.ci` for a whole test or `pytest.param(..., marks=pytest.mark.ci)`
 for selected parameters. The marker is registered in `backend/pytest.ini`;

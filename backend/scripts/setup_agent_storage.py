@@ -193,6 +193,17 @@ async def run_initialize() -> None:
     if confirmation != "INITIALIZE":
         raise SystemExit("Cancelled; no database changes were requested.")
 
+    search_path = await initialize_and_verify(settings)
+    print("Agent checkpoint and store tables are initialized and verified:")
+    print(f"  search_path: {search_path}")
+    print("  Checkpointer empty read: passed")
+    print("  Store empty query: passed")
+    print("  public schema objects unchanged: passed")
+
+
+async def initialize_and_verify(settings: AgentPersistenceSettings) -> str:
+    """Idempotently initialize Agent storage after the caller selects a target."""
+
     async with await AsyncConnection.connect(
         settings.psycopg_url(),
         autocommit=True,
@@ -240,12 +251,7 @@ async def run_initialize() -> None:
         raise RuntimeError("Store verification unexpectedly found data.")
     if public_before != public_after:
         raise RuntimeError("Public schema objects changed during Agent initialization.")
-
-    print("Agent checkpoint and store tables are initialized and verified:")
-    print(f"  search_path: {search_path}")
-    print("  Checkpointer empty read: passed")
-    print("  Store empty query: passed")
-    print("  public schema objects unchanged: passed")
+    return search_path
 
 
 async def main() -> None:

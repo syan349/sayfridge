@@ -42,3 +42,21 @@ class LoginResponse(BaseModel):
     token_type: Literal["bearer"] = "bearer"
     expires_in: int
     user: UserPublic
+
+
+class AuthErrorResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"detail": "Invalid email or password"}}
+    )
+
+    detail: str
+
+
+class AuthValidationIssue(BaseModel):
+    type: str
+    loc: list[str | int]
+    msg: str
+
+
+class AuthValidationErrorResponse(BaseModel):
+    detail: list[AuthValidationIssue]
