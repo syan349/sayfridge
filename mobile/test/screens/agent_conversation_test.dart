@@ -15,6 +15,58 @@ import 'package:sayfridge/theme/app_theme.dart';
 import '../support/integration_fixtures.dart';
 
 void main() {
+  testWidgets('history opens the current conversation without sample records', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var requests = 0;
+    final api = ApiClient(
+      client: MockClient((request) async {
+        requests++;
+        expect(request.url.path, endsWith('/agent/chat'));
+        return eventResponse([
+          {
+            'type': 'done',
+            'status': 'COMPLETED',
+            'data': {'status': 'COMPLETED', 'items': []},
+          },
+        ]);
+      }),
+    );
+    addTearDown(api.close);
+    final agent = AgentController(
+      WorkspaceRepository(api, MemoryTokens()),
+      store: MemoryAgentStore(),
+    );
+    addTearDown(agent.dispose);
+    await agent.bindUser('alice');
+    await tester.runAsync(() => agent.send('Add items to my inventory'));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: AgentConversationScreen(controller: agent),
+      ),
+    );
+    await tester.tap(find.byTooltip('Conversation history'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Conversation History'), findsOneWidget);
+    expect(find.text('Current conversation'), findsOneWidget);
+    expect(find.text('Add items to my inventory'), findsOneWidget);
+    expect(find.text('Record milk used.'), findsNothing);
+    expect(requests, 1);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI Assistant'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('welcome shortcuts send their own text through the real Agent', (
     tester,
   ) async {

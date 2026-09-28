@@ -14,6 +14,7 @@ import '../widgets/assistant_welcome.dart';
 import '../widgets/business_forms.dart';
 import '../widgets/hold_to_speak_button.dart';
 import 'camera_input_screen.dart';
+import 'conversation_history_screen.dart';
 
 class AgentConversationScreen extends StatefulWidget {
   const AgentConversationScreen({
@@ -250,16 +251,13 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                 );
                               }
                             },
-                            onHistory: () {
-                              agent.recover();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Recovering the latest conversation. Full conversation history is not provided by the current API.',
-                                  ),
+                            onHistory: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => ConversationHistoryScreen(
+                                  controller: agent,
                                 ),
-                              );
-                            },
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 15),
                           const Center(
