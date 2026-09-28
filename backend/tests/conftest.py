@@ -43,6 +43,13 @@ from app.db.database_target import (
 from app.db.session import get_db_session
 
 
+@pytest.fixture(scope="session")
+def live_runner():
+    # Both live Agent modules share the loop used by the cached model HTTP client.
+    with asyncio.Runner() as runner:
+        yield runner
+
+
 # Each database test owns a migrated schema, including committed test data.
 @pytest.fixture
 def database():

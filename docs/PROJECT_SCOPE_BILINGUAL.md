@@ -61,7 +61,7 @@ MVP 面向个人用户。每个账户可以建立冰箱、冷柜、仓库等多�
 | Accounts and personal inventory / 账户与个人库存 | Registration/login, profile, personal inventory, and access isolation by authenticated user / 注册登录、用户资料、个人库存、按认证用户进行权限隔离 |
 | Inventory management / 库存管理 | Create, view, edit, and delete items; quantity, unit, category, purchase date, expiry date, storage location, and notes / 物品增删改查；数量、单位、类别、购买日期、到期日、储存位置和备注 |
 | Multimodal input / 多模态录入 | Camera/image upload, receipt or invoice OCR, product-image recognition, voice input, and text input / 拍照上传、小票或发票 OCR、商品图像识别、语音与文字输入 |
-| Agent assistant / Agent 助手 | Intent parsing and controlled tool use; clarify missing/ambiguous information and confirm estimates or new associations / 意图解析、受控工具调用；缺失或歧义信息需补充，估算或新建关联需要确认 |
+| Agent assistant / Agent 助手 | Intent parsing and controlled tool use; clarify missing/ambiguous information and confirm estimates or image-derived entries / 意图解析、受控工具调用；缺失或歧义信息需补充，估算或图片入库需要确认 |
 | Reminders / 提醒机制 | 09:00 expiry reminder, 21:00 daily-recall reminder, and configurable schedule/on-off preferences / 09:00 临期提醒、21:00 使用情况回顾提醒、可配置时间与开关 |
 | User mobile app / 用户手机 App | Inventory overview, camera, voice/text entry, push notifications, item details, and manual maintenance / 库存概览、相机、语音/文字录入、推送、详情与手动维护 |
 | User web / 用户 Web | Shared inventory data with the app; large-screen browsing, filtering, and bulk editing / 与手机端共享数据；大屏浏览、筛选和批量编辑 |
@@ -139,7 +139,7 @@ The old conceptual tool list is preserved with the archived implementation plan.
 
 Agent 负责理解请求、选择目标和提出候选；后端负责身份、归属、数量校验、余额计算和正式事务。
 当前节点、工具与记忆设计只在架构文档维护，接口只在 API 参考维护。
-缺少信息需要补充；估算及新建关联需要确认；完整的确定性操作不增加固定确认。
+缺少信息需要补充；估算及图片入库需要确认；明确物品和用户明确指定的新空间随入库自动创建，完整的确定性操作不增加固定确认。
 模型输出使用受控结构，不能将模型文字拼接为 SQL 或执行任意命令。
 
 ## 7. Current Basic Data Model / 当前数据库基础模型

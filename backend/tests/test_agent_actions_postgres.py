@@ -89,23 +89,25 @@ def test_receipt_failure_rolls_back_all_new_associations(inventory_context):
     async def scenario(client, sessions):
         memory = MemoryService(InMemoryStore(), c[1].id)
         action = ActionDraft(item_key="new", original_text="two bags", action="CREATE_STOCK", quantity_value="2", quantity_unit="bag",
-            new_space={"name": "Agent pantry", "type": "PANTRY"}, new_definition={"name": "New rice", "category_id": c[3].id})
+            new_space={"name": "Agent pantry", "type": "PANTRY"}, new_space_source_text="Put them in Agent pantry",
+            new_definition={"name": "New rice", "category_id": c[3].id})
         async with sessions() as session:
-            preview = await prepare_action(session, c[1].id, action, memory)
+            preview = await prepare_action(session, c[1].id, action, memory, source_texts=["Put them in Agent pantry"])
+            assert not preview["requires_confirmation"]
             await session.execute(text("ALTER TABLE agent_inventory_action ADD CONSTRAINT reject_receipt CHECK (action <> 'CREATE_STOCK')"))
             await session.commit()
         pid, conv, turn = uuid4(), uuid4(), uuid4()
         async with sessions() as session:
             with pytest.raises(IntegrityError):
-                await execute_action(session, c[1].id, conv, turn, pid, preview, memory, approved=True)
+                await execute_action(session, c[1].id, conv, turn, pid, preview, memory)
             assert await session.scalar(select(func.count()).select_from(StorageSpace).where(StorageSpace.name == "Agent pantry")) == 0
             assert await session.scalar(select(func.count()).select_from(ItemDefinition).where(ItemDefinition.name == "New rice")) == 0
             await session.execute(text("ALTER TABLE agent_inventory_action DROP CONSTRAINT reject_receipt"))
             await session.commit()
         async with sessions() as session:
-            first = await execute_action(session, c[1].id, conv, turn, pid, preview, memory, approved=True)
+            first = await execute_action(session, c[1].id, conv, turn, pid, preview, memory)
         async with sessions() as session:
-            replay = await execute_action(session, c[1].id, conv, turn, pid, preview, memory, approved=True)
+            replay = await execute_action(session, c[1].id, conv, turn, pid, preview, memory)
             assert first["inventory"]["id"] == replay["inventory"]["id"]
             assert replay["replayed"]
             assert await session.scalar(select(func.count()).select_from(InventoryItem)) == 1

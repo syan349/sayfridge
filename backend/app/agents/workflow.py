@@ -11,6 +11,7 @@ from langgraph.types import interrupt
 from app.agents.memory import MemoryService, MemoryUnavailable
 from app.agents.messages import user_text, human_message, image_catalog, resume_fingerprint
 from app.agents.prompts import system_prompt
+from app.agents.intake import identify_turn, waiting_question, outcome_text
 from app.agents.state import AgentContext, AgentState
 from app.agents.tools import AGENT_TOOLS
 from app.schemas.agent_actions import ActionDraft, ProposeActions, AgentResumeRequest
@@ -33,7 +34,8 @@ def public_item(item):
         "source_image_ids": item.get("image_policy", {}).get("source_image_ids", draft.get("source_image_ids", [])),
         "recognized_text": draft.get("original_text", ""), "package_description": draft.get("package_description"),
         "review_notes": draft.get("review_notes", []), "missing_fields": missing,
-        "confirmation_reasons": preview.get("confirmation_reasons", [])}
+        "confirmation_reasons": preview.get("confirmation_reasons", []),
+        "question": item.get("question")}
     return result
 
 
@@ -94,7 +96,24 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
         summary = {"spaces": [{"id": str(s.id), "name": s.name, "type": s.type, "status": s.status} for s in spaces],
             "spaces_truncated": total > len(spaces), "memories": loaded}
         runtime.context.cache.update(summary)
-        return {"context_summary": summary, "route": "MODEL", "events": []}
+        intent = await identify_turn(model, state["messages"])
+        items = []
+        for entry in intent.items:
+            draft = ActionDraft.model_validate(entry.model_dump())
+            items.append({"item_id": str(uuid5(UUID(state["turn_id"]), draft.item_key)),
+                "item_key": draft.item_key, "proposal_id": str(uuid4()), "status": "DRAFT",
+                "original_text": draft.original_text, "draft": draft.model_dump(mode="json"),
+                "attempts": 0, "source_texts": [latest], "needs_proposal": True})
+        return {"context_summary": summary, "turn_intent": intent.model_dump(), "items": items,
+                "route": "FINISH" if intent.exceeds_item_limit else "MODEL", "events": [],
+                "proposal_retries": 0, "prose_retries": 0}
+
+    def reject_proposal(state, response, reason):
+        attempts = state.get("proposal_retries", 0)
+        if attempts >= 2:
+            raise ValueError("Unable to prepare a valid inventory proposal")
+        return {"messages": [response, *[ToolMessage(content=reason, tool_call_id=c["id"]) for c in [*response.tool_calls, *response.invalid_tool_calls]]],
+                "route": "MODEL", "events": [], "proposal_retries": attempts + 1}
 
     async def agent(state, runtime: Runtime[AgentContext]):
         items = [dict(i) for i in state.get("items", [])]
@@ -114,13 +133,29 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             prompt += "\nThis image task allows CREATE_STOCK only. Ask about intent if unclear. Never propose changes to existing batches."
         if final:
             prompt += "\nReport only the actual outcomes of these items. Do not initiate additional work."
-        response = await (model if final else bound).ainvoke([SystemMessage(content=prompt), *state["messages"]],
-            config={"tags": ["agent_final" if final else "agent_internal"]})
+        if state.get("turn_intent", {}).get("exceeds_item_limit"):
+            prompt += "\nMore than 20 items were requested. No actions accepted. Ask for groups of at most 20."
+        if state.get("prose_retries"):
+            prompt += "\nYou have unfinished inventory items. Submit propose_inventory_actions now, even with missing fields. Do not replace it with a prose question."
+        language = state.get("turn_intent", {}).get("language", "en")
+        if final and state.get("turn_intent", {}).get("exceeds_item_limit"):
+            limit_message = ("每次最多处理20项，请将剩余物品分批发送。" if language.lower().startswith(("zh", "chinese", "中文"))
+                             else "Please send the remaining items in groups of at most 20.")
+            response = AIMessage(content="\n".join(filter(None, [outcome_text(items, language), limit_message])))
+        elif final and items:
+            response = AIMessage(content=outcome_text(items, language))
+        else:
+            response = await (model if final else bound).ainvoke([SystemMessage(content=prompt), *state["messages"]],
+                config={"tags": ["agent_final" if final else "agent_internal"]})
         calls = response.tool_calls if not final else []
+        if not final and response.invalid_tool_calls:
+            return reject_proposal(state, response, "Invalid tool arguments. Return valid JSON matching the tool schema. No tools executed.")
         proposals = [c for c in calls if c["name"] == "propose_inventory_actions"]
         if proposals:
             if len(calls) != 1:
-                return {"messages": [response, *[ToolMessage(content="Do queries first, then propose separately. No tools executed.", tool_call_id=c["id"]) for c in calls]], "route": "MODEL", "events": []}
+                return reject_proposal(state, response, "Do queries first, then propose separately. No tools executed.")
+            if state.get("turn_intent", {}).get("kind", "INVENTORY") != "INVENTORY":
+                return reject_proposal(state, response, "The current request does not authorize inventory changes. Answer the question or clarify intent without proposing stock actions.")
             try:
                 payload = ProposeActions.model_validate(proposals[0]["args"])
                 if payload.exceeds_item_limit:
@@ -129,7 +164,8 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                                  if i["status"] not in TERMINAL and i.get("error", {}).get("code") != "EXECUTION_UNCERTAIN"
                                  else i for i in items]
                     return {"messages": [response, ToolMessage(content="ITEM_LIMIT_EXCEEDED: No new actions accepted. Ask the user to split into at most 20 items; do not claim success.", tool_call_id=proposals[0]["id"])],
-                            "items": cancelled, "route": "FINISH", "events": [{"type": "operation_result", "data": public_item(i)} for i in cancelled if i["status"] in TERMINAL]}
+                            "items": cancelled, "route": "FINISH", "turn_intent": {**state.get("turn_intent", {}), "exceeds_item_limit": True, "items": []},
+                            "events": [{"type": "operation_result", "data": public_item(i)} for i in cancelled if i["status"] in TERMINAL]}
                 known = {i["item_key"]: i for i in items}
                 initially_empty = not items
                 for draft in payload.actions:
@@ -151,18 +187,22 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                     item = {"item_id": old["item_id"] if old else str(uuid5(UUID(state["turn_id"]), draft.item_key)),
                         "item_key": draft.item_key, "proposal_id": str(uuid4()), "status": "DRAFT",
                         "original_text": draft.original_text, "draft": draft.model_dump(mode="json"),
-                        "attempts": old.get("attempts", 0) if old else 0}
+                        "attempts": old.get("attempts", 0) if old else 0,
+                        "source_texts": old.get("source_texts", []) if old else [runtime.context.user_message],
+                        "needs_proposal": False}
                     item["image_policy"] = image_policy(state, draft)
                     if old:
                         items[items.index(old)] = item
                     else:
                         items.append(item)
-                return {"messages": [response, ToolMessage(content="Drafts received, not executed.", tool_call_id=proposals[0]["id"])], "items": items, "route": "PREPARE", "events": []}
+                return {"messages": [response, ToolMessage(content="Drafts received, not executed.", tool_call_id=proposals[0]["id"])], "items": items, "route": "PREPARE", "events": [], "proposal_retries": 0, "prose_retries": 0}
             except ValueError:
-                return {"messages": [response, ToolMessage(content="Invalid proposal. Correct the schema, image references and allowed action types. No actions executed.", tool_call_id=proposals[0]["id"])], "route": "MODEL", "events": []}
+                return reject_proposal(state, response, "Invalid proposal. Correct the schema, existing item keys, image references and allowed action types. No actions executed.")
         if calls:
             return {"messages": [response], "route": "TOOLS", "events": []}
         if any(i["status"] not in TERMINAL for i in items):
+            if state.get("prose_retries", 0) < 2:
+                return {"messages": [response], "route": "MODEL", "events": [], "prose_retries": state.get("prose_retries", 0) + 1}
             return {"messages": [response], "route": "PREPARE", "events": []}
         requests = dict(state.get("requests", {}))
         requests[state["turn_id"]] = {"fingerprint": state["request_fingerprint"], "state": public_state(state), "answer": response.content}
@@ -199,6 +239,8 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                 async with session_factory() as session:
                     policy = item.get("image_policy", {})
                     options = {"image_policy": policy} if any(policy.values()) else {}
+                    if draft.new_space:
+                        options["source_texts"] = item.get("source_texts", [])
                     preview = await prepare_action(session, runtime.context.user_id, draft, memories(runtime), runtime.context.as_of, **options)
                 resolved_target = preview["draft"].get("inventory_item_id")
                 if resolved_target and resolved_target in blocked:
@@ -207,6 +249,11 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                     continue
                 item.update(preview=preview, draft=preview["draft"], approved=False,
                     status="NEEDS_CONFIRMATION" if preview["requires_confirmation"] else "READY")
+                if item.get("needs_proposal"):
+                    # Intake is a record of intent, not an executable proposal.
+                    item.update(status="NEEDS_INPUT", error={"code": "PROPOSAL_REQUIRED", "message": "Please retry this item", "details": {}})
+                    item.pop("preview", None)
+                    continue
                 item.pop("error", None)
                 events.append({"type": "operation_preview", "data": public_item(item)})
                 if item["status"] == "READY":
@@ -219,6 +266,10 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                     item["attempts"] = item.get("attempts", 0) + 1
                     return {"route": "MODEL", "items": items, "events": events}
                 item["status"] = "NEEDS_INPUT"
+        language = state.get("turn_intent", {}).get("language", "en")
+        for item in items:
+            if item["status"] in WAITING:
+                item["question"] = waiting_question(item, language)
         pending = [public_item(i) for i in items if i["status"] in WAITING]
         return {"items": items, "pending_input": pending, "route": "WAIT" if pending else "FINISH", "events": events}
 
@@ -233,6 +284,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                 continue
             if item["status"] not in WAITING or str(answer.proposal_id) != item["proposal_id"]:
                 raise ValueError("Stale response")
+            item.pop("question", None)
             if answer.decision == "confirm":
                 if item["status"] != "NEEDS_CONFIRMATION":
                     raise ValueError("Missing information must be answered first")
@@ -242,6 +294,11 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             else:
                 item.update(status="DRAFT", proposal_id=str(uuid4()), approved=False, attempts=0)
                 item.pop("preview", None)
+                item.pop("question", None)
+                if answer.message:
+                    item["source_texts"] = [*item.get("source_texts", []), answer.message]
+                if answer.message or answer.images:
+                    item["needs_proposal"] = True
                 if answer.selected_inventory_item_id:
                     item["draft"] = {**item["draft"], "inventory_item_id": str(answer.selected_inventory_item_id)}
                 if answer.message or answer.images:
@@ -252,7 +309,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
         route = "MODEL" if messages else "EXECUTE" if any(i["status"] == "READY" for i in items) else "CANCELLED"
         return {"items": items, "messages": messages, "route": route,
                 "image_task_active": state.get("image_task_active", False) or any(r.images for r in payload.responses),
-                "resume_requests": {**state.get("resume_requests", {}), str(payload.request_id): resume_fingerprint(payload)}, "events": []}
+                "resume_requests": {**state.get("resume_requests", {}), str(payload.request_id): resume_fingerprint(payload)}, "events": [], "proposal_retries": 0, "prose_retries": 0}
 
     async def execute_operation(state, runtime: Runtime[AgentContext]):
         items = [dict(i) for i in state["items"]]
@@ -267,6 +324,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                     state["turn_id"], item["proposal_id"], item["preview"], memories(runtime), approved=item.get("approved", False), **options)
             item.update(status="SUCCEEDED", result=result)
             item.pop("error", None)
+            item.pop("question", None)
         except Exception as exc:
             item["error"] = error_info(exc)
             code = item["error"]["code"]

@@ -1,5 +1,4 @@
 """Opt-in multimodal acceptance; generated labels/receipts and isolated stock only."""
-import asyncio
 import os
 from uuid import uuid4
 
@@ -21,13 +20,6 @@ from auth_test_support import exercise
 from agent_image_support import image_input
 
 pytestmark = [pytest.mark.postgres, pytest.mark.skipif(os.getenv("AGENT_LIVE_MODEL") != "1", reason="Opt in to model API costs")]
-
-
-@pytest.fixture(scope="module")
-def live_runner():
-    # LangChain caches its HTTP client; keep all parameterized calls on one loop.
-    with asyncio.Runner() as runner:
-        yield runner
 
 
 @pytest.mark.parametrize("kind", ["single", "multiple", "receipt", "two_views", "question", "image_only"])

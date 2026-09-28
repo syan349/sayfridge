@@ -106,10 +106,16 @@ async def _creation_values(session, user_id, draft, *, create=False):
         category = (await catalog._lock_categories(session, {draft.new_definition.category_id}))[draft.new_definition.category_id] if create else await session.get(ItemCategory, draft.new_definition.category_id)
         if category is None or category.status != "ACTIVE":
             raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category")
-        found = await session.scalar(select(ItemDefinition).where(ItemDefinition.owner_user_id == user_id,
-            ItemDefinition.normalized_name == normalize_catalog_name(draft.new_definition.name)))
-        if found and (found.category_id != category.id or found.status != "ACTIVE"):
-            raise PreparationError("ASSOCIATION_CONFLICT", "Existing item definition differs from this proposal")
+        matches = list(await session.scalars(select(ItemDefinition).where(
+            (ItemDefinition.owner_user_id == user_id) | ItemDefinition.owner_user_id.is_(None),
+            ItemDefinition.normalized_name == normalize_catalog_name(draft.new_definition.name))))
+        private = [row for row in matches if row.owner_user_id == user_id]
+        candidates = private or [row for row in matches if row.status == "ACTIVE"]
+        if len(candidates) > 1:
+            raise PreparationError("DEFINITION_REQUIRED", "Which matching item do you mean?")
+        found = candidates[0] if candidates else None
+        if found and found.status != "ACTIVE":
+            raise PreparationError("ASSOCIATION_CONFLICT", "Existing item definition is archived")
         if found:
             definition_id = found.id
         elif create:
@@ -138,8 +144,21 @@ def validate_image_policy(draft, image_policy, *, approved=None):
         raise PreparationError("CONFIRMATION_REQUIRED", "Review the current image-derived proposal first")
 
 
-async def prepare_action(session, user_id, draft: ActionDraft, memory: MemoryService, as_of=None, *, image_policy=None):
+def validate_new_space_source(draft, source_texts):
+    if not draft.new_space:
+        return
+    quote = draft.new_space_source_text
+    if not quote or not any(quote in value for value in source_texts):
+        raise PreparationError("SPACE_REQUIRED", "Where would you like to store this?")
+    if normalize_catalog_name(draft.new_space.name) not in normalize_catalog_name(quote):
+        raise PreparationError("SPACE_REQUIRED", "What is the name of the storage location?")
+
+
+async def prepare_action(session, user_id, draft: ActionDraft, memory: MemoryService, as_of=None, *, image_policy=None, source_texts=()):
     validate_image_policy(draft, image_policy)
+    if draft.clarification_question:
+        raise PreparationError("CLARIFICATION_REQUIRED", draft.clarification_question)
+    validate_new_space_source(draft, source_texts)
     snapshots = []
     if draft.action == "CREATE_STOCK":
         if draft.estimate or draft.quantity_kind != "AMOUNT" or draft.quantity_value is None or not draft.quantity_unit:
@@ -160,12 +179,12 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
                         "space_name": space.name if space else draft.new_space.name,
                         "category_id": str(category.id), "category_name": category.name},
             "image_policy": image_policy or {},
-            "confirmation_reasons": (["IMAGE_REVIEW"] if image_review else []) +
-                (["NEW_ASSOCIATION"] if draft.new_space or draft.new_definition else []),
+            "confirmation_reasons": ["IMAGE_REVIEW"] if image_review else [],
+            "creation_policy": {"version": 1, "new_space_authorized": bool(draft.new_space)},
             "after": {"confirmed_current_amount": values.amount, "confirmed_current_unit": values.unit,
                       "estimated_current_amount": None}, "calculation_method": "EXACT",
             "affects_state": "CONFIRMED", "memory_snapshots": [],
-            "requires_confirmation": bool(image_review or draft.new_space or draft.new_definition), "expected_version": None}
+            "requires_confirmation": bool(image_review), "expected_version": None}
     if not draft.inventory_item_id:
         if not draft.item_query:
             raise PreparationError("TARGET_REQUIRED", "Identify the inventory item")
@@ -252,6 +271,8 @@ async def execute_action(session, user_id, conversation_id, turn_id, proposal_id
         if draft.source_image_ids and not approved:
             raise PreparationError("CONFIRMATION_REQUIRED", "Review the image-derived proposal first")
         if preview["requires_confirmation"] and not approved:
+            raise PreparationError("CONFIRMATION_REQUIRED", "Confirm the current proposal")
+        if draft.new_space and not approved and not preview.get("creation_policy", {}).get("new_space_authorized"):
             raise PreparationError("CONFIRMATION_REQUIRED", "Confirm the current proposal")
         if not await memory.verify_snapshots(preview["memory_snapshots"]):
             raise PreparationError("MEMORY_CHANGED", "Memory changed; prepare a new proposal")

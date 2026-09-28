@@ -486,6 +486,13 @@ $env:AGENT_LIVE_MODEL='1'
 Live checks use synthetic inventory in the isolated test database and incur model
 API usage; they never use the production inventory connection for test actions.
 
+The intake step records every stock request before conversational replies. Clear
+new products and explicitly named new spaces are created automatically with the
+stock transaction; missing details remain resumable items. Image review and
+estimate confirmation are still required. Run the first-purchase regression with
+`python -m pytest -q tests/test_agent_stock_entry_postgres.py`; the opt-in live-model
+suite also covers English/Chinese purchases and ambiguous storage locations.
+
 Multimodal input requires Pillow from requirements.txt and a configured model/API
 that supports image content blocks together with tool calls. Requests accept at
 most 4 JPEG/PNG/WebP still images, 3 MiB decoded each, 8 MiB combined, 20 million
