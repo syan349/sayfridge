@@ -10,7 +10,7 @@ The FastAPI backend for SayFridge. The current version provides health checks, l
 | Current components, Agent graph, tools, memory and user intervention | [Architecture](../docs/ARCHITECTURE.md) |
 | Initial, confirmed, estimated and reconciled quantities | [Quantity rules](../docs/QUANTITY_STATE_DESIGN.md) |
 | Tables, fields and constraints | [Database design](../docs/DATABASE_DESIGN.md) |
-| Backend services, permissions and transaction implementation | [Backend design](../docs/BACKEND_DESIGN.md) |
+| HTTP request flow, layer ownership, services, permissions and transactions | [Backend design](../docs/BACKEND_DESIGN.md#21-http-request-lifecycle-and-layer-ownership) |
 | HTTP/SSE contracts for frontend integration | [API reference](../docs/API_REFERENCE.md) |
 | Validation evidence and test commands | [Test index](../docs/testing/README.md) |
 
