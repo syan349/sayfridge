@@ -58,6 +58,7 @@ class _HoldToSpeakButtonState extends State<HoldToSpeakButton>
   @override
   Widget build(BuildContext context) => Tooltip(
     message: 'Hold to speak',
+    triggerMode: TooltipTriggerMode.manual,
     child: Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: (event) {

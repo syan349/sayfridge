@@ -231,8 +231,10 @@ void main() {
     (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 3;
+      tester.view.padding = const FakeViewPadding(top: 132);
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPadding);
       var requests = 0;
       final api = ApiClient(
         client: MockClient((request) async {
@@ -272,11 +274,13 @@ void main() {
         tester.getCenter(find.byTooltip('Hold to speak')),
       );
       await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
-      expect(find.text('按住识别语音'), findsOneWidget);
-      expect(find.text('松手编辑'), findsOneWidget);
+      expect(find.text('Hold to speak'), findsOneWidget);
+      expect(find.text('Release to edit'), findsOneWidget);
       final overlay = find.byKey(const Key('voice-recording-overlay'));
       expect(overlay, findsOneWidget);
       expect(tester.widget<ColoredBox>(overlay).color, const Color(0x88000000));
+      expect(tester.getTopLeft(overlay).dy, 0);
+      expect(tester.getBottomRight(overlay).dy, 800);
       expect(find.text('add two bottles of milk'), findsOneWidget);
       await gesture.up();
       await tester.pumpAndSettle();
@@ -326,7 +330,7 @@ void main() {
     await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
     await leftGesture.moveBy(const Offset(-80, 0));
     await tester.pump();
-    expect(find.text('松手取消'), findsOneWidget);
+    expect(find.text('Release to cancel'), findsWidgets);
     await leftGesture.up();
     await tester.pumpAndSettle();
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/agent_image.dart';
@@ -39,6 +40,7 @@ class AgentConversationScreen extends StatefulWidget {
 
 class _AgentConversationScreenState extends State<AgentConversationScreen> {
   final _message = TextEditingController();
+  OverlayEntry? _voiceOverlayEntry;
   final List<AgentImage> _images = [];
   late final VoiceInputService _voiceInput;
   bool _recordingVoice = false;
@@ -60,8 +62,34 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     ++_voiceSession;
     _holdingVoice = false;
     if (_recordingVoice) _voiceInput.cancel();
+    _hideVoiceOverlay();
     _message.dispose();
     super.dispose();
+  }
+
+  void _showVoiceOverlay() {
+    final entry = OverlayEntry(
+      builder: (context) => Positioned.fill(
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle.light,
+          child: VoiceRecordingOverlay(
+            words: _recognizedWords,
+            cancelling: _cancelVoice,
+            finishing: _finishingVoice,
+            onClose: () => _finishVoiceInput(forceCancel: true),
+          ),
+        ),
+      ),
+    );
+    _voiceOverlayEntry = entry;
+    Overlay.of(context, rootOverlay: true).insert(entry);
+  }
+
+  void _hideVoiceOverlay() {
+    final entry = _voiceOverlayEntry;
+    _voiceOverlayEntry = null;
+    entry?.remove();
+    entry?.dispose();
   }
 
   Future<void> _startVoiceInput() async {
@@ -74,10 +102,12 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
       _cancelVoice = false;
       _recognizedWords = '';
     });
+    _showVoiceOverlay();
     final available = await _voiceInput.start(
       onWords: (words) {
         if (!mounted || session != _voiceSession || !_recordingVoice) return;
         setState(() => _recognizedWords = words.trim());
+        _voiceOverlayEntry?.markNeedsBuild();
       },
       onError: (message) {
         if (!mounted || session != _voiceSession) return;
@@ -88,6 +118,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
           _cancelVoice = false;
           _recognizedWords = '';
         });
+        _hideVoiceOverlay();
         _messageFor(message);
       },
       shouldContinue: () =>
@@ -101,6 +132,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
       _recordingVoice = false;
       _holdingVoice = false;
     });
+    _hideVoiceOverlay();
     _messageFor(
       'Voice recognition is not available. Check microphone permission or use a supported browser.',
     );
@@ -111,6 +143,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     final shouldCancel = offset.dy < -60 || offset.dx < -60;
     if (shouldCancel != _cancelVoice) {
       setState(() => _cancelVoice = shouldCancel);
+      _voiceOverlayEntry?.markNeedsBuild();
     }
   }
 
@@ -120,6 +153,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     final session = _voiceSession;
     final cancelled = forceCancel || _cancelVoice;
     setState(() => _finishingVoice = true);
+    _voiceOverlayEntry?.markNeedsBuild();
     if (cancelled) {
       await _voiceInput.cancel();
     } else {
@@ -140,6 +174,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
         );
       }
     });
+    _hideVoiceOverlay();
     if (!cancelled && words.isEmpty) {
       _messageFor('No speech was recognized. Please try again.');
     }
@@ -432,15 +467,6 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
             ),
           ),
         ),
-        if (_recordingVoice)
-          Positioned.fill(
-            child: VoiceRecordingOverlay(
-              words: _recognizedWords,
-              cancelling: _cancelVoice,
-              finishing: _finishingVoice,
-              onClose: () => _finishVoiceInput(forceCancel: true),
-            ),
-          ),
       ],
     ),
   );

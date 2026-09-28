@@ -129,16 +129,12 @@ class VoiceRecordingOverlay extends StatelessWidget {
                             child: Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: Text(
-                                cancelling ? '松手取消' : '松手编辑',
+                                cancelling
+                                    ? 'Release to cancel'
+                                    : 'Release to edit',
                                 style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 15,
-                                  fontFamilyFallback: [
-                                    'PingFang SC',
-                                    'Noto Sans CJK SC',
-                                    'Noto Sans SC',
-                                    'Microsoft YaHei',
-                                  ],
                                 ),
                               ),
                             ),
@@ -194,17 +190,8 @@ class _VoiceGestureFooter extends StatelessWidget {
                 borderRadius: BorderRadius.circular(46),
               ),
               child: const Text(
-                '取消',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontFamilyFallback: [
-                    'PingFang SC',
-                    'Noto Sans CJK SC',
-                    'Noto Sans SC',
-                    'Microsoft YaHei',
-                  ],
-                ),
+                'Cancel',
+                style: TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
           ),
@@ -219,18 +206,9 @@ class _VoiceGestureFooter extends StatelessWidget {
               borderRadius: BorderRadius.circular(46),
             ),
             child: const Text(
-              '按住识别语音',
+              'Hold to speak',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 16,
-                fontFamilyFallback: [
-                  'PingFang SC',
-                  'Noto Sans CJK SC',
-                  'Noto Sans SC',
-                  'Microsoft YaHei',
-                ],
-              ),
+              style: TextStyle(color: Colors.black, fontSize: 16),
             ),
           ),
         ),
