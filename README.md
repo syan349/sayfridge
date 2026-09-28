@@ -121,7 +121,7 @@ docs/      Architecture, API, database, design, and test documentation
 ## Local development prerequisites
 
 - Git
-- Python 3.11
+- Python 3.12
 - Node.js 22 or newer and npm
 - Flutter 3.44.8 with Dart 3.12.2
 - Android Studio / Android SDK for Android development
@@ -138,7 +138,7 @@ From the repository root:
 
 ```bash
 cd backend
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env

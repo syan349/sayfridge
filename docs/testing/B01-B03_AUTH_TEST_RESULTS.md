@@ -80,7 +80,7 @@ The user subsequently confirmed successful Postman testing against the local Fas
 
 ## 5. Remaining acceptance and limits
 
-- Remote GitHub Actions results must still be confirmed after submission. The workflow uses Python 3.11 and isolated PostgreSQL 18; the local container run is supporting evidence, not a remote CI run.
+- Remote GitHub Actions results must still be confirmed after submission. The workflow uses Python 3.12 and isolated PostgreSQL 18; the local container run is supporting evidence, not a remote CI run.
 - The team must review the changes and link code and test results to GitHub Issues. No commit, push, or task closure is implied by this report.
 - Web/Flutter integration and device acceptance, cloud application deployment, performance testing, and full security acceptance remain later project work and are not claimed complete here.
 - Unit/API/integration results do not turn every design in the backend handbook into an implemented feature. This report covers B01–B03 only.

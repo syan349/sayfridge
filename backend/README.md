@@ -28,14 +28,14 @@ databases require the explicit receipt-table setup before enabling Agent writes.
 The same configured model reads text and inline images; no OCR service or second
 model is used. See [frontend handoff](../docs/AGENT_FRONTEND_INTEGRATION.md).
 
-- Python 3.11
+- Python 3.12
 
 ## Run locally on Windows
 
 Run the following commands from the `backend` directory after configuring `.env` as described below:
 
 ```powershell
-py -3.11 -m venv .venv
+py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
@@ -115,10 +115,10 @@ python -m pytest
 
 ## B01–B09 local startup and Postman
 
-On macOS / Linux, create an environment with Python 3.11 from the `backend` directory. Skip environment creation if `.venv` already exists:
+On macOS / Linux, create an environment with Python 3.12 from the `backend` directory. Skip environment creation if `.venv` already exists:
 
 ```bash
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -295,7 +295,7 @@ python -m pytest -v tests/test_admin_users.py --strict-markers
 
 ## Agent configuration and storage
 
-Python 3.11 and backend requirements are required. Agent persistence uses
+Python 3.12 and backend requirements are required. Agent persistence uses
 AGENT_DATABASE_URL when nonempty, otherwise DATABASE_URL_DIRECT. Keep credentials
 only in local/deployment secrets. AGENT_WORKFLOW_STEP_LIMIT defaults to 128 and is
 the six-node step budget; legacy AGENT_RECURSION_LIMIT does not control this workflow.
