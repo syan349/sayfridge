@@ -109,7 +109,7 @@ def test_category_tool_returns_real_ids_with_guidance(database, monkeypatch):
 
 
 @pytest.mark.postgres
-def test_new_category_confirmation_correction_and_invalid_categories(inventory_context):
+def test_category_ambiguity_correction_and_invalid_categories(inventory_context):
     from langgraph.store.memory import InMemoryStore
     from app.agents.memory import MemoryService
     from app.schemas.agent_actions import ActionDraft
@@ -122,17 +122,17 @@ def test_new_category_confirmation_correction_and_invalid_categories(inventory_c
             cats = dict((await session.execute(text("SELECT name,id FROM item_category"))).all())
             action = ActionDraft(item_key='new', original_text='add coconut milk', action='CREATE_STOCK',
                 quantity_value='1', quantity_unit='can', storage_space_id=c[4].id,
+                clarification_question='Is this for drinking or cooking?',
                 new_definition={'name': 'Coconut milk', 'category_id': cats['Milk & Plant-Based Milk']})
-            preview = await prepare_action(session, c[1].id, action, memory)
-            assert preview['requires_confirmation']
-            assert preview['display']['category_name'] == 'Milk & Plant-Based Milk'
-            with pytest.raises(PreparationError):
-                await execute_action(session, c[1].id, uuid4(), uuid4(), uuid4(), preview, memory)
+            with pytest.raises(PreparationError, match='drinking or cooking'):
+                await prepare_action(session, c[1].id, action, memory)
         async with sessions() as session:
+            action.clarification_question = None
             action.new_definition.category_id = cats['Sauces, Condiments & Spreads']
             revised = await prepare_action(session, c[1].id, action, memory)
+            assert not revised['requires_confirmation']
             assert revised['display']['category_name'] == 'Sauces, Condiments & Spreads'
-            result = await execute_action(session, c[1].id, uuid4(), uuid4(), uuid4(), revised, memory, approved=True)
+            result = await execute_action(session, c[1].id, uuid4(), uuid4(), uuid4(), revised, memory)
             assert result['inventory']['category_id'] == str(cats['Sauces, Condiments & Spreads'])
         for invalid in (uuid4(), cats['Other']):
             async with sessions() as session:

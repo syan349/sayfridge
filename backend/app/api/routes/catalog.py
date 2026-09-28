@@ -13,10 +13,11 @@ from app.schemas.business import (
     BusinessErrorResponse, CatalogListQuery, ItemCategoryPage, ItemDefinitionCreate,
     ItemDefinitionListQuery, ItemDefinitionPage, ItemDefinitionRead, ItemDefinitionUpdate,
 )
+from app.schemas.auth import AuthErrorResponse
 from app.services import catalog as service
 
 router = APIRouter(prefix="/api/v1", tags=["catalog"], responses={
-    401: {"description": "Missing, invalid, or unavailable identity"},
+    401: {"model": AuthErrorResponse, "description": "Missing, invalid, expired, or unavailable identity"},
     422: {"model": BusinessErrorResponse, "description": "Invalid request parameters"},
 })
 NOT_FOUND = {404: {"model": BusinessErrorResponse, "description": "Missing or inaccessible resource"}}

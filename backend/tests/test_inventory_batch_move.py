@@ -66,7 +66,12 @@ def test_batch_move_preserves_input_order_and_treats_current_target_as_noop(inve
     [
         ("missing", 404, "NOT_FOUND"),
         ("foreign", 404, "NOT_FOUND"),
-        pytest.param("stale", 409, "VERSION_CONFLICT", marks=pytest.mark.ci),
+        pytest.param(
+            "stale",
+            409,
+            "VERSION_CONFLICT",
+            marks=[pytest.mark.ci, pytest.mark.database_acceptance],
+        ),
         ("terminal", 409, "STATE_CONFLICT"),
     ],
 )

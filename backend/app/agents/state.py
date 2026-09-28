@@ -26,6 +26,9 @@ class AgentState(TypedDict):
     final_only: bool
     image_task_active: bool
     turn_has_images: bool
+    turn_intent: dict
+    proposal_retries: int
+    prose_retries: int
 
 
 @dataclass(frozen=True, slots=True)

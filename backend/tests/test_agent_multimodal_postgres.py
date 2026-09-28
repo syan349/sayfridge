@@ -20,7 +20,7 @@ from app.schemas.agent_actions import ActionDraft
 from app.services.agent_actions import prepare_action, execute_action, PreparationError
 from inventory_test_support import inventory_context
 from auth_test_support import exercise
-from test_agent_workflow import ScriptModel, call
+from test_agent_workflow import ScriptModel, call, intake
 from test_agent_api_postgres import parse_events
 from agent_image_support import image_input
 
@@ -43,7 +43,7 @@ def test_image_http_review_supplement_restart_and_duplicate_submission(inventory
             saver = AsyncPostgresSaver(conn)
             await saver.setup()
             store = InMemoryStore()
-            model = ScriptModel([call([draft]), call([{**draft, "quantity_value": "3", "source_image_ids": [str(supplement.image_id)]}])])
+            model = ScriptModel([call([draft]), call([{**draft, "quantity_value": "3", "source_image_ids": [str(supplement.image_id)]}])], intents=[intake([draft])])
             def build():
                 return workflow.build_agent_graph(model, checkpointer=saver, store=store, session_factory=sessions, tools=[])
             graph = build()

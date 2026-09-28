@@ -13,7 +13,7 @@ from app.agents.state import AgentContext
 from app.schemas.agent_actions import ActionDraft
 from app.services.agent_actions import validate_image_policy
 from agent_image_support import image_input
-from test_agent_workflow import ScriptModel, call, fake_session, setup_services
+from test_agent_workflow import ScriptModel, call, intake, fake_session, setup_services
 
 
 def creation(**kwargs):
@@ -38,7 +38,7 @@ def test_cross_turn_image_review_supplement_cancel_and_replay(monkeypatch):
     async def scenario():
         initial_image, label = image_input(), image_input("3 bottles")
         model = ScriptModel([AIMessage(content="Do you want to enter these?"), call([creation()]),
-                             call([creation(quantity_value="3", source_image_ids=[str(label.image_id)])])])
+                             call([creation(quantity_value="3", source_image_ids=[str(label.image_id)])])], intents=[intake(kind="UNCLEAR"), intake([creation()])])
         saver, store = InMemorySaver(), InMemoryStore()
         def build():
             return workflow.build_agent_graph(model, checkpointer=saver, store=store, session_factory=fake_session, tools=[])
@@ -98,12 +98,14 @@ def test_overflow_never_prepares_or_executes_partial_items(monkeypatch):
     response = AIMessage(content="", tool_calls=[{"id": "overflow", "name": "propose_inventory_actions",
         "args": {"actions": [], "exceeds_item_limit": True}, "type": "tool_call"}])
     async def scenario():
-        graph = workflow.build_agent_graph(ScriptModel([response, AIMessage(content="Please split the receipt")]),
-            checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[])
-        state = await graph.ainvoke({"messages": [human_message("enter", [image_input()], "1")],
-            "turn_id": str(uuid4()), "request_fingerprint": "overflow", "items": []},
-            {"configurable": {"thread_id": "overflow"}}, context=AgentContext(uuid4(), None))
-        assert not state["items"] and state["route"] == "END"
+        for model in (ScriptModel([], intents=[intake(exceeds_item_limit=True)]),
+                      ScriptModel([response], intents=[intake([creation()])])):
+            graph = workflow.build_agent_graph(model, checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[])
+            state = await graph.ainvoke({"messages": [human_message("enter", [image_input()], "1")],
+                "turn_id": str(uuid4()), "request_fingerprint": "overflow", "items": []},
+                {"configurable": {"thread_id": "overflow"}}, context=AgentContext(uuid4(), None))
+            assert all(i["status"] == "CANCELLED" for i in state["items"]) and state["route"] == "END"
+            assert "20" in state["messages"][-1].content
     asyncio.run(scenario())
 
 
@@ -117,7 +119,7 @@ def test_supplement_without_new_proposal_cannot_keep_old_text_permissions(monkey
     monkeypatch.setattr(workflow, "prepare_action", prepare)
     monkeypatch.setattr(workflow, "execute_action", forbidden)
     async def scenario():
-        graph = workflow.build_agent_graph(ScriptModel([call([creation(action="CONSUME")]), AIMessage(content="Photo received")]),
+        graph = workflow.build_agent_graph(ScriptModel([call([creation(action="CONSUME")]), AIMessage(content="Photo received")], intents=[intake([creation(action="CONSUME")])]),
             checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[])
         config = {"configurable": {"thread_id": "supplement-policy"}, "recursion_limit": 60}
         context = AgentContext(uuid4(), None, uuid4())

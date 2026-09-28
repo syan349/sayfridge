@@ -1,6 +1,6 @@
 # SayFridge Backend Design Handbook
 
-> Updated: 2026-09-25 (documentation consolidation). This handbook is the shared design reference for the current backend development phase. Unless an endpoint is explicitly identified as already implemented, its content is a planned contract, not evidence of passing tests or applied database migrations.
+> Updated: 2026-09-28 (release-readiness architecture review). This handbook is the shared design reference for the current backend development phase. Unless an endpoint is explicitly identified as already implemented, its content is a planned contract, not evidence of passing tests or applied database migrations.
 >
 > The development and acceptance plan incorporates the course requirements: tests accompany features, with plans for cloud capacity, security, and deployment. Existing API business rules remain unchanged. Section 10 retains three questions for the project owner to clarify. Editing this handbook does not itself execute tests, migrations, or deployments.
 
@@ -74,7 +74,10 @@ The retained rules include ownership, status transitions, original quantity expr
 | [Authentication routes](../backend/app/api/routes/auth.py), [schemas](../backend/app/schemas/auth.py), and [service](../backend/app/services/auth.py) | Registration, login, and current-user endpoints already exist | Preserve compatibility and add password change |
 | [Backend README](../backend/README.md) | Current startup and verification instructions | Update implemented capabilities and database setup instructions |
 
-At the time of consolidation, health, registration, login, and current-user endpoints existed. Inventory business routes and `inventory_item.notes` did not. Code and migration files describe local structure; they do not prove that a remote database has been migrated or that business tests have passed.
+At the release-readiness review, the registered REST modules use the documented
+route/schema/service/ORM structure, and the initial schema includes
+`inventory_item.notes`. Code and migration files describe repository structure;
+deployment synchronization and test results remain separate evidence.
 
 ### 1.5 Course requirements and coordination with both frontends
 
@@ -86,18 +89,80 @@ The backend enforces user and administrator permissions; identifying a request a
 
 ## 2. Architecture and database foundations
 
-```text
-Frontend request
-  → Route: parse the request model and obtain the current user and database session
-  → Service: check ownership, state, and version; calculate changes and manage transactions
-  → ORM: read and write rows in the existing tables
-  → PostgreSQL: execute SQL and enforce foreign keys, uniqueness, and CHECK constraints
-  → Response model: expose only permitted fields
+### 2.1 HTTP request lifecycle and layer ownership
+
+```mermaid
+sequenceDiagram
+    participant Client as Web / Flutter
+    participant FastAPI as FastAPI + middleware
+    participant Route as Route + dependencies
+    participant Schema as Pydantic schema
+    participant Service as Feature service
+    participant ORM as SQLAlchemy ORM
+    participant DB as PostgreSQL
+
+    Client->>FastAPI: HTTPS request
+    FastAPI->>Schema: Parse path, query, header and body values
+    Schema-->>FastAPI: Validated Python values or 422
+    FastAPI->>Route: Inject AsyncSession and authenticated User
+    Route->>Service: Call a business operation
+    Service->>ORM: Build user-scoped queries and mutations
+    ORM->>DB: Execute SQL inside the service transaction
+    DB-->>ORM: Rows or constraint error
+    ORM-->>Service: Models / result rows
+    Service-->>Route: Response data or domain exception
+    Route-->>FastAPI: Return value or mapped HTTP error
+    FastAPI-->>Client: Serialize response_model as JSON
 ```
 
-Routes handle HTTP parameters, dependencies, response models, and error translation. Put database queries and business rules in feature services, including simple reads, so modules follow the same structure as authentication. Services own write transactions, multi-table writes, quantity calculations, idempotency, and batches. More APIs do not necessarily require more tables. Updating data requires no migration; adding fields requires matching model, table definition, and API updates.
+The layer boundaries are:
 
-### 2.1 Tables and business ownership
+| Layer | Owns | Must not own |
+| --- | --- | --- |
+| `app/main.py` | Application construction, middleware, router registration, global validation handlers and resource cleanup | Feature queries, business calculations or commits |
+| `app/api/dependencies.py` | Authentication/authorization dependencies and request-scoped dependency composition | Feature-specific inventory, catalog or administrator rules |
+| `app/api/routes/` | HTTP paths and methods, parameter/header extraction, dependency injection, response models/status codes, and domain-error translation | SQL construction, ORM mutation, commits, rollbacks or reusable business rules |
+| `app/schemas/` | Pydantic request, query, response and structured error contracts | SQLAlchemy models, sessions or database access |
+| `app/services/` | User-scoped reads, ownership/state/version rules, calculations, locking, idempotency, ORM changes, and transaction completion | FastAPI request/response objects, HTTP status codes or routing |
+| `app/db/models.py` | SQLAlchemy persistence mapping and database-level relationships/constraints | HTTP validation or endpoint behavior |
+| `app/core/` | Configuration, security and reusable pure domain helpers | Route registration or feature transaction orchestration |
+| `migrations/` and `scripts/` | Repeatable database structure and explicit initialization/maintenance | Request-time schema changes |
+
+Routes may use `AsyncSession` and ORM `User` types supplied by dependencies, but
+they do not execute SQL or alter ORM state. All feature reads, including simple
+list/detail queries, go through services. Services raise domain exceptions; route
+or application handlers translate only known exceptions into stable HTTP errors.
+Unexpected database errors are rolled back by the transaction-owning service and
+must not expose SQL, credentials or stack traces to clients.
+
+For example, `POST /api/v1/inventory-items/{item_id}/operations` follows this
+concrete path:
+
+1. FastAPI matches `app/api/routes/inventory.py` and validates `item_id`, the
+   `Idempotency-Key` header, and the JSON body as `InventoryOperationCreate`.
+2. Dependencies provide one request-scoped `AsyncSession` and load the current
+   active `User` from the bearer token.
+3. The route passes validated values and `user.id` to
+   `app/services/inventory.py::submit_inventory_operation`; it does not read or
+   write the database itself.
+4. The service performs the ownership, state, version and idempotency checks,
+   calls the pure quantity helpers, updates `InventoryItem`, inserts an
+   `InventoryOperation`, and commits once or rolls back on failure.
+5. The service returns `OperationResult`. The route selects HTTP 201 for a new
+   operation or 200 for a replay, and FastAPI serializes the declared response
+   model into the final JSON response.
+
+Pydantic validation failures occur before the route body runs. Domain failures
+travel back from the service to the registered handler, which supplies the HTTP
+status and error body. A successful service return and the route's response
+metadata are assembled by FastAPI; application code does not manually concatenate
+the status, headers and JSON bytes.
+
+More APIs do not necessarily require more tables. Updating data requires no
+migration; adding fields requires matching model, table definition, schema and API
+updates.
+
+### 2.2 Tables and business ownership
 
 | Table / ORM class | Meaning | Ownership and main API use |
 | --- | --- | --- |
@@ -112,7 +177,7 @@ Routes handle HTTP parameters, dependencies, response models, and error translat
 
 A valid foreign key does not imply a valid business relationship. It does not prove that a space belongs to the current user or prevent stock creation in an archived space. The backend must enforce these rules.
 
-### 2.2 Existing constraints and application responsibilities
+### 2.3 Existing constraints and application responsibilities
 
 | Existing database constraint | Remaining backend responsibility |
 | --- | --- |
@@ -128,22 +193,26 @@ A valid foreign key does not imply a valid business relationship. It does not pr
 
 Frontends and the Agent perform business writes through FastAPI, not directly against the inventory database.
 
-### 2.3 Cloud deployment and protocol choice
+### 2.4 Cloud deployment and protocol choice
 
-This phase starts with one FastAPI service and PostgreSQL. Web and Flutter access the same API over HTTPS through a cloud ingress or reverse proxy, which forwards to FastAPI and then the database. Retain the existing Neon pooled runtime connection and direct database administration connection. This is the target deployment structure; application hosting has not yet been selected or provisioned.
+The current predeployment uses one FastAPI service on Vercel and PostgreSQL on
+Neon. Web and Flutter Web deployments on Render access the same API over HTTPS.
+The backend retains a pooled Neon runtime connection and a direct connection for
+migrations and explicit initialization. Environment-specific URLs and credentials
+remain deployment configuration rather than source-code constants.
 
 ```text
-Web / Flutter
-    → HTTPS ingress (cloud ingress or reverse proxy)
-    → FastAPI service
-    → PostgreSQL
+Web / Flutter on Render
+    → HTTPS
+    → FastAPI on Vercel
+    → Neon PostgreSQL
 ```
 
 Inventory, spaces, and catalog entries support queries and changes on well-defined resources, so this phase uses REST and JSON. HTTP methods express actions, status codes express outcomes, and FastAPI supplies API documentation. Current queries and submissions do not need continuous bidirectional connections. Evaluate WebSocket, SSE, or other streaming protocols separately if future voice or Agent progress features require them. The course does not mandate a dedicated API Gateway, microservices, or autoscaling; do not add them simply to use those terms.
 
 Do not store login sessions or idempotency records only in one application process. Authentication uses JWT and current database user state; quantity idempotency uses database records and unique constraints. Future instances must share keys, configuration, and database access and follow section 7. Adding instances does not remove lock contention on the same inventory item or space.
 
-### 2.4 Capacity assumptions and scaling
+### 2.5 Capacity assumptions and scaling
 
 Use the following **initial engineering assumptions** to establish a repeatable performance baseline. They have not been validated by user research or measurements. Review them before the first performance test and update both load and acceptance targets when requirements change.
 
@@ -219,13 +288,13 @@ The course requires consulting at least OWASP Top Ten and addressing applicable 
 
 | Risk category | Project measures and evidence |
 | --- | --- |
-| Broken access control | Restrict resources through database ownership relationships and authenticate administrators separately. Test lists, details, writes, batches, and history with two users and an administrator; another user's ID must not expose records. |
+| Broken access control | Resource queries join inventory to `storage_space.user_id` and use the authenticated user's ID; private catalog queries use `owner_user_id`. Administrator routes use a separate ADMIN dependency. CI tests lists, details, writes, expiry results, batches, and history with two users; another user's ID either returns no list result or the same 404 as a missing ID. |
 | Security misconfiguration | HTTPS, explicit CORS origins/headers, least-privilege database access, and no production debug traces. Inspect deployment settings and test browser cross-origin requests. CORS is not authentication. |
 | Software supply chain failures | Record deployed dependency versions, check vulnerabilities in CI, and review updates. Limit pipeline permissions and keep credentials out of the repository and logs. |
 | Cryptographic failures | Retain password hashing and fixed JWT algorithm validation. Verify transport encryption and key configuration/protection. Do not log passwords, tokens, or database URLs. |
 | Injection | Allowlist and type-check request fields and bind query parameters. Test abnormal input and special characters for query/error behavior. |
-| Insecure design | Enforce quantity boundaries, idempotency, transactions, and batch limits. Plan login/registration rate limits and request-size limits at cloud ingress; record thresholds with capacity tests without changing normal business semantics. |
-| Authentication failures | Test invalid, forged, and expired tokens, wrong passwords, inactive accounts, and administrator targets. Document the absence of immediate token revocation. |
+| Insecure design | Enforce quantity boundaries, idempotency, transactions, and batch limits. Login has a configurable process-local sliding-window limit, defaulting to five attempts per client/account pair in 60 seconds. Multi-instance deployments still require a shared edge/gateway limit; registration and general request-size ingress limits remain deployment work. |
+| Authentication failures | CI tests invalid and expired tokens, wrong passwords, inactive accounts, login throttling, and attempts to register an administrator. Access tokens expire after 15 minutes by default. There are no refresh tokens, server sessions, logout endpoint, or individual token revocation; clients delete tokens to log out, while disabling/deleting an account invalidates access on the next authenticated request. |
 | Software or data integrity failures | Compute critical fields on the server; do not trust client balances or roles. Commit quantity and operation together. Deploy reviewed, tested, traceable commits. |
 | Security logging and alerting failures | Log request correlation identifiers, route templates, status codes, duration, and sanitized authentication/authorization error categories. Verify logs omit request bodies and credentials. Configure notification or checking mechanisms for persistent service errors and abnormal authentication failures. |
 | Mishandling of exceptional conditions | Verify rollback and session release after database errors, concurrent conflicts, and mid-operation failures. Return stable business errors or generic service errors without SQL or stack traces. |
@@ -246,12 +315,13 @@ B01–B03 implementation and verification are documented in the [API reference](
 
 | Existing endpoint | Database reads | Database writes or response |
 | --- | --- | --- |
-| `GET /health` | None in the current implementation | No writes; returns `status=ok` and `service=sayfridge-backend`. Does not prove database connectivity |
+| `GET /health` | None | No writes; returns typed `status=ok` and `service=sayfridge-backend`. Does not prove database connectivity |
+| `GET /system/version` | None | No writes; returns public application version and deployment commit SHA, or null when no provider commit is available |
 | `POST /auth/register` | Look up `user` by normalized email | Create a user with normalized email, password hash, auth_provider=LOCAL, role=USER, status=ACTIVE; commit and read the new user. Roll back uniqueness conflicts. Do not create spaces or inventory |
-| `POST /auth/login` | Read user by email; verify password, LOCAL provider, and ACTIVE state | No user, inventory, or server-side session writes; issue an access token |
+| `POST /auth/login` | Reserve one process-local attempt for the hashed client/account pair, then read user by email and verify password, LOCAL provider, and ACTIVE state | Return 429 with Retry-After above the configured window limit; successful authentication clears the pair's window. No user, inventory, or server-side session writes; issue an access token |
 | `GET /auth/me` | Validate token, then read user by ID; reject missing/non-ACTIVE users. Read current database role and state | No business writes |
 
-The existing registration/login contract accepts only email and password and rejects unknown fields. Email is trimmed and lowercased; password length is 8–128. Successful registration returns HTTP 201 with id, email, role, status, and created_at; duplicate email returns 409. Login returns access_token, token_type=bearer, expires_in, and user. Unknown accounts, wrong passwords, and unavailable accounts share a 401 response. `/auth/me` returns the same public user structure and rejects missing, invalid, or expired credentials with 401. These rules describe the current implementation and do not automatically apply to every new business endpoint.
+The existing registration/login contract accepts only email and password and rejects unknown fields, including role, status, and user ID. The service always creates USER/ACTIVE accounts. Email is trimmed and lowercased; password length is 8–128. Successful registration returns HTTP 201 with id, email, role, status, and created_at; duplicate email returns 409. Login returns access_token, token_type=bearer, expires_in, and user. Unknown accounts, wrong passwords, and unavailable accounts share a 401 response. The process-local login limit defaults to five attempts for one client/account pair in 60 seconds and returns 429 with Retry-After when exceeded. `/auth/me` returns the same public user structure and rejects missing, invalid, or expired credentials with 401. It also reads current account role and state, so suspension, disabling, or deletion prevents continued access even if a JWT has not expired. These rules describe the current implementation and do not automatically apply to every new business endpoint.
 
 #### 4.1.1 `POST /auth/change-password`
 
@@ -669,7 +739,7 @@ Paths below are relative to `backend/` unless explicitly identified as repositor
 | Add | `app/services/inventory.py` | Pure quantity calculations, inventory writes, versions, idempotency, batch transactions | inventory_item, inventory_operation; lock/check related spaces/catalog |
 | Update | `migrations/versions/create_initial_tables.py` | Include nullable TEXT notes in the latest initial table definition | Fresh database initialization |
 | Add | Repository-root `docs/API_REFERENCE.md` | Implemented frontend contracts, examples, and verification status | No database access |
-| Modify | `app/main.py` | Register five route groups, CORS, and new business error handling | No direct business writes |
+| Modify | `app/main.py` | Register route groups, CORS, and business error handling | No direct business writes |
 | Modify | `app/api/dependencies.py` | require_admin, reusing current-user lookup | user |
 | Modify | `app/api/routes/auth.py`, `app/schemas/auth.py`, `app/services/auth.py` | Password-change request, validation, and update | user.password_hash |
 | Modify | `app/db/models.py` | Add InventoryItem.notes only | inventory_item |
@@ -681,6 +751,7 @@ Additional file responsibilities do not add product APIs or tables:
 | Location | Work |
 | --- | --- |
 | `backend/tests/` | Reuse authentication tests and add business-rule, API, PostgreSQL integration, and concurrency tests. Use a repeatable team-selected tool/script for performance tests |
+| `backend/tests/test_architecture_boundaries.py` | Keep schemas independent of persistence, services independent of HTTP, routes free of SQL/transactions, and ORM mappings independent of upper layers |
 | `.github/workflows/` | Backend checks, isolated database tests, and dependency checks in the course repository; trigger on PRs or agreed events |
 | Actual deployment configuration path | Record once hosting is selected; include startup, environment variable names, HTTPS, connection budgets, and logs, without real secrets |
 | `backend/README.md` | Update local startup, testing, development database setup and initialization instructions; link this handbook |
@@ -688,7 +759,8 @@ Additional file responsibilities do not add product APIs or tables:
 ### 8.2 Code organization
 
 - Register routes directly in the existing main.py; do not add an aggregate router file.
-- Simple read-only queries may live in routes. Put calculations, transactions, and shared rules in services.
+- Keep all feature reads and writes in services. Routes only adapt HTTP inputs/outputs and dependencies to service calls.
+- Keep schemas independent of SQLAlchemy and services independent of FastAPI so validation, business logic and persistence remain separately testable.
 - Do not add a Repository layer, generic CRUD framework, background jobs, or documentation-generation scripts.
 - Do not mechanically create a request/response pair for every endpoint. Share response models between details/lists and create no request model for bodyless endpoints.
 - Group business.py into spaces, catalog, inventory, operations, and administration, with clearly named models.
@@ -768,7 +840,7 @@ This handbook owns design rules. `docs/API_REFERENCE.md` documents implemented r
 
 The API reference must describe purpose and permissions in English, request/response fields, defaults, enumerations, and error codes. Include examples for login, space creation, item selection, stock entry, preview, consumption, reconciliation, and history. Explain version conflicts, retries, and expiry dates. Link to the backend README for startup/database setup, the Postman guide for client setup, and the test index for actual verification status. Follow the file responsibilities in section 8.
 
-Use FastAPI's built-in /docs, /redoc, and /openapi.json; add no documentation-export script.
+Use FastAPI's built-in `/docs`, `/redoc`, and `/openapi.json`; add no documentation-export script. Define ordered tag descriptions and explicit endpoint summaries/descriptions. Pydantic request and response models remain the source for Swagger schemas, while documented 401/403/404/409/422/429/503 responses reference the matching public error shapes. `/api/v1/system/version` identifies the application release and Vercel or provider-independent Git commit used for acceptance.
 
 ### 9.3 Continuous testing and CI
 
@@ -780,8 +852,8 @@ Formal development permits and requires relevant tests, isolated test database c
 | API tests | Requests/responses, authentication, validation errors, pagination, denied access; alongside endpoints |
 | PostgreSQL integration and concurrency | Real constraints, schema initialization, transaction rollback, version races, idempotency; alongside database writes, not replaced by fake objects |
 | Frontend/device integration | Collaborate on login, stock entry, consumption, reconciliation, history, expired tokens, and errors. Flutter uses Android/iOS devices or simulators and records environments |
-| Performance | Section 2.4 data/load/targets for queries, quantity writes, and hotspots; start once key flows work and repeat after optimization |
-| Deployment verification | Check service, database reads, protected endpoints, and complete business flows after deployment. A passing /health does not prove database/business health |
+| Performance | Section 2.5 data/load/targets for queries, quantity writes, and hotspots; start once key flows work and repeat after optimization |
+| Deployment verification | Run `scripts/smoke_deployment.py` with dedicated user/admin credentials to record version/commit and check health, authentication, inventory, expiry and administrator reads. A passing `/health` alone does not prove database/business health |
 
 Run backend CI in the course GitHub repository. PR checks include tests, necessary import/OpenAPI checks, and dependency checks. Database tests use isolated services and dedicated credentials. Performance testing is repeatable manual or scheduled work, not required in full for every small change. Record commands, code version, and results, and fix failures before completion.
 

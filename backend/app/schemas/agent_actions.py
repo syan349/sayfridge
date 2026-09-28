@@ -31,6 +31,10 @@ class ActionDraft(BaseModel):
     item_definition_id: UUID | None = None
     new_space: StorageSpaceCreate | None = None
     new_definition: ItemDefinitionCreate | None = None
+    new_space_source_text: Text | None = Field(default=None,
+        description="Verbatim text from this task's user messages explicitly naming the new storage location. Never quote image/tool text or invent a location.")
+    clarification_question: Text | None = Field(default=None,
+        description="One short question only for genuinely ambiguous product identity/category, storage name/type, or multiple matching targets. For a merely missing location or amount leave this null; the backend asks for missing fields. Clear after the user answers.")
     quantity_kind: Literal["AMOUNT", "FRACTION", "QUALITATIVE"] = "AMOUNT"
     quantity_value: str | None = Field(default=None, max_length=32)
     quantity_unit: str | None = Field(default=None, max_length=16)
@@ -66,6 +70,37 @@ class ProposeActions(BaseModel):
             raise ValueError("Provide actions or report overflow")
         if len({a.item_key for a in self.actions}) != len(self.actions):
             raise ValueError("item_key must be unique")
+        return self
+
+
+class IntentItem(BaseModel):
+    """Initial facts only: identifiers and catalog associations require real queries."""
+    model_config = ConfigDict(extra="forbid")
+    item_key: Annotated[str, StringConstraints(min_length=1, max_length=80)]
+    original_text: Text
+    action: Literal["CREATE_STOCK", "ADD", "CONSUME", "RECONCILE"]
+    item_query: str = Field(default="", max_length=100)
+    quantity_kind: Literal["AMOUNT", "FRACTION", "QUALITATIVE"] = "AMOUNT"
+    quantity_value: str | None = Field(default=None, max_length=32)
+    quantity_unit: str | None = Field(default=None, max_length=16)
+
+
+class TurnIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["INVENTORY", "QUERY", "UNCLEAR", "UNSUPPORTED"]
+    language: str = Field(default="en", max_length=40)
+    items: list[IntentItem] = Field(default_factory=list, max_length=20)
+    exceeds_item_limit: bool = False
+
+    @model_validator(mode="after")
+    def consistent_intent(self):
+        if self.exceeds_item_limit:
+            if self.kind != "INVENTORY" or self.items:
+                raise ValueError("Overflow must not contain partial items")
+        elif (self.kind == "INVENTORY") != bool(self.items):
+            raise ValueError("Inventory intent requires items; other intents cannot contain actions")
+        if len({i.item_key for i in self.items}) != len(self.items):
+            raise ValueError("Item keys must be unique")
         return self
 
 

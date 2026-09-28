@@ -44,6 +44,21 @@ class AgentStreamEvent(BaseModel):
     data: dict | None = None
 
 
+class AgentErrorResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "detail": {
+                    "code": "AGENT_CONVERSATION_BUSY",
+                    "message": "Conversation is running",
+                }
+            }
+        }
+    )
+
+    detail: dict
+
+
 class ListStorageSpacesToolInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

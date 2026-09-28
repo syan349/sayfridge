@@ -16,7 +16,16 @@ from test_inventory_additions import addition, headers, url
 pytestmark = pytest.mark.postgres
 
 
-@pytest.mark.parametrize("same_key", [pytest.param(True, marks=pytest.mark.ci), False])
+@pytest.mark.parametrize(
+    "same_key",
+    [
+        pytest.param(
+            True,
+            marks=[pytest.mark.ci, pytest.mark.database_acceptance],
+        ),
+        False,
+    ],
+)
 def test_concurrent_additions_apply_once_for_one_version(inventory_context, monkeypatch, same_key):
     c=inventory_context;item=seed_inventory(c)
     original=service._operation_by_key
@@ -76,6 +85,7 @@ def test_concurrent_same_key_across_spaces_uses_unique_constraint(inventory_cont
 
 
 @pytest.mark.ci
+@pytest.mark.database_acceptance
 def test_operation_insert_failure_rolls_back_inventory_and_session_recovers(inventory_context):
     c=inventory_context;item=seed_inventory(c)
     with c[0][2].begin() as connection:

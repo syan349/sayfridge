@@ -9,8 +9,8 @@ For manual requests, see the [Postman guide](testing/POSTMAN_GUIDE.md).
 ## 1. Common conventions
 
 - Local base URL: `http://127.0.0.1:8000`; API prefix: `/api/v1`.
-- Interactive schemas: `/docs`. `GET /health` returns service health without
-  querying the database.
+- Interactive schemas: Swagger UI at `/docs`, ReDoc at `/redoc`, and machine-readable
+  OpenAPI at `/openapi.json`.
 - Paths below omit the API prefix. JSON requests use `Content-Type: application/json`.
 - Except registration and login, all endpoints require `Authorization: Bearer <token>`.
   Identity, role, and ACTIVE account state are checked against the current database.
@@ -63,6 +63,25 @@ invalid field. Codes: `NOT_FOUND`, `NAME_CONFLICT`, `STATE_CONFLICT`,
 `QUANTITY_OUT_OF_RANGE`. Error messages depend on the resource.
 Authentication failures on business endpoints retain the authentication format.
 
+### Public system endpoints
+
+`GET /health` returns `{"status":"ok","service":"sayfridge-backend"}` without
+querying the database. It confirms process availability only.
+
+`GET /api/v1/system/version` returns public deployment identity:
+
+```json
+{
+  "service": "sayfridge-backend",
+  "version": "0.1.0",
+  "commit_sha": "0123456789abcdef0123456789abcdef01234567"
+}
+```
+
+`commit_sha` is null outside a deployment that supplies `APP_COMMIT_SHA` or
+`VERCEL_GIT_COMMIT_SHA`. Use this endpoint before acceptance testing to confirm
+that the expected Git revision is running.
+
 ## 2. Authentication — B01–B03
 
 ### User response
@@ -113,6 +132,11 @@ Success: **200**, with these JSON fields:
 - Database effect: read account and verify password; no session record or cookie.
 - Unknown email, wrong password, non-local account, missing hash, or inactive account:
   **401**, `Invalid email or password`.
+- The application allows five attempts per client/account pair in a 60-second sliding
+  window by default. The next attempt returns **429**,
+  `Too many login attempts; try again later`, with `Retry-After`. A successful login
+  clears the pair's window. Deployments with multiple application instances must also
+  enforce a shared limit at the hosting edge or gateway.
 - Malformed input: **422**.
 
 ### GET /auth/me — B03
@@ -123,8 +147,11 @@ Success: **200**, with these JSON fields:
 - Missing/invalid/expired token or unavailable user: **401**,
   `Invalid or expired access token`, with `WWW-Authenticate: Bearer`.
 
-Profile editing, password change, refresh tokens, cookie login, and logout are
-outside this delivery.
+Profile editing, password change, refresh tokens, cookie login, server-side sessions,
+and a logout endpoint are outside this delivery. Clients log out by deleting the
+Bearer token. Tokens cannot be revoked individually and remain valid until their
+configured expiry unless the account is suspended, disabled, or deleted; each
+authenticated request reads the account's current state from the database.
 
 ## 3. Storage spaces — B04
 
@@ -720,6 +747,22 @@ The first stream ends with `WAITING_INPUT`; the server does not keep it open whi
 waiting for the user's click. The frontend then starts a new resume request.
 A turn has at most 20 independently handled items. One failure does not roll back
 other successful items, unlike an atomic manual batch operation.
+
+Text stock requests are recorded as unfinished work before normal model/tool replies.
+A purchase with missing storage returns WAITING_INPUT and an action_required item,
+plus a short text_delta question. The same question is in display.question on state
+and replay. After the user supplies a clear location, exact stock may execute directly
+without another confirmation, including first-time product/space creation.
+
+Chat/resume request schemas and event names are unchanged. Internal drafts add
+optional clarification_question and new_space_source_text; clients do not supply
+these as request fields. Missing new checkpoint fields have defaults. Old confirmation
+proposals remain waiting until explicitly answered; completed requests are not rerun.
+No database migration is needed.
+
+Stock completion text is derived from actual per-item results (English/Chinese),
+not a second model interpretation of whether approval is needed. Estimated remaining
+quantities stay labeled as estimates. Queries still use model-generated plain text.
 
 Start with the [frontend interaction guide](AGENT_FRONTEND_INTEGRATION.md).
 Graph/memory rules: [architecture](ARCHITECTURE.md). Environment and storage:
@@ -1357,7 +1400,8 @@ Public items in preview/result/waiting/state responses add a `display` object:
 | package_description | Optional label detail, e.g. 500ml per bottle; not a second stock balance |
 | review_notes | Model-supplied notes requiring user attention |
 | missing_fields | Required fields identified by backend preparation errors |
-| confirmation_reasons | IMAGE_REVIEW and/or NEW_ASSOCIATION for new-stock previews |
+| confirmation_reasons | IMAGE_REVIEW for new-stock previews; legacy pending proposals may retain NEW_ASSOCIATION |
+| question | Optional short plain-text question, checkpointed for waiting items and repeated on replay/state recovery |
 
 Preview `draft` retains quantity_value, quantity_unit, purchase_date, expiry_date,
 and storage/item-definition IDs. `after` contains the actual proposed stock amount.
@@ -1451,11 +1495,14 @@ complete category-facet count; do not present one page as the whole inventory.
 Agent `list_item_categories` additionally returns `description`, `examples` and
 `exclusions` for each real active category. CREATE_STOCK previews expose
 `display.category_id` and `display.category_name`, propagated into public item display.
-New-definition confirmation must show the item name and proposed category. Category
-corrections use the existing resume request with `decision: "edit"` and a `message`
-identifying the desired category. There is no new category-ID field on the resume
-HTTP request. The Agent revises `new_definition.category_id` in its next proposal,
-which is validated and confirmed through the existing workflow.
+Clear products automatically reuse an existing visible definition or create a private
+definition in a real active category; a new definition alone does not require approval.
+An explicitly named new storage space with a clear type is also created automatically.
+Missing location/quantity or genuine product ambiguity remains NEEDS_INPUT. The user
+answers through the existing resume request; no new category-ID field is added.
+For an already waiting proposal, `decision: "edit"` can correct the category in a
+message. Image-derived stock and estimates still require review. Completed stock
+is not silently reclassified by subsequent chat.
 Changing a saved definition's category affects all inventory batches referring to
 that definition, not just one batch. Public definitions remain subject to existing
 ownership restrictions. See [category rules](DATABASE_DESIGN.md#4-public-category-catalog-table-item_category).

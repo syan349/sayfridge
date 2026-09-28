@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from langgraph.types import Command
+from langchain_core.messages import AIMessage
 
 from app.api.dependencies import get_current_user
 from app.db.models import User
@@ -18,10 +19,28 @@ from app.agents.locking import conversation_lock, ConversationBusy
 from app.agents.state import AgentContext
 from app.agents.messages import human_message, chat_fingerprint, resume_fingerprint, validate_image_ids
 from app.agents.workflow import public_state
-from app.schemas.agent import AgentChatRequest
+from app.schemas.agent import AgentChatRequest, AgentErrorResponse
+from app.schemas.auth import AuthErrorResponse
 from app.schemas.agent_actions import AgentResumeRequest, AgentConversationState
 
-router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
+router = APIRouter(
+    prefix="/api/v1/agent",
+    tags=["agent"],
+    responses={
+        401: {
+            "model": AuthErrorResponse,
+            "description": "Missing, invalid, expired, or unavailable identity",
+        },
+        409: {
+            "model": AgentErrorResponse,
+            "description": "Conversation state or idempotency conflict",
+        },
+        503: {
+            "model": AgentErrorResponse,
+            "description": "Agent persistence or execution service is unavailable",
+        },
+    },
+)
 logger = logging.getLogger(__name__)
 
 
@@ -58,6 +77,12 @@ def _text(content):
     return "".join(v.get("text", "") for v in content if isinstance(v, dict) and v.get("type") in {"text", "output_text"}) if isinstance(content, list) else ""
 
 
+def _pending_text(items):
+    questions = [(item.get("display") or {}).get("question") for item in items
+                 if item.get("status") in {"NEEDS_INPUT", "NEEDS_CONFIRMATION"}]
+    return "\n".join(dict.fromkeys(q for q in questions if q))
+
+
 async def _open(user, conversation_id):
     stack = AsyncExitStack()
     try:
@@ -88,6 +113,9 @@ def _response(stack, resources, config, command, context, request, request_id, r
                     if item["status"] in {"SUCCEEDED", "FAILED", "CANCELLED"}:
                         yield _sse("operation_result", data=item)
                 if state.get("interrupt_id"):
+                    question = _pending_text(state.get("items", []))
+                    if question:
+                        yield _sse("text_delta", delta=question)
                     yield _sse("action_required", data=state)
                 yield _sse("done", status=state.get("status", "COMPLETED"), data=state)
                 return
@@ -106,13 +134,16 @@ def _response(stack, resources, config, command, context, request, request_id, r
                     for node, update in chunk.items():
                         if node == "__interrupt__":
                             for intr in update:
+                                question = _pending_text(intr.value.get("items", []))
+                                if question:
+                                    yield _sse("text_delta", delta=question)
                                 yield _sse("action_required", data={"interrupt_id": intr.id, **intr.value})
                         elif isinstance(update, dict):
                             for event in update.get("events", []):
                                 yield _sse(event["type"], data=event["data"])
                             if update.get("route") == "END" and not final_streamed:
                                 for message in update.get("messages", []):
-                                    if _text(message.content):
+                                    if isinstance(message, AIMessage) and not message.tool_calls and _text(message.content):
                                         yield _sse("text_delta", delta=_text(message.content))
             snapshot = await resources.graph.aget_state(config)
             state = _state(snapshot)
@@ -131,6 +162,7 @@ def _response(stack, resources, config, command, context, request, request_id, r
 @router.post("/chat", summary="Stream an Agent turn", response_class=StreamingResponse,
              responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}})
 async def chat_with_agent(payload: AgentChatRequest, request: Request, user: User = Depends(get_current_user)):
+    """Start or replay one Agent turn and stream typed server-sent events."""
     request_id = payload.request_id or uuid4()
     conversation_id = payload.conversation_id or uuid5(user.id, f"agent:{request_id}")
     stack, resources, config, snapshot = await _open(user, conversation_id)
@@ -170,6 +202,7 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
 @router.post("/resume", summary="Answer, edit, confirm or cancel pending Agent items", response_class=StreamingResponse,
              responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}})
 async def resume_agent(payload: AgentResumeRequest, request: Request, user: User = Depends(get_current_user)):
+    """Resume one paused conversation with validated answers or confirmations."""
     stack, resources, config, snapshot = await _open(user, payload.conversation_id)
     try:
         data = payload.model_dump(mode="json")
@@ -210,6 +243,7 @@ async def resume_agent(payload: AgentResumeRequest, request: Request, user: User
 @router.get("/conversations/{conversation_id}/state", summary="Read sanitized Agent recovery state",
             response_model=AgentConversationState, response_model_exclude_none=True)
 async def conversation_state(conversation_id: UUID, user: User = Depends(get_current_user)):
+    """Return the current user's sanitized conversation state for recovery."""
     try:
         resources = await get_agent_resources()
         snapshot = await resources.graph.aget_state(_config(user.id, conversation_id))
