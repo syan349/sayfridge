@@ -9,8 +9,8 @@ For manual requests, see the [Postman guide](testing/POSTMAN_GUIDE.md).
 ## 1. Common conventions
 
 - Local base URL: `http://127.0.0.1:8000`; API prefix: `/api/v1`.
-- Interactive schemas: `/docs`. `GET /health` returns service health without
-  querying the database.
+- Interactive schemas: Swagger UI at `/docs`, ReDoc at `/redoc`, and machine-readable
+  OpenAPI at `/openapi.json`.
 - Paths below omit the API prefix. JSON requests use `Content-Type: application/json`.
 - Except registration and login, all endpoints require `Authorization: Bearer <token>`.
   Identity, role, and ACTIVE account state are checked against the current database.
@@ -62,6 +62,25 @@ invalid field. Codes: `NOT_FOUND`, `NAME_CONFLICT`, `STATE_CONFLICT`,
 `IDEMPOTENCY_CONFLICT`, `UNIT_NOT_CONVERTIBLE`, `QUANTITY_TOO_SMALL`, and
 `QUANTITY_OUT_OF_RANGE`. Error messages depend on the resource.
 Authentication failures on business endpoints retain the authentication format.
+
+### Public system endpoints
+
+`GET /health` returns `{"status":"ok","service":"sayfridge-backend"}` without
+querying the database. It confirms process availability only.
+
+`GET /api/v1/system/version` returns public deployment identity:
+
+```json
+{
+  "service": "sayfridge-backend",
+  "version": "0.1.0",
+  "commit_sha": "0123456789abcdef0123456789abcdef01234567"
+}
+```
+
+`commit_sha` is null outside a deployment that supplies `APP_COMMIT_SHA` or
+`VERCEL_GIT_COMMIT_SHA`. Use this endpoint before acceptance testing to confirm
+that the expected Git revision is running.
 
 ## 2. Authentication — B01–B03
 

@@ -151,6 +151,16 @@ def run_smoke(
             raise SmokeFailure("health check did not report status=ok")
         print("PASS health")
 
+        version = _expect(
+            client.get("/api/v1/system/version"), 200, "version check"
+        )
+        if not isinstance(version.get("version"), str) or not version["version"]:
+            raise SmokeFailure("version check did not return an application version")
+        print(
+            "PASS version "
+            f"{version['version']} (commit {version.get('commit_sha') or 'unavailable'})"
+        )
+
         credentials = {
             "email": config.user_email,
             "password": config.user_password,

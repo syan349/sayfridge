@@ -28,6 +28,15 @@ def test_smoke_flow_is_repeatable_without_duplicate_business_resources():
         params = request.url.params
         if path == "/health":
             return response(200, {"status": "ok", "service": "sayfridge-backend"})
+        if path == "/api/v1/system/version":
+            return response(
+                200,
+                {
+                    "service": "sayfridge-backend",
+                    "version": "0.1.0",
+                    "commit_sha": "0123456789abcdef0123456789abcdef01234567",
+                },
+            )
         if path == "/api/v1/auth/register":
             if state["registered"]:
                 return response(409, {"detail": "Email is already registered"})

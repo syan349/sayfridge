@@ -315,7 +315,8 @@ B01–B03 implementation and verification are documented in the [API reference](
 
 | Existing endpoint | Database reads | Database writes or response |
 | --- | --- | --- |
-| `GET /health` | None in the current implementation | No writes; returns `status=ok` and `service=sayfridge-backend`. Does not prove database connectivity |
+| `GET /health` | None | No writes; returns typed `status=ok` and `service=sayfridge-backend`. Does not prove database connectivity |
+| `GET /system/version` | None | No writes; returns public application version and deployment commit SHA, or null when no provider commit is available |
 | `POST /auth/register` | Look up `user` by normalized email | Create a user with normalized email, password hash, auth_provider=LOCAL, role=USER, status=ACTIVE; commit and read the new user. Roll back uniqueness conflicts. Do not create spaces or inventory |
 | `POST /auth/login` | Reserve one process-local attempt for the hashed client/account pair, then read user by email and verify password, LOCAL provider, and ACTIVE state | Return 429 with Retry-After above the configured window limit; successful authentication clears the pair's window. No user, inventory, or server-side session writes; issue an access token |
 | `GET /auth/me` | Validate token, then read user by ID; reject missing/non-ACTIVE users. Read current database role and state | No business writes |
@@ -839,7 +840,7 @@ This handbook owns design rules. `docs/API_REFERENCE.md` documents implemented r
 
 The API reference must describe purpose and permissions in English, request/response fields, defaults, enumerations, and error codes. Include examples for login, space creation, item selection, stock entry, preview, consumption, reconciliation, and history. Explain version conflicts, retries, and expiry dates. Link to the backend README for startup/database setup, the Postman guide for client setup, and the test index for actual verification status. Follow the file responsibilities in section 8.
 
-Use FastAPI's built-in /docs, /redoc, and /openapi.json; add no documentation-export script.
+Use FastAPI's built-in `/docs`, `/redoc`, and `/openapi.json`; add no documentation-export script. Define ordered tag descriptions and explicit endpoint summaries/descriptions. Pydantic request and response models remain the source for Swagger schemas, while documented 401/403/404/409/422/429/503 responses reference the matching public error shapes. `/api/v1/system/version` identifies the application release and Vercel or provider-independent Git commit used for acceptance.
 
 ### 9.3 Continuous testing and CI
 
@@ -852,7 +853,7 @@ Formal development permits and requires relevant tests, isolated test database c
 | PostgreSQL integration and concurrency | Real constraints, schema initialization, transaction rollback, version races, idempotency; alongside database writes, not replaced by fake objects |
 | Frontend/device integration | Collaborate on login, stock entry, consumption, reconciliation, history, expired tokens, and errors. Flutter uses Android/iOS devices or simulators and records environments |
 | Performance | Section 2.5 data/load/targets for queries, quantity writes, and hotspots; start once key flows work and repeat after optimization |
-| Deployment verification | Run `scripts/smoke_deployment.py` with dedicated user/admin credentials to check health, authentication, inventory, expiry and administrator reads. A passing `/health` alone does not prove database/business health |
+| Deployment verification | Run `scripts/smoke_deployment.py` with dedicated user/admin credentials to record version/commit and check health, authentication, inventory, expiry and administrator reads. A passing `/health` alone does not prove database/business health |
 
 Run backend CI in the course GitHub repository. PR checks include tests, necessary import/OpenAPI checks, and dependency checks. Database tests use isolated services and dedicated credentials. Performance testing is repeatable manual or scheduled work, not required in full for every small change. Record commands, code version, and results, and fix failures before completion.
 

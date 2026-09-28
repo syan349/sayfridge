@@ -44,6 +44,7 @@ uvicorn app.main:app --reload
 Once the server starts, the following endpoints are available:
 
 - Health check: `GET http://127.0.0.1:8000/health`
+- Deployed version: `GET http://127.0.0.1:8000/api/v1/system/version`
 - Register: `POST http://127.0.0.1:8000/api/v1/auth/register`
 - Log in: `POST http://127.0.0.1:8000/api/v1/auth/login`
 - Current user: `GET http://127.0.0.1:8000/api/v1/auth/me`
@@ -61,9 +62,16 @@ Once the server starts, the following endpoints are available:
 - Item operation history: `GET http://127.0.0.1:8000/api/v1/inventory-items/{id}/operations`
 - Global operation history: `GET http://127.0.0.1:8000/api/v1/inventory-operations`
 - Operation detail: `GET http://127.0.0.1:8000/api/v1/inventory-operations/{id}`
-- API documentation: `http://127.0.0.1:8000/docs`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- ReDoc: `http://127.0.0.1:8000/redoc`
+- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
 
 ## Authentication settings
+
+`APP_VERSION` identifies the release shown by OpenAPI and the version endpoint;
+it defaults to `0.1.0`. Vercel automatically supplies `VERCEL_GIT_COMMIT_SHA` for
+the same endpoint. Other providers may set `APP_COMMIT_SHA` to a 7–40 character
+hexadecimal Git commit. These values are public deployment metadata, not secrets.
 
 - `JWT_SECRET_KEY`: HS256 signing secret with at least 32 characters. Store it only in the local or deployment environment.
 - `ACCESS_TOKEN_EXPIRE_MINUTES`: Access token lifetime in minutes; defaults to `15`.
@@ -144,7 +152,7 @@ the `ADMIN` role. Keep all five values in the operator's secret store or protect
 CI secrets. They are test-runner settings and must not be added to the Vercel
 application environment or committed files.
 
-The script verifies `/health`, registration, login/current identity, inventory
+The script verifies `/health`, deployed version/commit, registration, login/current identity, inventory
 list/detail/create behavior, the expiry summary, and an administrator account
 query. It creates at most one named private space, item definition and in-stock
 item for the dedicated user, then reuses them on later runs. It never deletes

@@ -7,7 +7,14 @@ from app.core.login_rate_limit import login_rate_limiter
 from app.core.security import create_access_token
 from app.db.models import User
 from app.db.session import get_db_session
-from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest, UserPublic
+from app.schemas.auth import (
+    AuthErrorResponse,
+    AuthValidationErrorResponse,
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
+    UserPublic,
+)
 from app.services.auth import (
     EmailAlreadyRegisteredError,
     authenticate_user,
@@ -15,7 +22,16 @@ from app.services.auth import (
 )
 
 
-router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+router = APIRouter(
+    prefix="/api/v1/auth",
+    tags=["auth"],
+    responses={
+        422: {
+            "model": AuthValidationErrorResponse,
+            "description": "Malformed or invalid authentication request",
+        }
+    },
+)
 
 
 @router.post(
@@ -23,6 +39,12 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
     response_model=UserPublic,
     summary="Register user",
     status_code=status.HTTP_201_CREATED,
+    responses={
+        409: {
+            "model": AuthErrorResponse,
+            "description": "The normalized email is already registered",
+        }
+    },
 )
 async def register(
     payload: RegisterRequest,
@@ -42,7 +64,10 @@ async def register(
     "/login",
     response_model=LoginResponse,
     summary="Log in",
-    responses={429: {"description": "Too many login attempts"}},
+    responses={
+        401: {"model": AuthErrorResponse, "description": "Invalid credentials or unavailable account"},
+        429: {"model": AuthErrorResponse, "description": "Too many login attempts"},
+    },
 )
 async def login(
     payload: LoginRequest,
@@ -86,7 +111,14 @@ async def login(
     )
 
 
-@router.get("/me", response_model=UserPublic, summary="Get current user")
+@router.get(
+    "/me",
+    response_model=UserPublic,
+    summary="Get current user",
+    responses={
+        401: {"model": AuthErrorResponse, "description": "Missing, invalid, expired, or unavailable identity"}
+    },
+)
 async def me(current_user: User = Depends(get_current_user)) -> User:
     """Read the current account status and role."""
     return current_user

@@ -13,13 +13,14 @@ from app.schemas.business import (
     BusinessErrorResponse, StorageSpaceCreate, StorageSpaceListQuery, StorageSpacePage,
     StorageSpaceRead, StorageSpaceUpdate,
 )
+from app.schemas.auth import AuthErrorResponse
 from app.services import storage_spaces as service
 
 router = APIRouter(
     prefix="/api/v1/storage-spaces",
     tags=["storage-spaces"],
     responses={
-        401: {"description": "Missing, invalid, or unavailable identity"},
+        401: {"model": AuthErrorResponse, "description": "Missing, invalid, expired, or unavailable identity"},
         422: {"model": BusinessErrorResponse, "description": "Invalid request parameters"},
     },
 )
@@ -38,12 +39,18 @@ async def storage_space_error_handler(request: Request, exc: service.StorageSpac
     return JSONResponse(status_code=http_status, content={"detail": {"code": code, "message": str(exc)}})
 
 
-@router.get("", response_model=StorageSpacePage, status_code=status.HTTP_200_OK)
+@router.get(
+    "",
+    response_model=StorageSpacePage,
+    status_code=status.HTTP_200_OK,
+    summary="List owned storage spaces",
+)
 async def list_storage_spaces(
     query: Annotated[StorageSpaceListQuery, Query()],
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> StorageSpacePage:
+    """Return a filtered page of storage spaces owned by the current user."""
     spaces, total = await service.list_storage_spaces(
         session, current_user.id, status=query.status, page=query.page, page_size=query.page_size,
     )
@@ -51,33 +58,36 @@ async def list_storage_spaces(
 
 
 @router.get("/{space_id}", response_model=StorageSpaceRead, status_code=status.HTTP_200_OK,
-            responses=NOT_FOUND_RESPONSE)
+            responses=NOT_FOUND_RESPONSE, summary="Read an owned storage space")
 async def get_storage_space(
     space_id: UUID,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> StorageSpace:
+    """Read one owned space; foreign and missing identifiers both return 404."""
     return await service.get_storage_space_by_id(session, space_id, current_user.id)
 
 
 @router.post("", response_model=StorageSpaceRead, status_code=status.HTTP_201_CREATED,
-             responses=CONFLICT_RESPONSE)
+             responses=CONFLICT_RESPONSE, summary="Create a storage space")
 async def create_storage_space(
     payload: StorageSpaceCreate,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> StorageSpace:
+    """Create an active space owned by the current user."""
     return await service.create_storage_space(session, current_user.id, **payload.model_dump())
 
 
 @router.patch("/{space_id}", response_model=StorageSpaceRead, status_code=status.HTTP_200_OK,
-              responses=WRITE_RESPONSES)
+              responses=WRITE_RESPONSES, summary="Edit an owned storage space")
 async def update_storage_space(
     space_id: UUID,
     payload: StorageSpaceUpdate,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> StorageSpace:
+    """Update the submitted name or type fields on an owned active space."""
     return await service.update_storage_space(
         session, space_id, current_user.id, changes=payload.model_dump(exclude_unset=True),
     )
@@ -85,21 +95,23 @@ async def update_storage_space(
 
 @router.post("/{space_id}/archive", response_model=StorageSpaceRead,
              status_code=status.HTTP_200_OK, dependencies=[Depends(require_empty_body)],
-             responses=WRITE_RESPONSES)
+             responses=WRITE_RESPONSES, summary="Archive an owned storage space")
 async def archive_storage_space(
     space_id: UUID,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> StorageSpace:
+    """Archive an owned space only when it contains no in-stock inventory."""
     return await service.set_storage_space_status(session, space_id, current_user.id, target_status="ARCHIVED")
 
 
 @router.post("/{space_id}/restore", response_model=StorageSpaceRead,
              status_code=status.HTTP_200_OK, dependencies=[Depends(require_empty_body)],
-             responses=WRITE_RESPONSES)
+             responses=WRITE_RESPONSES, summary="Restore an owned storage space")
 async def restore_storage_space(
     space_id: UUID,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> StorageSpace:
+    """Restore an archived owned space when its active name remains available."""
     return await service.set_storage_space_status(session, space_id, current_user.id, target_status="ACTIVE")

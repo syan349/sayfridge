@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -22,7 +22,40 @@ from app.services.admin import AdminError
 from app.agents.persistence import close_agent_resources
 from app.api.routes.agent import router as agent_router
 from app.agents.request_limits import AgentBodyLimitMiddleware
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
+from app.schemas.system import HealthResponse, VersionResponse
+
+
+OPENAPI_TAGS = [
+    {
+        "name": "system",
+        "description": "Public service health and deployed-version metadata.",
+    },
+    {
+        "name": "auth",
+        "description": "Local account registration, login, and current identity.",
+    },
+    {
+        "name": "storage-spaces",
+        "description": "Authenticated storage-space lifecycle for the current user.",
+    },
+    {
+        "name": "catalog",
+        "description": "Public categories plus public and user-owned item definitions.",
+    },
+    {
+        "name": "inventory",
+        "description": "User-owned stock, batch actions, quantities, expiry, and history.",
+    },
+    {
+        "name": "admin",
+        "description": "Administrator-only account inspection and status management.",
+    },
+    {
+        "name": "agent",
+        "description": "Authenticated AI assistant streaming and recovery endpoints.",
+    },
+]
 
 
 @asynccontextmanager
@@ -33,11 +66,21 @@ async def lifespan(_: FastAPI):
         await close_agent_resources()
 
 
-app = FastAPI(title="SayFridge Backend", lifespan=lifespan)
+settings = get_settings()
+app = FastAPI(
+    title="SayFridge Backend",
+    version=settings.app_version,
+    description=(
+        "SayFridge REST API. Use **Authorize** with a Bearer token returned by "
+        "`POST /api/v1/auth/login` for protected endpoints."
+    ),
+    openapi_tags=OPENAPI_TAGS,
+    lifespan=lifespan,
+)
 app.add_middleware(AgentBodyLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_settings().cors_origins,
+    allow_origins=settings.cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
@@ -55,9 +98,33 @@ app.add_exception_handler(StorageSpaceError, storage_space_error_handler)
 app.add_exception_handler(AdminError, admin_error_handler)
 
 
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "sayfridge-backend"}
+@app.get(
+    "/health",
+    response_model=HealthResponse,
+    tags=["system"],
+    summary="Check service health",
+    description="Confirm that the API process is running. This does not query the database.",
+)
+async def health() -> HealthResponse:
+    return HealthResponse(status="ok", service="sayfridge-backend")
+
+
+@app.get(
+    "/api/v1/system/version",
+    response_model=VersionResponse,
+    tags=["system"],
+    summary="Read deployed backend version",
+    description=(
+        "Return the configured application version and deployed Git commit SHA. "
+        "The commit is null when the deployment provider did not supply one."
+    ),
+)
+async def version(current: Settings = Depends(get_settings)) -> VersionResponse:
+    return VersionResponse(
+        service="sayfridge-backend",
+        version=current.app_version,
+        commit_sha=current.app_commit_sha,
+    )
 
 
 @app.exception_handler(RequestValidationError)

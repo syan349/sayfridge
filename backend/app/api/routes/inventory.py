@@ -10,6 +10,7 @@ from app.api.dependencies import get_current_user
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas.business import BusinessErrorResponse
+from app.schemas.auth import AuthErrorResponse
 from app.schemas.inventory import (
     ExpirySummary,
     ExpirySummaryQuery,
@@ -34,11 +35,16 @@ from app.schemas.inventory_operations import (
 
 
 router = APIRouter(prefix="/api/v1/inventory-items", tags=["inventory"], responses={
-    401: {"description": "Missing, invalid, or unavailable identity"},
-    404: {"model": BusinessErrorResponse},
-    409: {"model": BusinessErrorResponse},
-    422: {"model": BusinessErrorResponse},
+    401: {"model": AuthErrorResponse, "description": "Missing, invalid, expired, or unavailable identity"},
+    422: {"model": BusinessErrorResponse, "description": "Invalid request parameters or quantity"},
 })
+NOT_FOUND_RESPONSE = {
+    404: {"model": BusinessErrorResponse, "description": "Missing or inaccessible inventory resource"}
+}
+CONFLICT_RESPONSE = {
+    409: {"model": BusinessErrorResponse, "description": "Version, state, relationship, or idempotency conflict"}
+}
+WRITE_RESPONSES = {**NOT_FOUND_RESPONSE, **CONFLICT_RESPONSE}
 
 
 async def inventory_error_handler(request: Request, exc: service.InventoryError):
@@ -70,6 +76,7 @@ async def list_inventory(query: Annotated[InventoryListQuery, Query()],
     response_model=InventoryBatchResult,
     status_code=201,
     summary="Create multiple stock batches atomically",
+    responses=WRITE_RESPONSES,
 )
 async def batch_create_inventory(
     payload: InventoryBatchCreate,
@@ -89,6 +96,7 @@ async def batch_create_inventory(
     "/batch-move",
     response_model=InventoryBatchResult,
     summary="Move multiple inventory items atomically",
+    responses=WRITE_RESPONSES,
 )
 async def batch_move_inventory(
     payload: InventoryBatchMove,
@@ -109,6 +117,7 @@ async def batch_move_inventory(
     "/batch-archive",
     response_model=InventoryBatchResult,
     summary="Archive multiple inventory items atomically",
+    responses=WRITE_RESPONSES,
 )
 async def batch_archive_inventory(
     payload: InventoryBatchArchive,
@@ -149,14 +158,25 @@ async def get_expiry_summary(
     )
 
 
-@router.get("/{item_id}", response_model=InventoryItemRead, summary="Read owned inventory")
+@router.get(
+    "/{item_id}",
+    response_model=InventoryItemRead,
+    summary="Read owned inventory",
+    responses=NOT_FOUND_RESPONSE,
+)
 async def get_inventory(item_id: UUID, session: AsyncSession = Depends(get_db_session),
                         user: User = Depends(get_current_user)):
     """Read inventory in any state without hiding archived associations."""
     return await service.get_inventory(session, item_id, user.id)
 
 
-@router.post("", response_model=InventoryItemRead, status_code=201, summary="Create stock")
+@router.post(
+    "",
+    response_model=InventoryItemRead,
+    status_code=201,
+    summary="Create stock",
+    responses=WRITE_RESPONSES,
+)
 async def create_inventory(payload: InventoryCreate, session: AsyncSession = Depends(get_db_session),
                            user: User = Depends(get_current_user)):
     """Create a confirmed stock batch in active associations without an ADD event."""
@@ -167,6 +187,7 @@ async def create_inventory(payload: InventoryCreate, session: AsyncSession = Dep
     "/{item_id}/operations",
     response_model=list[InventoryOperationRead],
     summary="List inventory operation history",
+    responses=NOT_FOUND_RESPONSE,
 )
 async def list_inventory_operations(
     item_id: UUID,
@@ -182,7 +203,9 @@ async def list_inventory_operations(
                 200: {
                     "model": OperationResult,
                     "description": "Successful request replay",
-                }},
+                },
+                **WRITE_RESPONSES,
+            },
              response_model = OperationResult,
              status_code = 201,
              summary = "Add, consume, or reconcile inventory quantity",
@@ -191,6 +214,7 @@ async def create_inventory_operation(item_id:UUID, payload:InventoryOperationCre
                                      idempotency_key: Annotated[IdempotencyKey, Header(alias="Idempotency-Key")],
                                      response: Response, session:AsyncSession = Depends(get_db_session), 
                                      user:User = Depends(get_current_user)):
+    """Apply an idempotent quantity operation and return its resulting stock state."""
     result = await service.submit_inventory_operation(session, item_id, user.id,
                                 operation_type=payload.operation_type, quantity_kind=payload.quantity_kind,
                                 expected_version = payload.expected_version, quantity_value = payload.quantity_value, 
@@ -203,7 +227,12 @@ async def create_inventory_operation(item_id:UUID, payload:InventoryOperationCre
 
 
 
-@router.patch("/{item_id}", response_model=InventoryItemRead, summary="Edit inventory metadata or location")
+@router.patch(
+    "/{item_id}",
+    response_model=InventoryItemRead,
+    summary="Edit inventory metadata or location",
+    responses=WRITE_RESPONSES,
+)
 async def update_inventory(item_id: UUID, payload: InventoryUpdate,
                            session: AsyncSession = Depends(get_db_session), user: User = Depends(get_current_user)):
     """Apply version-checked metadata changes without altering stock quantities or history."""
@@ -212,7 +241,12 @@ async def update_inventory(item_id: UUID, payload: InventoryUpdate,
     return await service.update_inventory(session, item_id, user.id, expected_version=version, changes=values)
 
 
-@router.post("/{item_id}/discard", response_model=InventoryItemRead, summary="Discard inventory")
+@router.post(
+    "/{item_id}/discard",
+    response_model=InventoryItemRead,
+    summary="Discard inventory",
+    responses=WRITE_RESPONSES,
+)
 async def discard_inventory(
     item_id: UUID,
     payload: InventoryStateAction,
@@ -225,7 +259,12 @@ async def discard_inventory(
     )
 
 
-@router.post("/{item_id}/archive", response_model=InventoryItemRead, summary="Archive inventory")
+@router.post(
+    "/{item_id}/archive",
+    response_model=InventoryItemRead,
+    summary="Archive inventory",
+    responses=WRITE_RESPONSES,
+)
 async def archive_inventory(
     item_id: UUID,
     payload: InventoryStateAction,
