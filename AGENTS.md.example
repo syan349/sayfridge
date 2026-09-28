@@ -13,7 +13,7 @@ Keep changes inside the component that owns the behavior.
   - User and administrator UI: `web/src/`
   - Current application entry: `web/src/App.tsx`
   - Web-specific instructions: `web/README.md`
-- `backend/` — Python 3.11 and FastAPI service.
+- `backend/` — Python 3.12 and FastAPI service.
   - FastAPI entry: `backend/app/main.py`
   - Backend tests: `backend/tests/`
   - Backend-specific instructions: `backend/README.md`
@@ -49,7 +49,7 @@ Run tests appropriate to the change and complete required checks. Once those pas
 
 - Mobile: run `flutter analyze` and `flutter test` from `mobile/`.
 - Web: run `npm run lint` and `npm run build` from `web/`.
-- Backend: use Python 3.11 and run `python -m pytest` from `backend/`.
+- Backend: use Python 3.12 and run `python -m pytest` from `backend/`.
 - Keep global ignore rules in the root `.gitignore` and framework-specific rules in
   `mobile/.gitignore`, `web/.gitignore`, and `backend/.gitignore`.
 - Never commit `.env` files, virtual environments, dependency folders, build output,

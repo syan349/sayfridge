@@ -9,6 +9,7 @@ from app.api.dependencies import get_current_user
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas.business import BusinessErrorResponse
+from app.schemas.auth import AuthErrorResponse
 from app.schemas.inventory_operations import (
     InventoryOperationListQuery,
     InventoryOperationPage,
@@ -21,9 +22,8 @@ router = APIRouter(
     prefix="/api/v1/inventory-operations",
     tags=["inventory"],
     responses={
-        401: {"description": "Missing, invalid, or unavailable identity"},
-        404: {"model": BusinessErrorResponse},
-        422: {"model": BusinessErrorResponse},
+        401: {"model": AuthErrorResponse, "description": "Missing, invalid, expired, or unavailable identity"},
+        422: {"model": BusinessErrorResponse, "description": "Invalid query parameters"},
     },
 )
 
@@ -46,8 +46,14 @@ async def list_inventory_operations(
     )
 
 
-@router.get("/{operation_id}", response_model=InventoryOperationRead,
-            summary="Read an owned inventory operation")
+@router.get(
+    "/{operation_id}",
+    response_model=InventoryOperationRead,
+    summary="Read an owned inventory operation",
+    responses={
+        404: {"model": BusinessErrorResponse, "description": "Missing or inaccessible operation"}
+    },
+)
 async def get_inventory_operation(
     operation_id: UUID,
     session: AsyncSession = Depends(get_db_session),

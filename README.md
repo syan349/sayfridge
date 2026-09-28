@@ -121,7 +121,7 @@ docs/      Architecture, API, database, design, and test documentation
 ## Local development prerequisites
 
 - Git
-- Python 3.11
+- Python 3.12
 - Node.js 22 or newer and npm
 - Flutter 3.44.8 with Dart 3.12.2
 - Android Studio / Android SDK for Android development
@@ -138,7 +138,7 @@ From the repository root:
 
 ```bash
 cd backend
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env
@@ -152,19 +152,18 @@ Edit `backend/.env` and set at least:
 - `CORS_ORIGINS`: an exact JSON list of allowed browser origins; and
 - `AGENT_API_KEY` plus the other `AGENT_*` settings when using the Agent.
 
-Both database URLs use the `postgresql+psycopg://` prefix. Initialise a fresh
-database from `backend/`:
+Both database URLs use the `postgresql+psycopg://` prefix. Initialise and verify
+all business tables, the public category catalog, and Agent persistence from
+`backend/`:
 
 ```bash
-python -m alembic upgrade head
+python scripts/initialize_database.py
 ```
 
-Then apply the reviewed public-category seed in
-`backend/scripts/sql/seed_item_categories.sql` using the Neon SQL editor or a
-PostgreSQL client connected to the intended database. Agent persistence requires
-its separate setup procedure; read
+The command is safe to repeat and must finish before the API is started against a
+fresh database. It does not run implicitly during FastAPI startup. Read
 [Agent configuration and storage](backend/README.md#agent-configuration-and-storage)
-before enabling Agent writes.
+for the separate inspection and repair commands used with existing databases.
 
 Start the API:
 

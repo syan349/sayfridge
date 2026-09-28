@@ -10,7 +10,7 @@ The FastAPI backend for SayFridge. The current version provides health checks, l
 | Current components, Agent graph, tools, memory and user intervention | [Architecture](../docs/ARCHITECTURE.md) |
 | Initial, confirmed, estimated and reconciled quantities | [Quantity rules](../docs/QUANTITY_STATE_DESIGN.md) |
 | Tables, fields and constraints | [Database design](../docs/DATABASE_DESIGN.md) |
-| Backend services, permissions and transaction implementation | [Backend design](../docs/BACKEND_DESIGN.md) |
+| HTTP request flow, layer ownership, services, permissions and transactions | [Backend design](../docs/BACKEND_DESIGN.md#21-http-request-lifecycle-and-layer-ownership) |
 | HTTP/SSE contracts for frontend integration | [API reference](../docs/API_REFERENCE.md) |
 | Validation evidence and test commands | [Test index](../docs/testing/README.md) |
 
@@ -28,14 +28,14 @@ databases require the explicit receipt-table setup before enabling Agent writes.
 The same configured model reads text and inline images; no OCR service or second
 model is used. See [frontend handoff](../docs/AGENT_FRONTEND_INTEGRATION.md).
 
-- Python 3.11
+- Python 3.12
 
 ## Run locally on Windows
 
 Run the following commands from the `backend` directory after configuring `.env` as described below:
 
 ```powershell
-py -3.11 -m venv .venv
+py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
@@ -44,6 +44,7 @@ uvicorn app.main:app --reload
 Once the server starts, the following endpoints are available:
 
 - Health check: `GET http://127.0.0.1:8000/health`
+- Deployed version: `GET http://127.0.0.1:8000/api/v1/system/version`
 - Register: `POST http://127.0.0.1:8000/api/v1/auth/register`
 - Log in: `POST http://127.0.0.1:8000/api/v1/auth/login`
 - Current user: `GET http://127.0.0.1:8000/api/v1/auth/me`
@@ -61,14 +62,30 @@ Once the server starts, the following endpoints are available:
 - Item operation history: `GET http://127.0.0.1:8000/api/v1/inventory-items/{id}/operations`
 - Global operation history: `GET http://127.0.0.1:8000/api/v1/inventory-operations`
 - Operation detail: `GET http://127.0.0.1:8000/api/v1/inventory-operations/{id}`
-- API documentation: `http://127.0.0.1:8000/docs`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- ReDoc: `http://127.0.0.1:8000/redoc`
+- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
 
 ## Authentication settings
 
+`APP_VERSION` identifies the release shown by OpenAPI and the version endpoint;
+it defaults to `0.1.0`. Vercel automatically supplies `VERCEL_GIT_COMMIT_SHA` for
+the same endpoint. Other providers may set `APP_COMMIT_SHA` to a 7–40 character
+hexadecimal Git commit. These values are public deployment metadata, not secrets.
+
 - `JWT_SECRET_KEY`: HS256 signing secret with at least 32 characters. Store it only in the local or deployment environment.
 - `ACCESS_TOKEN_EXPIRE_MINUTES`: Access token lifetime in minutes; defaults to `15`.
+- `LOGIN_RATE_LIMIT_ATTEMPTS`: Login attempts allowed for one client/account pair; defaults to `5`.
+- `LOGIN_RATE_LIMIT_WINDOW_SECONDS`: Sliding login-limit window; defaults to `60` seconds.
 
-Authentication supports local email/password accounts and short-lived Bearer access tokens. Refresh tokens, server-side sessions, logout, third-party login, email verification, password recovery, and MFA are not currently available.
+Authentication supports local email/password accounts and short-lived Bearer access
+tokens. A successful login clears that client/account limit. The application limit is
+process-local, so a multi-instance deployment must also configure a shared limit at
+the hosting edge or gateway. Refresh tokens, server-side sessions, a logout endpoint,
+immediate token revocation, third-party login, email verification, password recovery,
+and MFA are not currently available. Clients log out by deleting their token; an
+issued token otherwise remains usable until expiry unless the account is suspended,
+disabled, or deleted.
 
 ## Web browser access (CORS)
 
@@ -96,15 +113,131 @@ Both URLs must use the `postgresql+psycopg://` prefix. Git ignores `.env`; never
 Before the first backend release, maintain the latest table definition, ORM,
 and API contracts together; record structural changes in the design handbook.
 Incremental migration histories and deployment rollback procedures are not required.
-The existing Alembic initial script is retained as the fresh-database initializer:
+Initialize a fresh database completely with:
 
 ```bash
-python -m alembic upgrade head
+python scripts/initialize_database.py
 ```
 
-This command initializes a fresh database/schema. Editing the initial script does
-not update an already initialized database. Existing development databases must
-be synchronized explicitly; do not assume the command reapplies the definition.
+This repeatable command applies the Alembic schema, seeds the 25 public categories,
+initializes the isolated Agent checkpoint/store schema, and verifies the result.
+It must run before FastAPI uses an empty database and never runs implicitly during
+application startup. Editing the initial migration does not update an already
+initialized database; existing databases must still be reviewed and synchronized
+explicitly.
+
+Verify the complete process against the configured isolated test database with:
+
+```bash
+python -m pytest tests/test_database_initialization_postgres.py -v --strict-markers
+```
+
+For an existing Neon or PostgreSQL environment, run the read-only structural check:
+
+```bash
+python scripts/verify_database_schema.py
+python scripts/setup_agent_storage.py --check
+```
+
+The first command compares the business schema with the current ORM tables,
+columns, primary/foreign/unique/check constraints, and indexes. The second checks
+the separate LangGraph Agent schema. Neither command creates, alters, seeds, or
+deletes database objects. A successful migration of a new empty database is also
+covered by `test_database_initialization_postgres.py` and included in core CI.
+
+### Migration, seed, reset, and restore
+
+These operations have separate purposes and must not be treated as interchangeable:
+
+| Operation | Command/process | Effect |
+| --- | --- | --- |
+| Migration | `python scripts/initialize_database.py` | Applies `alembic upgrade head` to an empty/current database and initializes the separate Agent schema. |
+| Required seed | Included in `initialize_database.py` | Idempotently adds the 25 public item categories required by the application. |
+| Demo seed | `scripts/manage_demo_data.py seed` | Explicitly adds non-production acceptance accounts and sample business data. |
+| Demo reset | `scripts/manage_demo_data.py reset` | Removes only deterministic demo rows; it does not drop the schema or categories. |
+| Restore | Neon branch restore/recreation or an approved database backup | Recovers an environment; it is an operator action, not application startup behavior. |
+
+The optional demo dataset contains 11 accounts (the five configured team emails,
+five virtual users, and one virtual administrator), 33 storage spaces, 25 public
+item definitions, 77 inventory items, and 66 inventory operations. It covers
+in-stock, estimated, empty, expired, discarded, archived, notes, expiry dates,
+and ADD/CONSUME/RECONCILE history. It is not part of application startup and must
+never be run against production.
+
+Set two uncommitted operator passwords, then explicitly identify and confirm the
+non-production target:
+
+```bash
+export DEMO_USER_PASSWORD='replace-with-shared-demo-user-password'
+export DEMO_ADMIN_PASSWORD='replace-with-shared-demo-admin-password'
+
+python scripts/manage_demo_data.py seed \
+  --target predeploy \
+  --confirm SEED-DEMO-DATA
+python scripts/manage_demo_data.py check --target predeploy
+```
+
+The seed is repeatable. Existing accounts with one of the configured email
+addresses retain their ID, password, role, and data; incompatible account or
+catalog records stop the entire transaction instead of being overwritten.
+
+Distribute the real non-production passwords through a secure team channel; do
+not commit them to this repository or reuse them in production.
+To update existing deterministic demo accounts without deleting their inventory,
+spaces, or operation history, run:
+
+```bash
+python scripts/manage_demo_data.py seed \
+  --target predeploy \
+  --confirm SEED-DEMO-DATA \
+  --rotate-passwords
+```
+
+To remove deterministic demo rows while retaining the required categories:
+
+```bash
+python scripts/manage_demo_data.py reset \
+  --target predeploy \
+  --confirm RESET-DEMO-DATA
+```
+
+The reset preserves pre-existing accounts and definitions. A seeded account is
+also preserved if it has acquired non-demo spaces, private definitions,
+conversations, or Agent receipts, avoiding cascading deletion of later work.
+
+## Post-deployment smoke test
+
+After deploying the Backend and initializing its database, run the smoke test from
+`backend/` against the deployed HTTPS origin:
+
+```bash
+export SMOKE_BASE_URL="https://your-backend.example.com"
+export SMOKE_USER_EMAIL="deployment-smoke@example.com"
+export SMOKE_USER_PASSWORD="replace-with-a-strong-dedicated-password"
+export SMOKE_ADMIN_EMAIL="deployment-smoke-admin@example.com"
+export SMOKE_ADMIN_PASSWORD="replace-with-the-existing-admin-password"
+python scripts/smoke_deployment.py
+```
+
+Use dedicated deployment-test accounts. The ordinary account is registered on its
+first run and reused afterward; the administrator account must already exist with
+the `ADMIN` role. Keep all five values in the operator's secret store or protected
+CI secrets. They are test-runner settings and must not be added to the Vercel
+application environment or committed files.
+
+The script verifies `/health`, deployed version/commit, registration, login/current identity, inventory
+list/detail/create behavior, the expiry summary, and an administrator account
+query. It creates at most one named private space, item definition and in-stock
+item for the dedicated user, then reuses them on later runs. It never deletes
+records, changes roles, modifies account status or prints access tokens/passwords.
+Any missing endpoint, unexpected status, invalid response, database initialization
+problem or insufficient administrator permission makes the command exit nonzero.
+
+The smoke runner's offline contract tests are part of core PR CI:
+
+```bash
+python -m pytest tests/test_deployment_smoke.py -v --strict-markers
+```
 
 
 ## Tests
@@ -115,10 +248,10 @@ python -m pytest
 
 ## B01–B09 local startup and Postman
 
-On macOS / Linux, create an environment with Python 3.11 from the `backend` directory. Skip environment creation if `.venv` already exists:
+On macOS / Linux, create an environment with Python 3.12 from the `backend` directory. Skip environment creation if `.venv` already exists:
 
 ```bash
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -182,6 +315,23 @@ See the [CI selection policy](../docs/testing/README.md#ci-selection-policy) for
 selected scenarios and maintenance rules. The core subset reduces test execution,
 not the fixed time needed for GitHub runner setup and dependency installation.
 
+### Database environments and acceptance
+
+Database purposes are intentionally separate. Local development uses the ignored
+application `.env`; backend tests and GitHub CI use a direct `_test` database;
+future end-to-end CI must use a direct `_e2e` database configured from
+`.env.e2e.example`; Vercel/manual acceptance uses the dedicated Neon predeploy
+branch. Disposable test or E2E jobs must never reset the predeploy database.
+
+The reusable target guards, read-only evidence command, and transaction/rollback
+acceptance matrix are documented in
+[Database isolation and acceptance evidence](../docs/testing/DATABASE_ACCEPTANCE.md).
+The transaction matrix can be run independently with:
+
+```bash
+python -m pytest -v -m database_acceptance --strict-markers
+```
+
 
 ## Backend organization
 
@@ -207,7 +357,9 @@ The 25 public categories and Agent classification guidance share one configurati
 `app/core/category_catalog.py`. The reviewed seed SQL is
 `scripts/sql/seed_item_categories.sql`; `python scripts/render_category_seed.py`
 prints SQL for review without connecting to a database. This is not a database
-synchronization service. Fresh schemas also require explicit category seeding.
+synchronization service. The fresh-database initializer applies the reviewed seed
+automatically; existing databases still require review before corrections are
+applied.
 
 The inventory routes use `app/schemas/inventory.py` and `app/services/inventory.py`.
 An owned active space and visible active definition/category must exist before
@@ -295,7 +447,7 @@ python -m pytest -v tests/test_admin_users.py --strict-markers
 
 ## Agent configuration and storage
 
-Python 3.11 and backend requirements are required. Agent persistence uses
+Python 3.12 and backend requirements are required. Agent persistence uses
 AGENT_DATABASE_URL when nonempty, otherwise DATABASE_URL_DIRECT. Keep credentials
 only in local/deployment secrets. AGENT_WORKFLOW_STEP_LIMIT defaults to 128 and is
 the six-node step budget; legacy AGENT_RECURSION_LIMIT does not control this workflow.

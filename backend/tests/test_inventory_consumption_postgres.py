@@ -16,7 +16,16 @@ from test_inventory_consumption_quantities import consumption
 pytestmark = pytest.mark.postgres
 
 
-@pytest.mark.parametrize("same_key", [pytest.param(True, marks=pytest.mark.ci), False])
+@pytest.mark.parametrize(
+    "same_key",
+    [
+        pytest.param(
+            True,
+            marks=[pytest.mark.ci, pytest.mark.database_acceptance],
+        ),
+        False,
+    ],
+)
 def test_concurrent_consumptions_cannot_double_consume(inventory_context, monkeypatch, same_key):
     c = inventory_context; item = seed_inventory(c)
     original = service._operation_by_key
@@ -47,6 +56,7 @@ def test_concurrent_consumptions_cannot_double_consume(inventory_context, monkey
 
 
 @pytest.mark.ci
+@pytest.mark.database_acceptance
 def test_consumption_insert_failure_rolls_back_and_allows_retry(inventory_context):
     c = inventory_context; item = seed_inventory(c)
     with c[0][2].begin() as connection:

@@ -126,6 +126,7 @@ def test_global_history_filters_inventory_type_status_and_half_open_time_range(i
     assert [row["id"] for row in inclusive.json()["items"]] == [str(operations[0].id)]
 
 
+@pytest.mark.ci
 def test_global_history_foreign_inventory_filter_returns_empty_page(inventory_context):
     context = inventory_context
     _, _, foreign_item, _, _, _, _, _ = build_history(context)

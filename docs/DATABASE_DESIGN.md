@@ -331,6 +331,42 @@ Transactions must guarantee that:
 
 This document maintains business fields and constraints. See [backend design](BACKEND_DESIGN.md) for service/transaction rules, [architecture](ARCHITECTURE.md) for Agent orchestration and [API reference](API_REFERENCE.md) for HTTP/SSE contracts. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
 
+Database structure is acceptance-tested from an empty PostgreSQL schema by running
+`alembic upgrade head` through `test_database_initialization_postgres.py`. The same
+test verifies all ORM-required tables, columns, primary/foreign/unique/check
+constraints, and indexes. Existing Neon environments can be checked without
+mutation using `python scripts/verify_database_schema.py`; the separate LangGraph
+schema is checked with `python scripts/setup_agent_storage.py --check`.
+
+### Required and demonstration seed data
+
+`scripts/initialize_database.py` owns structural migration and the required,
+idempotent 25-category seed. `scripts/manage_demo_data.py` is a separate,
+non-production acceptance-data tool: it creates deterministic users, shared item
+definitions, spaces, inventory states, and operation history only after an
+explicit target and confirmation are supplied. Real passwords are injected by
+the operator and are never stored in the repository.
+
+Demo reset deletes known deterministic rows in dependency order and never drops
+the schema or category seed. Database restore is separate again: use a Neon branch
+restore/recreation or an approved backup, then run structural and seed checks.
+Application startup performs none of these operations automatically.
+
+### Environment isolation and acceptance evidence
+
+Local development, GitHub/PostgreSQL tests, future E2E tests, and Neon predeploy
+use different database targets. Test databases must end in `_test`, E2E databases
+must end in `_e2e`, and both use direct connections. The code-level target guard
+rejects ambiguous names, pooled endpoints, and an E2E target that is also the
+runtime/predeploy target.
+
+`scripts/record_database_acceptance.py` performs a read-only release check and
+writes credential-free JSON evidence containing the environment and initialization
+date, application commit, current and expected Alembic revisions, category seed
+content version, and schema verification counts. The complete procedure and the
+real-PostgreSQL rollback/idempotency matrix are maintained in
+[`testing/DATABASE_ACCEPTANCE.md`](testing/DATABASE_ACCEPTANCE.md).
+
 ## 13. Agent business receipts: `agent_inventory_action`
 
 The Agent extension adds a ninth business table. Each row is a committed, independently

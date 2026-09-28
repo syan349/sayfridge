@@ -16,6 +16,7 @@ from app.schemas.admin import (
     AdminUserStatusUpdate,
 )
 from app.schemas.business import BusinessErrorResponse
+from app.schemas.auth import AuthErrorResponse
 from app.services import admin as service
 
 
@@ -23,10 +24,9 @@ router = APIRouter(
     prefix="/api/v1/admin",
     tags=["admin"],
     responses={
-        401: {"description": "Missing, invalid, or unavailable identity"},
-        403: {"model": BusinessErrorResponse},
-        404: {"model": BusinessErrorResponse},
-        422: {"model": BusinessErrorResponse},
+        401: {"model": AuthErrorResponse, "description": "Missing, invalid, expired, or unavailable identity"},
+        403: {"model": BusinessErrorResponse, "description": "Administrator access required"},
+        422: {"model": BusinessErrorResponse, "description": "Invalid request parameters"},
     },
 )
 
@@ -55,7 +55,12 @@ async def list_users(
     )
 
 
-@router.get("/users/{user_id}", response_model=AdminUserRead, summary="Read a user account")
+@router.get(
+    "/users/{user_id}",
+    response_model=AdminUserRead,
+    summary="Read a user account",
+    responses={404: {"model": BusinessErrorResponse, "description": "User does not exist"}},
+)
 async def get_user(
     user_id: UUID,
     session: AsyncSession = Depends(get_db_session),
@@ -69,6 +74,7 @@ async def get_user(
     "/users/{user_id}/status",
     response_model=AdminUserRead,
     summary="Change an ordinary user's account status",
+    responses={404: {"model": BusinessErrorResponse, "description": "User does not exist"}},
 )
 async def update_user_status(
     user_id: UUID,

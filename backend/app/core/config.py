@@ -1,8 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
+import re
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,11 @@ class Settings(BaseSettings):
     )
 
     # repr=False prevents full connection strings from appearing in debug representations.
+    app_version: str = Field(default="0.1.0", alias="APP_VERSION")
+    app_commit_sha: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("APP_COMMIT_SHA", "VERCEL_GIT_COMMIT_SHA"),
+    )
     database_url: SecretStr = Field(alias="DATABASE_URL", repr=False)
     database_url_direct: SecretStr = Field(alias="DATABASE_URL_DIRECT", repr=False)
     jwt_secret_key: SecretStr = Field(alias="JWT_SECRET_KEY", repr=False)
@@ -28,7 +34,37 @@ class Settings(BaseSettings):
         ge=1,
         le=1440,
     )
+    login_rate_limit_attempts: int = Field(
+        default=5,
+        alias="LOGIN_RATE_LIMIT_ATTEMPTS",
+        ge=1,
+        le=100,
+    )
+    login_rate_limit_window_seconds: int = Field(
+        default=60,
+        alias="LOGIN_RATE_LIMIT_WINDOW_SECONDS",
+        ge=1,
+        le=3600,
+    )
     cors_origins: list[str] = Field(default_factory=list, alias="CORS_ORIGINS")
+
+    @field_validator("app_version")
+    @classmethod
+    def require_safe_app_version(cls, value: str) -> str:
+        value = value.strip()
+        if not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z._+\-]{0,63}", value):
+            raise ValueError("APP_VERSION must be a short release identifier")
+        return value
+
+    @field_validator("app_commit_sha")
+    @classmethod
+    def require_git_commit_sha(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        value = value.strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{7,40}", value):
+            raise ValueError("APP_COMMIT_SHA must contain 7 to 40 hexadecimal characters")
+        return value
 
     @field_validator("database_url", "database_url_direct")
     @classmethod

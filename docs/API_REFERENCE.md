@@ -9,8 +9,8 @@ For manual requests, see the [Postman guide](testing/POSTMAN_GUIDE.md).
 ## 1. Common conventions
 
 - Local base URL: `http://127.0.0.1:8000`; API prefix: `/api/v1`.
-- Interactive schemas: `/docs`. `GET /health` returns service health without
-  querying the database.
+- Interactive schemas: Swagger UI at `/docs`, ReDoc at `/redoc`, and machine-readable
+  OpenAPI at `/openapi.json`.
 - Paths below omit the API prefix. JSON requests use `Content-Type: application/json`.
 - Except registration and login, all endpoints require `Authorization: Bearer <token>`.
   Identity, role, and ACTIVE account state are checked against the current database.
@@ -63,6 +63,25 @@ invalid field. Codes: `NOT_FOUND`, `NAME_CONFLICT`, `STATE_CONFLICT`,
 `QUANTITY_OUT_OF_RANGE`. Error messages depend on the resource.
 Authentication failures on business endpoints retain the authentication format.
 
+### Public system endpoints
+
+`GET /health` returns `{"status":"ok","service":"sayfridge-backend"}` without
+querying the database. It confirms process availability only.
+
+`GET /api/v1/system/version` returns public deployment identity:
+
+```json
+{
+  "service": "sayfridge-backend",
+  "version": "0.1.0",
+  "commit_sha": "0123456789abcdef0123456789abcdef01234567"
+}
+```
+
+`commit_sha` is null outside a deployment that supplies `APP_COMMIT_SHA` or
+`VERCEL_GIT_COMMIT_SHA`. Use this endpoint before acceptance testing to confirm
+that the expected Git revision is running.
+
 ## 2. Authentication — B01–B03
 
 ### User response
@@ -113,6 +132,11 @@ Success: **200**, with these JSON fields:
 - Database effect: read account and verify password; no session record or cookie.
 - Unknown email, wrong password, non-local account, missing hash, or inactive account:
   **401**, `Invalid email or password`.
+- The application allows five attempts per client/account pair in a 60-second sliding
+  window by default. The next attempt returns **429**,
+  `Too many login attempts; try again later`, with `Retry-After`. A successful login
+  clears the pair's window. Deployments with multiple application instances must also
+  enforce a shared limit at the hosting edge or gateway.
 - Malformed input: **422**.
 
 ### GET /auth/me — B03
@@ -123,8 +147,11 @@ Success: **200**, with these JSON fields:
 - Missing/invalid/expired token or unavailable user: **401**,
   `Invalid or expired access token`, with `WWW-Authenticate: Bearer`.
 
-Profile editing, password change, refresh tokens, cookie login, and logout are
-outside this delivery.
+Profile editing, password change, refresh tokens, cookie login, server-side sessions,
+and a logout endpoint are outside this delivery. Clients log out by deleting the
+Bearer token. Tokens cannot be revoked individually and remain valid until their
+configured expiry unless the account is suspended, disabled, or deleted; each
+authenticated request reads the account's current state from the database.
 
 ## 3. Storage spaces — B04
 
