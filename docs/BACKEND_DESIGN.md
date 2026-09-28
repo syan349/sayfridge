@@ -852,7 +852,7 @@ Formal development permits and requires relevant tests, isolated test database c
 | PostgreSQL integration and concurrency | Real constraints, schema initialization, transaction rollback, version races, idempotency; alongside database writes, not replaced by fake objects |
 | Frontend/device integration | Collaborate on login, stock entry, consumption, reconciliation, history, expired tokens, and errors. Flutter uses Android/iOS devices or simulators and records environments |
 | Performance | Section 2.5 data/load/targets for queries, quantity writes, and hotspots; start once key flows work and repeat after optimization |
-| Deployment verification | Check service, database reads, protected endpoints, and complete business flows after deployment. A passing /health does not prove database/business health |
+| Deployment verification | Run `scripts/smoke_deployment.py` with dedicated user/admin credentials to check health, authentication, inventory, expiry and administrator reads. A passing `/health` alone does not prove database/business health |
 
 Run backend CI in the course GitHub repository. PR checks include tests, necessary import/OpenAPI checks, and dependency checks. Database tests use isolated services and dedicated credentials. Performance testing is repeatable manual or scheduled work, not required in full for every small change. Record commands, code version, and results, and fix failures before completion.
 

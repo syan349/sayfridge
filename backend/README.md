@@ -115,6 +115,40 @@ Verify the complete process against the configured isolated test database with:
 python -m pytest tests/test_database_initialization_postgres.py -v --strict-markers
 ```
 
+## Post-deployment smoke test
+
+After deploying the Backend and initializing its database, run the smoke test from
+`backend/` against the deployed HTTPS origin:
+
+```bash
+export SMOKE_BASE_URL="https://your-backend.example.com"
+export SMOKE_USER_EMAIL="deployment-smoke@example.com"
+export SMOKE_USER_PASSWORD="replace-with-a-strong-dedicated-password"
+export SMOKE_ADMIN_EMAIL="deployment-smoke-admin@example.com"
+export SMOKE_ADMIN_PASSWORD="replace-with-the-existing-admin-password"
+python scripts/smoke_deployment.py
+```
+
+Use dedicated deployment-test accounts. The ordinary account is registered on its
+first run and reused afterward; the administrator account must already exist with
+the `ADMIN` role. Keep all five values in the operator's secret store or protected
+CI secrets. They are test-runner settings and must not be added to the Vercel
+application environment or committed files.
+
+The script verifies `/health`, registration, login/current identity, inventory
+list/detail/create behavior, the expiry summary, and an administrator account
+query. It creates at most one named private space, item definition and in-stock
+item for the dedicated user, then reuses them on later runs. It never deletes
+records, changes roles, modifies account status or prints access tokens/passwords.
+Any missing endpoint, unexpected status, invalid response, database initialization
+problem or insufficient administrator permission makes the command exit nonzero.
+
+The smoke runner's offline contract tests are part of core PR CI:
+
+```bash
+python -m pytest tests/test_deployment_smoke.py -v --strict-markers
+```
+
 
 ## Tests
 
