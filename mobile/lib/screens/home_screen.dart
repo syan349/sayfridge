@@ -470,6 +470,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           InventoryLoadStatus.loaded => _CategoryCounts(
             items: controller!.items,
             partial: controller.hasNextPage,
+            onSelected: (group) => _openInventory(group: group),
           ),
         },
       ],
@@ -663,7 +664,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
     }
   }
 
-  Future<void> _openInventory() async {
+  Future<void> _openInventory({InventoryCategoryGroup? group}) async {
     final custom = widget.onInventoryTap;
     if (custom != null) {
       custom();
@@ -677,6 +678,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           controller: controller,
           storageSpaceController: widget.storageSpaceController,
           onAddItemTap: widget.onAddItemTap,
+          initialCategoryGroup: group,
         ),
       ),
     );
@@ -904,47 +906,46 @@ class _ExpiryPreviewRow extends StatelessWidget {
 }
 
 class _CategoryCounts extends StatelessWidget {
-  const _CategoryCounts({required this.items, required this.partial});
+  const _CategoryCounts({
+    required this.items,
+    required this.partial,
+    required this.onSelected,
+  });
 
   final List<InventoryItem> items;
   final bool partial;
+  final ValueChanged<InventoryCategoryGroup> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    int count(String group) => items.where((item) {
-      final category = item.categoryName.toLowerCase();
-      if (group == 'Meat') {
-        return category.contains('meat') ||
-            category.contains('poultry') ||
-            category.contains('seafood');
-      }
-      if (group == 'Vegetables') {
-        return category.contains('vegetable') || category.contains('produce');
-      }
-      return !category.contains('meat') &&
-          !category.contains('poultry') &&
-          !category.contains('seafood') &&
-          !category.contains('vegetable') &&
-          !category.contains('produce');
-    }).length;
-
     return Row(
       children: [
-        for (final group in const ['Meat', 'Vegetables', 'Others']) ...[
-          if (group != 'Meat')
+        for (final group in InventoryCategoryGroup.values) ...[
+          if (group != InventoryCategoryGroup.meat)
             Container(width: 1, height: 78, color: const Color(0xFFA8D589)),
           Expanded(
-            child: Column(
-              children: [
-                Text(
-                  '${count(group)}${partial ? '+' : ''}',
-                  style: const TextStyle(fontSize: 40, height: 1.1),
+            child: InkWell(
+              key: ValueKey('inventory-group-${group.name}'),
+              onTap: () => onSelected(group),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    Text(
+                      '${items.where(group.includes).length}${partial ? '+' : ''}',
+                      style: const TextStyle(fontSize: 40, height: 1.1),
+                    ),
+                    Text(
+                      group.label,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  group,
-                  style: const TextStyle(fontSize: 15, color: AppColors.muted),
-                ),
-              ],
+              ),
             ),
           ),
         ],
