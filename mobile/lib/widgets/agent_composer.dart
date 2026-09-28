@@ -85,6 +85,89 @@ class _AgentComposerState extends State<AgentComposer> {
     super.dispose();
   }
 
+  Widget _assetIcon(String asset) =>
+      Image.asset(asset, width: 24, height: 20, fit: BoxFit.contain);
+
+  Widget _photoButton() => _ComposerButton(
+    tooltip: 'Add photos',
+    icon: _assetIcon(AssistantAssets.photo),
+    onPressed: widget.voiceActive ? null : widget.onPhotoPressed,
+  );
+
+  Widget _sendButton() => _ComposerButton(
+    tooltip: 'Send message',
+    icon: _assetIcon(AssistantAssets.send),
+    onPressed: widget.voiceActive ? null : widget.onSendPressed,
+  );
+
+  Widget _typingLayout() => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+        child: TextField(
+          key: const Key('assistant-message-field'),
+          controller: widget.controller,
+          focusNode: _focusNode,
+          enabled: widget.enabled && !widget.voiceActive,
+          maxLines: 6,
+          minLines: 1,
+          maxLength: 8000,
+          keyboardType: TextInputType.multiline,
+          textInputAction: TextInputAction.newline,
+          style: const TextStyle(fontSize: 16, height: 1.2),
+          decoration: InputDecoration(
+            isCollapsed: true,
+            counterText: '',
+            filled: false,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            hintText: widget.waiting
+                ? 'Answer the pending items above'
+                : 'Send message ...',
+            hintStyle: const TextStyle(color: Color(0xFFA4A4AE), fontSize: 16),
+          ),
+        ),
+      ),
+      Row(
+        children: [
+          _photoButton(),
+          const Spacer(),
+          _ComposerButton(
+            tooltip: 'Switch to voice input',
+            icon: _assetIcon(AssistantAssets.microphone),
+            onPressed: widget.enabled && !widget.voiceActive
+                ? _voiceMode
+                : null,
+          ),
+          Container(
+            width: 1,
+            height: 26,
+            margin: const EdgeInsets.symmetric(horizontal: 5),
+            color: const Color(0xFFC6C6CB),
+          ),
+          _sendButton(),
+        ],
+      ),
+    ],
+  );
+
+  Widget _voiceLayout() => Row(
+    children: [
+      _photoButton(),
+      if (widget.hasImages) const SizedBox(width: 42),
+      Expanded(child: widget.voiceButton),
+      _ComposerButton(
+        tooltip: 'Type a message',
+        icon: _assetIcon(AssistantAssets.keyboard),
+        onPressed: widget.enabled && !widget.voiceActive ? _typeMessage : null,
+      ),
+      if (widget.hasImages) _sendButton(),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) => Container(
     constraints: const BoxConstraints(minHeight: 63),
@@ -101,87 +184,7 @@ class _AgentComposerState extends State<AgentComposer> {
         ),
       ],
     ),
-    child: Row(
-      children: [
-        _ComposerButton(
-          tooltip: 'Add photos',
-          icon: Image.asset(
-            AssistantAssets.photo,
-            width: 31,
-            height: 28,
-            fit: BoxFit.contain,
-          ),
-          onPressed: widget.voiceActive ? null : widget.onPhotoPressed,
-        ),
-        if (_typing || widget.waiting) const SizedBox(width: 6),
-        if (!_typing && !widget.waiting && widget.hasImages)
-          const SizedBox(width: 42),
-        Expanded(
-          child: _typing || widget.waiting
-              ? TextField(
-                  key: const Key('assistant-message-field'),
-                  controller: widget.controller,
-                  focusNode: _focusNode,
-                  enabled: widget.enabled && !widget.voiceActive,
-                  maxLines: 3,
-                  minLines: 1,
-                  maxLength: 8000,
-                  textInputAction: TextInputAction.send,
-                  style: const TextStyle(fontSize: 16),
-                  decoration: InputDecoration(
-                    isCollapsed: true,
-                    counterText: '',
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    hintText: widget.waiting
-                        ? 'Answer the pending items above'
-                        : 'Send message ...',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFFA4A4AE),
-                      fontSize: 16,
-                    ),
-                  ),
-                  onSubmitted: (_) => widget.onSendPressed?.call(),
-                )
-              : widget.voiceButton,
-        ),
-        if (_typing || widget.waiting) ...[
-          _ComposerButton(
-            tooltip: 'Switch to voice input',
-            icon: Image.asset(
-              AssistantAssets.microphone,
-              width: 23,
-              height: 29,
-            ),
-            onPressed: widget.enabled && !widget.voiceActive
-                ? _voiceMode
-                : null,
-          ),
-          Container(
-            width: 1,
-            height: 34,
-            margin: const EdgeInsets.symmetric(horizontal: 7),
-            color: const Color(0xFFC6C6CB),
-          ),
-        ] else
-          _ComposerButton(
-            tooltip: 'Type a message',
-            icon: Image.asset(AssistantAssets.keyboard, width: 30, height: 26),
-            onPressed: widget.enabled && !widget.voiceActive
-                ? _typeMessage
-                : null,
-          ),
-        if (_typing || widget.waiting || widget.hasImages)
-          _ComposerButton(
-            tooltip: 'Send message',
-            icon: Image.asset(AssistantAssets.send, width: 26, height: 24),
-            onPressed: widget.voiceActive ? null : widget.onSendPressed,
-          ),
-      ],
-    ),
+    child: _typing || widget.waiting ? _typingLayout() : _voiceLayout(),
   );
 }
 

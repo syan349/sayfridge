@@ -68,6 +68,53 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('history lists and opens an earlier conversation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = ApiClient(
+      client: MockClient(
+        (request) async => request.method == 'GET'
+            ? jsonResponse({'status': 'COMPLETED', 'items': []})
+            : eventResponse([
+                {'type': 'text_delta', 'delta': 'A reply'},
+                {
+                  'type': 'done',
+                  'status': 'COMPLETED',
+                  'data': {'status': 'COMPLETED', 'items': []},
+                },
+              ]),
+      ),
+    );
+    addTearDown(api.close);
+    final agent = AgentController(
+      WorkspaceRepository(api, MemoryTokens()),
+      store: MemoryAgentStore(),
+    );
+    addTearDown(agent.dispose);
+    await agent.bindUser('alice');
+    await tester.runAsync(() => agent.send('First question'));
+    await agent.newConversation();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: AgentConversationScreen(controller: agent),
+      ),
+    );
+    await tester.tap(find.byTooltip('Conversation history'));
+    await tester.pumpAndSettle();
+    expect(find.text('Earlier conversations'), findsOneWidget);
+    expect(find.text('No current conversation'), findsNothing);
+    expect(find.text('First question'), findsOneWidget);
+    await _tapAndFinish(tester, agent, find.text('First question'));
+    await tester.pumpAndSettle();
+    expect(agent.messages.values, contains('First question'));
+    expect(find.text('First question'), findsOneWidget);
+  });
+
   testWidgets('welcome shortcuts send their own text through the real Agent', (
     tester,
   ) async {
@@ -225,9 +272,15 @@ void main() {
         tester.getCenter(find.byTooltip('Hold to speak')),
       );
       await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
-      expect(find.textContaining('Release to insert text'), findsOneWidget);
+      expect(find.text('按住识别语音'), findsOneWidget);
+      expect(find.text('松手编辑'), findsOneWidget);
+      final overlay = find.byKey(const Key('voice-recording-overlay'));
+      expect(overlay, findsOneWidget);
+      expect(tester.widget<ColoredBox>(overlay).color, const Color(0xE8444444));
+      expect(find.text('add two bottles of milk'), findsOneWidget);
       await gesture.up();
       await tester.pumpAndSettle();
+      expect(overlay, findsNothing);
 
       expect(
         tester.widget<TextField>(field).controller!.text,
@@ -269,6 +322,14 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
 
+    final leftGesture = await tester.startGesture(tester.getCenter(microphone));
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await leftGesture.moveBy(const Offset(-80, 0));
+    await tester.pump();
+    expect(find.text('松手取消'), findsOneWidget);
+    await leftGesture.up();
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byTooltip('Type a message'));
     await tester.pumpAndSettle();
     expect(
@@ -277,6 +338,7 @@ void main() {
     );
     expect(voice.cancelled, isTrue);
     expect(voice.stopped, isFalse);
+    expect(voice.starts, 2);
   });
 
   testWidgets(

@@ -11,6 +11,51 @@ import 'package:sayfridge/state/agent_controller.dart';
 import '../support/integration_fixtures.dart';
 
 void main() {
+  test(
+    'earlier conversations survive restart and reopen with their messages',
+    () async {
+      final store = MemoryAgentStore();
+      final api = ApiClient(
+        client: MockClient((request) async {
+          if (request.method == 'GET') {
+            return jsonResponse({'status': 'COMPLETED', 'items': []});
+          }
+          return eventResponse([
+            {'type': 'text_delta', 'delta': 'Saved reply'},
+            {
+              'type': 'done',
+              'status': 'COMPLETED',
+              'data': {'status': 'COMPLETED', 'items': []},
+            },
+          ]);
+        }),
+      );
+      addTearDown(api.close);
+      final workspace = WorkspaceRepository(api, MemoryTokens());
+      final first = AgentController(workspace, store: store);
+      await first.bindUser('alice');
+      await first.send('First question');
+      final firstId = first.conversationId!;
+      await first.newConversation();
+      expect(first.history.single.title, 'First question');
+      await first.send('Second question');
+      first.dispose();
+
+      final restored = AgentController(workspace, store: store);
+      addTearDown(restored.dispose);
+      await restored.bindUser('alice');
+      expect(restored.messages.values, contains('Second question'));
+      expect(restored.history.single.title, 'First question');
+      await restored.openConversation(firstId);
+      expect(restored.conversationId, firstId);
+      expect(
+        restored.messages.values,
+        containsAll(['First question', 'Saved reply']),
+      );
+      expect(restored.history.single.title, 'Second question');
+    },
+  );
+
   test('image-only supplement replaces the pending proposal version', () async {
     const oldItem = {
       'item_id': 'item',

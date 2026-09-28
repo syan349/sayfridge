@@ -6,6 +6,53 @@ import '../repositories/workspace_repository.dart';
 import '../services/agent_session_store.dart';
 import '../services/api_exception.dart';
 
+class SavedConversation {
+  const SavedConversation({
+    required this.id,
+    required this.messages,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final Map<String, String> messages;
+  final DateTime updatedAt;
+
+  String get title {
+    for (final entry in messages.entries) {
+      if (entry.key.startsWith('user:') && entry.value.trim().isNotEmpty) {
+        return entry.value.trim();
+      }
+    }
+    return 'Conversation';
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'messages': messages,
+    'updated_at': updatedAt.toUtc().toIso8601String(),
+  };
+
+  static SavedConversation? fromJson(Object? value) {
+    if (value is! Map || value['id'] is! String) return null;
+    return SavedConversation(
+      id: value['id'] as String,
+      messages: _readMessages(value['messages']),
+      updatedAt:
+          DateTime.tryParse(value['updated_at']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
+}
+
+Map<String, String> _readMessages(Object? value) {
+  if (value is! Map) return {};
+  return {
+    for (final entry in value.entries)
+      if (entry.key is String && entry.value is String)
+        entry.key as String: entry.value as String,
+  };
+}
+
 class AgentController extends ChangeNotifier {
   AgentController(
     this.workspace, {
@@ -23,6 +70,8 @@ class AgentController extends ChangeNotifier {
   Map<String, dynamic>? _pending;
   final Map<String, Map<String, dynamic>> _items = {};
   final Map<String, String> messages = {};
+  final List<SavedConversation> _history = [];
+  List<SavedConversation> get history => List.unmodifiable(_history);
   List<Map<String, dynamic>> get items => _items.values.toList();
   bool get unresolved => _pending != null || status == 'RECOVERABLE';
   bool get waiting => status == 'WAITING_INPUT';
@@ -52,6 +101,16 @@ class AgentController extends ChangeNotifier {
       _sessionLoaded = true;
       conversationId = saved?['conversation_id'] as String?;
       _pending = saved?['pending'] as Map<String, dynamic>?;
+      messages.addAll(_readMessages(saved?['messages']));
+      final savedHistory = saved?['history'];
+      if (savedHistory is List) {
+        for (final record in savedHistory) {
+          final conversation = SavedConversation.fromJson(record);
+          if (conversation != null && conversation.id != conversationId) {
+            _history.add(conversation);
+          }
+        }
+      }
       if (conversationId != null) {
         status = 'RECOVERABLE';
         await _readState(generation);
@@ -73,6 +132,7 @@ class AgentController extends ChangeNotifier {
     status = 'COMPLETED';
     _items.clear();
     messages.clear();
+    _history.clear();
     busy = false;
   }
 
@@ -82,13 +142,16 @@ class AgentController extends ChangeNotifier {
       await store.write(user, {
         'conversation_id': conversationId,
         'pending': _pending,
+        'messages': messages,
+        'history': _history.map((entry) => entry.toJson()).toList(),
       });
     }
   }
 
   Future<void> newConversation() async {
     if (!canSend) return; // Do not lose unresolved receipt/request identities.
-    _clear();
+    _archiveCurrent();
+    _resetCurrent();
     busy = true;
     final generation = _generation;
     try {
@@ -99,6 +162,57 @@ class AgentController extends ChangeNotifier {
     if (_current(generation)) {
       busy = false;
       _notify();
+    }
+  }
+
+  void _archiveCurrent() {
+    final id = conversationId;
+    if (id == null || messages.isEmpty) return;
+    _history.removeWhere((entry) => entry.id == id);
+    _history.insert(
+      0,
+      SavedConversation(
+        id: id,
+        messages: Map.of(messages),
+        updatedAt: DateTime.now(),
+      ),
+    );
+    // The device keeps a bounded list; the server remains the source of truth
+    // for inventory actions and pending requests.
+    if (_history.length > 20) _history.removeRange(20, _history.length);
+  }
+
+  void _resetCurrent() {
+    conversationId = interruptId = error = null;
+    _pending = null;
+    _verified = false;
+    status = 'COMPLETED';
+    _items.clear();
+    messages.clear();
+  }
+
+  Future<void> openConversation(String id) async {
+    if (!canSend || id == conversationId) return;
+    final index = _history.indexWhere((entry) => entry.id == id);
+    if (index < 0) return;
+    final selected = _history.removeAt(index);
+    _archiveCurrent();
+    _resetCurrent();
+    conversationId = selected.id;
+    messages.addAll(selected.messages);
+    busy = true;
+    _notify();
+    final generation = _generation;
+    try {
+      await _persist();
+      await _readState(generation);
+    } catch (e) {
+      if (_current(generation)) error = businessError(e);
+    } finally {
+      if (_current(generation)) {
+        busy = false;
+        _notify();
+      }
     }
   }
 
@@ -347,13 +461,24 @@ class AgentController extends ChangeNotifier {
       }
     } finally {
       if (_current(generation)) {
-        busy = false;
-        _notify();
-        // Some items can have succeeded even when another item or the stream failed.
-        try {
-          await onInventoryChanged?.call();
-        } catch (_) {
-          /* Readers expose their own errors. */
+        // A completed stream was saved at 'done'. Failed streams retain any
+        // partial transcript alongside the exact pending request identity.
+        if (!terminal || error != null) {
+          try {
+            await _persist();
+          } catch (_) {
+            /* The request path already reports storage errors above. */
+          }
+        }
+        if (_current(generation)) {
+          busy = false;
+          _notify();
+          // Some items can have succeeded even when another item or the stream failed.
+          try {
+            await onInventoryChanged?.call();
+          } catch (_) {
+            /* Readers expose their own errors. */
+          }
         }
       }
     }

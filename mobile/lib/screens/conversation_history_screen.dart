@@ -69,8 +69,8 @@ class ConversationHistoryScreen extends StatelessWidget {
         ),
         const SizedBox(height: 30),
         const Text(
-          'You can return to your current conversation here. Earlier '
-          'conversations and full message history are not available yet.',
+          'The latest 20 conversations on this device appear here. '
+          'Chats from before this update cannot be restored.',
           style: TextStyle(color: AppColors.muted, fontSize: 15, height: 1.4),
         ),
         const SizedBox(height: 32),
@@ -127,7 +127,7 @@ class ConversationHistoryScreen extends StatelessWidget {
               ),
             ),
           ),
-        ] else
+        ] else if (agent == null || agent.history.isEmpty)
           const Center(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 45),
@@ -147,6 +147,63 @@ class ConversationHistoryScreen extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        const SizedBox(height: 32),
+        const Text(
+          'Earlier conversations',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 17),
+        if (agent == null || agent.history.isEmpty)
+          const Text(
+            'No earlier conversations on this device yet.',
+            style: TextStyle(color: AppColors.muted, fontSize: 15),
+          )
+        else
+          for (final conversation in agent.history) ...[
+            Material(
+              color: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Color(0xFFB5CE9F), width: 1.2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: InkWell(
+                onTap: agent.canSend
+                    ? () async {
+                        await agent.openConversation(conversation.id);
+                        if (context.mounted) Navigator.of(context).pop();
+                      }
+                    : null,
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 15, 11, 15),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.chat_bubble_outline_rounded, size: 30),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          conversation.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 16.5),
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, size: 30),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        if (agent != null && agent.history.isNotEmpty && !agent.canSend)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'Finish or recover the current request before switching conversations.',
+              style: TextStyle(color: AppColors.muted, fontSize: 14),
             ),
           ),
       ],

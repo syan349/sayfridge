@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Only the latest conversation and any unacknowledged request; never a token copy.
+/// Device-local recent transcripts and any unacknowledged request; never tokens.
 class AgentSessionStore {
   const AgentSessionStore([this.storage = const FlutterSecureStorage()]);
   final FlutterSecureStorage storage;
