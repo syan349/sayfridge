@@ -43,6 +43,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   bool _holdingVoice = false;
   bool _finishingVoice = false;
   bool _cancelVoice = false;
+  int _voiceModeReset = 0;
   String _recognizedWords = '';
   int _voiceSession = 0;
 
@@ -152,7 +153,10 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     await widget.controller.send(text, images: List.unmodifiable(_images));
     if (!mounted || widget.controller.error != null) return;
     _message.clear();
-    setState(_images.clear);
+    setState(() {
+      _images.clear();
+      _voiceModeReset++;
+    });
   }
 
   Future<void> _pickImages() async {
@@ -399,6 +403,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                             ),
                           AgentComposer(
                             controller: _message,
+                            voiceModeReset: _voiceModeReset,
                             enabled: agent.canSend,
                             waiting: agent.waiting,
                             hasImages: _images.isNotEmpty,

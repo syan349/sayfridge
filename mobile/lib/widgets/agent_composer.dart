@@ -12,6 +12,7 @@ class AgentComposer extends StatefulWidget {
     required this.onPhotoPressed,
     required this.onSendPressed,
     required this.voiceButton,
+    this.voiceModeReset = 0,
     this.waiting = false,
     this.voiceActive = false,
     super.key,
@@ -19,6 +20,7 @@ class AgentComposer extends StatefulWidget {
 
   final TextEditingController controller;
   final bool enabled, hasImages, waiting, voiceActive;
+  final int voiceModeReset;
   final VoidCallback? onPhotoPressed, onSendPressed;
   final Widget voiceButton;
 
@@ -46,6 +48,10 @@ class _AgentComposerState extends State<AgentComposer> {
       oldWidget.controller.removeListener(_refresh);
       widget.controller.addListener(_refresh);
       _lastText = widget.controller.text;
+    }
+    if (oldWidget.voiceModeReset != widget.voiceModeReset) {
+      _typing = false;
+      _focusNode.unfocus();
     }
   }
 
