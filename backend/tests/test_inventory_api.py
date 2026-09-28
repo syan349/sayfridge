@@ -92,7 +92,8 @@ def test_archived_associations_remain_readable_with_zero_estimate_and_current_na
     assert request(c[0],"GET",BASE,headers=c[-1]).json()["total"]==1
 
 
-@pytest.mark.parametrize("method", ["GET", pytest.param("PATCH",marks=pytest.mark.ci)])
+@pytest.mark.ci
+@pytest.mark.parametrize("method", ["GET", "PATCH"])
 def test_foreign_and_missing_inventory_are_indistinguishable(inventory_context,method):
     c=inventory_context
     space=seed_space(c[0],c[2].id)

@@ -67,8 +67,17 @@ Once the server starts, the following endpoints are available:
 
 - `JWT_SECRET_KEY`: HS256 signing secret with at least 32 characters. Store it only in the local or deployment environment.
 - `ACCESS_TOKEN_EXPIRE_MINUTES`: Access token lifetime in minutes; defaults to `15`.
+- `LOGIN_RATE_LIMIT_ATTEMPTS`: Login attempts allowed for one client/account pair; defaults to `5`.
+- `LOGIN_RATE_LIMIT_WINDOW_SECONDS`: Sliding login-limit window; defaults to `60` seconds.
 
-Authentication supports local email/password accounts and short-lived Bearer access tokens. Refresh tokens, server-side sessions, logout, third-party login, email verification, password recovery, and MFA are not currently available.
+Authentication supports local email/password accounts and short-lived Bearer access
+tokens. A successful login clears that client/account limit. The application limit is
+process-local, so a multi-instance deployment must also configure a shared limit at
+the hosting edge or gateway. Refresh tokens, server-side sessions, a logout endpoint,
+immediate token revocation, third-party login, email verification, password recovery,
+and MFA are not currently available. Clients log out by deleting their token; an
+issued token otherwise remains usable until expiry unless the account is suspended,
+disabled, or deleted.
 
 ## Web browser access (CORS)
 

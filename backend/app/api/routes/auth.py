@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
 from app.core.config import Settings, get_settings
+from app.core.login_rate_limit import login_rate_limiter
 from app.core.security import create_access_token
 from app.db.models import User
 from app.db.session import get_db_session
@@ -37,13 +38,33 @@ async def register(
         ) from exc
 
 
-@router.post("/login", response_model=LoginResponse, summary="Log in")
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    summary="Log in",
+    responses={429: {"description": "Too many login attempts"}},
+)
 async def login(
     payload: LoginRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> LoginResponse:
     """Validate credentials and issue a short-lived access token."""
+    client_host = request.client.host if request.client else "unknown"
+    limit_key = login_rate_limiter.key(client_host, str(payload.email))
+    decision = login_rate_limiter.reserve(
+        limit_key,
+        maximum_attempts=settings.login_rate_limit_attempts,
+        window_seconds=settings.login_rate_limit_window_seconds,
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts; try again later",
+            headers={"Retry-After": str(decision.retry_after_seconds)},
+        )
+
     user = await authenticate_user(session, str(payload.email), payload.password)
     if user is None:
         # Return the same response for unknown emails, incorrect passwords, and unavailable accounts to avoid disclosing account status.
@@ -53,6 +74,7 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    login_rate_limiter.clear(limit_key)
     return LoginResponse(
         access_token=create_access_token(
             user.id,

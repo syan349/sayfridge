@@ -25,6 +25,24 @@ def test_short_jwt_secret_is_rejected() -> None:
         Settings(**BASE_CONFIG, JWT_SECRET_KEY="too-short")
 
 
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("LOGIN_RATE_LIMIT_ATTEMPTS", 0),
+        ("LOGIN_RATE_LIMIT_ATTEMPTS", 101),
+        ("LOGIN_RATE_LIMIT_WINDOW_SECONDS", 0),
+        ("LOGIN_RATE_LIMIT_WINDOW_SECONDS", 3601),
+    ],
+)
+def test_invalid_login_rate_limit_settings_are_rejected(name: str, value: int) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            **BASE_CONFIG,
+            JWT_SECRET_KEY="s" * 40,
+            **{name: value},
+        )
+
+
 def test_cors_origins_default_to_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
     settings = Settings(

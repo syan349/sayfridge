@@ -28,6 +28,18 @@ class Settings(BaseSettings):
         ge=1,
         le=1440,
     )
+    login_rate_limit_attempts: int = Field(
+        default=5,
+        alias="LOGIN_RATE_LIMIT_ATTEMPTS",
+        ge=1,
+        le=100,
+    )
+    login_rate_limit_window_seconds: int = Field(
+        default=60,
+        alias="LOGIN_RATE_LIMIT_WINDOW_SECONDS",
+        ge=1,
+        le=3600,
+    )
     cors_origins: list[str] = Field(default_factory=list, alias="CORS_ORIGINS")
 
     @field_validator("database_url", "database_url_direct")
