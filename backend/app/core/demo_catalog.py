@@ -14,6 +14,7 @@ def demo_uuid(key: str) -> UUID:
 
 @dataclass(frozen=True, slots=True)
 class DemoUser:
+    seed_key: str
     email: str
     role: str
     spaces: tuple[tuple[str, str, str], ...]
@@ -27,13 +28,16 @@ TEAM_EMAILS = (
     "member05@example.com",
 )
 
+# The first value is the legacy identity key used to derive existing UUIDs. It
+# is never exposed as the account email; retaining it prevents an email repair
+# from duplicating the user's spaces, inventory, or operation history.
 _VIRTUAL_USERS = (
-    ("ava.demo@example.test", "USER"),
-    ("ben.demo@example.test", "USER"),
-    ("chloe.demo@example.test", "USER"),
-    ("daniel.demo@example.test", "USER"),
-    ("emma.demo@example.test", "USER"),
-    ("admin.demo@example.test", "ADMIN"),
+    ("ava.demo@example.test", "ava.demo@example.com", "USER"),
+    ("ben.demo@example.test", "ben.demo@example.com", "USER"),
+    ("chloe.demo@example.test", "chloe.demo@example.com", "USER"),
+    ("daniel.demo@example.test", "daniel.demo@example.com", "USER"),
+    ("emma.demo@example.test", "emma.demo@example.com", "USER"),
+    ("admin.demo@example.test", "admin.demo@example.com", "ADMIN"),
 )
 
 _SPACE_NAMES = (
@@ -60,11 +64,21 @@ def _spaces(names: tuple[str, str, str]) -> tuple[tuple[str, str, str], ...]:
 
 
 DEMO_USERS = tuple(
-    DemoUser(email=email, role="USER", spaces=_spaces(_SPACE_NAMES[index]))
+    DemoUser(
+        seed_key=email,
+        email=email,
+        role="USER",
+        spaces=_spaces(_SPACE_NAMES[index]),
+    )
     for index, email in enumerate(TEAM_EMAILS)
 ) + tuple(
-    DemoUser(email=email, role=role, spaces=_spaces(_SPACE_NAMES[index + 5]))
-    for index, (email, role) in enumerate(_VIRTUAL_USERS)
+    DemoUser(
+        seed_key=seed_key,
+        email=email,
+        role=role,
+        spaces=_spaces(_SPACE_NAMES[index + 5]),
+    )
+    for index, (seed_key, email, role) in enumerate(_VIRTUAL_USERS)
 )
 
 

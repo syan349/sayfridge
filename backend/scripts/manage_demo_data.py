@@ -150,7 +150,11 @@ def _seed_users(
     *,
     rotate_passwords: bool = False,
 ) -> dict[str, User]:
-    emails = [entry.email for entry in DEMO_USERS]
+    emails = {
+        email
+        for entry in DEMO_USERS
+        for email in (entry.email, entry.seed_key)
+    }
     existing = {
         row.email: row
         for row in session.scalars(select(User).where(User.email.in_(emails))).all()
@@ -159,10 +163,16 @@ def _seed_users(
     admin_hash = hash_password(admin_password)
     result: dict[str, User] = {}
     for entry in DEMO_USERS:
-        row = existing.get(entry.email)
+        current = existing.get(entry.email)
+        legacy = existing.get(entry.seed_key)
+        if current is not None and legacy is not None and current.id != legacy.id:
+            raise RuntimeError(
+                f"Both current and legacy demo accounts exist for {entry.email}"
+            )
+        row = current or legacy
         if row is None:
             row = User(
-                id=demo_uuid(f"user:{entry.email}"),
+                id=demo_uuid(f"user:{entry.seed_key}"),
                 email=entry.email,
                 password_hash=admin_hash if entry.role == "ADMIN" else user_hash,
                 auth_provider="LOCAL",
@@ -182,6 +192,8 @@ def _seed_users(
             )
         elif rotate_passwords:
             row.password_hash = admin_hash if entry.role == "ADMIN" else user_hash
+        if row.email != entry.email:
+            row.email = entry.email
         result[entry.email] = row
     session.flush()
     return result
@@ -204,7 +216,7 @@ def _seed_spaces(session: Session, users: dict[str, User]) -> dict[tuple[str, st
             row = existing.get(name.casefold())
             if row is None:
                 row = StorageSpace(
-                    id=demo_uuid(f"space:{entry.email}:{key}"),
+                    id=demo_uuid(f"space:{entry.seed_key}:{key}"),
                     user_id=user.id,
                     name=name,
                     type=space_type,
@@ -231,14 +243,18 @@ def _seed_inventory(
 ) -> None:
     inventory_ids = _expected_ids(
         "inventory",
-        [f"{entry.email}:{scenario.key}" for entry in DEMO_USERS for scenario in INVENTORY_SCENARIOS],
+        [
+            f"{entry.seed_key}:{scenario.key}"
+            for entry in DEMO_USERS
+            for scenario in INVENTORY_SCENARIOS
+        ],
     )
     existing_inventory = set(
         session.scalars(select(InventoryItem.id).where(InventoryItem.id.in_(inventory_ids)))
     )
     for entry in DEMO_USERS:
         for scenario in INVENTORY_SCENARIOS:
-            row_id = demo_uuid(f"inventory:{entry.email}:{scenario.key}")
+            row_id = demo_uuid(f"inventory:{entry.seed_key}:{scenario.key}")
             if row_id in existing_inventory:
                 continue
             estimated_at = now if scenario.estimated_amount is not None else None
@@ -276,7 +292,12 @@ def _seed_inventory(
 
     operation_ids = _expected_ids(
         "operation",
-        [f"{entry.email}:{scenario.key}" for entry in DEMO_USERS for scenario in INVENTORY_SCENARIOS if scenario.operation],
+        [
+            f"{entry.seed_key}:{scenario.key}"
+            for entry in DEMO_USERS
+            for scenario in INVENTORY_SCENARIOS
+            if scenario.operation
+        ],
     )
     existing_operations = set(
         session.scalars(
@@ -288,14 +309,14 @@ def _seed_inventory(
         for scenario in INVENTORY_SCENARIOS:
             if scenario.operation is None:
                 continue
-            row_id = demo_uuid(f"operation:{entry.email}:{scenario.key}")
+            row_id = demo_uuid(f"operation:{entry.seed_key}:{scenario.key}")
             if row_id in existing_operations:
                 continue
             operation_type, quantity_kind, value, unit, affects_state, applied = scenario.operation
             session.add(
                 InventoryOperation(
                     id=row_id,
-                    inventory_item_id=demo_uuid(f"inventory:{entry.email}:{scenario.key}"),
+                    inventory_item_id=demo_uuid(f"inventory:{entry.seed_key}:{scenario.key}"),
                     operation_type=operation_type,
                     affects_state=affects_state,
                     input_method="MANUAL",
@@ -319,11 +340,20 @@ def inspect_demo_data(session: Session) -> DemoDataReport:
     definition_names = [normalize_catalog_name(name) for name, _ in PUBLIC_ITEM_DEFINITIONS]
     inventory_ids = _expected_ids(
         "inventory",
-        [f"{entry.email}:{scenario.key}" for entry in DEMO_USERS for scenario in INVENTORY_SCENARIOS],
+        [
+            f"{entry.seed_key}:{scenario.key}"
+            for entry in DEMO_USERS
+            for scenario in INVENTORY_SCENARIOS
+        ],
     )
     operation_ids = _expected_ids(
         "operation",
-        [f"{entry.email}:{scenario.key}" for entry in DEMO_USERS for scenario in INVENTORY_SCENARIOS if scenario.operation],
+        [
+            f"{entry.seed_key}:{scenario.key}"
+            for entry in DEMO_USERS
+            for scenario in INVENTORY_SCENARIOS
+            if scenario.operation
+        ],
     )
     expected_space_count = 0
     for entry in DEMO_USERS:
@@ -350,10 +380,14 @@ def inspect_demo_data(session: Session) -> DemoDataReport:
             )
         ) or 0,
         inventory_items=session.scalar(
-            select(func.count()).select_from(InventoryItem).where(InventoryItem.id.in_(inventory_ids))
+            select(func.count())
+            .select_from(InventoryItem)
+            .where(InventoryItem.id.in_(inventory_ids))
         ) or 0,
         inventory_operations=session.scalar(
-            select(func.count()).select_from(InventoryOperation).where(InventoryOperation.id.in_(operation_ids))
+            select(func.count())
+            .select_from(InventoryOperation)
+            .where(InventoryOperation.id.in_(operation_ids))
         ) or 0,
     )
 
@@ -404,12 +438,12 @@ def seed_demo_data(
 
 def reset_demo_data(session: Session) -> None:
     inventory_keys = [
-        f"{entry.email}:{scenario.key}"
+        f"{entry.seed_key}:{scenario.key}"
         for entry in DEMO_USERS
         for scenario in INVENTORY_SCENARIOS
     ]
     operation_keys = [
-        f"{entry.email}:{scenario.key}"
+        f"{entry.seed_key}:{scenario.key}"
         for entry in DEMO_USERS
         for scenario in INVENTORY_SCENARIOS
         if scenario.operation
@@ -429,12 +463,16 @@ def reset_demo_data(session: Session) -> None:
             StorageSpace.id.in_(
                 _expected_ids(
                     "space",
-                    [f"{entry.email}:{key}" for entry in DEMO_USERS for key, _name, _type in entry.spaces],
+                    [
+                        f"{entry.seed_key}:{key}"
+                        for entry in DEMO_USERS
+                        for key, _name, _type in entry.spaces
+                    ],
                 )
             )
         )
     )
-    seeded_user_ids = _expected_ids("user", [entry.email for entry in DEMO_USERS])
+    seeded_user_ids = _expected_ids("user", [entry.seed_key for entry in DEMO_USERS])
     session.execute(
         delete(User).where(
             User.id.in_(seeded_user_ids),
