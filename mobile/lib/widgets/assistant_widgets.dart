@@ -206,7 +206,7 @@ class UserMessageBubble extends StatelessWidget {
               color: AppColors.userMessage,
               child: Text(
                 message,
-                textAlign: TextAlign.center,
+                textAlign: TextAlign.left,
                 textWidthBasis: TextWidthBasis.longestLine,
                 style:
                     (textStyle ??
@@ -214,7 +214,7 @@ class UserMessageBubble extends StatelessWidget {
                               fontSize: 17,
                               fontWeight: FontWeight.w500,
                             ))
-                        .copyWith(color: AppColors.text),
+                        .copyWith(color: Colors.white),
               ),
             ),
           ),
@@ -266,21 +266,38 @@ class AssistantMessageBubble extends StatelessWidget {
       clipper: const _SpeechBubbleClipper(tailOnLeft: true),
       child: Container(
         constraints: const BoxConstraints(maxWidth: _bubbleMaxWidth),
-        padding: const EdgeInsets.fromLTRB(
-          _bubbleTailWidth + _bubbleTextInset,
-          12,
-          _bubbleTextInset,
-          12,
-        ),
+        padding: const EdgeInsets.fromLTRB(_bubbleTailWidth + 16, 16, 16, 16),
         color: AppColors.primarySoft,
-        child: Text(
-          message,
-          style: textStyle,
+        child: Text.rich(
+          TextSpan(children: _assistantTextSpans(message)),
+          style: textStyle.copyWith(height: 1.35),
           textWidthBasis: TextWidthBasis.longestLine,
         ),
       ),
     ),
   );
+}
+
+List<InlineSpan> _assistantTextSpans(String message) {
+  final spans = <InlineSpan>[];
+  final markup = RegExp(r'\*\*([^*]+)\*\*|^#{1,3}\s+([^\n]+)', multiLine: true);
+  var cursor = 0;
+  for (final match in markup.allMatches(message)) {
+    if (match.start > cursor) {
+      spans.add(TextSpan(text: message.substring(cursor, match.start)));
+    }
+    spans.add(
+      TextSpan(
+        text: match.group(1) ?? match.group(2),
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    );
+    cursor = match.end;
+  }
+  if (cursor < message.length) {
+    spans.add(TextSpan(text: message.substring(cursor)));
+  }
+  return spans;
 }
 
 class _SpeechBubbleClipper extends CustomClipper<Path> {

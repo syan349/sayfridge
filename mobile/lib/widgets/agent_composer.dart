@@ -87,11 +87,12 @@ class _AgentComposerState extends State<AgentComposer> {
 
   @override
   Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 60),
+    constraints: const BoxConstraints(minHeight: 63),
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(32),
+      border: Border.all(color: const Color(0xFFE5E7E1)),
       boxShadow: const [
         BoxShadow(
           color: Color(0x26000000),
@@ -104,14 +105,17 @@ class _AgentComposerState extends State<AgentComposer> {
       children: [
         _ComposerButton(
           tooltip: 'Add photos',
-          icon: const Icon(
-            Icons.image_outlined,
-            color: Color(0xFF81848A),
-            size: 25,
+          icon: Image.asset(
+            AssistantAssets.photo,
+            width: 31,
+            height: 28,
+            fit: BoxFit.contain,
           ),
           onPressed: widget.voiceActive ? null : widget.onPhotoPressed,
         ),
-        const SizedBox(width: 12),
+        if (_typing || widget.waiting) const SizedBox(width: 6),
+        if (!_typing && !widget.waiting && widget.hasImages)
+          const SizedBox(width: 42),
         Expanded(
           child: _typing || widget.waiting
               ? TextField(
@@ -165,7 +169,7 @@ class _AgentComposerState extends State<AgentComposer> {
         ] else
           _ComposerButton(
             tooltip: 'Type a message',
-            icon: Image.asset(AssistantAssets.keyboard, width: 28, height: 24),
+            icon: Image.asset(AssistantAssets.keyboard, width: 30, height: 26),
             onPressed: widget.enabled && !widget.voiceActive
                 ? _typeMessage
                 : null,
@@ -196,8 +200,8 @@ class _ComposerButton extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(
     tooltip: tooltip,
     onPressed: onPressed,
-    constraints: const BoxConstraints.tightFor(width: 38, height: 42),
-    padding: const EdgeInsets.all(5),
+    constraints: const BoxConstraints.tightFor(width: 42, height: 44),
+    padding: const EdgeInsets.all(4),
     icon: Opacity(opacity: onPressed == null ? 0.4 : 1, child: icon),
   );
 }

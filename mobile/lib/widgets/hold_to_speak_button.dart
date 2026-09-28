@@ -111,7 +111,7 @@ class _HoldToSpeakButtonState extends State<HoldToSpeakButton>
             style: TextStyle(
               fontSize: 16,
               height: 1.15,
-              color: widget.cancelling ? Colors.red : const Color(0xFFA4A4AE),
+              color: widget.cancelling ? Colors.red : const Color(0xFF9999A3),
             ),
           ),
         ),
