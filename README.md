@@ -297,3 +297,7 @@ path and record the tested commit and result:
 - UQwinder (`qche584`)
 - DaryaRastegar (`dras728`)
 - hrainy (`rhan637`)
+
+## Privacy and security
+
+- [Security and Privacy](docs/SECURITY_AND_PRIVACY.md): controls, data handling, findings and fixes, test/audit evidence, and remaining risks.

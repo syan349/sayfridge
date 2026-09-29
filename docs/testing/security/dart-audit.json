@@ -1,0 +1,679 @@
+{
+  "queries": [
+    {
+      "package": {
+        "name": "args",
+        "ecosystem": "Pub"
+      },
+      "version": "2.7.0"
+    },
+    {
+      "package": {
+        "name": "async",
+        "ecosystem": "Pub"
+      },
+      "version": "2.13.1"
+    },
+    {
+      "package": {
+        "name": "boolean_selector",
+        "ecosystem": "Pub"
+      },
+      "version": "2.1.2"
+    },
+    {
+      "package": {
+        "name": "camera",
+        "ecosystem": "Pub"
+      },
+      "version": "0.12.1"
+    },
+    {
+      "package": {
+        "name": "camera_android_camerax",
+        "ecosystem": "Pub"
+      },
+      "version": "0.7.5"
+    },
+    {
+      "package": {
+        "name": "camera_avfoundation",
+        "ecosystem": "Pub"
+      },
+      "version": "0.10.3+1"
+    },
+    {
+      "package": {
+        "name": "camera_platform_interface",
+        "ecosystem": "Pub"
+      },
+      "version": "2.14.0"
+    },
+    {
+      "package": {
+        "name": "camera_web",
+        "ecosystem": "Pub"
+      },
+      "version": "0.3.5+6"
+    },
+    {
+      "package": {
+        "name": "characters",
+        "ecosystem": "Pub"
+      },
+      "version": "1.4.1"
+    },
+    {
+      "package": {
+        "name": "clock",
+        "ecosystem": "Pub"
+      },
+      "version": "1.1.2"
+    },
+    {
+      "package": {
+        "name": "code_assets",
+        "ecosystem": "Pub"
+      },
+      "version": "1.2.1"
+    },
+    {
+      "package": {
+        "name": "collection",
+        "ecosystem": "Pub"
+      },
+      "version": "1.19.1"
+    },
+    {
+      "package": {
+        "name": "cross_file",
+        "ecosystem": "Pub"
+      },
+      "version": "0.3.5+5"
+    },
+    {
+      "package": {
+        "name": "crypto",
+        "ecosystem": "Pub"
+      },
+      "version": "3.0.7"
+    },
+    {
+      "package": {
+        "name": "cupertino_icons",
+        "ecosystem": "Pub"
+      },
+      "version": "1.0.9"
+    },
+    {
+      "package": {
+        "name": "fake_async",
+        "ecosystem": "Pub"
+      },
+      "version": "1.3.3"
+    },
+    {
+      "package": {
+        "name": "ffi",
+        "ecosystem": "Pub"
+      },
+      "version": "2.2.0"
+    },
+    {
+      "package": {
+        "name": "ffi_leak_tracker",
+        "ecosystem": "Pub"
+      },
+      "version": "0.1.2"
+    },
+    {
+      "package": {
+        "name": "file_selector_linux",
+        "ecosystem": "Pub"
+      },
+      "version": "0.9.4+1"
+    },
+    {
+      "package": {
+        "name": "file_selector_macos",
+        "ecosystem": "Pub"
+      },
+      "version": "0.9.5+1"
+    },
+    {
+      "package": {
+        "name": "file_selector_platform_interface",
+        "ecosystem": "Pub"
+      },
+      "version": "2.7.0"
+    },
+    {
+      "package": {
+        "name": "file_selector_windows",
+        "ecosystem": "Pub"
+      },
+      "version": "0.9.3+6"
+    },
+    {
+      "package": {
+        "name": "flutter_lints",
+        "ecosystem": "Pub"
+      },
+      "version": "6.0.0"
+    },
+    {
+      "package": {
+        "name": "flutter_plugin_android_lifecycle",
+        "ecosystem": "Pub"
+      },
+      "version": "2.0.35"
+    },
+    {
+      "package": {
+        "name": "flutter_secure_storage",
+        "ecosystem": "Pub"
+      },
+      "version": "11.2.0"
+    },
+    {
+      "package": {
+        "name": "flutter_secure_storage_darwin",
+        "ecosystem": "Pub"
+      },
+      "version": "0.4.3"
+    },
+    {
+      "package": {
+        "name": "flutter_secure_storage_linux",
+        "ecosystem": "Pub"
+      },
+      "version": "3.0.3"
+    },
+    {
+      "package": {
+        "name": "flutter_secure_storage_platform_interface",
+        "ecosystem": "Pub"
+      },
+      "version": "2.1.1"
+    },
+    {
+      "package": {
+        "name": "flutter_secure_storage_web",
+        "ecosystem": "Pub"
+      },
+      "version": "2.1.1"
+    },
+    {
+      "package": {
+        "name": "flutter_secure_storage_windows",
+        "ecosystem": "Pub"
+      },
+      "version": "4.2.2"
+    },
+    {
+      "package": {
+        "name": "hooks",
+        "ecosystem": "Pub"
+      },
+      "version": "2.0.2"
+    },
+    {
+      "package": {
+        "name": "http",
+        "ecosystem": "Pub"
+      },
+      "version": "1.6.0"
+    },
+    {
+      "package": {
+        "name": "http_parser",
+        "ecosystem": "Pub"
+      },
+      "version": "4.1.2"
+    },
+    {
+      "package": {
+        "name": "image_picker",
+        "ecosystem": "Pub"
+      },
+      "version": "1.2.3"
+    },
+    {
+      "package": {
+        "name": "image_picker_android",
+        "ecosystem": "Pub"
+      },
+      "version": "0.8.13+23"
+    },
+    {
+      "package": {
+        "name": "image_picker_for_web",
+        "ecosystem": "Pub"
+      },
+      "version": "3.1.1"
+    },
+    {
+      "package": {
+        "name": "image_picker_ios",
+        "ecosystem": "Pub"
+      },
+      "version": "0.8.13+7"
+    },
+    {
+      "package": {
+        "name": "image_picker_linux",
+        "ecosystem": "Pub"
+      },
+      "version": "0.2.2"
+    },
+    {
+      "package": {
+        "name": "image_picker_macos",
+        "ecosystem": "Pub"
+      },
+      "version": "0.2.2+1"
+    },
+    {
+      "package": {
+        "name": "image_picker_platform_interface",
+        "ecosystem": "Pub"
+      },
+      "version": "2.11.1"
+    },
+    {
+      "package": {
+        "name": "image_picker_windows",
+        "ecosystem": "Pub"
+      },
+      "version": "0.2.2"
+    },
+    {
+      "package": {
+        "name": "jni",
+        "ecosystem": "Pub"
+      },
+      "version": "1.0.3"
+    },
+    {
+      "package": {
+        "name": "jni_flutter",
+        "ecosystem": "Pub"
+      },
+      "version": "1.0.3"
+    },
+    {
+      "package": {
+        "name": "jni_util",
+        "ecosystem": "Pub"
+      },
+      "version": "1.0.0"
+    },
+    {
+      "package": {
+        "name": "json_annotation",
+        "ecosystem": "Pub"
+      },
+      "version": "4.12.0"
+    },
+    {
+      "package": {
+        "name": "leak_tracker",
+        "ecosystem": "Pub"
+      },
+      "version": "11.0.2"
+    },
+    {
+      "package": {
+        "name": "leak_tracker_flutter_testing",
+        "ecosystem": "Pub"
+      },
+      "version": "3.0.10"
+    },
+    {
+      "package": {
+        "name": "leak_tracker_testing",
+        "ecosystem": "Pub"
+      },
+      "version": "3.0.2"
+    },
+    {
+      "package": {
+        "name": "lints",
+        "ecosystem": "Pub"
+      },
+      "version": "6.1.0"
+    },
+    {
+      "package": {
+        "name": "logging",
+        "ecosystem": "Pub"
+      },
+      "version": "1.3.0"
+    },
+    {
+      "package": {
+        "name": "matcher",
+        "ecosystem": "Pub"
+      },
+      "version": "0.12.19"
+    },
+    {
+      "package": {
+        "name": "material_color_utilities",
+        "ecosystem": "Pub"
+      },
+      "version": "0.13.0"
+    },
+    {
+      "package": {
+        "name": "meta",
+        "ecosystem": "Pub"
+      },
+      "version": "1.18.0"
+    },
+    {
+      "package": {
+        "name": "mime",
+        "ecosystem": "Pub"
+      },
+      "version": "2.1.0"
+    },
+    {
+      "package": {
+        "name": "objective_c",
+        "ecosystem": "Pub"
+      },
+      "version": "9.5.0"
+    },
+    {
+      "package": {
+        "name": "package_config",
+        "ecosystem": "Pub"
+      },
+      "version": "3.0.0"
+    },
+    {
+      "package": {
+        "name": "path",
+        "ecosystem": "Pub"
+      },
+      "version": "1.9.1"
+    },
+    {
+      "package": {
+        "name": "path_provider",
+        "ecosystem": "Pub"
+      },
+      "version": "2.1.6"
+    },
+    {
+      "package": {
+        "name": "path_provider_android",
+        "ecosystem": "Pub"
+      },
+      "version": "2.3.1"
+    },
+    {
+      "package": {
+        "name": "path_provider_foundation",
+        "ecosystem": "Pub"
+      },
+      "version": "2.6.0"
+    },
+    {
+      "package": {
+        "name": "path_provider_linux",
+        "ecosystem": "Pub"
+      },
+      "version": "2.2.2"
+    },
+    {
+      "package": {
+        "name": "path_provider_platform_interface",
+        "ecosystem": "Pub"
+      },
+      "version": "2.1.3"
+    },
+    {
+      "package": {
+        "name": "path_provider_windows",
+        "ecosystem": "Pub"
+      },
+      "version": "2.3.0"
+    },
+    {
+      "package": {
+        "name": "platform",
+        "ecosystem": "Pub"
+      },
+      "version": "3.2.0"
+    },
+    {
+      "package": {
+        "name": "plugin_platform_interface",
+        "ecosystem": "Pub"
+      },
+      "version": "2.1.8"
+    },
+    {
+      "package": {
+        "name": "pub_semver",
+        "ecosystem": "Pub"
+      },
+      "version": "2.2.1"
+    },
+    {
+      "package": {
+        "name": "record_use",
+        "ecosystem": "Pub"
+      },
+      "version": "0.6.0"
+    },
+    {
+      "package": {
+        "name": "source_span",
+        "ecosystem": "Pub"
+      },
+      "version": "1.10.2"
+    },
+    {
+      "package": {
+        "name": "speech_to_text",
+        "ecosystem": "Pub"
+      },
+      "version": "7.5.0"
+    },
+    {
+      "package": {
+        "name": "speech_to_text_platform_interface",
+        "ecosystem": "Pub"
+      },
+      "version": "2.5.0"
+    },
+    {
+      "package": {
+        "name": "speech_to_text_windows",
+        "ecosystem": "Pub"
+      },
+      "version": "1.0.1"
+    },
+    {
+      "package": {
+        "name": "stack_trace",
+        "ecosystem": "Pub"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "package": {
+        "name": "stream_channel",
+        "ecosystem": "Pub"
+      },
+      "version": "2.1.4"
+    },
+    {
+      "package": {
+        "name": "stream_transform",
+        "ecosystem": "Pub"
+      },
+      "version": "2.1.2"
+    },
+    {
+      "package": {
+        "name": "string_scanner",
+        "ecosystem": "Pub"
+      },
+      "version": "1.4.1"
+    },
+    {
+      "package": {
+        "name": "term_glyph",
+        "ecosystem": "Pub"
+      },
+      "version": "1.2.2"
+    },
+    {
+      "package": {
+        "name": "test_api",
+        "ecosystem": "Pub"
+      },
+      "version": "0.7.11"
+    },
+    {
+      "package": {
+        "name": "typed_data",
+        "ecosystem": "Pub"
+      },
+      "version": "1.4.0"
+    },
+    {
+      "package": {
+        "name": "vector_math",
+        "ecosystem": "Pub"
+      },
+      "version": "2.2.0"
+    },
+    {
+      "package": {
+        "name": "vm_service",
+        "ecosystem": "Pub"
+      },
+      "version": "15.2.0"
+    },
+    {
+      "package": {
+        "name": "web",
+        "ecosystem": "Pub"
+      },
+      "version": "1.1.1"
+    },
+    {
+      "package": {
+        "name": "win32",
+        "ecosystem": "Pub"
+      },
+      "version": "6.4.0"
+    },
+    {
+      "package": {
+        "name": "xdg_directories",
+        "ecosystem": "Pub"
+      },
+      "version": "1.1.0"
+    },
+    {
+      "package": {
+        "name": "yaml",
+        "ecosystem": "Pub"
+      },
+      "version": "3.1.4"
+    }
+  ],
+  "results": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+  ],
+  "scope": "pubspec.lock hosted Pub packages; excludes Flutter SDK and native Gradle dependencies"
+}

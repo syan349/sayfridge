@@ -87,7 +87,7 @@ and MFA are not currently available. Clients log out by deleting their token; an
 issued token otherwise remains usable until expiry unless the account is suspended,
 disabled, or deleted.
 
-The [8.1–8.3 security review](../docs/testing/SECURITY_REVIEW.md) records focused
+The [Security and Privacy review (8.1–8.6)](../docs/SECURITY_AND_PRIVACY.md) records focused
 verification and remaining risks. Runtime SQLAlchemy exceptions hide bound SQL
 parameters; this does not replace sanitizing driver messages or application logs.
 
