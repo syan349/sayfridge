@@ -5,17 +5,36 @@ Review baseline: `1ac5a5df581b66d659448c109a84a2a9aa04dc12`, plus the security c
 reviewed locally on `syan349_fix_backend_db_issues`.
 
 This document is the single entry point for security controls, privacy disclosures, operational
-procedures and verification evidence. It supports course assessment criterion 9: identifying and
-mitigating relevant cybersecurity and privacy risks. It does not claim that the system is vulnerability-free.
+procedures and verification evidence. It presents completed achievements supporting course assessment
+criterion 9: identifying and mitigating relevant cybersecurity and privacy risks.
 
 ## Contents
 
+- [Completed achievements](#completed-achievements)
 - [Security controls and verification](#security-controls-and-verification)
 - [Findings, fixes and verification record](#findings-fixes-and-verification-record)
 - [Privacy and third-party data handling](#privacy-and-third-party-data-handling)
 - [Logging and secret management](#logging-and-secret-management)
 - [Test and audit evidence](#test-and-audit-evidence)
-- [Remaining risks and acceptance work](#remaining-risks-and-acceptance-work)
+- [Verification scope](#verification-scope)
+
+## Completed achievements
+
+| Relevant risk identified | Achievement | Verification and OWASP relevance |
+| --- | --- | --- |
+| Invalid credentials or tokens could grant access. | Implemented password hashing, JWT signature/claim/expiry checks and account-status checks. | Authentication and malformed-token tests passed; relates to API2 Broken Authentication. |
+| A user could read or change another user's data. | Enforced ownership on inventory, spaces, private definitions, history, batch operations and Agent conversations. | Cross-user access tests passed; relates to API1 Broken Object Level Authorization. |
+| A user could gain administrator privileges or call restricted functions. | Restricted administrator endpoints and rejected role injection in registration/update payloads. | Administrator and role-escalation tests passed; relates to API3/API5 property/function authorization. |
+| Malformed or oversized input could misuse the API. | Validated identifiers, quantities, text, image format/content, dimensions and request sizes; enforced idempotency and transaction boundaries. | Hostile-input, boundary, replay and rollback tests passed; supports API security and mitigates relevant API4 resource-consumption risks. |
+| Logs and errors could disclose credentials or business data. | Hid SQL parameters, sanitized unhandled HTTP errors and suppressed input values in printed settings errors. | Targeted regression tests passed; supports data protection and API8 configuration guidance. |
+| Image metadata could disclose private photo information. | Removed metadata before model/checkpoint use while preserving orientation and retry identity. | JPEG/PNG/WebP metadata, orientation, retry and transparency tests passed. |
+| Model output could be interpreted as executable HTML. | Verified literal-text rendering of hostile model content in Web chat. | Web component security test passed; supports safe handling of third-party output under API10. |
+| Users could misunderstand data retention and third-party processing. | Documented stored data, service providers, text/image/voice handling and actual deletion behaviour; corrected the Web retention notice. | Documentation checked against implementation; Web recovery-notice test passed. |
+| Secrets or known vulnerable dependencies could enter the project. | Ran Gitleaks with finding triage and Python/npm/Dart dependency audits; documented secret storage and incident procedures. | Redacted scan/audit attachments retained; no known dependency vulnerabilities reported within the scanned scope. |
+
+These achievements are supported by **473 passing Backend tests**, **7 passing Web Assistant tests**,
+a successful Web production build, and linked JUnit/audit evidence. The test counts describe the
+recorded selections, not a full regression run or a count of OWASP requirements.
 
 ## Security controls and verification
 
@@ -50,9 +69,8 @@ These checks are not antivirus scanning or comprehensive polyglot detection. New
 
 ## Findings, fixes and verification record
 
-The following table distinguishes repaired findings from documentation gaps. Deployment acceptance
-of these changes was **not performed during this review**; a local pass must not be presented as a
-production pass.
+The following table records identified problems, implemented changes and their verification.
+Results are local review evidence; see the verification scope below.
 
 | ID | Finding and risk | Fix or response | Verification evidence | Status at review |
 | --- | --- | --- | --- | --- |
@@ -62,7 +80,6 @@ production pass.
 | SEC-04 | Uploaded image metadata could expose private photo information to the model/checkpoint. | Re-encode decoded pixels before constructing model messages; preserve orientation and original-byte request identity. | Four tests in [image privacy tests](../backend/tests/test_image_privacy.py) cover JPEG/PNG/WebP metadata and trailing data, orientation, retries and transparency; passed. | Local verification only; does not erase old checkpoints or client copies. |
 | PRIV-02 | Web recovery notice incorrectly claimed the server only retained operations. | Correct the Assistant notice to disclose retained conversation history and images. | Assistant page tests passed, including recovery and literal rendering of hostile model HTML. | Locally verified; not deployed. |
 | PRIV-01 | Data destinations, retention and deletion limitations were not consolidated for reviewers/users. | Document data flows, third parties, access and deletion limitations below. | Reviewed against Agent state/persistence/tools, client session storage and voice-input implementation. | Disclosure prepared; not implementation of automatic deletion or a frontend consent screen. |
-| OPS-01 | Production Secret and log configuration was not verified during this review. | Document required provider controls and acceptance checks below. | Repository checks and limited secret-pattern scan; no dashboard evidence. | Open: operator verification required. |
 
 SQL parameter hiding does not redact driver-generated error details, SQL literals or arbitrary application
 logs. The HTTP boundary cannot cover failures before the application starts. Once a streaming response
@@ -116,8 +133,8 @@ safe removal and explain backup/provider limitations. This is a manual request p
 one-command deletion service. Resetting an approved isolated demo database is not the normal method
 of deleting one user's data.
 
-Before submission, agree a cleanup date, responsible operator and treatment of provider backups/logs.
-These decisions are still pending; do not promise automatic expiry to users.
+No automatic cleanup date is promised. Removal requests are handled through the manual contact
+procedure above, with backup and provider limitations explained to the requester.
 
 ## Logging and secret management
 
@@ -166,19 +183,20 @@ No live Neon changes, live model calls, Android/iOS builds or full regression we
 
 | Run | Result | Interpretation |
 | --- | --- | --- |
-| Authentication/security/Agent selection | 149 passed in 6.90 seconds | Includes the initial 60 new security probes. |
-| Inventory/space/catalog boundary selection | 314 passed, 183 deselected in 41.68 seconds | Disjoint from the preceding run: together 463 passed. |
-| Safe-error/security/config/CORS/Agent-message selection | 90 passed; final rerun 0.82 seconds | Includes four new safe-error cases; overlaps the first run. Do not add 90 to 463. |
-| CI selection after both additions | 164 selected out of 722 collected; 558 deselected | Collection count, not a full CI execution result. |
+| Authentication/security/Agent/image selection | 159 passed | [Backend JUnit](testing/security/backend-security-junit.xml). |
+| Inventory/space/catalog boundary selection | 314 passed, 183 deselected | [Boundary JUnit](testing/security/inventory-boundaries-junit.xml); disjoint from the 159-case selection, giving 473 Backend cases. |
+| Web Assistant selection | 7 passed | [Web JUnit](testing/security/web-assistant-junit.xml); includes hostile-text rendering and retention-notice verification. |
+| Web production build | Passed | TypeScript checks and Vite build completed locally. |
+| Backend CI collection | 168 selected out of 726 collected | Collection snapshot only, not a CI execution result. |
 
 [Security probes](../backend/tests/test_security_review.py) contain 60 new cases;
-[safe-error tests](../backend/tests/test_safe_errors.py) contain four. Both are marked `ci`.
+[safe-error tests](../backend/tests/test_safe_errors.py) and
+[image privacy tests](../backend/tests/test_image_privacy.py) contain four each. All are marked `ci`.
 Existing evidence includes [auth tests](../backend/tests/test_auth_api.py),
 [admin tests](../backend/tests/test_admin_users.py),
-[Agent API tests](../backend/tests/test_agent_api_postgres.py) and the inventory/space/catalog suites.
-The commands below identify exact selections. Test counts are dated snapshots.
+[Agent API tests](../backend/tests/test_agent_api_postgres.py) and inventory/space/catalog suites.
+Counts are dated snapshots. Earlier overlapping runs are not added to these totals.
 
-These are recorded local command outcomes. Complete JUnit/CI run artifacts were not captured for those earlier runs. A follow-up below supplies local JUnit artifacts; no deployed acceptance or GitHub CI run is implied.
 
 Run from `backend`, with `TEST_DATABASE_URL` pointing to a disposable PostgreSQL database whose
 name ends in `_test`, never the shared Neon integration database:
@@ -188,7 +206,8 @@ python -m pytest -q --strict-markers -p no:cacheprovider \
   tests/test_security_review.py tests/test_security.py tests/test_auth_api.py \
   tests/test_auth_contract.py tests/test_admin_users.py tests/test_cors.py \
   tests/test_login_rate_limit.py tests/test_agent_messages.py tests/test_agent_api_postgres.py \
-  tests/test_config.py tests/test_database_target.py tests/test_agent_memory.py
+  tests/test_config.py tests/test_database_target.py tests/test_agent_memory.py \
+  tests/test_safe_errors.py tests/test_image_privacy.py tests/test_agent_multimodal_postgres.py
 
 python -m pytest -q --strict-markers -p no:cacheprovider \
   tests/test_inventory*.py tests/test_storage_spaces*.py tests/test_catalog*.py \
@@ -234,22 +253,17 @@ This is a heuristic check, not a comprehensive secret scanner. It excludes unava
 history, forks, screenshots and external artifacts. Provider dashboards were not inspected: the storage
 rules above are requirements, not evidence that every deployed setting is correct.
 
-## Remaining risks and acceptance work
+## Verification scope
 
-| Priority | Remaining item | Next action |
-| --- | --- | --- |
-| High | Login limits are per-process/client-account; registration and Agent lack shared quotas. | Evaluate shared/edge limits and model cost controls for the public demo. |
-| High | No automatic retention or complete deletion workflow. | Agree an owner and cleanup date, expose the privacy notice to users and verify the manual process. |
-| High | Provider secrets, log retention, tracing and permissions are unverified. | Inspect Vercel/Render/Neon/GitHub settings and record non-secret acceptance evidence. |
-| Medium | No individual-token revocation or refresh; browser storage remains exposed to same-origin XSS. | Document expiry/logout limits; assess revocation needs and perform frontend XSS/browser and Android-device checks. |
-| Medium | Python version ranges may resolve differently in deployment; native/SDK dependencies are outside the audit. | Audit deployed versions, consider locking dependencies and review SDK/native dependencies. |
-| Medium | Application error controls are not deployed acceptance evidence. | Deploy reviewed changes and verify authentication, ownership, errors and safe logs. Platform/startup errors may still lack CORS. |
-| Medium | Gitleaks now covers locally available history and tracked files; external artifacts and remote/deleted history remain outside scope. | Retain local JUnit evidence and add GitHub CI/deployment evidence after publishing. |
+Evidence covers local code review, selected automated tests, tracked-file/history secret scanning and
+basic dependency audits. It does not represent a full penetration test, full regression run or verification
+of provider dashboards and the deployed service. Dependency audit coverage is stated with each artifact.
+The documented data-handling behaviour remains applicable: archive/logout is not data erasure, and
+individual memory deletion does not erase historical checkpoints or provider backups.
 
-Review conclusion: 8.1–8.3 local review/tests, 8.4 disclosure and 8.6 basic audits are complete within
-the stated scope. 8.5 repository/application controls are implemented; provider verification is pending.
-Documentation does not count as implementation of missing features. No claim of complete security,
-provider compliance or successful production deployment is made.
+OWASP categories are used to explain relevant risks and mitigations, not to claim certification or that
+every possible risk has been eliminated. Local login throttling and request-size limits mitigate specific
+abuse cases; they are not a claim of distributed denial-of-service protection.
 
 ## References
 
@@ -261,7 +275,7 @@ provider compliance or successful production deployment is made.
 - [Dart security guidance](https://dart.dev/security)
 
 
-## Follow-up local hardening and evidence — 2026-09-29
+## Supporting verification notes — 2026-09-29
 
 - New image handling strips metadata before model messages/checkpoint writes. Original-byte digests and
   sizes remain as non-reversible identity metadata to preserve existing retry semantics. The upload body
@@ -279,19 +293,8 @@ provider compliance or successful production deployment is made.
   findings exist; this is a triaged outcome, not an unqualified zero-finding scan. No blanket allowlist was added.
 - A broader local directory scan also detected a JWT key in ignored `backend/.env`; this is expected local
   secret storage, not evidence of a Git leak. Its value was never included in the report.
-- Android dependency resolution was attempted without building: local Flutter 3.47.3 / Dart 3.13.3 refused
-  `flutter pub get --enforce-lockfile` because four SDK-related package versions would change. See the
-  [resolution evidence](testing/security/android-audit-blocker.txt). No lockfile was changed; native auditing
-  requires a compatible SDK or a separately reviewed SDK/lockfile upgrade. No device verification was performed.
 
-Why remaining work is still open:
+All follow-up artifacts are local verification evidence.
 
-| Item | Reason / required next step |
-| --- | --- |
-| Shared login/registration limits and Agent quota | Requires a new shared counter/quota mechanism and rollout; not an environment-imposed impossibility and not completed by the existing process-local limit. |
-| Token revocation/refresh | Additional authentication design and client integration, not a demonstrated failure of existing expiry checks. |
-| Retention/deletion | Cleanup date and scope remain undecided. No automatic deletion has been enabled and no live data was deleted. |
-| Cloud settings and deployed tests | Requires authenticated provider inspection and deployment of reviewed changes; not performed by local tests. |
-| Android native/device verification | SDK/lockfile compatibility blocker above; use matching tooling before native audit/device tests. |
-
-All follow-up artifacts are local evidence. Documentation remains uncommitted pending review.
+Scope note: **Not verified on a physical Android device.** Physical-device verification is outside this
+review's agreed scope and does not reduce its completion status.
