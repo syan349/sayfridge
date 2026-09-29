@@ -17,6 +17,7 @@ class Settings(BaseSettings):
         env_file=BACKEND_DIR / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     # repr=False prevents full connection strings from appearing in debug representations.

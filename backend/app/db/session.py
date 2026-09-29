@@ -15,6 +15,8 @@ settings = get_settings()
 engine = create_async_engine(
     settings.database_url.get_secret_value(),
     pool_pre_ping=True,
+    # Keep bound account/inventory values out of SQLAlchemy exception logs.
+    hide_parameters=True,
 )
 AsyncSessionFactory = async_sessionmaker(
     bind=engine,

@@ -85,8 +85,8 @@ export function AssistantPage() {
 
             {state.restored && (
               <p className={styles.note}>
-                Earlier messages aren’t shown after a reload — the server only keeps what the assistant proposed and
-                saved, listed on the right.
+                Earlier messages aren’t shown here after a reload. The server may retain conversation history and
+                submitted images to resume your session; proposed and saved operations are listed on the right.
               </p>
             )}
 

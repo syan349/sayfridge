@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites name="vitest tests" tests="7" failures="0" errors="0" time="0.762683666">
+    <testsuite name="src/pages/assistant/AssistantPage.test.tsx" timestamp="2026-09-29T04:33:48.046Z" hostname="local-review" tests="7" failures="0" errors="0" skipped="0" time="0.762683666">
+        <testcase classname="src/pages/assistant/AssistantPage.test.tsx" name="AssistantPage (W07) &gt; renders hostile model text as text, never executable HTML" time="0.217568708">
+        </testcase>
+        <testcase classname="src/pages/assistant/AssistantPage.test.tsx" name="AssistantPage (W07) &gt; streams the answer into the chat, and sends today’s local date and a request id" time="0.083286959">
+        </testcase>
+        <testcase classname="src/pages/assistant/AssistantPage.test.tsx" name="AssistantPage (W07) &gt; shows a proposal, and Confirm sends it back with POST /agent/resume" time="0.113787834">
+        </testcase>
+        <testcase classname="src/pages/assistant/AssistantPage.test.tsx" name="AssistantPage (W07) &gt; Edit sends what should change, in the user’s words" time="0.188449167">
+        </testcase>
+        <testcase classname="src/pages/assistant/AssistantPage.test.tsx" name="AssistantPage (W07) &gt; brings the conversation back after a reload, with the proposal still waiting" time="0.023460833">
+        </testcase>
+        <testcase classname="src/pages/assistant/AssistantPage.test.tsx" name="AssistantPage (W07) &gt; offers Try again when the answer breaks off, and retries with the same request id" time="0.093628834">
+        </testcase>
+        <testcase classname="src/pages/assistant/AssistantPage.test.tsx" name="AssistantPage (W07) &gt; says so when the assistant is unavailable" time="0.038747625">
+        </testcase>
+    </testsuite>
+</testsuites>

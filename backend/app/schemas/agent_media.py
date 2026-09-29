@@ -7,7 +7,7 @@ import warnings
 from typing import Literal
 from uuid import UUID
 
-from PIL import Image
+from PIL import Image, ImageOps
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 from pydantic_core import PydanticCustomError
 
@@ -24,6 +24,8 @@ class AgentImage(BaseModel):
     data_base64: str = Field(max_length=4 * ((MAX_IMAGE_BYTES + 2) // 3), repr=False)
     _size: int = PrivateAttr(default=0)
     _digest: str = PrivateAttr(default="")
+    _safe_base64: str = PrivateAttr(default="")
+    _safe_size: int = PrivateAttr(default=0)
 
     @model_validator(mode="after")
     def validate_image(self):
@@ -46,6 +48,22 @@ class AgentImage(BaseModel):
                     picture.verify()
                 with Image.open(io.BytesIO(raw)) as picture:
                     picture.load()
+                    # Correct camera orientation before removing metadata. Copy only
+                    # pixels so EXIF/GPS, XMP, comments and trailing data cannot pass
+                    # into model messages or their persisted checkpoints.
+                    oriented = ImageOps.exif_transpose(picture)
+                    mode = "RGBA" if "A" in oriented.getbands() or "transparency" in oriented.info else "RGB"
+                    if self.mime_type == "image/jpeg":
+                        mode = "RGB"
+                    pixels = oriented.convert(mode)
+                    clean = Image.frombytes(mode, pixels.size, pixels.tobytes())
+                    output = io.BytesIO()
+                    clean.save(output, format=picture.format)
+                    safe = output.getvalue()
+                    if len(safe) > MAX_IMAGE_BYTES:
+                        raise PydanticCustomError("IMAGE_TOO_LARGE", "Sanitized image exceeds 3 MiB")
+                    self._safe_base64 = base64.b64encode(safe).decode("ascii")
+                    self._safe_size = len(safe)
         except PydanticCustomError:
             raise
         except Exception:
@@ -53,13 +71,17 @@ class AgentImage(BaseModel):
         self._size, self._digest = len(raw), hashlib.sha256(raw).hexdigest()
         return self
 
+    def model_data_url(self):
+        """Only decoded, metadata-free pixels may leave the request boundary."""
+        return f"data:{self.mime_type};base64,{self._safe_base64}"
+
     def metadata(self):
         return {"image_id": str(self.image_id), "mime_type": self.mime_type,
                 "sha256": self._digest, "size_bytes": self._size}
 
 
 def validate_image_batch(images):
-    if len(images) > 4 or sum(i._size for i in images) > MAX_TOTAL_BYTES:
+    if len(images) > 4 or sum(max(i._size, i._safe_size) for i in images) > MAX_TOTAL_BYTES:
         raise PydanticCustomError("IMAGE_BATCH_TOO_LARGE", "Send at most 4 images totaling at most 8 MiB")
     if len({i.image_id for i in images}) != len(images):
         raise PydanticCustomError("DUPLICATE_IMAGE_ID", "Image IDs must be unique within a request")
