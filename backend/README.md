@@ -87,6 +87,10 @@ and MFA are not currently available. Clients log out by deleting their token; an
 issued token otherwise remains usable until expiry unless the account is suspended,
 disabled, or deleted.
 
+The [8.1–8.3 security review](../docs/testing/SECURITY_REVIEW.md) records focused
+verification and remaining risks. Runtime SQLAlchemy exceptions hide bound SQL
+parameters; this does not replace sanitizing driver messages or application logs.
+
 ## Web browser access (CORS)
 
 Set `CORS_ORIGINS` to the exact browser origins allowed to call the API. The value
