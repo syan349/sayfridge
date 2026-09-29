@@ -1,198 +1,219 @@
 import 'package:flutter/material.dart';
 
+import '../state/agent_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
-import '../widgets/app_bottom_navigation.dart';
 
 class ConversationHistoryScreen extends StatelessWidget {
-  const ConversationHistoryScreen({super.key});
+  const ConversationHistoryScreen({this.controller, super.key});
 
-  static const _today = <_ConversationRecord>[
-    _ConversationRecord('What’s expiring soon?', '03:06 PM'),
-    _ConversationRecord('Add chicken to fridge.', '09:25 AM'),
-  ];
-
-  static const _earlier = <_ConversationRecord>[
-    _ConversationRecord('Record milk used.', '15 Sep 2026'),
-    _ConversationRecord('Daily fridge check-in', '15 Sep 2026'),
-    _ConversationRecord('What fruit is left?', '14 Sep 2026'),
-    _ConversationRecord('Remove one chicken breast.', '13 Sep 2026'),
-    _ConversationRecord('Give me a fridge summary.', '11 Sep 2026'),
-    _ConversationRecord('What vegetables do I have?', '09 Sep 2026'),
-  ];
+  final AgentController? controller;
 
   @override
   Widget build(BuildContext context) {
+    final agent = controller;
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 27, 24, 42),
+              child: agent == null
+                  ? _content(context, null)
+                  : ListenableBuilder(
+                      listenable: agent,
+                      builder: (context, _) => _content(context, agent),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, AgentController? agent) {
+    final hasCurrentConversation = agent?.conversationId != null;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 27, 24, 42),
+      children: [
+        SizedBox(
+          height: 48,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 40,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerLeft,
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 29),
+                  tooltip: 'Back',
+                ),
+              ),
+              const Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Conversation History',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.35,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 40),
+            ],
+          ),
+        ),
+        const SizedBox(height: 30),
+        const Text(
+          'The latest 20 conversations on this device appear here. '
+          'Chats from before this update cannot be restored.',
+          style: TextStyle(color: AppColors.muted, fontSize: 15, height: 1.4),
+        ),
+        const SizedBox(height: 32),
+        if (hasCurrentConversation) ...[
+          const Text(
+            'Current conversation',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 17),
+          Material(
+            color: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              side: const BorderSide(color: Color(0xFFB5CE9F), width: 1.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: InkWell(
+              onTap: () => Navigator.of(context).pop(),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 15, 11, 15),
+                child: Row(
+                  children: [
+                    const Icon(Icons.chat_bubble_outline_rounded, size: 30),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _latestUserMessage(agent!) ??
+                                'Return to your current session',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 16.5),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            agent.waiting
+                                ? 'Waiting for your input'
+                                : agent.unresolved
+                                ? 'Needs recovery'
+                                : 'Open conversation',
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 14.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, size: 30),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ] else if (agent == null || agent.history.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 45),
+              child: Column(
                 children: [
-                  SizedBox(
-                    height: 48,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(
-                            onPressed: () => Navigator.of(context).maybePop(),
-                            padding: EdgeInsets.zero,
-                            alignment: Alignment.centerLeft,
-                            icon: const Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              size: 29,
-                            ),
-                            tooltip: 'Back',
-                          ),
-                        ),
-                        const Text(
-                          'Conversation History',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.35,
-                          ),
-                        ),
-                      ],
-                    ),
+                  Icon(Icons.history_rounded, size: 58, color: AppColors.muted),
+                  SizedBox(height: 18),
+                  Text(
+                    'No current conversation',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 24),
-                  Container(
-                    height: 53,
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(17),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.search_rounded, size: 30),
-                        SizedBox(width: 14),
-                        Expanded(
-                          child: TextField(
-                            decoration: InputDecoration(
-                              hintText: 'Search conversations ...',
-                              hintStyle: TextStyle(
-                                color: AppColors.muted,
-                                fontSize: 17,
-                              ),
-                              filled: false,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Start a chat with the assistant to see it here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.muted, fontSize: 15),
                   ),
-                  const SizedBox(height: 39),
-                  const _HistorySection(title: 'Today', records: _today),
-                  const SizedBox(height: 57),
-                  const _HistorySection(title: 'Earlier', records: _earlier),
                 ],
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ConversationRecord {
-  const _ConversationRecord(this.title, this.time);
-
-  final String title;
-  final String time;
-}
-
-class _HistorySection extends StatelessWidget {
-  const _HistorySection({required this.title, required this.records});
-
-  final String title;
-  final List<_ConversationRecord> records;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+        const SizedBox(height: 32),
+        const Text(
+          'Earlier conversations',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 17),
-        for (var index = 0; index < records.length; index++) ...[
-          _HistoryCard(record: records[index]),
-          if (index != records.length - 1) const SizedBox(height: 14),
-        ],
+        if (agent == null || agent.history.isEmpty)
+          const Text(
+            'No earlier conversations on this device yet.',
+            style: TextStyle(color: AppColors.muted, fontSize: 15),
+          )
+        else
+          for (final conversation in agent.history) ...[
+            Material(
+              color: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Color(0xFFB5CE9F), width: 1.2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: InkWell(
+                onTap: agent.canSend
+                    ? () async {
+                        await agent.openConversation(conversation.id);
+                        if (context.mounted) Navigator.of(context).pop();
+                      }
+                    : null,
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 15, 11, 15),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.chat_bubble_outline_rounded, size: 30),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          conversation.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 16.5),
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, size: 30),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        if (agent != null && agent.history.isNotEmpty && !agent.canSend)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'Finish or recover the current request before switching conversations.',
+              style: TextStyle(color: AppColors.muted, fontSize: 14),
+            ),
+          ),
       ],
     );
   }
-}
 
-class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({required this.record});
-
-  final _ConversationRecord record;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 76,
-      padding: const EdgeInsets.fromLTRB(16, 11, 11, 11),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        border: Border.all(color: const Color(0xFFB5CE9F), width: 1.2),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            AssistantAssets.chat,
-            width: 31,
-            height: 31,
-            cacheWidth: 90,
-          ),
-          Container(
-            width: 1,
-            height: 47,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            color: const Color(0xFFB5CE9F),
-          ),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  record.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 16.5, height: 1.05),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  record.time,
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 14.5,
-                    height: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, size: 30),
-        ],
-      ),
-    );
+  String? _latestUserMessage(AgentController agent) {
+    for (final entry in agent.messages.entries.toList().reversed) {
+      if (entry.key.startsWith('user:')) return entry.value;
+    }
+    return null;
   }
 }
