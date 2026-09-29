@@ -74,7 +74,6 @@ def test_expiry_summary_classifies_orders_and_preserves_archived_associations(
     assert body["items"][0]["item_definition_name"] == "Archived rice"
 
 
-@pytest.mark.ci
 def test_bucket_filters_details_without_changing_counts_and_pages(inventory_context):
     context = inventory_context
     first = seed_inventory(context, expiry_date=date(2026, 9, 20))
@@ -100,7 +99,6 @@ def test_bucket_filters_details_without_changing_counts_and_pages(inventory_cont
     assert str(first.id) != str(second.id)
 
 
-@pytest.mark.ci
 def test_expiry_summary_applies_owned_space_and_category_filters(inventory_context):
     context = inventory_context
     seed_inventory(context, expiry_date=date(2026, 9, 24))

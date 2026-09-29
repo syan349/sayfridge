@@ -1,0 +1,82 @@
+name: Frontend CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-tests:
+    name: Web tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npx tsc -b
+      - name: Unit and UI tests (mock APIs)
+        run: npm test -- --reporter=default --reporter=junit --outputFile=test-results.xml
+      - name: Verify production build
+        run: npm run build
+      - name: Test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-test-results
+          path: web/test-results.xml
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 7
+          if-no-files-found: error
+
+  flutter-tests:
+    name: Flutter tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: mobile
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          # Keep aligned with mobile/scripts/render-build.sh and README.md.
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+      - name: SDK version
+        run: flutter --version
+      - name: Install locked dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Unit and widget tests (no device or live APIs)
+        run: flutter test --no-pub --exclude-tags manual_preview --machine | tee test-results.jsonl
+      - name: Test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-test-results
+          path: mobile/test-results.jsonl
+          retention-days: 7
+          if-no-files-found: warn

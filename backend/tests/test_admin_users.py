@@ -47,7 +47,6 @@ def admin_request(context, method, path="", *, query="", json=None):
     )
 
 
-@pytest.mark.ci
 def test_admin_lists_filters_and_paginates_safe_user_fields(admin_context):
     context = admin_context
     response = admin_request(context, "GET")

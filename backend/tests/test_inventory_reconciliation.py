@@ -74,7 +74,7 @@ def test_reconcile_records_a_new_confirmation_even_when_total_is_unchanged(
 
 @pytest.mark.parametrize("total,space_status,expected", [
     ("1", "ACTIVE", 201),
-    pytest.param("1", "ARCHIVED", 409, marks=pytest.mark.ci),
+    pytest.param("1", "ARCHIVED", 409),
     ("0", "ARCHIVED", 201),
 ])
 def test_reconcile_empty_inventory_applies_space_rules(

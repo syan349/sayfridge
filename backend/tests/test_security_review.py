@@ -18,7 +18,6 @@ from app.main import app
 from app.schemas.agent_media import MAX_IMAGE_BYTES, MAX_REQUEST_BYTES
 from agent_image_support import image_input
 
-pytestmark = pytest.mark.ci
 ORIGIN = "http://localhost:5173"
 
 
@@ -72,6 +71,7 @@ def test_missing_required_token_claim_is_rejected(claim):
 
 
 @pytest.mark.parametrize("algorithm", ["none", "HS384"])
+@pytest.mark.ci
 def test_unapproved_jwt_algorithm_is_rejected(algorithm, monkeypatch):
     monkeypatch.setattr(get_settings(), "jwt_secret_key", SecretStr("s" * 64))
     now = datetime.now(timezone.utc)
@@ -82,7 +82,7 @@ def test_unapproved_jwt_algorithm_is_rejected(algorithm, monkeypatch):
     assert send("GET", "/api/v1/auth/me", headers={"Authorization": "Bearer " + token}).status_code == 401
 
 
-@pytest.mark.parametrize("case", ["svg", "mime_mismatch", "fake_png", "filename", "url", "oversize", "too_many"])
+@pytest.mark.parametrize("case", [pytest.param("svg", marks=pytest.mark.ci), "mime_mismatch", "fake_png", "filename", "url", "oversize", "too_many"])
 def test_untrusted_uploads_are_rejected_without_echo(schema_client, case):
     image = image_input().model_dump(mode="json")
     sentinel = "PRIVATE_UPLOAD_SENTINEL"
@@ -113,6 +113,7 @@ def test_declared_oversized_body_is_rejected_with_cors(path):
     assert response.headers["access-control-allow-origin"] == ORIGIN
 
 
+@pytest.mark.ci
 def test_chunked_oversized_body_is_rejected_with_cors():
     async def scenario():
         async def chunks():
@@ -150,6 +151,7 @@ def test_every_protected_route_rejects_missing_identity(method, path):
     assert response.status_code == 401, (method, path, response.text)
 
 
+@pytest.mark.ci
 def test_sql_exception_representation_hides_bound_private_data():
     # Drivers/ASGI servers may log SQLAlchemy exception text on an unhandled error.
     error = StatementError("execution failed", "INSERT INTO users VALUES (:email)",

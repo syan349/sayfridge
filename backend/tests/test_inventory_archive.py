@@ -153,7 +153,6 @@ def test_archive_is_allowed_in_an_archived_space(inventory_context):
     assert response.json()["status"] == "ARCHIVED"
 
 
-@pytest.mark.ci
 def test_concurrent_archives_with_one_version_have_one_winner(inventory_context):
     context = inventory_context
     item = seed_inventory(context)

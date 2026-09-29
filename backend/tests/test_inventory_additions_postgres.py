@@ -21,7 +21,7 @@ pytestmark = pytest.mark.postgres
     [
         pytest.param(
             True,
-            marks=[pytest.mark.ci, pytest.mark.database_acceptance],
+            marks=[pytest.mark.database_acceptance],
         ),
         False,
     ],
@@ -106,7 +106,7 @@ def test_operation_insert_failure_rolls_back_inventory_and_session_recovers(inve
 
 
 @pytest.mark.parametrize("action,code",[
-    pytest.param("archive","STATE_CONFLICT",marks=pytest.mark.ci),
+    pytest.param("archive","STATE_CONFLICT",marks=[]),
     ("move","RESOURCE_CHANGED"),
 ])
 def test_addition_rechecks_changes_after_waiting_for_space_lock(inventory_context,monkeypatch,action,code):
