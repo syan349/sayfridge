@@ -12,6 +12,7 @@ from app.core.demo_catalog import (
     DEMO_USERS,
     INVENTORY_SCENARIOS,
     PUBLIC_ITEM_DEFINITIONS,
+    demo_uuid,
 )
 from app.core.security import hash_password, verify_password
 from app.db.models import (
@@ -22,6 +23,7 @@ from app.db.models import (
     StorageSpace,
     User,
 )
+from app.schemas.auth import LoginRequest
 from scripts.manage_demo_data import (
     inspect_demo_data,
     reset_demo_data,
@@ -49,6 +51,8 @@ def test_demo_seed_is_complete_idempotent_and_resettable(database):
     _url, _schema, engine = database
     existing_id = None
     existing_hash = hash_password("existing-account-password")
+    legacy_entry = next(entry for entry in DEMO_USERS if entry.seed_key != entry.email)
+    legacy_id = demo_uuid(f"user:{legacy_entry.seed_key}")
 
     with Session(engine) as session, session.begin():
         _seed_categories(session)
@@ -62,6 +66,18 @@ def test_demo_seed_is_complete_idempotent_and_resettable(database):
             voice_used_seconds=0,
         )
         session.add(existing)
+        session.add(
+            User(
+                id=legacy_id,
+                email=legacy_entry.seed_key,
+                password_hash=existing_hash,
+                auth_provider="LOCAL",
+                role=legacy_entry.role,
+                status="ACTIVE",
+                voice_limit_seconds=0,
+                voice_used_seconds=0,
+            )
+        )
         session.flush()
         existing_id = existing.id
 
@@ -83,6 +99,14 @@ def test_demo_seed_is_complete_idempotent_and_resettable(database):
         assert preserved is not None
         assert preserved.id == existing_id
         assert preserved.password_hash == existing_hash
+        renamed = session.scalar(
+            select(User).where(User.email == legacy_entry.email)
+        )
+        assert renamed is not None
+        assert renamed.id == legacy_id
+        assert session.scalar(
+            select(User).where(User.email == legacy_entry.seed_key)
+        ) is None
 
     with Session(engine) as session, session.begin():
         rotated = seed_demo_data(
@@ -145,3 +169,9 @@ def test_demo_seed_is_complete_idempotent_and_resettable(database):
         preserved = session.scalar(select(User).where(User.email == DEMO_USERS[0].email))
         assert preserved is not None
         assert preserved.id == existing_id
+
+
+def test_demo_account_emails_are_valid_login_inputs():
+    for entry in DEMO_USERS:
+        payload = LoginRequest(email=entry.email, password="valid-password")
+        assert str(payload.email) == entry.email

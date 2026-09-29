@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 UserRole = Literal["USER", "ADMIN"]
 UserStatus = Literal["ACTIVE", "SUSPENDED", "DISABLED"]
@@ -29,7 +29,7 @@ class AdminUserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    email: EmailStr
+    email: str
     role: UserRole
     status: UserStatus
     created_at: datetime
