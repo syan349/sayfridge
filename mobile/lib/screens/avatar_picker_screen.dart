@@ -189,6 +189,7 @@ class AvatarBubble extends StatelessWidget {
     this.showUploadBadge = false,
     this.onTap,
     this.onUploadTap,
+    this.isUploading = false,
     super.key,
   });
 
@@ -199,6 +200,7 @@ class AvatarBubble extends StatelessWidget {
   final bool showUploadBadge;
   final VoidCallback? onTap;
   final VoidCallback? onUploadTap;
+  final bool isUploading;
 
   @override
   Widget build(BuildContext context) {
@@ -240,17 +242,30 @@ class AvatarBubble extends StatelessWidget {
                       shape: const CircleBorder(),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
-                        onTap: showUploadBadge ? onUploadTap : null,
+                        onTap: showUploadBadge && !isUploading
+                            ? onUploadTap
+                            : null,
                         customBorder: const CircleBorder(),
-                        child: Icon(
-                          showUploadBadge
-                              ? Icons.ios_share_rounded
-                              : Icons.check,
-                          size: resolvedSize * 0.2,
-                          color: showUploadBadge
-                              ? AppColors.text
-                              : Colors.white,
-                        ),
+                        child: isUploading
+                            ? Center(
+                                child: SizedBox.square(
+                                  key: const Key('avatar-upload-loading'),
+                                  dimension: resolvedSize * 0.18,
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2.3,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                showUploadBadge
+                                    ? Icons.ios_share_rounded
+                                    : Icons.check,
+                                size: resolvedSize * 0.2,
+                                color: showUploadBadge
+                                    ? AppColors.text
+                                    : Colors.white,
+                              ),
                       ),
                     ),
                   ),

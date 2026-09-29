@@ -59,7 +59,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
 
   Future<void> _uploadAvatar() async {
     if (_pickingImage) return;
-    _pickingImage = true;
+    setState(() => _pickingImage = true);
     try {
       final image = await ImagePicker().pickImage(
         source: ImageSource.gallery,
@@ -80,7 +80,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         _message('Unable to open that photo. Please try another image.');
       }
     } finally {
-      _pickingImage = false;
+      if (mounted) setState(() => _pickingImage = false);
     }
   }
 
@@ -122,6 +122,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
             asset: _avatarAsset,
             bytes: _avatarBytes,
             onUpload: _uploadAvatar,
+            uploading: _pickingImage,
           ),
         ),
         const SizedBox(height: 10),

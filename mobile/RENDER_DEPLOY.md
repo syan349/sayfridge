@@ -2,34 +2,41 @@
 
 目标：老师通过手机 Safari、Chrome 或电脑浏览器打开一个 HTTPS 网址，使用 Flutter 手机界面。这个站点与已上线的 React Web 分开创建，共用实际后端。
 
-## 1. 将准备好的代码放到 GitHub
+## 1. 正式站与测试站
 
-最终部署分支使用 `main`。本次部署改动在以最新 `main` 为基线的 `mobile-render` 分支准备；先将改动合入 GitHub 上的 `main`，再创建 Render 站点。
+同一个 GitHub 仓库可以创建两个独立的 Flutter Static Site，分别跟踪不同分支：
 
-在 GitHub Desktop 中按以下顺序操作：
+| 用途 | Render 站点名称 | Branch |
+| --- | --- | --- |
+| 正式展示 | `sayfridge-mobile`（现有站点） | `main` |
+| 日常测试 | `sayfridge-mobile-test`，或另一个可用名称 | `mobile-render` |
 
-1. 当前分支保持 `mobile-render`，检查并提交本次部署文件。
-2. 点击 **Publish branch**（已发布时为 **Push origin**），将分支上传到 GitHub。
-3. 创建 Pull Request，目标为 **base: main**，来源为 **compare: mobile-render**。
-4. 检查 Files changed 只包含预期的手机端部署改动，待检查通过并按小组流程合并 PR。若 `main` 在此期间有更新，先在 `mobile-render` 合入最新 `main`，处理冲突并重新检查。
-5. 确认 GitHub 的 `main` 已包含 `mobile/scripts/render-build.sh`、`mobile/web/index.html` 等文件，然后在 Render 选择 `main`。
+日常使用 GitHub Desktop：
 
-提交和发布 `mobile-render` 本身不会修改远程 `main`；合并 PR 才会把这些改动加入 `main`。不要手动用旧目录覆盖 `main`，也不要强制推送。不要添加 `.env`、SDK、依赖目录或 `build/` 产物。Render 会从 GitHub 拉取源码并自行构建。
+1. **Current branch** 保持 `mobile-render`，检查 Changes，填写 Summary，再点击 **Commit to mobile-render**。
+2. 点击 **Push origin**（分支尚未发布时为 **Publish branch**）。只有本地 Commit 不会触发云端部署。
+3. 测试站在 `On Commit` 模式下自动重新部署；到该站的 **Deploys** 等待成功，再打开测试网址验收。日常测试不需要创建 PR。
+4. 一批修改验证稳定后，再创建 Pull Request：**base: main**，**compare: mobile-render**。按小组流程审批合并后，正式站自动更新。
+5. 在下一批工作开始前，先提交保存本地改动并 **Fetch origin**；保持 `mobile-render`，通过 **Branch → Merge into current branch** 将最新 `origin/main` 合入测试分支（若界面只有 `main`，先确保本地 `main` 已拉取到最新）。处理冲突、检查后再 Push。同步方向是 `main → mobile-render`。
 
-既有 React 站点继续使用 `main` 和 `web` 根目录；新手机站点使用同一个 `main` 和 `mobile` 根目录。
+提交和发布 `mobile-render` 本身不会修改远程 `main`；合并 PR 才会把这些改动加入 `main`。不要手动用旧目录覆盖 `main`，也不要强制推送。不要添加 `.env`、SDK、依赖目录或 `build/` 产物。Render 会从 GitHub 拉取源码并自行构建。[Render 分支自动部署说明](https://render.com/docs/deploys#automatic-deploys)
 
-## 2. 新建第二个 Static Site
+两个站点的部署与前端配置独立；如果 `API_BASE_URL` 指向同一个后端，仍共享该后端的数据。测试站不会自动创建独立数据库。现有 React 站点保持原配置。
 
-Render → New → Static Site → 选择同一个 GitHub 仓库。
+## 2. 新建测试 Static Site
+
+先将本地修改推送到 GitHub 的 `mobile-render`。Render → New → Static Site → 选择同一个 GitHub 仓库。保留现有正式站的 `main` 配置。
 
 | 配置 | 值 |
 | --- | --- |
-| Name | `sayfridge-mobile`，或另一个可用名称 |
-| Branch | `main`（先确保部署改动已合并到 GitHub 上的 main） |
+| Name | `sayfridge-mobile-test`，或另一个可用名称 |
+| Branch | `mobile-render` |
 | Root Directory | `mobile` |
 | Build Command | `bash scripts/render-build.sh` |
 | Publish Directory | `build/web` |
 | Auto-Deploy | `On Commit` |
+
+Project 可选；Secret Files 和 Build Filters 保持空白。以后需要重建正式站时，使用同样的构建设置，将 Name 与 Branch 分别改为正式站名称和 `main`。
 
 目录均相对 `mobile`，发布目录不要再重复添加 `mobile/`。配置依据：[Render Monorepo Support](https://render.com/docs/monorepo-support)。
 
@@ -60,13 +67,13 @@ Deploy succeeded 后，记录页面顶部实际的 `.onrender.com` 地址。不�
 
 Flutter 当前使用 Navigator 页面导航，不保证每个屏幕都有可分享的独立路径。回退规则用于让请求回到应用入口，不会自动为每个页面创建深链接。[Render 重写说明](https://render.com/docs/redirects-rewrites)
 
-让后端负责人在 **后端服务**的 `CORS_ORIGINS` 中保留原来源，并添加新手机站点的来源。例如，下面两个域名都是需要替换的占位符：
+让后端负责人在 **后端服务**的 `CORS_ORIGINS` 中保留原来源，并添加测试站的实际来源。例如，下面三个域名都是需要替换的占位符：
 
 ```text
-CORS_ORIGINS=["https://YOUR-REACT-SITE.onrender.com","https://YOUR-FLUTTER-SITE.onrender.com"]
+CORS_ORIGINS=["https://YOUR-REACT-SITE.onrender.com","https://YOUR-FLUTTER-SITE.onrender.com","https://YOUR-FLUTTER-TEST-SITE.onrender.com"]
 ```
 
-这里填完整 HTTPS 来源，不带 `/api/v1` 或页面路径。后端需要部署已包含 CORS 中间件的版本，并配置这两个站点的来源；前端代码合入 `main` 不代表云端后端已同步部署或配置完成。
+这里填完整 HTTPS 来源，不带 `/api/v1` 或页面路径。后端需要部署已包含 CORS 中间件的版本，并配置各站点的来源；前端代码合入 `main` 不代表云端后端已同步部署或配置完成。
 
 ## 4. 老师访问前的验收
 
@@ -93,4 +100,4 @@ CORS_ORIGINS=["https://YOUR-REACT-SITE.onrender.com","https://YOUR-FLUTTER-SITE.
 | 页面能开，登录失败 | 检查编译时 API 地址、后端实际版本、CORS、数据库和测试账号 |
 | 浏览器显示旧版本 | 确认最新部署成功后刷新；检查实际 URL 和部署 commit |
 
-老师需要的是第二个站点的公开访问链接，不需要 Render 后台账号或安装 APK。登录后的业务功能仍需要应用自身账号和可用后端。
+老师使用正式站的公开访问链接；开发期间使用测试链接。两者都不需要 Render 后台账号或安装 APK。登录后的业务功能仍需要应用自身账号和可用后端。
