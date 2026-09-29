@@ -41,7 +41,6 @@ def test_consumption_and_replay_preserve_history_and_empty_state(inventory_conte
         assert session.scalar(select(func.count()).select_from(InventoryOperation)) == 1
 
 
-@pytest.mark.ci
 def test_fraction_consumption_preserves_estimated_state_at_zero(inventory_context):
     c = inventory_context; now = datetime.now(timezone.utc)
     item = seed_inventory(c, estimated_current_amount=Decimal("1"), estimated_current_unit="kg", estimated_at=now)
@@ -67,7 +66,7 @@ def test_fraction_rounds_applied_change_once(inventory_context):
 
 
 @pytest.mark.parametrize("value,kind,unit,code", [
-    pytest.param("1.001", "AMOUNT", "g", "INSUFFICIENT_QUANTITY", marks=pytest.mark.ci),
+    pytest.param("1.001", "AMOUNT", "g", "INSUFFICIENT_QUANTITY"),
     ("1/2", "FRACTION", "remaining", "QUANTITY_PRECISION_UNSUPPORTED"),
     ("1/3", "FRACTION", "remaining", "QUANTITY_TOO_SMALL"),
     ("1", "AMOUNT", "ml", "UNIT_NOT_CONVERTIBLE"),

@@ -24,7 +24,7 @@ def setup_owner(database):
     return owner, {"Authorization": f"Bearer {token}"}
 
 
-@pytest.mark.parametrize("operation", [pytest.param("create", marks=pytest.mark.ci), "rename", "restore"])
+@pytest.mark.parametrize("operation", [pytest.param("create"), "rename", "restore"])
 def test_concurrent_active_name_claims_have_one_winner(database, operation):
     """Independent requests contend for the same unique index; only one commits."""
     owner, headers = setup_owner(database)
@@ -53,7 +53,7 @@ def test_concurrent_active_name_claims_have_one_winner(database, operation):
     asyncio.run(exercise(database, scenario))
 
 
-@pytest.mark.parametrize("operation", [pytest.param("archive_after_stock", marks=pytest.mark.ci), "patch_after_archive"])
+@pytest.mark.parametrize("operation", [pytest.param("archive_after_stock"), "patch_after_archive"])
 def test_waiting_write_rechecks_committed_state_after_space_lock(database, monkeypatch, operation):
     """Hold a real row lock, prove the API waits on it, then commit a conflicting change."""
     owner, headers = setup_owner(database)

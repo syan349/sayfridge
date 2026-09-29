@@ -206,7 +206,6 @@ def test_me_tolerates_legacy_invalid_stored_email(database) -> None:
 
 
 @pytest.mark.parametrize("token_kind", ["missing", "invalid", "expired"])
-@pytest.mark.ci
 def test_me_rejects_missing_invalid_or_expired_token(database, token_kind: str) -> None:
     headers = None
     if token_kind == "invalid":

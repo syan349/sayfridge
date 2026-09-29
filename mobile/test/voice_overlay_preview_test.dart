@@ -64,7 +64,7 @@ void main() {
     await file.parent.create(recursive: true);
     await file.writeAsBytes(png!.buffer.asUint8List());
     await gesture.up();
-  });
+  }, tags: ['manual_preview']);
 }
 
 class _PreviewVoiceInput implements VoiceInputService {

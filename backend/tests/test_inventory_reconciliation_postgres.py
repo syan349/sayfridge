@@ -17,7 +17,6 @@ from test_inventory_reconciliation_quantities import reconciliation
 pytestmark = pytest.mark.postgres
 
 
-@pytest.mark.ci
 @pytest.mark.database_acceptance
 def test_concurrent_identical_reconciliations_apply_once(inventory_context, monkeypatch):
     context = inventory_context; item = seed_inventory(context)
@@ -51,7 +50,6 @@ def test_concurrent_identical_reconciliations_apply_once(inventory_context, monk
     asyncio.run(exercise(context[0], scenario))
 
 
-@pytest.mark.ci
 @pytest.mark.database_acceptance
 def test_reconciliation_insert_failure_rolls_back_and_allows_retry(inventory_context):
     context = inventory_context

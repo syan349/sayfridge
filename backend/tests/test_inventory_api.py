@@ -75,7 +75,6 @@ def test_inventory_list_visibility_filters_dates_order_and_empty_page(inventory_
     assert get("?q=_")["total"]==0
 
 
-@pytest.mark.ci
 def test_archived_associations_remain_readable_with_zero_estimate_and_current_names(inventory_context):
     c=inventory_context
     item=seed_inventory(c, estimated_current_amount=Decimal("0"), estimated_current_unit="kg", estimated_at=datetime.now(timezone.utc))
@@ -119,7 +118,7 @@ def test_invalid_stock_fields_are_rejected(inventory_context,changes):
     assert request(c[0],"POST",BASE,json=payload(c,**changes),headers=c[-1]).status_code==422
 
 
-@pytest.mark.parametrize("kind", [pytest.param("space",marks=pytest.mark.ci),"category","definition","foreign_space","foreign_definition","missing_space","missing_definition"])
+@pytest.mark.parametrize("kind", [pytest.param("space",marks=[]),"category","definition","foreign_space","foreign_definition","missing_space","missing_definition"])
 def test_stock_entry_requires_owned_active_visible_associations(inventory_context,kind):
     c=inventory_context
     values=payload(c)
@@ -156,7 +155,6 @@ def test_terminal_inventory_is_readable_but_not_editable(inventory_context,state
     assert request(c[0],"PATCH",url,json={"expected_version":1,"notes":"x"},headers=c[-1]).status_code==409
 
 
-@pytest.mark.ci
 def test_empty_inventory_can_leave_archived_space_but_cannot_move_to_foreign_or_archived_target(inventory_context):
     c=inventory_context;row=seed_inventory(c,status="EMPTY",confirmed_current_amount=Decimal("0"))
     foreign=seed_space(c[0],c[2].id)

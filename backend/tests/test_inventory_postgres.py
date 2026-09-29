@@ -28,7 +28,7 @@ def test_concurrent_metadata_writes_with_same_version_have_one_winner(inventory_
     asyncio.run(exercise(c[0],scenario))
 
 
-@pytest.mark.parametrize("operation",[pytest.param("create",marks=pytest.mark.ci),"move"])
+@pytest.mark.parametrize("operation",[pytest.param("create",marks=[]),"move"])
 def test_waiting_inventory_write_rechecks_archived_target_space(inventory_context,monkeypatch,operation):
     c=inventory_context
     target=seed_space(c[0],c[1].id,"Destination") if operation=="move" else c[4]

@@ -22,3 +22,9 @@ Thumbs.db
 !.env.test.example
 !.env.demo.example
 !.env.e2e.example
+
+# Local frontend CI reports (uploaded as Actions artifacts)
+/web/test-results.xml
+/mobile/test-results.jsonl
+
+/backend/test-results.xml

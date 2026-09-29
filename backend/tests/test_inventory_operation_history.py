@@ -126,7 +126,6 @@ def test_global_history_filters_inventory_type_status_and_half_open_time_range(i
     assert [row["id"] for row in inclusive.json()["items"]] == [str(operations[0].id)]
 
 
-@pytest.mark.ci
 def test_global_history_foreign_inventory_filter_returns_empty_page(inventory_context):
     context = inventory_context
     _, _, foreign_item, _, _, _, _, _ = build_history(context)
@@ -153,7 +152,6 @@ def test_operation_detail_returns_owned_record_including_historical_state(invent
     assert "idempotency_key" not in response.json()
 
 
-@pytest.mark.ci
 def test_operation_detail_hides_foreign_and_missing_records(inventory_context):
     context = inventory_context
     foreign_space = seed_space(context[0], context[2].id)

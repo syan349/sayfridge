@@ -63,7 +63,7 @@ def test_batch_create_returns_input_order_and_allows_identical_stock(inventory_c
         ),
         ("foreign_space", 404, "NOT_FOUND"),
         ("missing_definition", 404, "NOT_FOUND"),
-        pytest.param("archived_definition", 409, "STATE_CONFLICT", marks=pytest.mark.ci),
+        pytest.param("archived_definition", 409, "STATE_CONFLICT"),
     ],
 )
 def test_batch_create_rolls_back_every_item_and_reports_failing_index(
