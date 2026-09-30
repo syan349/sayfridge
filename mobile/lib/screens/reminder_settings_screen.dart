@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../services/notification_service.dart';
 import '../state/profile_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/profile_widgets.dart';
@@ -26,28 +28,77 @@ class ReminderSettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showNotificationStatus(BuildContext context) => showDialog<void>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Device notifications'),
-      content: const Text(
-        'Notification delivery is not available yet. You can set your reminder preferences and save them on this device.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('OK'),
+  Future<void> _enableNotifications(BuildContext context) async {
+    if (controller.notificationPermission ==
+        NotificationPermissionState.enabled) {
+      await _showStatus(context, 'Notifications are enabled.');
+      return;
+    }
+    final continueRequest = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enable notifications?'),
+        content: Text(
+          kIsWeb
+              ? 'SayFridge will show reminders when you open this website. Web browsers cannot deliver scheduled reminders while the site is closed.'
+              : 'SayFridge will use device notifications for expiry and daily inventory reminders at your selected time.',
         ),
-      ],
-    ),
-  );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (continueRequest != true || !context.mounted) return;
+    final enabled = await controller.requestNotificationPermission();
+    if (!context.mounted) return;
+    await _showStatus(
+      context,
+      enabled
+          ? kIsWeb
+                ? 'Notifications enabled. Unread reminders will appear when you open SayFridge.'
+                : 'Notifications enabled. Reminders will use your selected time.'
+          : controller.notificationError ?? 'Notifications were not enabled.',
+    );
+  }
+
+  Future<void> _showStatus(BuildContext context, String message) =>
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Device notifications'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+
+  String _notificationStatus() => switch (controller.notificationPermission) {
+    NotificationPermissionState.enabled => 'Enabled',
+    NotificationPermissionState.denied => 'Blocked',
+    NotificationPermissionState.unsupported => 'Unavailable',
+    NotificationPermissionState.unknown => 'Set up',
+  };
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
     builder: (context, _) {
       final preferences = controller.preferences;
-      final busy = controller.isSaving || controller.isLoading;
+      final busy =
+          controller.isSaving ||
+          controller.isLoading ||
+          controller.isUpdatingNotifications;
       final time = TimeOfDay(
         hour: preferences.notificationHour,
         minute: preferences.notificationMinute,
@@ -60,26 +111,34 @@ class ReminderSettingsScreen extends StatelessWidget {
             padding: EdgeInsets.zero,
             child: InkWell(
               borderRadius: BorderRadius.circular(9),
-              onTap: () => _showNotificationStatus(context),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+              onTap: busy ? null : () => _enableNotifications(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 20,
+                ),
                 child: Row(
                   children: [
-                    Icon(CupertinoIcons.bell, size: 25),
-                    SizedBox(width: 13),
-                    Expanded(
+                    const Icon(CupertinoIcons.bell, size: 25),
+                    const SizedBox(width: 13),
+                    const Expanded(
                       flex: 2,
                       child: Text(
                         'Device notifications',
                         style: TextStyle(fontSize: 16),
                       ),
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        'Not available',
+                        controller.isUpdatingNotifications
+                            ? 'Checking…'
+                            : _notificationStatus(),
                         textAlign: TextAlign.right,
-                        style: TextStyle(fontSize: 13, color: AppColors.muted),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.muted,
+                        ),
                       ),
                     ),
                   ],
