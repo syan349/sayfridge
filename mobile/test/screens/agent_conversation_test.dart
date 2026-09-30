@@ -341,16 +341,70 @@ void main() {
     await tapGesture.up();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Type a message'));
+    // Cancelling must leave the hold gesture ready for another recording.
+    final retryGesture = await tester.startGesture(
+      tester.getCenter(microphone),
+    );
+    await tester.pump();
+    expect(find.text('discard this text'), findsOneWidget);
+    await retryGesture.up();
     await tester.pumpAndSettle();
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller!.text,
-      '',
+      'discard this text',
     );
+
     expect(voice.cancelled, isTrue);
-    expect(voice.stopped, isFalse);
-    expect(voice.starts, 3);
+    expect(voice.stopped, isTrue);
+    expect(voice.starts, 4);
   });
+
+  testWidgets(
+    'cancel during final transcription discards it and permits another hold',
+    (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final api = ApiClient(client: MockClient((_) async => eventResponse([])));
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: MemoryAgentStore(),
+      );
+      addTearDown(agent.dispose);
+      await agent.bindUser('alice');
+      final voice = _FakeVoiceInput('two tomatoes')
+        ..finishPending = Completer<void>();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: AgentConversationScreen(controller: agent, voiceInput: voice),
+        ),
+      );
+      final microphone = find.byTooltip('Hold to speak');
+      final gesture = await tester.startGesture(tester.getCenter(microphone));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+      expect(find.text('Converting speech to text…'), findsOneWidget);
+      await tester.tap(find.byTooltip('Cancel voice input'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('voice-recording-overlay')), findsNothing);
+      expect(find.text('Press and hold to speak'), findsOneWidget);
+      expect(voice.cancelled, isTrue);
+      final retry = await tester.startGesture(tester.getCenter(microphone));
+      await tester.pump();
+      await retry.up();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'two tomatoes',
+      );
+      expect(voice.starts, 2);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'releasing during first permission request prevents late listening',
@@ -737,6 +791,7 @@ class _FakeVoiceInput implements VoiceInputService {
   bool stopped = false;
   bool cancelled = false;
   int starts = 0;
+  Completer<void>? finishPending;
 
   @override
   Future<bool> start({
@@ -751,10 +806,17 @@ class _FakeVoiceInput implements VoiceInputService {
   }
 
   @override
-  Future<void> stop() async => stopped = true;
+  Future<void> stop() async {
+    stopped = true;
+    await finishPending?.future;
+  }
 
   @override
-  Future<void> cancel() async => cancelled = true;
+  Future<void> cancel() async {
+    cancelled = true;
+    final pending = finishPending;
+    if (pending != null && !pending.isCompleted) pending.complete();
+  }
 }
 
 class _DelayedVoiceInput implements VoiceInputService {

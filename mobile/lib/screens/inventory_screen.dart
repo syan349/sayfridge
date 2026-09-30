@@ -2,11 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../widgets/page_scroll_fade.dart';
+
 import '../models/inventory_item.dart';
 import '../state/inventory_controller.dart';
 import '../state/storage_space_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/inventory_toolbar.dart';
+import '../widgets/storage_space_picker.dart';
 import '../widgets/inventory_visuals.dart';
 import 'inventory_detail_screen.dart';
 
@@ -94,30 +98,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(25, 8, 25, 13),
-                    child: Row(
-                      children: [
-                        _StoragePill(
-                          controller: widget.controller,
-                          spacesController: widget.storageSpaceController,
-                          pageSize: _selectedGroup == null ? 20 : 100,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(child: _SearchPill(onTap: _openSearch)),
-                        const SizedBox(width: 12),
-                        IconButton.filled(
-                          onPressed: _showFilter,
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                          ),
-                          icon: Image.asset(
-                            HomeAssets.filter,
-                            width: 22,
-                            height: 22,
-                          ),
-                          tooltip: 'Filter',
-                        ),
-                      ],
+                    child: InventoryToolbar(
+                      storagePicker: _StoragePill(
+                        controller: widget.controller,
+                        spacesController: widget.storageSpaceController,
+                        pageSize: _selectedGroup == null ? 20 : 100,
+                      ),
+                      onSearch: _openSearch,
+                      onFilter: _showFilter,
                     ),
                   ),
                   const Padding(
@@ -125,9 +113,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     child: QuantityLegend(),
                   ),
                   Expanded(
-                    child: AnimatedBuilder(
-                      animation: widget.controller,
-                      builder: (context, child) => _buildContent(context),
+                    child: PageScrollFade(
+                      child: AnimatedBuilder(
+                        animation: widget.controller,
+                        builder: (context, child) => _buildContent(context),
+                      ),
                     ),
                   ),
                 ],
@@ -396,38 +386,45 @@ class _InventorySearchScreenState extends State<InventorySearchScreen> {
                     ),
                   ),
                   Expanded(
-                    child: AnimatedBuilder(
-                      animation: widget.controller,
-                      builder: (context, child) {
-                        final controller = widget.controller;
-                        if (controller.status == InventoryLoadStatus.loading) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-                        if (controller.status == InventoryLoadStatus.error) {
-                          return _InventoryMessage(
-                            title: 'Unable to search',
-                            message:
-                                controller.errorMessage ?? 'Please try again.',
-                            onAction: controller.reload,
-                          );
-                        }
-                        if (controller.status == InventoryLoadStatus.empty) {
-                          return const Center(child: Text('No matching items'));
-                        }
-                        return _InventoryResults(
-                          controller: controller,
-                          onOpenDetails: (item) => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => InventoryDetailScreen(
-                                itemId: item.id,
-                                controller: controller.createDetailController(),
+                    child: PageScrollFade(
+                      child: AnimatedBuilder(
+                        animation: widget.controller,
+                        builder: (context, child) {
+                          final controller = widget.controller;
+                          if (controller.status ==
+                              InventoryLoadStatus.loading) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          if (controller.status == InventoryLoadStatus.error) {
+                            return _InventoryMessage(
+                              title: 'Unable to search',
+                              message:
+                                  controller.errorMessage ??
+                                  'Please try again.',
+                              onAction: controller.reload,
+                            );
+                          }
+                          if (controller.status == InventoryLoadStatus.empty) {
+                            return const Center(
+                              child: Text('No matching items'),
+                            );
+                          }
+                          return _InventoryResults(
+                            controller: controller,
+                            onOpenDetails: (item) => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => InventoryDetailScreen(
+                                  itemId: item.id,
+                                  controller: controller
+                                      .createDetailController(),
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ],
@@ -464,126 +461,40 @@ class _StoragePill extends StatelessWidget {
     this.spacesController,
     this.pageSize = 20,
   });
-
   final InventoryController controller;
   final StorageSpaceController? spacesController;
   final int pageSize;
 
   @override
-  Widget build(BuildContext context) {
-    final selectedId = controller.storageSpaceId;
-    final spaces = <String, String>{};
-    for (final item in controller.items) {
-      spaces[item.storageSpaceId] = item.storageSpaceName;
-    }
-    for (final space in spacesController?.storageSpaces ?? const []) {
-      spaces[space.id] = space.name;
-    }
-    final label = selectedId == null
-        ? 'All Spaces'
-        : spaces[selectedId] ?? 'Selected space';
-    return ActionChip(
-      backgroundColor: Colors.white,
-      side: const BorderSide(color: Color(0xFFE6EDDF)),
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 14)),
-          const SizedBox(width: 6),
-          const Icon(Icons.keyboard_arrow_down, size: 19),
-        ],
-      ),
-      onPressed: () => showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: AppColors.background,
-        builder: (sheetContext) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(18),
-                child: Text(
-                  'Choose storage space',
-                  style: TextStyle(fontSize: 21),
-                ),
-              ),
-              ListTile(
-                title: const Text('All Spaces'),
-                onTap: () => _select(sheetContext, null),
-              ),
-              for (final space in spaces.entries)
-                ListTile(
-                  title: Text(space.value),
-                  onTap: () => _select(sheetContext, space.key),
-                ),
-            ],
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([controller, spacesController]),
+    builder: (context, _) {
+      final spaces = <String, String>{};
+      for (final item in controller.items) {
+        spaces[item.storageSpaceId] = item.storageSpaceName;
+      }
+      for (final space in spacesController?.storageSpaces ?? const []) {
+        spaces[space.id] = space.name;
+      }
+      return StoragePickerButton(
+        label: controller.storageSpaceId == null
+            ? 'All Spaces'
+            : spaces[controller.storageSpaceId] ?? 'Selected space',
+        onTap: () => showStorageSpacePicker(
+          context,
+          selectedId: controller.storageSpaceId,
+          fallbackSpaces: spaces,
+          spacesController: spacesController,
+          inventoryController: controller,
+          onSelected: (id) => controller.loadInventory(
+            query: controller.query,
+            storageSpaceId: id,
+            pageSize: pageSize,
           ),
         ),
-      ),
-    );
-  }
-
-  void _select(BuildContext sheetContext, String? spaceId) {
-    Navigator.pop(sheetContext);
-    controller.loadInventory(
-      query: controller.query,
-      storageSpaceId: spaceId,
-      pageSize: pageSize,
-    );
-  }
-}
-
-class _SearchPill extends StatelessWidget {
-  const _SearchPill({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 60;
-        return InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(28),
-          child: Container(
-            height: 42,
-            padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 13),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0xFFE6EDDF)),
-            ),
-            child: compact
-                ? Center(
-                    child: Image.asset(
-                      HomeAssets.search,
-                      width: 22,
-                      height: 22,
-                    ),
-                  )
-                : Row(
-                    children: [
-                      Image.asset(HomeAssets.search, width: 22, height: 22),
-                      const SizedBox(width: 7),
-                      const Flexible(
-                        child: Text(
-                          'Search items ...',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        );
-      },
-    );
-  }
+      );
+    },
+  );
 }
 
 class _InventoryResults extends StatelessWidget {

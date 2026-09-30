@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/page_scroll_fade.dart';
+
 import '../models/inventory_item.dart';
 import '../repositories/workspace_repository.dart';
 import '../services/api_exception.dart';
@@ -213,132 +215,134 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
                         ? const Center(child: CircularProgressIndicator())
                         : Form(
                             key: _form,
-                            child: ListView(
-                              padding: const EdgeInsets.all(25),
-                              children: [
-                                if (_error != null) ...[
-                                  Text(
-                                    _error!,
-                                    style: const TextStyle(color: Colors.red),
-                                  ),
-                                  if (!_blocked)
-                                    TextButton(
-                                      onPressed: _busy ? null : _load,
-                                      child: const Text('Reload choices'),
+                            child: PageScrollFade(
+                              child: ListView(
+                                padding: const EdgeInsets.all(25),
+                                children: [
+                                  if (_error != null) ...[
+                                    Text(
+                                      _error!,
+                                      style: const TextStyle(color: Colors.red),
                                     ),
-                                ],
-                                if (widget.item == null) ...[
+                                    if (!_blocked)
+                                      TextButton(
+                                        onPressed: _busy ? null : _load,
+                                        child: const Text('Reload choices'),
+                                      ),
+                                  ],
+                                  if (widget.item == null) ...[
+                                    _select(
+                                      'Item',
+                                      _definition,
+                                      _definitions,
+                                      (v) => setState(() => _definition = v),
+                                    ),
+                                    TextButton(
+                                      onPressed: _busy || _blocked
+                                          ? null
+                                          : _newDefinition,
+                                      child: _loadingDefinitionChoices
+                                          ? const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                SizedBox.square(
+                                                  key: Key(
+                                                    'definition-loading-indicator',
+                                                  ),
+                                                  dimension: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2.2,
+                                                      ),
+                                                ),
+                                                SizedBox(width: 10),
+                                                Text('Loading categories…'),
+                                              ],
+                                            )
+                                          : const Text(
+                                              'Create a private item definition',
+                                            ),
+                                    ),
+                                  ] else ...[
+                                    Text(
+                                      widget.item!.itemDefinitionName,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const Text(
+                                      'Use Add / Use / Confirm remaining on item details to change quantities. This form changes dates, location and notes only.',
+                                    ),
+                                    const SizedBox(height: 20),
+                                  ],
                                   _select(
-                                    'Item',
-                                    _definition,
-                                    _definitions,
-                                    (v) => setState(() => _definition = v),
+                                    'Storage space',
+                                    _space,
+                                    _spaces,
+                                    (v) => setState(() => _space = v),
                                   ),
                                   TextButton(
                                     onPressed: _busy || _blocked
                                         ? null
-                                        : _newDefinition,
-                                    child: _loadingDefinitionChoices
-                                        ? const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              SizedBox.square(
-                                                key: Key(
-                                                  'definition-loading-indicator',
-                                                ),
-                                                dimension: 18,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2.2,
-                                                    ),
-                                              ),
-                                              SizedBox(width: 10),
-                                              Text('Loading categories…'),
-                                            ],
-                                          )
-                                        : const Text(
-                                            'Create a private item definition',
-                                          ),
+                                        : () async {
+                                            setState(() => _busy = true);
+                                            await editSpace(
+                                              context,
+                                              widget.workspace,
+                                            );
+                                            if (!mounted) return;
+                                            setState(() => _busy = false);
+                                            await _load();
+                                          },
+                                    child: const Text('Add storage space'),
                                   ),
-                                ] else ...[
-                                  Text(
-                                    widget.item!.itemDefinitionName,
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w600,
+                                  if (widget.item == null) ...[
+                                    _field(
+                                      'Amount',
+                                      _amount,
+                                      (v) => validateAmount(v),
+                                    ),
+                                    _field(
+                                      'Unit (e.g. kg, g, ml, pcs)',
+                                      _unit,
+                                      (v) =>
+                                          requiredValue(v) ??
+                                          (v!.length > 16
+                                              ? 'Maximum 16 characters'
+                                              : null),
+                                    ),
+                                  ],
+                                  _field(
+                                    'Purchase date (YYYY-MM-DD, optional)',
+                                    _purchase,
+                                    validateDate,
+                                  ),
+                                  _field(
+                                    'Expiry date (YYYY-MM-DD, optional)',
+                                    _expiry,
+                                    validateDate,
+                                  ),
+                                  _field(
+                                    'Notes (optional)',
+                                    _notes,
+                                    (v) => (v?.length ?? 0) > 1000
+                                        ? 'Maximum 1000 characters'
+                                        : null,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  FilledButton(
+                                    onPressed: _busy || _blocked ? null : _save,
+                                    child: Text(
+                                      _busy
+                                          ? 'Saving…'
+                                          : widget.item == null
+                                          ? 'Add inventory'
+                                          : 'Save changes',
                                     ),
                                   ),
-                                  const Text(
-                                    'Use Add / Use / Confirm remaining on item details to change quantities. This form changes dates, location and notes only.',
-                                  ),
-                                  const SizedBox(height: 20),
                                 ],
-                                _select(
-                                  'Storage space',
-                                  _space,
-                                  _spaces,
-                                  (v) => setState(() => _space = v),
-                                ),
-                                TextButton(
-                                  onPressed: _busy || _blocked
-                                      ? null
-                                      : () async {
-                                          setState(() => _busy = true);
-                                          await editSpace(
-                                            context,
-                                            widget.workspace,
-                                          );
-                                          if (!mounted) return;
-                                          setState(() => _busy = false);
-                                          await _load();
-                                        },
-                                  child: const Text('Add storage space'),
-                                ),
-                                if (widget.item == null) ...[
-                                  _field(
-                                    'Amount',
-                                    _amount,
-                                    (v) => validateAmount(v),
-                                  ),
-                                  _field(
-                                    'Unit (e.g. kg, g, ml, pcs)',
-                                    _unit,
-                                    (v) =>
-                                        requiredValue(v) ??
-                                        (v!.length > 16
-                                            ? 'Maximum 16 characters'
-                                            : null),
-                                  ),
-                                ],
-                                _field(
-                                  'Purchase date (YYYY-MM-DD, optional)',
-                                  _purchase,
-                                  validateDate,
-                                ),
-                                _field(
-                                  'Expiry date (YYYY-MM-DD, optional)',
-                                  _expiry,
-                                  validateDate,
-                                ),
-                                _field(
-                                  'Notes (optional)',
-                                  _notes,
-                                  (v) => (v?.length ?? 0) > 1000
-                                      ? 'Maximum 1000 characters'
-                                      : null,
-                                ),
-                                const SizedBox(height: 24),
-                                FilledButton(
-                                  onPressed: _busy || _blocked ? null : _save,
-                                  child: Text(
-                                    _busy
-                                        ? 'Saving…'
-                                        : widget.item == null
-                                        ? 'Add inventory'
-                                        : 'Save changes',
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
                   ),

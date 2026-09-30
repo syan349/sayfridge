@@ -91,6 +91,74 @@ void main() {
   );
 
   test(
+    'restart waits for asynchronous abort/end and ignores old errors',
+    () async {
+      final speech = _Speech()..delayCancelEnd = true;
+      final service = DeviceVoiceInputService(speech);
+      final firstWords = <String>[];
+      final words = <String>[];
+      final errors = <String>[];
+      await service.start(
+        onWords: firstWords.add,
+        onError: errors.add,
+        shouldContinue: () => true,
+      );
+      var cancelled = false;
+      final cancelling = service.cancel().then((_) => cancelled = true);
+      final restarting = service.start(
+        onWords: words.add,
+        onError: errors.add,
+        shouldContinue: () => true,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(cancelled, isFalse);
+      expect(speech.listens, 1);
+      speech.errorListener?.call(SpeechRecognitionError('aborted', false));
+      speech.result('discard this', finalResult: true);
+      speech.statusListener?.call(SpeechToText.doneStatus);
+      await Future<void>.delayed(Duration.zero);
+      // The web plugin sends done on error, before the recognizer is idle.
+      expect(speech.listens, 1);
+      speech.statusListener?.call(SpeechToText.notListeningStatus);
+      await cancelling;
+      expect(await restarting, isTrue);
+      speech.statusListener?.call(SpeechToText.listeningStatus);
+      speech.result('two tomatoes', finalResult: false);
+      expect(firstWords, isEmpty);
+      expect(words, ['two tomatoes']);
+      expect(errors, isEmpty);
+      speech.delayCancelEnd = false;
+      await service.cancel();
+    },
+  );
+
+  test(
+    'release during abort cleanup does not start the next microphone',
+    () async {
+      final speech = _Speech()..delayCancelEnd = true;
+      final service = DeviceVoiceInputService(speech);
+      var holding = true;
+      await service.start(
+        onWords: (_) {},
+        onError: fail,
+        shouldContinue: () => holding,
+      );
+      final cancelling = service.cancel();
+      final restarting = service.start(
+        onWords: (_) => fail('Unexpected transcript'),
+        onError: fail,
+        shouldContinue: () => holding,
+      );
+      holding = false;
+      await service.stop();
+      speech.statusListener?.call(SpeechToText.notListeningStatus);
+      await cancelling;
+      expect(await restarting, isFalse);
+      expect(speech.listens, 1);
+    },
+  );
+
+  test(
     'releasing while permissions are pending never starts the microphone',
     () async {
       final speech = _Speech()..permission = Completer<bool>();
@@ -140,6 +208,7 @@ class _Speech extends SpeechToText {
 
   Completer<bool>? permission;
   bool initialized = false;
+  bool delayCancelEnd = false;
   int listens = 0, stops = 0, cancels = 0;
   SpeechResultListener? resultListener;
   SpeechListenOptions? options;
@@ -190,10 +259,12 @@ class _Speech extends SpeechToText {
   @override
   Future<void> stop() async {
     stops++;
+    statusListener?.call(SpeechToText.notListeningStatus);
   }
 
   @override
   Future<void> cancel() async {
     cancels++;
+    if (!delayCancelEnd) statusListener?.call(SpeechToText.notListeningStatus);
   }
 }

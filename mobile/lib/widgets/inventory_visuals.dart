@@ -15,6 +15,8 @@ abstract final class HomeAssets {
   static const titleLine = '$root/title_line.png';
   static const morningLine = '$root/morning.png';
   static const eveningLine = '$root/evening.png';
+  static const notificationEmpty = '$root/notification_empty.png';
+  static const notificationUnread = '$root/notification_unread.png';
 }
 
 class HomeEmptyIllustration extends StatelessWidget {
@@ -96,7 +98,11 @@ class _EmptyIllustrationAccents extends CustomPainter {
 }
 
 String itemArtwork(InventoryItem item) {
-  final name = item.itemDefinitionName.toLowerCase();
+  return itemArtworkForName(item.itemDefinitionName);
+}
+
+String itemArtworkForName(String itemName) {
+  final name = itemName.toLowerCase();
   const icons = <String, String>{
     'chicken thigh': 'chicken_drumstick',
     'chicken drumstick': 'chicken_drumstick',

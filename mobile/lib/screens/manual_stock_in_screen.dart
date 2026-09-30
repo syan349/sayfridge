@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/page_scroll_fade.dart';
+
 import '../models/inventory_item.dart';
 import '../state/manual_stock_in_controller.dart';
 import '../theme/app_theme.dart';
@@ -72,154 +74,156 @@ class _ManualStockInScreenState extends State<ManualStockInScreen> {
 
     return Form(
       key: _formKey,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: isSubmitting ? null : Navigator.of(context).pop,
-                icon: const Icon(Icons.arrow_back),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Add inventory',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          DropdownButtonFormField<String>(
-            initialValue: controller.selectedStorageSpaceId,
-            decoration: const InputDecoration(labelText: 'Storage space'),
-            items: controller.storageSpaces
-                .map(
-                  (space) => DropdownMenuItem(
-                    value: space.id,
-                    child: Text(space.name),
-                  ),
-                )
-                .toList(),
-            onChanged: isSubmitting ? null : controller.selectStorageSpace,
-            validator: (value) =>
-                value == null ? 'Choose a storage space.' : null,
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: controller.selectedCategoryId,
-            decoration: const InputDecoration(labelText: 'Category'),
-            items: controller.categories
-                .map(
-                  (category) => DropdownMenuItem(
-                    value: category.id,
-                    child: Text(category.name),
-                  ),
-                )
-                .toList(),
-            onChanged: isSubmitting ? null : controller.selectCategory,
-            validator: (value) => value == null ? 'Choose a category.' : null,
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            key: ValueKey(controller.selectedCategoryId),
-            initialValue: controller.selectedDefinitionId,
-            decoration: InputDecoration(
-              labelText: 'Item',
-              suffixIcon: controller.isLoadingDefinitions
-                  ? const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : null,
-            ),
-            items: controller.definitions
-                .map(
-                  (definition) => DropdownMenuItem(
-                    value: definition.id,
-                    child: Text(definition.name),
-                  ),
-                )
-                .toList(),
-            onChanged: isSubmitting || controller.isLoadingDefinitions
-                ? null
-                : controller.selectDefinition,
-            validator: (value) => value == null ? 'Choose an item.' : null,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _amountController,
-                  enabled: !isSubmitting,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(labelText: 'Quantity'),
-                  validator: _validateAmount,
+      child: PageScrollFade(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: isSubmitting ? null : Navigator.of(context).pop,
+                  icon: const Icon(Icons.arrow_back),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  controller: _unitController,
-                  enabled: !isSubmitting,
-                  decoration: const InputDecoration(labelText: 'Unit'),
-                  validator: _validateUnit,
+                const SizedBox(width: 8),
+                Text(
+                  'Add inventory',
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _DateField(
-            label: 'Purchase date (optional)',
-            value: _purchaseDate,
-            enabled: !isSubmitting,
-            onChanged: (value) => setState(() => _purchaseDate = value),
-          ),
-          const SizedBox(height: 16),
-          _DateField(
-            label: 'Expiry date (optional)',
-            value: _expiryDate,
-            enabled: !isSubmitting,
-            onChanged: (value) => setState(() => _expiryDate = value),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _notesController,
-            enabled: !isSubmitting,
-            maxLines: 3,
-            maxLength: 1000,
-            decoration: const InputDecoration(labelText: 'Notes (optional)'),
-          ),
-          if (controller.errorMessage != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              controller.errorMessage!,
-              style: const TextStyle(color: Colors.redAccent),
+              ],
             ),
-          ],
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: isSubmitting || !controller.hasRequiredOptions
-                ? null
-                : _submit,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primaryDark,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: isSubmitting
-                ? const SizedBox.square(
-                    dimension: 22,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
+            const SizedBox(height: 24),
+            DropdownButtonFormField<String>(
+              initialValue: controller.selectedStorageSpaceId,
+              decoration: const InputDecoration(labelText: 'Storage space'),
+              items: controller.storageSpaces
+                  .map(
+                    (space) => DropdownMenuItem(
+                      value: space.id,
+                      child: Text(space.name),
                     ),
                   )
-                : const Text('Add to inventory'),
-          ),
-        ],
+                  .toList(),
+              onChanged: isSubmitting ? null : controller.selectStorageSpace,
+              validator: (value) =>
+                  value == null ? 'Choose a storage space.' : null,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: controller.selectedCategoryId,
+              decoration: const InputDecoration(labelText: 'Category'),
+              items: controller.categories
+                  .map(
+                    (category) => DropdownMenuItem(
+                      value: category.id,
+                      child: Text(category.name),
+                    ),
+                  )
+                  .toList(),
+              onChanged: isSubmitting ? null : controller.selectCategory,
+              validator: (value) => value == null ? 'Choose a category.' : null,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              key: ValueKey(controller.selectedCategoryId),
+              initialValue: controller.selectedDefinitionId,
+              decoration: InputDecoration(
+                labelText: 'Item',
+                suffixIcon: controller.isLoadingDefinitions
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
+              ),
+              items: controller.definitions
+                  .map(
+                    (definition) => DropdownMenuItem(
+                      value: definition.id,
+                      child: Text(definition.name),
+                    ),
+                  )
+                  .toList(),
+              onChanged: isSubmitting || controller.isLoadingDefinitions
+                  ? null
+                  : controller.selectDefinition,
+              validator: (value) => value == null ? 'Choose an item.' : null,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _amountController,
+                    enabled: !isSubmitting,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Quantity'),
+                    validator: _validateAmount,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _unitController,
+                    enabled: !isSubmitting,
+                    decoration: const InputDecoration(labelText: 'Unit'),
+                    validator: _validateUnit,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _DateField(
+              label: 'Purchase date (optional)',
+              value: _purchaseDate,
+              enabled: !isSubmitting,
+              onChanged: (value) => setState(() => _purchaseDate = value),
+            ),
+            const SizedBox(height: 16),
+            _DateField(
+              label: 'Expiry date (optional)',
+              value: _expiryDate,
+              enabled: !isSubmitting,
+              onChanged: (value) => setState(() => _expiryDate = value),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _notesController,
+              enabled: !isSubmitting,
+              maxLines: 3,
+              maxLength: 1000,
+              decoration: const InputDecoration(labelText: 'Notes (optional)'),
+            ),
+            if (controller.errorMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                controller.errorMessage!,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            ],
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: isSubmitting || !controller.hasRequiredOptions
+                  ? null
+                  : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryDark,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: isSubmitting
+                  ? const SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text('Add to inventory'),
+            ),
+          ],
+        ),
       ),
     );
   }
