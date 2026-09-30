@@ -5,8 +5,9 @@
 Start from the [root README](../../README.md#run-the-tests). The fast selection
 contains **314 cases: Backend 60, Web 103, Flutter 151**. Backend PR checks target
 `main` (and also run after pushes to `main`); frontend checks run for every PR.
-No path filtering is applied. E2E and unified full-regression orchestration are
-not implemented by this change; Backend manual dispatch retains its full suite.
+No path filtering is applied to fast CI. Core E2E has a separate manual-only
+workflow; unified full-regression orchestration is still a later step. Backend
+manual dispatch retains its full suite.
 
 The execution entry point is **GitHub Actions**:
 
@@ -14,6 +15,7 @@ The execution entry point is **GitHub Actions**:
 | --- | --- | --- |
 | [Backend CI](../../.github/workflows/backend-ci.yml) | Core selection on PRs targeting `main` and pushes to `main` | Full Backend regression |
 | [Frontend CI](../../.github/workflows/frontend-ci.yml) | Web and Flutter fast checks on every PR | The same frontend fast checks |
+| [Core E2E](../../.github/workflows/core-e2e.yml) | None at this foundation stage | Chromium → real Web → Backend → disposable PostgreSQL |
 
 For local verification, use the per-module commands in this guide: frontend
 commands below and Backend commands under **Run tests**. Use Python 3.12,
@@ -74,13 +76,125 @@ production build; Flutter 3.44.8 / Dart 3.12.2 passed all 151 selected tests wit
 clients without changing either lockfile. Test execution took approximately
 5 seconds for Web and 11 seconds for Flutter; these exclude installation and
 are not GitHub runner timings. Existing Web fixture warnings (duplicate keys and
-unhandled mocked admin requests) did not fail the suite. The first GitHub Linux
-run remains to be verified after pushing a PR.
+unhandled mocked admin requests) did not fail the suite. The developer subsequently confirmed that the merged fast-CI PR passed on GitHub.
+This confirmation does not cover the new Core E2E workflow.
 
 The workflow reports checks automatically; requiring `Web tests` and
 `Flutter tests` before merging is a separate GitHub branch-protection setting.
 No repository setting is changed by adding this workflow. Historical Backend
 reports below retain their original scope and results.
+
+## Core E2E foundation
+
+This suite currently contains **one browser scenario**: register a unique user,
+sign out, explicitly sign in again, open the empty inventory, and reload it.
+It verifies registration/login HTTP status, the real inventory response and the
+rendered empty state. Requests are not intercepted or mocked. This proves the
+initial browser/authentication/API/database integration, not the later inventory
+create/edit/archive scenarios, Flutter device behavior, or deployed-system health.
+
+The [runner](../../backend/scripts/run_e2e.py) starts a fresh Backend process and
+Playwright starts a production Web build with the actual Backend URL. Different
+loopback ports exercise CORS. Database migrations, 25 public categories and Agent
+storage are initialized in unique schemas; no demonstration accounts are seeded.
+The browser creates its account through the real registration endpoint. Agent
+model calls are disabled and no OpenAI or hosting-platform credentials are needed.
+
+**Isolation:** only an explicit `E2E_DATABASE_URL` with a loopback host and a database
+name ending `_e2e` is accepted. Connection parameters that could override the host
+or database are rejected. There is no application `.env` database fallback. Every
+run owns two random schemas and removes them after success or failure, after
+stopping its Backend. Playwright stops the Web server. Forced process termination
+may prevent local cleanup; use a disposable database/container. In GitHub the
+entire service container is discarded when the job ends. Never point this suite
+at Neon or the shared demonstration environment.
+
+### Local setup and execution
+
+Prerequisites: Python 3.12, Node.js 22 and PostgreSQL 18 with a UTF8 database.
+Install once (from repository root):
+
+```bash
+python -m pip install -r backend/requirements.txt
+npm --prefix web ci
+cd web
+npx playwright install chromium
+cd ..
+```
+
+For example, create a disposable database with Docker (port 5433):
+
+```bash
+docker run --rm -d --name sayfridge-e2e-db \
+  -e POSTGRES_USER=e2e_user -e POSTGRES_PASSWORD=local-e2e-password \
+  -e POSTGRES_DB=sayfridge_e2e -p 127.0.0.1:5433:5432 postgres:18
+docker exec sayfridge-e2e-db pg_isready -U e2e_user -d sayfridge_e2e
+cp backend/.env.e2e.example backend/.env.e2e
+```
+
+Wait until PostgreSQL accepts connections. A locally installed PostgreSQL also
+works: create a dedicated UTF8 database ending `_e2e` and edit the ignored
+`backend/.env.e2e`. Its user needs permission to create and drop schemas.
+
+The single execution entry point, from repository root, is:
+
+```bash
+python backend/scripts/run_e2e.py
+```
+
+To watch Chromium perform the same test with slower browser actions:
+
+```bash
+python backend/scripts/run_e2e.py --headed
+```
+
+The script builds the Web app, starts the services, waits for readiness, runs
+Chromium, and cleans its schemas. Run one local instance at a time: each run
+replaces the previous build/report directory. No separately started backend/frontend is needed.
+An `E2E_DATABASE_URL` environment variable takes precedence over `.env.e2e`.
+After testing, stop the optional disposable container:
+
+```bash
+docker stop sayfridge-e2e-db
+```
+
+### GitHub execution and evidence
+
+After the workflow is present on the default branch, select **Actions → Core E2E
+→ Run workflow** and choose the branch to test. It has no PR or push trigger yet;
+path-based gating after fast CI belongs to the next stage. Each manual run uses
+Ubuntu, Node.js 22, Python 3.12, Chromium and a PostgreSQL 18 service, with a
+15-minute job limit. No Render, Vercel or Neon environment is changed.
+
+`core-e2e-results` is retained for seven days. Local evidence is ignored under
+`web/.e2e-artifacts/`: HTML/JUnit results, initialization/backend logs, and a run
+manifest recording the commit and temporary schema names. Browser failures retain
+a screenshot and Playwright trace. These may contain generated test credentials
+and tokens; keep artifacts within the team rather than publishing traces.
+
+```bash
+# From web/, view the latest report
+npx playwright show-report .e2e-artifacts/html
+```
+
+Vitest explicitly excludes `e2e/**`, keeping the 103 Web fast tests independent.
+The seven database-target guard cases belong to Backend full regression; the fast
+Backend selection remains 60. Core E2E results must be reported separately from
+unit/component counts.
+
+Local verification on 2026-09-30 (this working tree, macOS, Python 3.12,
+Node.js 22.23.3, PostgreSQL 18, Playwright 1.63.0):
+
+- Real-browser flow passed twice; the latest Playwright run took 5.8 seconds,
+  including its Web startup/build, excluding database initialization and tooling
+  installation. It is not a GitHub timing estimate.
+- Seven runner-safety tests passed; all 103 existing Web tests passed. Backend
+  collection confirmed 60 fast cases out of 734 total; full regression was not run.
+- A temporary deliberately failing browser test produced a nonzero exit,
+  screenshot and trace. Schemas were removed after both success and failure.
+  The temporary test was deleted and the normal suite passed again.
+- The new manual GitHub E2E workflow still needs its first remote run after push.
+  Local execution does not claim that GitHub has already passed.
 
 ## Reports
 
@@ -133,8 +247,8 @@ limitations of that run.
 Use one test implementation for local and CI runs. The fast selection contains
 **60 scenarios: 28 PostgreSQL-backed and 32 database-free** (collected on
 2026-09-30). It was reduced from 169 (80 PostgreSQL-backed) after slow local runs.
-No test bodies or assertions were removed. All 727 scenarios remain in full
-regression; 667 are excluded only by `-m ci`. Live-model cases still require opt-in.
+No test bodies or assertions were removed. The original 727 scenarios remain in full regression; this E2E foundation adds
+seven runner-safety cases (734 total; 674 excluded by `-m ci`). Live-model cases still require opt-in.
 
 | Fast coverage | Scenarios |
 | --- | ---: |
@@ -168,8 +282,8 @@ selected database test still migrates its own schema; isolation is unchanged.
 Local verification on 2026-09-30: **60 passed, 667 deselected in 12.67 seconds**
 using Python 3.12 and a disposable PostgreSQL 18 instance on localhost (UTC).
 This is a local measurement, not a remote Neon or GitHub runtime guarantee.
-Full collection still contains the same 727 parameterized scenarios, and test
-function bodies and assertions are unchanged. Web (103) and Flutter (151) fast
+At that verification point, full collection contained 727 parameterized
+scenarios, and test function bodies and assertions were unchanged. Web (103) and Flutter (151) fast
 selections were not reduced.
 
 Use `@pytest.mark.ci` for a whole test or `pytest.param(..., marks=pytest.mark.ci)`

@@ -285,9 +285,17 @@ flutter build web --release --no-web-resources-cdn \
 
 ### End-to-end acceptance
 
-The current `main` branch does not yet contain an automated browser/system E2E
-runner. Until that suite is added, validate the deployed system with this manual
-path and record the tested commit and result:
+The [Core E2E guide](docs/testing/README.md#core-e2e-foundation) describes the
+isolated Playwright/Web/Backend/PostgreSQL environment and its manual GitHub
+workflow. After the one-time setup, run from the repository root:
+
+```bash
+python backend/scripts/run_e2e.py
+```
+
+The first automated scenario covers registration, sign-out, login and an empty
+inventory. Continue to validate the broader deployed-system path manually and
+record the tested commit and result:
 
 1. Register and sign in.
 2. Create a storage space.
