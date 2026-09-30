@@ -10,6 +10,9 @@ on:
         default: true
   workflow_call:
     inputs:
+      test_ref:
+        type: string
+        default: ''
       full_regression:
         type: boolean
         default: false
@@ -21,7 +24,7 @@ concurrency:
 jobs:
   test-job:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: ${{ inputs.full_regression && 60 || 10 }}
     services:
       postgres:
         image: postgres:18
@@ -40,9 +43,12 @@ jobs:
       run:
         working-directory: backend
     env:
+      AGENT_LIVE_MODEL: '0'
       TEST_DATABASE_URL: postgresql+psycopg://test_user:ci-only-password@localhost:5432/sayfridge_auth_test
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.test_ref || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

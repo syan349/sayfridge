@@ -2,6 +2,10 @@ name: Frontend CI
 
 on:
   workflow_call:
+    inputs:
+      test_ref:
+        type: string
+        default: ''
   workflow_dispatch:
 
 permissions:
@@ -21,6 +25,8 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.test_ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -60,6 +66,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.test_ref || github.sha }}
       - uses: subosito/flutter-action@v2
         with:
           # Keep aligned with mobile/scripts/render-build.sh and README.md.

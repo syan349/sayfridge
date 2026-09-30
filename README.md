@@ -225,12 +225,19 @@ Web, preview, and deployment details.
 
 See the [testing guide and CI policy](docs/testing/README.md) for automated
 checks, test scope, and result artifacts. Every PR runs Backend core checks
-(for PRs targeting `main`) and the Web/Flutter fast checks.
+ and the Web/Flutter fast checks.
 
-GitHub Actions is the automated entry point: [Backend CI](.github/workflows/backend-ci.yml)
-and [Frontend CI](.github/workflows/frontend-ci.yml). For local verification, use
+GitHub Actions is the automated entry point: [Core E2E](.github/workflows/core-e2e.yml)
+coordinates reusable Backend and Frontend fast checks on every PR. For local verification, use
 the per-module commands below and the testing guide. Backend **Run workflow**
 executes full regression; its automatic PR/main runs execute the fast selection.
+
+
+For one complete automated regression of the same commit, use **Actions →
+[Full Regression](.github/workflows/full-regression.yml) → Run workflow**.
+It runs the offline Backend suite, all selected Web/Flutter tests and core E2E,
+then publishes the aggregate result and commit SHA. See the
+[full regression guide](docs/testing/README.md#unified-full-regression).
 
 ### Backend
 
@@ -285,16 +292,17 @@ flutter build web --release --no-web-resources-cdn \
 
 ### End-to-end acceptance
 
-The [Core E2E guide](docs/testing/README.md#core-e2e-foundation) describes the
-isolated Playwright/Web/Backend/PostgreSQL environment and its manual GitHub
-workflow. After the one-time setup, run from the repository root:
+The [Core E2E guide](docs/testing/README.md#core-e2e) describes the
+isolated Playwright/Web/Backend/PostgreSQL environment, eight browser scenarios,
+and PR path gates with manual dispatch. After the one-time setup, run from the repository root:
 
 ```bash
 python backend/scripts/run_e2e.py
 ```
 
-The first automated scenario covers registration, sign-out, login and an empty
-inventory. Continue to validate the broader deployed-system path manually and
+The automated suite covers authentication, spaces, stock entry, editing/moving,
+consumption/history, reconciliation, archival and ownership/admin boundaries.
+Continue to validate the broader deployed-system path manually and
 record the tested commit and result:
 
 1. Register and sign in.

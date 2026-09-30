@@ -1,21 +1,21 @@
-# Testing and CI
+# Testing Strategy and Evidence
 
 ## Fast CI entry point
 
 Start from the [root README](../../README.md#run-the-tests). The fast selection
-contains **314 cases: Backend 60, Web 103, Flutter 151**. Backend PR checks target
-`main` (and also run after pushes to `main`); frontend checks run for every PR.
-No path filtering is applied to fast CI. Core E2E has a separate manual-only
-workflow; unified full-regression orchestration is still a later step. Backend
-manual dispatch retains its full suite.
+contains **314 cases: Backend 60, Web 103, Flutter 151**. All PRs run the fast checks through Core E2E orchestration; Backend also runs
+after pushes to `main`. Fast CI has no path filter. Integration changes run
+Core E2E after both reusable fast workflows succeed. Manual dispatch runs
+the same gates and E2E. Backend manual dispatch retains its full suite.
 
 The execution entry point is **GitHub Actions**:
 
 | Workflow | Automatic execution | Manual `Run workflow` |
 | --- | --- | --- |
-| [Backend CI](../../.github/workflows/backend-ci.yml) | Core selection on PRs targeting `main` and pushes to `main` | Full Backend regression |
-| [Frontend CI](../../.github/workflows/frontend-ci.yml) | Web and Flutter fast checks on every PR | The same frontend fast checks |
-| [Core E2E](../../.github/workflows/core-e2e.yml) | None at this foundation stage | Chromium → real Web → Backend → disposable PostgreSQL |
+| [Backend CI](../../.github/workflows/backend-ci.yml) | Reused by PR orchestration; core selection on pushes to `main` | Full Backend regression |
+| [Frontend CI](../../.github/workflows/frontend-ci.yml) | Reused by PR orchestration on every PR | The same frontend fast checks |
+| [Core E2E](../../.github/workflows/core-e2e.yml) | Every PR runs fast checks; relevant changes then run Chromium E2E | Fast checks followed by Chromium E2E |
+| [Full Regression](../../.github/workflows/full-regression.yml) | None | Same-commit full offline Backend, Web, Flutter and browser E2E |
 
 For local verification, use the per-module commands in this guide: frontend
 commands below and Backend commands under **Run tests**. Use Python 3.12,
@@ -33,8 +33,8 @@ separate concurrency group from PR/push runs.
 
 ## Frontend fast CI
 
-[Frontend CI](../../.github/workflows/frontend-ci.yml) runs on every pull request
-(open, update, or reopen), without path filters, and can also be started manually.
+[Frontend CI](../../.github/workflows/frontend-ci.yml) is called by Core E2E on every
+pull request (open, update, or reopen), without path filters, and can also be started manually.
 It adds two independent checks alongside the existing Backend CI:
 
 | Check | Runtime | Verification | Evidence artifact |
@@ -84,14 +84,23 @@ The workflow reports checks automatically; requiring `Web tests` and
 No repository setting is changed by adding this workflow. Historical Backend
 reports below retain their original scope and results.
 
-## Core E2E foundation
+## Core E2E
 
-This suite currently contains **one browser scenario**: register a unique user,
-sign out, explicitly sign in again, open the empty inventory, and reload it.
-It verifies registration/login HTTP status, the real inventory response and the
-rendered empty state. Requests are not intercepted or mocked. This proves the
-initial browser/authentication/API/database integration, not the later inventory
-create/edit/archive scenarios, Flutter device behavior, or deployed-system health.
+This suite contains **eight browser scenarios**:
+
+1. Register, sign out, sign in, load empty inventory and reload.
+2. Create, rename, archive and restore an empty storage space.
+3. Create a private definition and stock item; verify inventory and expiry summary.
+4. Edit notes and move an item; verify persistence after reload.
+5. Record consumption; verify remaining quantity and operation history.
+6. Reconcile an exact count; verify confirmed quantity and null estimate.
+7. Archive an item; verify read-only persistence and removal from in-stock queries.
+8. Verify another user cannot read or edit the item, or access administrator accounts.
+
+Requests are real and are not intercepted. Each test has a unique account.
+Fixture setup and persistence assertions also use authenticated real HTTP calls;
+the business action under test is performed through Web UI. Archival is the
+supported removal action; the suite does not invent a hard-delete API.
 
 The [runner](../../backend/scripts/run_e2e.py) starts a fresh Backend process and
 Playwright starts a production Web build with the actual Backend URL. Different
@@ -161,8 +170,7 @@ docker stop sayfridge-e2e-db
 ### GitHub execution and evidence
 
 After the workflow is present on the default branch, select **Actions → Core E2E
-→ Run workflow** and choose the branch to test. It has no PR or push trigger yet;
-path-based gating after fast CI belongs to the next stage. Each manual run uses
+→ Run workflow** and choose the branch to test. Each manual run uses
 Ubuntu, Node.js 22, Python 3.12, Chromium and a PostgreSQL 18 service, with a
 15-minute job limit. No Render, Vercel or Neon environment is changed.
 
@@ -182,19 +190,64 @@ The seven database-target guard cases belong to Backend full regression; the fas
 Backend selection remains 60. Core E2E results must be reported separately from
 unit/component counts.
 
-Local verification on 2026-09-30 (this working tree, macOS, Python 3.12,
-Node.js 22.23.3, PostgreSQL 18, Playwright 1.63.0):
+### PR gates and verification
 
-- Real-browser flow passed twice; the latest Playwright run took 5.8 seconds,
-  including its Web startup/build, excluding database initialization and tooling
-  installation. It is not a GitHub timing estimate.
-- Seven runner-safety tests passed; all 103 existing Web tests passed. Backend
-  collection confirmed 60 fast cases out of 734 total; full regression was not run.
-- A temporary deliberately failing browser test produced a nonzero exit,
-  screenshot and trace. Schemas were removed after both success and failure.
-  The temporary test was deleted and the normal suite passed again.
-- The new manual GitHub E2E workflow still needs its first remote run after push.
-  Local execution does not claim that GitHub has already passed.
+The [path selector](../../.github/scripts/e2e_paths.py) compares the PR base and
+head commits. Backend application code, migrations, initialization scripts,
+Python dependencies/runtime declarations, Web code/assets/API clients, npm lock
+files, browser tests/configuration and workflow changes trigger E2E. Documentation
+and Flutter-only changes skip browser E2E; Flutter still runs all its fast checks.
+The Web suite does not exercise native Android hardware.
+
+Backend and frontend workflows are reused by the orchestrator, so each fast
+selection runs once per PR. The browser job depends on successful Backend,
+Web and Flutter checks and relevant paths. A failed fast job prevents E2E startup.
+Manual dispatch selects E2E regardless of paths. Superseded runs are cancelled.
+Check names now include reusable-job prefixes; update any required-check setting
+that names the former checks after confirming the first remote PR run.
+
+Local verification on 2026-09-30: eight real-browser scenarios passed in 11.7
+seconds with Node.js 22, Python 3.12 and Docker PostgreSQL 18. Six path-selection
+checks cover docs, business code, migrations, client code, locks/workflows and
+Flutter-only changes. The next PR run provides GitHub execution evidence.
+
+## Unified full regression
+
+Use **Actions → Full Regression → Run workflow**, choose the target branch and
+start one run. Run it before a release, after substantial changes across modules,
+or before final acceptance. It has no PR, push or scheduled trigger.
+
+The revision job resolves an immutable commit SHA. Every module checks out that
+same SHA; branch updates during execution do not change the tested version.
+Backend, frontend and browser E2E run concurrently on separate Linux jobs.
+Backend and browser jobs each have their own disposable PostgreSQL service.
+
+| Required job | Selection | Limit | Artifact |
+| --- | --- | --- | --- |
+| Backend | All collected offline pytest tests with strict markers; live-model opt-ins disabled | 60 minutes | `backend-test-results` JUnit |
+| Web | All Vitest tests, typecheck and production build | 10 minutes | `web-test-results`, `web-dist` |
+| Flutter | All unit/widget tests except `manual_preview` exporters | 10 minutes | `flutter-test-results` JSON lines |
+| Browser E2E | Eight real Web/API/database scenarios plus database guards | 15 minutes | `core-e2e-results` HTML, JUnit and diagnostics |
+
+The summary always evaluates all required jobs. Failure, cancellation, skipped
+or missing results produce **FAIL**. It records the test SHA, workflow SHA, run ID,
+job outcomes and test scope in the Actions summary and `full-regression-summary`
+(JSON and Markdown). Reports from all jobs belong to the same Actions run and
+are retained for seven days. Download them when preparing final submission evidence.
+Backend's regular PR fast timeout remains ten minutes.
+
+This workflow runs automated regression, not deployment or Android packaging.
+Live OpenAI acceptance needs a separate explicit opt-in and credentials; native
+Android validation and manual screenshot exporters remain separate activities.
+Their exclusion is recorded in the summary. Web and Flutter currently use the
+same complete offline unit/UI selections in both fast CI and full regression;
+Backend expands from its 60-case fast selection to the full offline suite.
+
+Local verification: orchestration tests exercise successful aggregation and
+failure/cancellation/skipped/missing outcomes; YAML and reusable workflow targets
+are checked locally. The complete multi-module run is performed through the
+manual GitHub workflow after this configuration is pushed and available on the
+default branch. Record that run's result and SHA as final full-regression evidence.
 
 ## Reports
 
