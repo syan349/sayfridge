@@ -23,6 +23,7 @@ import 'state/manual_stock_in_controller.dart';
 import 'state/profile_controller.dart';
 import 'state/storage_space_controller.dart';
 import 'theme/app_theme.dart';
+import 'widgets/web_safe_area.dart';
 
 void main() {
   runApp(const SayFridgeApp());
@@ -219,6 +220,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       title: 'SayFridge',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      builder: (context, child) => WebSafeArea(child: child!),
       home: AuthGate(
         authController: _authDependencies.authController,
         checkingBuilder: (context, authController) {
