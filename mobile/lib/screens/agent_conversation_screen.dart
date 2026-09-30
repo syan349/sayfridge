@@ -16,6 +16,7 @@ import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
+import '../widgets/assistant_scroll_layout.dart';
 import '../widgets/business_forms.dart';
 import '../widgets/hold_to_speak_button.dart';
 import '../widgets/voice_recording_overlay.dart';
@@ -247,67 +248,49 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: Stack(
-      children: [
-        AppBackground(
-          child: SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: ListenableBuilder(
-                  listenable: widget.controller,
-                  builder: (context, _) {
-                    final agent = widget.controller;
-                    final name = widget.displayName
-                        ?.trim()
-                        .split(RegExp(r'\s+'))
-                        .first;
-                    final showWelcome =
-                        agent.messages.isEmpty &&
-                        agent.items.isEmpty &&
-                        !agent.waiting &&
-                        !agent.unresolved &&
-                        agent.error == null;
-                    return Column(
-                      children: [
-                        Expanded(
-                          child: ListView(
-                            keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior.onDrag,
-                            padding: const EdgeInsets.fromLTRB(25, 27, 25, 16),
-                            children: [
-                              AssistantHeader(
-                                onNewConversation: () async {
-                                  if (agent.canSend) {
-                                    await agent.newConversation();
-                                    if (!mounted || agent.error != null) return;
-                                    _message.clear();
-                                    setState(() {
-                                      _images.clear();
-                                      _voiceModeReset++;
-                                    });
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Resolve or cancel pending items, or recover the current request first.',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                                onHistory: () async {
-                                  final previousId = agent.conversationId;
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => ConversationHistoryScreen(
-                                        controller: agent,
-                                      ),
-                                    ),
-                                  );
-                                  if (!mounted ||
-                                      agent.conversationId == previousId) {
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom == 0
+        ? MediaQuery.paddingOf(context).bottom
+        : 0.0;
+    return Scaffold(
+      body: Stack(
+        children: [
+          AppBackground(
+            child: SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: ListenableBuilder(
+                    listenable: widget.controller,
+                    builder: (context, _) {
+                      final agent = widget.controller;
+                      final name = widget.displayName
+                          ?.trim()
+                          .split(RegExp(r'\s+'))
+                          .first;
+                      final showWelcome =
+                          agent.messages.isEmpty &&
+                          agent.items.isEmpty &&
+                          !agent.waiting &&
+                          !agent.unresolved &&
+                          agent.error == null;
+                      return AssistantScrollLayout(
+                        bottomInset: bottomInset,
+                        contentBuilder: (context, bottomPadding) => ListView(
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: EdgeInsets.fromLTRB(
+                            25,
+                            27,
+                            25,
+                            bottomPadding,
+                          ),
+                          children: [
+                            AssistantHeader(
+                              onNewConversation: () async {
+                                if (agent.canSend) {
+                                  await agent.newConversation();
+                                  if (!mounted || agent.error != null) {
                                     return;
                                   }
                                   _message.clear();
@@ -315,169 +298,205 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                     _images.clear();
                                     _voiceModeReset++;
                                   });
-                                },
-                              ),
-                              const SizedBox(height: 15),
-                              const Center(
-                                child: Text(
-                                  'Add information using voice, photos, or text.',
-                                  style: TextStyle(
-                                    color: AppColors.muted,
-                                    fontSize: 13.5,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              AssistantGreeting(
-                                message: name == null || name.isEmpty
-                                    ? 'Hey! How can I help you?'
-                                    : 'Hey, $name! How can I help you?',
-                              ),
-                              if (showWelcome)
-                                AssistantWelcome(
-                                  onSuggestionSelected: agent.canSend
-                                      ? (message) => agent.send(message)
-                                      : null,
-                                )
-                              else
-                                const SizedBox(height: 24),
-                              for (final message in agent.messages.entries)
-                                if (message.value.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 24),
-                                    child: message.key.startsWith('user:')
-                                        ? UserMessageBubble(
-                                            message: message.value,
-                                            textStyle: exampleMessageStyle,
-                                          )
-                                        : AssistantReply(
-                                            textStyle: exampleMessageStyle,
-                                            message: message.value,
-                                          ),
-                                  ),
-                              for (final item in agent.items)
-                                _AgentItemCard(
-                                  controller: agent,
-                                  item: item,
-                                  pickImages: widget.pickImages,
-                                ),
-                              if (agent.waiting)
-                                const Text(
-                                  'Waiting for your input. Pending actions have not all completed.',
-                                ),
-                              if (agent.busy)
-                                const Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: LinearProgressIndicator(),
-                                ),
-                              if (agent.error != null)
-                                Text(
-                                  agent.error!,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              if (agent.unresolved)
-                                const Text(
-                                  'An earlier request is unresolved. Do not submit it as a new request.',
-                                ),
-                              if (agent.error != null || agent.unresolved)
-                                Wrap(
-                                  spacing: 8,
-                                  children: [
-                                    TextButton(
-                                      onPressed: agent.busy
-                                          ? null
-                                          : agent.recover,
-                                      child: const Text(
-                                        'Check conversation state',
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Resolve or cancel pending items, or recover the current request first.',
                                       ),
                                     ),
-                                    FilledButton(
-                                      onPressed: agent.canRetry
-                                          ? agent.retry
-                                          : null,
-                                      child: const Text('Retry same request'),
+                                  );
+                                }
+                              },
+                              onHistory: () async {
+                                final previousId = agent.conversationId;
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => ConversationHistoryScreen(
+                                      controller: agent,
                                     ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(22, 8, 22, 26),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (_images.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      for (
-                                        var index = 0;
-                                        index < _images.length;
-                                        index++
-                                      )
-                                        _ImagePreview(
-                                          key: ValueKey(
-                                            'agent-image-${_images[index].imageId}',
-                                          ),
-                                          image: _images[index],
-                                          onRemove: agent.canSend
-                                              ? () => setState(
-                                                  () => _images.removeAt(index),
-                                                )
-                                              : null,
-                                        ),
-                                    ],
                                   ),
-                                ),
-                              AgentComposer(
-                                controller: _message,
-                                voiceModeReset: _voiceModeReset,
-                                enabled: agent.canSend,
-                                waiting: agent.waiting,
-                                hasImages: _images.isNotEmpty,
-                                voiceActive: _recordingVoice,
-                                onPhotoPressed:
-                                    agent.canSend &&
-                                        _images.length < AgentImage.maxImages
-                                    ? _pickImages
-                                    : null,
-                                onSendPressed: agent.canSend ? _send : null,
-                                voiceButton: HoldToSpeakButton(
-                                  enabled: agent.canSend && !_finishingVoice,
-                                  recording: _recordingVoice,
-                                  cancelling: _cancelVoice,
-                                  finishing: _finishingVoice,
-                                  onStart: _startVoiceInput,
-                                  onMove: _updateVoiceCancel,
-                                  onEnd: () => _finishVoiceInput(),
-                                  onCancel: () =>
-                                      _finishVoiceInput(forceCancel: true),
+                                );
+                                if (!mounted ||
+                                    agent.conversationId == previousId) {
+                                  return;
+                                }
+                                _message.clear();
+                                setState(() {
+                                  _images.clear();
+                                  _voiceModeReset++;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 15),
+                            const Center(
+                              child: Text(
+                                'Add information using voice, photos, or text.',
+                                style: TextStyle(
+                                  color: AppColors.muted,
+                                  fontSize: 13.5,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 18),
+                            AssistantGreeting(
+                              message: name == null || name.isEmpty
+                                  ? 'Hey! How can I help you?'
+                                  : 'Hey, $name! How can I help you?',
+                            ),
+                            if (showWelcome)
+                              AssistantWelcome(
+                                onSuggestionSelected: agent.canSend
+                                    ? (message) => agent.send(message)
+                                    : null,
+                              )
+                            else
+                              const SizedBox(height: 24),
+                            for (final message in agent.messages.entries)
+                              if (message.value.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 24),
+                                  child: message.key.startsWith('user:')
+                                      ? UserMessageBubble(
+                                          message: message.value,
+                                          textStyle: exampleMessageStyle,
+                                        )
+                                      : AssistantReply(
+                                          textStyle: exampleMessageStyle,
+                                          message: message.value,
+                                        ),
+                                ),
+                            for (final item in agent.items)
+                              _AgentItemCard(
+                                controller: agent,
+                                item: item,
+                                pickImages: widget.pickImages,
+                              ),
+                            if (agent.waiting)
+                              const Text(
+                                'Waiting for your input. Pending actions have not all completed.',
+                              ),
+                            if (agent.busy)
+                              const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: LinearProgressIndicator(),
+                              ),
+                            if (agent.error != null)
+                              Text(
+                                agent.error!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            if (agent.unresolved)
+                              const Text(
+                                'An earlier request is unresolved. Do not submit it as a new request.',
+                              ),
+                            if (agent.error != null || agent.unresolved)
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  TextButton(
+                                    onPressed: agent.busy
+                                        ? null
+                                        : agent.recover,
+                                    child: const Text(
+                                      'Check conversation state',
+                                    ),
+                                  ),
+                                  FilledButton(
+                                    onPressed: agent.canRetry
+                                        ? agent.retry
+                                        : null,
+                                    child: const Text('Retry same request'),
+                                  ),
+                                ],
+                              ),
+                          ],
                         ),
-                        AppBottomNavigation(
-                          onHomeTap:
-                              widget.onHomeTap ??
-                              () => Navigator.of(context).maybePop(),
-                          onProfileTap: widget.onProfileTap,
+                        footer: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(22, 8, 22, 26),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_images.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          for (
+                                            var index = 0;
+                                            index < _images.length;
+                                            index++
+                                          )
+                                            _ImagePreview(
+                                              key: ValueKey(
+                                                'agent-image-${_images[index].imageId}',
+                                              ),
+                                              image: _images[index],
+                                              onRemove: agent.canSend
+                                                  ? () => setState(
+                                                      () => _images.removeAt(
+                                                        index,
+                                                      ),
+                                                    )
+                                                  : null,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  AgentComposer(
+                                    controller: _message,
+                                    voiceModeReset: _voiceModeReset,
+                                    enabled: agent.canSend,
+                                    waiting: agent.waiting,
+                                    hasImages: _images.isNotEmpty,
+                                    voiceActive: _recordingVoice,
+                                    onPhotoPressed:
+                                        agent.canSend &&
+                                            _images.length <
+                                                AgentImage.maxImages
+                                        ? _pickImages
+                                        : null,
+                                    onSendPressed: agent.canSend ? _send : null,
+                                    voiceButton: HoldToSpeakButton(
+                                      enabled:
+                                          agent.canSend && !_finishingVoice,
+                                      recording: _recordingVoice,
+                                      cancelling: _cancelVoice,
+                                      finishing: _finishingVoice,
+                                      onStart: _startVoiceInput,
+                                      onMove: _updateVoiceCancel,
+                                      onEnd: () => _finishVoiceInput(),
+                                      onCancel: () =>
+                                          _finishVoiceInput(forceCancel: true),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            AppBottomNavigation(
+                              onHomeTap:
+                                  widget.onHomeTap ??
+                                  () => Navigator.of(context).maybePop(),
+                              onProfileTap: widget.onProfileTap,
+                            ),
+                          ],
                         ),
-                      ],
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _ImagePreview extends StatelessWidget {
