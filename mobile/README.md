@@ -32,8 +32,6 @@ flutter test
 
 电脑浏览器在足够大的窗口中自动显示居中的手机外框，内部宽度为 390px，高度最多 844px；窗口变窄或变矮时使用全部可用区域。手机触摸浏览器使用 Flutter 原有的全屏模式与键盘处理。外框覆盖所有页面和弹窗，只影响浏览器展示，不改变 Android/iOS 原生应用。
 
-iPhone 添加到主屏幕时使用 `default` 状态栏模式，让 iOS 在网页上方保留状态栏，作为部分 WebKit 版本全屏底部留白问题的兼容调整。顶部系统区域由 iOS 绘制，语音遮罩仅保证覆盖网页区域。实际效果需真机验收；部署后如旧桌面图标仍异常，应重新添加图标进行对照。普通 Safari 标签页底部的地址栏和按钮是浏览器控件。详情见 [部署排错](RENDER_DEPLOY.md#5-日志排错)。
-
 ```bash
 flutter run -d chrome --web-port=5174 -t lib/main.dart --dart-define=API_BASE_URL=https://YOUR-BACKEND-HOST/api/v1
 flutter build web --release -t lib/main.dart --no-web-resources-cdn --dart-define=API_BASE_URL=https://YOUR-BACKEND-HOST/api/v1
