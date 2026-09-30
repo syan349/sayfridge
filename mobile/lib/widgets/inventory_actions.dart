@@ -18,6 +18,15 @@ class InventoryActions extends StatelessWidget {
   final WorkspaceRepository? workspace;
   final Future<void> Function() reload;
 
+  bool get _isExpired {
+    final expiryDate = item.expiryDate;
+    if (expiryDate == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+    return expiry.isBefore(today);
+  }
+
   Future<void> _quantity(
     BuildContext context,
     String operation, {
@@ -88,6 +97,28 @@ class InventoryActions extends StatelessWidget {
     if (context.mounted) await reload();
   }
 
+  Future<void> _markUsedUp(BuildContext context) async {
+    final key = requestId();
+    final confirmed = await businessForm(
+      context,
+      title: 'Mark this item as used up?',
+      fields: const [],
+      idempotentRetry: true,
+      explanation:
+          '${item.itemDefinitionName}\nThe remaining quantity will be set to 0 and the item will move out of the active inventory. Its history will be kept.',
+      submit: (_) async {
+        await workspace!.quantityOperation(item.id, {
+          'expected_version': item.version,
+          'operation_type': 'RECONCILE',
+          'quantity_kind': 'AMOUNT',
+          'quantity_value': '0',
+          'quantity_unit': item.displayUnit,
+        }, key);
+      },
+    );
+    if (confirmed == true && context.mounted) await reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     final editable = item.status == 'IN_STOCK' || item.status == 'EMPTY';
@@ -140,9 +171,15 @@ class InventoryActions extends StatelessWidget {
                 child: const Text('Confirm remaining'),
               ),
               if (item.isInStock)
+                OutlinedButton.icon(
+                  onPressed: () => _markUsedUp(context),
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Mark as used up'),
+                ),
+              if (item.isInStock && !_isExpired)
                 TextButton(
                   onPressed: () => _state(context, 'discard'),
-                  child: const Text('Discard'),
+                  child: const Text('Discard item'),
                 ),
               TextButton(
                 onPressed: () => _state(context, 'archive'),
@@ -150,6 +187,18 @@ class InventoryActions extends StatelessWidget {
               ),
             ],
           ),
+          if (item.isInStock && _isExpired) ...[
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              onPressed: () => _state(context, 'discard'),
+              icon: const Icon(Icons.delete_forever_outlined),
+              label: const Text('Discard expired item'),
+            ),
+          ],
         ],
         const SizedBox(height: 17),
         OutlinedButton.icon(
