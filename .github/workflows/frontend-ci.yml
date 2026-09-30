@@ -1,14 +1,18 @@
 name: Frontend CI
 
 on:
-  pull_request:
+  workflow_call:
+    inputs:
+      test_ref:
+        type: string
+        default: ''
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: frontend-fast-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -21,6 +25,8 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.test_ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -60,6 +66,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.test_ref || github.sha }}
       - uses: subosito/flutter-action@v2
         with:
           # Keep aligned with mobile/scripts/render-build.sh and README.md.

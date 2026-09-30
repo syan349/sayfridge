@@ -1,0 +1,41 @@
+name: Core E2E
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run: ${{ steps.paths.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify path selection
+        run: python -m unittest discover -s .github/scripts -p 'test_*.py'
+      - name: Select integration changes
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            python .github/scripts/e2e_paths.py "$BASE" "$HEAD" >> "$GITHUB_OUTPUT"
+          fi
+  backend-fast:
+    uses: ./.github/workflows/backend-ci.yml
+  frontend-fast:
+    uses: ./.github/workflows/frontend-ci.yml
+  browser-e2e:
+    needs: [changes, backend-fast, frontend-fast]
+    if: needs.changes.outputs.run == 'true'
+    uses: ./.github/workflows/browser-e2e.yml

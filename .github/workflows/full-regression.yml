@@ -1,0 +1,62 @@
+name: Full Regression
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: full-regression-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  revision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Verify orchestration rules
+        run: python -m unittest discover -s .github/scripts -p 'test_*.py'
+  backend-full:
+    needs: revision
+    uses: ./.github/workflows/backend-ci.yml
+    with:
+      full_regression: true
+      test_ref: ${{ needs.revision.outputs.sha }}
+  frontend-full:
+    needs: revision
+    uses: ./.github/workflows/frontend-ci.yml
+    with:
+      test_ref: ${{ needs.revision.outputs.sha }}
+  browser-e2e:
+    needs: revision
+    uses: ./.github/workflows/browser-e2e.yml
+    with:
+      test_ref: ${{ needs.revision.outputs.sha }}
+  summary:
+    if: always()
+    needs: [revision, backend-full, frontend-full, browser-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Aggregate required results
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+          TEST_COMMIT: ${{ needs.revision.outputs.sha || github.sha }}
+        run: python .github/scripts/regression_summary.py
+      - name: Save aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-regression-summary
+          path: |
+            regression-summary.json
+            regression-summary.md
+          retention-days: 7
+          if-no-files-found: error
