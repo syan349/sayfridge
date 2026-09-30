@@ -1,0 +1,26 @@
+{
+  "scanner": "gitleaks 8.30.1",
+  "redacted": true,
+  "findings": [
+    {
+      "RuleID": "generic-api-key",
+      "File": "web/src/pages/assistant/AssistantPage.test.tsx",
+      "StartLine": 162,
+      "EndLine": 162,
+      "Commit": "66d58759a43d7424bfb0237dea460c24cc699bec",
+      "Match": "STORAGE_KEY, 'REDACTED'",
+      "triage": "Synthetic conversation identifier in UI test",
+      "disposition": "false_positive"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "mobile/test/screens/forgot_password_test.dart",
+      "StartLine": 33,
+      "EndLine": 33,
+      "Commit": "a06ec80bada967817ba7b085389d03aade127865",
+      "Match": "password, 'REDACTED'",
+      "triage": "Unsubmitted synthetic password in widget test; no real authentication",
+      "disposition": "false_positive"
+    }
+  ]
+}

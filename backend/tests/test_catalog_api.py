@@ -19,7 +19,6 @@ pytestmark = pytest.mark.postgres
 DEFINITION_FIELDS = {"id", "name", "category_id", "status", "scope"}
 
 
-@pytest.mark.ci
 def test_category_list_filters_orders_paginates_and_exposes_public_fields(catalog_context):
     db, _, _, category, headers = catalog_context
     first = seed_category(db, "First", sort_order=0)
@@ -83,7 +82,6 @@ def test_definition_search_is_literal_case_insensitive_and_trimmed(catalog_conte
     asyncio.run(exercise(db, scenario))
 
 
-@pytest.mark.ci
 def test_private_definition_lifecycle_persists_fields_and_preserves_noop_timestamps(catalog_context):
     db, owner, _, category, headers = catalog_context
     new_cat = seed_category(db, "Other")
@@ -119,7 +117,7 @@ def test_private_definition_lifecycle_persists_fields_and_preserves_noop_timesta
     {"name": "\u00df" * 51, "category_id": "$category"},
     {"name": "\ufb03" * 34, "category_id": "$category"},
     {"name": "Rice", "category_id": None}, {"name": "Rice", "category_id": "invalid"},
-    pytest.param({"name": "Rice", "category_id": "$category", "owner_user_id": str(uuid.uuid4())}, marks=pytest.mark.ci, id="reject_client_owner"),
+    pytest.param({"name": "Rice", "category_id": "$category", "owner_user_id": str(uuid.uuid4())}, id="reject_client_owner"),
     {"name": "Rice", "category_id": "$category", "status": "ARCHIVED"},
     {"name": "Rice", "category_id": "$category", "normalized_name": "other"},
     {"name": "Rice", "category_id": "$category", "password": "do-not-echo"},
@@ -143,7 +141,7 @@ def test_patch_validation_preserves_existing_data(catalog_context, payload):
     assert read_definition(db, row.id).updated_at == row.updated_at
 
 
-@pytest.mark.parametrize("method,suffix", [pytest.param("PATCH", "", marks=pytest.mark.ci), ("POST", "/archive"), ("POST", "/restore")])
+@pytest.mark.parametrize("method,suffix", [pytest.param("PATCH", ""), ("POST", "/archive"), ("POST", "/restore")])
 def test_private_write_endpoints_reject_public_foreign_and_missing_ids_identically(catalog_context, method, suffix):
     db, _, other, category, headers = catalog_context
     public = seed_definition(db, category.id)
@@ -200,7 +198,7 @@ def test_invalid_category_queries_return_business_errors(catalog_context, query)
     assert request(db, "GET", CATEGORIES + "?" + query, headers=headers).status_code == 422
 
 
-@pytest.mark.parametrize("existing_state", [pytest.param("ARCHIVED", marks=pytest.mark.ci), "ACTIVE"])
+@pytest.mark.parametrize("existing_state", [pytest.param("ARCHIVED"), "ACTIVE"])
 def test_legacy_equivalent_names_remain_reserved_across_categories(catalog_context, existing_state):
     db, owner, _, category, headers = catalog_context
     old = seed_definition(db, category.id, name="\uff2d\uff49\uff4c\uff4b", normalized_name="legacy-key", owner_id=owner.id, status=existing_state)

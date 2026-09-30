@@ -17,6 +17,7 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="SayFridge — manage your food, track expiry dates, and get help from your AI assistant.">
   <meta name="theme-color" content="#91C35E">
@@ -25,16 +26,20 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="SayFridge">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png?v=63bd43f0dc89">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="icon" type="image/png" href="favicon.png?v=63bd43f0dc89"/>
 
   <title>SayFridge</title>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json?v=63bd43f0dc89">
+  <link rel="stylesheet" href="phone-preview.css">
 </head>
 <body>
   <noscript>Please enable JavaScript to open SayFridge.</noscript>
+  <div id="phone-shell">
+    <div id="flutter-host"></div>
+  </div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

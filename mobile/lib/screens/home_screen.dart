@@ -5,11 +5,13 @@ import '../models/inventory_item.dart';
 import '../models/storage_space.dart';
 import '../state/expiry_summary_controller.dart';
 import '../state/inventory_controller.dart';
+import '../state/app_notification_controller.dart';
 import '../state/storage_space_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../widgets/app_page_footer.dart';
+import '../widgets/home_greeting.dart';
 import '../widgets/inventory_visuals.dart';
 import 'expiring_items_screen.dart';
 import 'inventory_detail_screen.dart';
@@ -29,6 +31,7 @@ class HomeScreen extends StatelessWidget {
     this.onExpiringTap,
     this.onInventoryTap,
     this.onAddItemTap,
+    this.notificationController,
     this.isGuest = false,
     super.key,
   });
@@ -44,6 +47,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
   final VoidCallback? onAddItemTap;
+  final AppNotificationController? notificationController;
   final bool isGuest;
 
   @override
@@ -63,7 +67,7 @@ class HomeScreen extends StatelessWidget {
                             child: const Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _Greeting(),
+                                HomeGreeting(),
                                 SizedBox(height: 14),
                                 _GuestHomeContent(),
                               ],
@@ -83,11 +87,16 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         Positioned.fill(
                           child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(26, 30, 26, 120),
+                            padding: const EdgeInsets.fromLTRB(
+                              26,
+                              30,
+                              26,
+                              AppBottomNavigation.extent + 30,
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const _Greeting(),
+                                const HomeGreeting(),
                                 const SizedBox(height: 19),
                                 _UserHomeContent(
                                   expirySummaryController:
@@ -100,15 +109,17 @@ class HomeScreen extends StatelessWidget {
                                   onExpiringTap: onExpiringTap,
                                   onInventoryTap: onInventoryTap,
                                   onAddItemTap: onAddItemTap,
+                                  notificationController:
+                                      notificationController,
                                 ),
                               ],
                             ),
                           ),
                         ),
                         Positioned(
-                          left: 35,
-                          right: 35,
-                          bottom: 4,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
                           child: AppBottomNavigation(
                             selectedDestination: AppNavigationDestination.home,
                             onAssistantTap: onAssistantTap,
@@ -121,31 +132,6 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Greeting extends StatelessWidget {
-  const _Greeting();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Good afternoon!',
-          style: TextStyle(
-            fontSize: 29,
-            fontWeight: FontWeight.w500,
-            height: 1.1,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(left: 78, top: 1),
-          child: Image.asset(HomeAssets.titleLine, width: 145, height: 10),
-        ),
-      ],
     );
   }
 }
@@ -163,8 +149,9 @@ class _GuestHomeContent extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F5F0),
+              color: const Color(0xFFEEF0E9),
               borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: const Color(0xFFCDCDCD)),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
@@ -240,6 +227,7 @@ class _UserHomeContent extends StatefulWidget {
     required this.onExpiringTap,
     required this.onInventoryTap,
     required this.onAddItemTap,
+    required this.notificationController,
   });
 
   final ExpirySummaryController? expirySummaryController;
@@ -250,6 +238,7 @@ class _UserHomeContent extends StatefulWidget {
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
   final VoidCallback? onAddItemTap;
+  final AppNotificationController? notificationController;
 
   @override
   State<_UserHomeContent> createState() => _UserHomeContentState();
@@ -323,6 +312,17 @@ class _UserHomeContentState extends State<_UserHomeContent> {
             ),
           ],
         ),
+        if (widget.notificationController != null) ...[
+          const SizedBox(height: 18),
+          AnimatedBuilder(
+            animation: widget.notificationController!,
+            builder: (context, _) => _NotificationPanel(
+              controller: widget.notificationController!,
+              onProcessExpired: _openExpiredItems,
+              onViewExpiring: _openExpiringItems,
+            ),
+          ),
+        ],
         const SizedBox(height: 42),
         const _SectionTitle('Expiring soon'),
         const SizedBox(height: 15),
@@ -358,7 +358,8 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           builder: (context, child) => _buildInventorySummary(),
         ),
         const SizedBox(height: 23),
-        Center(
+        Align(
+          alignment: Alignment.centerLeft,
           child: _GreenAction(
             label: 'View all items',
             onPressed: _openInventory,
@@ -451,20 +452,9 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Expanded(child: _SectionTitle('Inventory')),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$total ${total == 1 ? 'item' : 'items'}',
-                  style: const TextStyle(fontSize: 17),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: widget.onAddItemTap,
-                  tooltip: 'Add inventory item',
-                  icon: const Icon(Icons.add),
-                ),
-              ],
+            Text(
+              '$total ${total == 1 ? 'item' : 'items'}',
+              style: const TextStyle(fontSize: 17),
             ),
           ],
         ),
@@ -498,6 +488,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           InventoryLoadStatus.loaded => _CategoryCounts(
             items: controller!.items,
             partial: controller.hasNextPage,
+            onSelected: (group) => _openInventory(group: group),
           ),
         },
       ],
@@ -691,7 +682,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
     }
   }
 
-  Future<void> _openInventory() async {
+  Future<void> _openInventory({InventoryCategoryGroup? group}) async {
     final custom = widget.onInventoryTap;
     if (custom != null) {
       custom();
@@ -705,6 +696,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           controller: controller,
           storageSpaceController: widget.storageSpaceController,
           onAddItemTap: widget.onAddItemTap,
+          initialCategoryGroup: group,
         ),
       ),
     );
@@ -740,6 +732,20 @@ class _UserHomeContentState extends State<_UserHomeContent> {
     }
   }
 
+  Future<void> _openExpiredItems() async {
+    final expiry = widget.expirySummaryController;
+    if (expiry == null) return;
+    await expiry.selectBucket('overdue');
+    if (!mounted) return;
+    await _openExpiringItems();
+    if (mounted) {
+      expiry.loadSummary(
+        asOf: DateUtils.dateOnly(DateTime.now()),
+        storageSpaceId: _selectedStorageSpace?.id,
+      );
+    }
+  }
+
   void _openDetail(InventoryItem item) {
     final inventory = widget.inventoryController;
     if (inventory == null) return;
@@ -750,6 +756,100 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           controller: inventory.createDetailController(),
         ),
       ),
+    );
+  }
+}
+
+class _NotificationPanel extends StatelessWidget {
+  const _NotificationPanel({
+    required this.controller,
+    required this.onProcessExpired,
+    required this.onViewExpiring,
+  });
+
+  final AppNotificationController controller;
+  final Future<void> Function() onProcessExpired;
+  final Future<void> Function() onViewExpiring;
+
+  @override
+  Widget build(BuildContext context) {
+    final notifications = controller.notifications;
+    if (notifications.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Notifications',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 10),
+        for (final notification in notifications)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: notification.type == AppNotificationType.expired
+                      ? const Color(0xFFD36B4A)
+                      : const Color(0xFFA8D589),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        notification.type == AppNotificationType.expired
+                            ? Icons.warning_amber_rounded
+                            : Icons.notifications_none,
+                        color: notification.type == AppNotificationType.expired
+                            ? const Color(0xFFC8532C)
+                            : AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          notification.title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Text(notification.message),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      if (notification.processable)
+                        FilledButton(
+                          onPressed: onProcessExpired,
+                          child: const Text('Process now'),
+                        )
+                      else if (notification.type ==
+                          AppNotificationType.expiring)
+                        TextButton(
+                          onPressed: onViewExpiring,
+                          child: const Text('View items'),
+                        ),
+                      TextButton(
+                        onPressed: () => controller.markRead(notification.type),
+                        child: const Text('Mark as read'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -932,47 +1032,46 @@ class _ExpiryPreviewRow extends StatelessWidget {
 }
 
 class _CategoryCounts extends StatelessWidget {
-  const _CategoryCounts({required this.items, required this.partial});
+  const _CategoryCounts({
+    required this.items,
+    required this.partial,
+    required this.onSelected,
+  });
 
   final List<InventoryItem> items;
   final bool partial;
+  final ValueChanged<InventoryCategoryGroup> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    int count(String group) => items.where((item) {
-      final category = item.categoryName.toLowerCase();
-      if (group == 'Meat') {
-        return category.contains('meat') ||
-            category.contains('poultry') ||
-            category.contains('seafood');
-      }
-      if (group == 'Vegetables') {
-        return category.contains('vegetable') || category.contains('produce');
-      }
-      return !category.contains('meat') &&
-          !category.contains('poultry') &&
-          !category.contains('seafood') &&
-          !category.contains('vegetable') &&
-          !category.contains('produce');
-    }).length;
-
     return Row(
       children: [
-        for (final group in const ['Meat', 'Vegetables', 'Others']) ...[
-          if (group != 'Meat')
+        for (final group in InventoryCategoryGroup.values) ...[
+          if (group != InventoryCategoryGroup.meat)
             Container(width: 1, height: 78, color: const Color(0xFFA8D589)),
           Expanded(
-            child: Column(
-              children: [
-                Text(
-                  '${count(group)}${partial ? '+' : ''}',
-                  style: const TextStyle(fontSize: 40, height: 1.1),
+            child: InkWell(
+              key: ValueKey('inventory-group-${group.name}'),
+              onTap: () => onSelected(group),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    Text(
+                      '${items.where(group.includes).length}${partial ? '+' : ''}',
+                      style: const TextStyle(fontSize: 40, height: 1.1),
+                    ),
+                    Text(
+                      group.label,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  group,
-                  style: const TextStyle(fontSize: 15, color: AppColors.muted),
-                ),
-              ],
+              ),
             ),
           ),
         ],

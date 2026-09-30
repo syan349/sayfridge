@@ -21,7 +21,7 @@ pytestmark = pytest.mark.postgres
     [
         pytest.param(
             True,
-            marks=[pytest.mark.ci, pytest.mark.database_acceptance],
+            marks=[pytest.mark.database_acceptance],
         ),
         False,
     ],
@@ -55,7 +55,6 @@ def test_concurrent_consumptions_cannot_double_consume(inventory_context, monkey
     asyncio.run(exercise(c[0], scenario))
 
 
-@pytest.mark.ci
 @pytest.mark.database_acceptance
 def test_consumption_insert_failure_rolls_back_and_allows_retry(inventory_context):
     c = inventory_context; item = seed_inventory(c)

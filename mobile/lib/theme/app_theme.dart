@@ -5,6 +5,7 @@ abstract final class AppColors {
   static const primary = Color(0xFF91C35E);
   static const primaryDark = Color(0xFF679C35);
   static const primarySoft = Color(0xFFDDF0C6);
+  static const userMessage = Color(0xFF4A672D);
   static const yellowSoft = Color(0xFFFFE99A);
   static const fieldBorder = Color(0xFFDADADA);
   static const muted = Color(0xFF929292);

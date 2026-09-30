@@ -41,7 +41,6 @@ def test_consumption_and_replay_preserve_history_and_empty_state(inventory_conte
         assert session.scalar(select(func.count()).select_from(InventoryOperation)) == 1
 
 
-@pytest.mark.ci
 def test_fraction_consumption_preserves_estimated_state_at_zero(inventory_context):
     c = inventory_context; now = datetime.now(timezone.utc)
     item = seed_inventory(c, estimated_current_amount=Decimal("1"), estimated_current_unit="kg", estimated_at=now)

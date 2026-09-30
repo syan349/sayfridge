@@ -31,7 +31,7 @@ class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    email: EmailStr
+    email: str
     role: Literal["USER", "ADMIN"]
     status: Literal["ACTIVE", "SUSPENDED", "DISABLED"]
     created_at: datetime

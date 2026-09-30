@@ -5,6 +5,7 @@ import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../widgets/app_page_footer.dart';
 import '../widgets/assistant_widgets.dart';
+import '../widgets/assistant_welcome.dart';
 import 'camera_input_screen.dart';
 import 'conversation_history_screen.dart';
 import 'agent_conversation_screen.dart';
@@ -17,6 +18,7 @@ class AiAssistantScreen extends StatefulWidget {
     this.onProfileTap,
     this.onLoginTap,
     this.agentController,
+    this.displayName,
     super.key,
   });
 
@@ -25,6 +27,7 @@ class AiAssistantScreen extends StatefulWidget {
   final VoidCallback? onProfileTap;
   final VoidCallback? onLoginTap;
   final AgentController? agentController;
+  final String? displayName;
 
   @override
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
@@ -129,6 +132,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (!widget.isGuest && widget.agentController != null) {
       return AgentConversationScreen(
         controller: widget.agentController!,
+        displayName: widget.displayName,
         onHomeTap: widget.onHomeTap,
         onProfileTap: widget.onProfileTap,
       );
@@ -168,7 +172,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            height: 255,
+                            height: AppBottomNavigation.extent + 165,
                             child: const IgnorePointer(
                               child: _BottomListMask(),
                             ),
@@ -177,7 +181,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                           Positioned(
                             left: 22,
                             right: 22,
-                            bottom: 116,
+                            bottom: AppBottomNavigation.extent + 26,
                             child: AssistantComposer(
                               controller: _messageController,
                               onPhotoPressed: _openCamera,
@@ -185,9 +189,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                             ),
                           ),
                         Positioned(
-                          left: 35,
-                          right: 35,
-                          bottom: 4,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
                           child: AppBottomNavigation(
                             onHomeTap:
                                 widget.onHomeTap ??
@@ -207,7 +211,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget _buildScrollableContent() {
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.fromLTRB(25, 27, 25, widget.isGuest ? 0 : 238),
+      padding: EdgeInsets.fromLTRB(
+        25,
+        27,
+        25,
+        widget.isGuest ? 0 : AppBottomNavigation.extent + 148,
+      ),
       children: [
         AssistantHeader(
           onNewConversation: _startNewConversation,
@@ -221,7 +230,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        const AssistantGreeting(),
+        AssistantGreeting(
+          message: widget.isGuest
+              ? 'Hey! How can I help you?'
+              : 'Hey, Tim!  How can I help you?',
+        ),
         if (widget.isGuest)
           _buildGuestContent()
         else if (_showResults)
@@ -232,60 +245,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
-  Widget _buildEmptyContent() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 45),
-        const Center(
-          child: Text(
-            'Manage your inventory\nin one conversation',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 25,
-              fontWeight: FontWeight.w700,
-              height: 1.12,
-            ),
-          ),
-        ),
-        const SizedBox(height: 25),
-        const Center(
-          child: Text(
-            'Tell me what you bought, used, moved,\nor want to check..',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.muted,
-              fontSize: 16.5,
-              height: 1.2,
-            ),
-          ),
-        ),
-        const SizedBox(height: 35),
-        const Text(
-          'Try saying',
-          style: TextStyle(color: Color(0xFF707070), fontSize: 16),
-        ),
-        const SizedBox(height: 11),
-        AssistantSuggestionTile(
-          label: 'I want to update my inventory',
-          asset: AssistantAssets.update,
-          onTap: () => _showExpiryResults('What’s expiring soon?'),
-        ),
-        const SizedBox(height: 14),
-        AssistantSuggestionTile(
-          label: 'Add items to my inventory',
-          asset: AssistantAssets.add,
-          onTap: () => _showExpiryResults('Add items to my inventory'),
-        ),
-        const SizedBox(height: 14),
-        AssistantSuggestionTile(
-          label: 'Show me an inventory report',
-          asset: AssistantAssets.report,
-          onTap: () => _showExpiryResults('Show me an inventory report'),
-        ),
-      ],
-    );
-  }
+  Widget _buildEmptyContent() => AssistantWelcome(
+    onSuggestionSelected: (message) => _showExpiryResults(
+      message == 'I want to update my inventory'
+          ? 'What’s expiring soon?'
+          : message,
+    ),
+  );
 
   Widget _buildResultsContent() {
     return Column(
@@ -340,7 +306,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     return Column(
       children: [
-        const SizedBox(height: 28),
+        const SizedBox(height: 40),
         const Text(
           'Your inventory, organised\nwith a conversation.',
           textAlign: TextAlign.center,
@@ -350,7 +316,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             height: 1.18,
           ),
         ),
-        const SizedBox(height: 25),
+        const SizedBox(height: 40),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(17, 20, 17, 20),
@@ -414,25 +380,10 @@ class _GuestAssistantReply extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        ClipOval(
-          child: Image.asset(
-            AssistantAssets.aiAssistant,
-            width: 42,
-            height: 42,
-            fit: BoxFit.cover,
-            cacheWidth: 100,
-          ),
-        ),
-        const SizedBox(width: 11),
-        const Flexible(
-          child: AssistantMessageBubble(
-            message: 'I’ll organise that for you.',
-            textStyle: exampleMessageStyle,
-          ),
-        ),
-      ],
+    return const AssistantReply(
+      avatarSize: 42,
+      message: 'I’ll organise that for you.',
+      textStyle: exampleMessageStyle,
     );
   }
 }

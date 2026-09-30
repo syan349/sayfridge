@@ -11,11 +11,7 @@ from app.db.database_acceptance import build_database_acceptance_evidence
 from app.db.models import ItemCategory
 
 
-pytestmark = [
-    pytest.mark.postgres,
-    pytest.mark.ci,
-    pytest.mark.database_acceptance,
-]
+pytestmark = [pytest.mark.postgres, pytest.mark.database_acceptance]
 
 
 def test_database_acceptance_evidence_records_revision_seed_and_structure(database):

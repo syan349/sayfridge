@@ -122,7 +122,6 @@ def test_batch_move_rolls_back_first_item_when_later_item_fails(
         assert unchanged.storage_space_id == context[4].id and unchanged.version == 1
 
 
-@pytest.mark.ci
 def test_batch_move_rejects_duplicate_ids_without_writes(inventory_context):
     context = inventory_context
     target = seed_space(context[0], context[1].id, "Target")

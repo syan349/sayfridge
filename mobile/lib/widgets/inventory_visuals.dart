@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../models/inventory_item.dart';
 import '../theme/app_theme.dart';
+import 'inventory_card_trailing.dart';
 
 abstract final class HomeAssets {
   static const root = 'assets/icons/home';
   static const avatar = '$root/default_avatar.png';
   static const guestExpiry = '$root/guest_expiry.png';
-  static const noExpiry = '$root/no_expiry.png';
+  static const noExpiry = '$root/expiry_all_clear.png';
   static const filter = '$root/filter.png';
   static const search = '$root/search.png';
   static const setting = '$root/setting.png';
   static const titleLine = '$root/title_line.png';
+  static const morningLine = '$root/morning.png';
+  static const eveningLine = '$root/evening.png';
 }
 
 class HomeEmptyIllustration extends StatelessWidget {
@@ -35,34 +38,22 @@ class HomeEmptyIllustration extends StatelessWidget {
           Positioned(
             left: 0,
             top: 8,
-            child: Image.asset(asset, width: size, height: size),
-          ),
-          Positioned(
-            right: 1,
-            top: 9,
-            child: Transform.rotate(
-              angle: -0.76,
-              child: Container(
-                width: 18,
-                height: 2,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryDark,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+            child: Image.asset(
+              asset,
+              width: size,
+              height: size,
+              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                  .ceil(),
+              // Mipmaps retain smooth edges when reducing the large source art.
+              filterQuality: FilterQuality.medium,
             ),
           ),
-          Positioned(
-            right: 0,
-            top: 27,
-            child: Transform.rotate(
-              angle: -0.27,
-              child: Container(
-                width: 17,
-                height: 2,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryDark,
-                  borderRadius: BorderRadius.circular(2),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _EmptyIllustrationAccents(
+                  diameter: size,
+                  isExpiry: asset == HomeAssets.guestExpiry,
                 ),
               ),
             ),
@@ -71,6 +62,37 @@ class HomeEmptyIllustration extends StatelessWidget {
       ),
     );
   }
+}
+
+class _EmptyIllustrationAccents extends CustomPainter {
+  const _EmptyIllustrationAccents({
+    required this.diameter,
+    required this.isExpiry,
+  });
+
+  final double diameter;
+  final bool isExpiry;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF85B85A)
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round;
+    // Positions are relative to the circular artwork, matching each reference.
+    Offset point(double x, double y) => Offset(x * diameter, 8 + y * diameter);
+    if (isExpiry) {
+      canvas.drawLine(point(.94, .12), point(1.07, -.01), paint);
+      canvas.drawLine(point(1.015, .235), point(1.195, .186), paint);
+    } else {
+      canvas.drawLine(point(.965, .197), point(1.067, .099), paint);
+      canvas.drawLine(point(1.026, .286), point(1.158, .253), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_EmptyIllustrationAccents oldDelegate) =>
+      oldDelegate.diameter != diameter || oldDelegate.isExpiry != isExpiry;
 }
 
 String itemArtwork(InventoryItem item) {
@@ -232,25 +254,9 @@ class InventoryItemTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    expiryLabel(item.expiryDate),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: expiryColor(item.expiryDate),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('View item', style: TextStyle(fontSize: 13)),
-                      Icon(Icons.chevron_right, size: 18),
-                    ],
-                  ),
-                ],
+              InventoryCardTrailing(
+                expiryText: expiryLabel(item.expiryDate),
+                expiryColor: expiryColor(item.expiryDate),
               ),
             ],
           ),

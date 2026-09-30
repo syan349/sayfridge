@@ -75,6 +75,16 @@ void main() {
     expect(find.text('View all expiring items'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.tap(find.byKey(const ValueKey('inventory-group-vegetables')));
+    await tester.pumpAndSettle();
+    expect(find.text('Vegetables'), findsOneWidget);
+    expect(find.text('Tomatoes'), findsOneWidget);
+    expect(find.text('Chicken Thigh'), findsNothing);
+    expect(find.text('Milk'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
     await tester.tap(find.text('All Spaces').first);
     await tester.pumpAndSettle();
     expect(find.text('Choose storage space'), findsOneWidget);

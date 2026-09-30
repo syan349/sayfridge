@@ -81,7 +81,7 @@ def test_create_trims_name_sets_owner_and_returns_public_fields(space_context, s
     {"name": 123, "type": "FRIDGE"}, {"name": "Kitchen", "type": "fridge"},
     {"name": "Kitchen", "type": None},
     pytest.param({"name": "Kitchen", "type": "FRIDGE", "user_id": str(uuid.uuid4())},
-                 marks=pytest.mark.ci, id="reject_client_owner"),
+                 id="reject_client_owner"),
     {"name": "Kitchen", "type": "FRIDGE", "status": "ARCHIVED"},
     {"name": "Kitchen", "type": "FRIDGE", "id": str(uuid.uuid4())},
     {"name": "Kitchen", "type": "FRIDGE", "password": "must-not-echo"},
@@ -112,7 +112,7 @@ def test_trimmed_name_boundary_and_duplicate_scope(space_context):
     assert boundary.status_code == 201 and len(boundary.json()["name"]) == 100
 
 
-@pytest.mark.parametrize("state", ["ACTIVE", pytest.param("ARCHIVED", marks=pytest.mark.ci)])
+@pytest.mark.parametrize("state", ["ACTIVE", pytest.param("ARCHIVED")])
 def test_detail_returns_owned_space_in_either_state(space_context, state):
     db, owner, _, headers = space_context
     space = seed_space(db, owner.id, status=state)
@@ -125,7 +125,6 @@ def test_detail_returns_owned_space_in_either_state(space_context, state):
     ("GET", "", None), ("PATCH", "", {"name": "Changed"}),
     ("POST", "/archive", None), ("POST", "/restore", None),
 ])
-@pytest.mark.ci
 def test_missing_and_other_owners_resources_have_identical_404(space_context, method, suffix, payload):
     """Resource IDs alone never authorize reads or writes."""
     db, _, other, headers = space_context
@@ -142,7 +141,7 @@ def test_missing_and_other_owners_resources_have_identical_404(space_context, me
 @pytest.mark.parametrize("method,path,payload", [
     ("GET", "", None), ("GET", "/{id}", None),
     pytest.param("POST", "", {"name": "Kitchen", "type": "FRIDGE"},
-                 marks=pytest.mark.ci, id="create_requires_authentication"),
+                 id="create_requires_authentication"),
     ("PATCH", "/{id}", {"name": "Changed"}),
     ("POST", "/{id}/archive", None), ("POST", "/{id}/restore", None),
 ])
@@ -165,7 +164,6 @@ def test_current_account_state_is_checked_for_business_requests(space_context, a
     assert request(db, "POST", BASE, json={"name": "Kitchen", "type": "FRIDGE"}, headers=headers).status_code == 401
 
 
-@pytest.mark.ci
 def test_list_filters_ownership_state_and_orders_pages_including_empty_pages(space_context):
     """Stable name/UUID ordering and total survive pagination beyond the last row."""
     db, owner, other, headers = space_context
@@ -210,7 +208,7 @@ def test_invalid_uuid_and_malformed_json_return_safe_business_errors(space_conte
     asyncio.run(exercise(db, scenario))
 
 
-@pytest.mark.parametrize("payload", [{}, pytest.param({"name": None}, marks=pytest.mark.ci, id="reject_null_name"), {"type": None}, {"name": " "}, {"name": "x" * 101}, {"type": "BAD"}, {"status": "ARCHIVED"}, {"user_id": str(uuid.uuid4())}])
+@pytest.mark.parametrize("payload", [{}, pytest.param({"name": None}, id="reject_null_name"), {"type": None}, {"name": " "}, {"name": "x" * 101}, {"type": "BAD"}, {"status": "ARCHIVED"}, {"user_id": str(uuid.uuid4())}])
 def test_patch_rejects_empty_null_invalid_or_extra_fields(space_context, payload):
     db, owner, _, headers = space_context
     space = seed_space(db, owner.id)
@@ -220,7 +218,6 @@ def test_patch_rejects_empty_null_invalid_or_extra_fields(space_context, payload
     assert stored.name == space.name and stored.updated_at == space.updated_at
 
 
-@pytest.mark.ci
 def test_patch_partial_fields_noop_and_conflict_rollback(space_context):
     db, owner, _, headers = space_context
     space = seed_space(db, owner.id)
@@ -240,7 +237,6 @@ def test_patch_partial_fields_noop_and_conflict_rollback(space_context):
     assert changed_type.status_code == 200 and changed_type.json()["name"] == "Changed" and changed_type.json()["type"] == "PANTRY"
 
 
-@pytest.mark.ci
 def test_archive_restore_retries_and_archived_patch(space_context):
     db, owner, _, headers = space_context
     space = seed_space(db, owner.id)
@@ -259,7 +255,6 @@ def test_archive_restore_retries_and_archived_patch(space_context):
     assert request(db, "POST", url + "/restore", headers=headers).json() == restored.json()
 
 
-@pytest.mark.ci
 def test_restore_conflicting_active_name_rolls_back(space_context):
     db, owner, _, headers = space_context
     archived = seed_space(db, owner.id, status="ARCHIVED")

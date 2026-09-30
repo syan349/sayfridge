@@ -24,6 +24,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
+  bool _isSubmitting = false;
+  bool _isPickingAvatar = false;
   AvatarChoice _avatar = avatarChoices.first;
   Uint8List? _uploadedAvatarBytes;
   final ImagePicker _imagePicker = ImagePicker();
@@ -52,6 +54,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _uploadAvatar() async {
+    if (_isPickingAvatar) return;
+    setState(() => _isPickingAvatar = true);
     try {
       final image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
@@ -72,6 +76,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           content: Text('Unable to open the photo library. Please try again.'),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isPickingAvatar = false);
     }
   }
 
@@ -79,12 +85,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
     FocusScope.of(context).unfocus();
 
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (widget.authController.isSubmitting) return;
+    if (_isSubmitting || widget.authController.isSubmitting) return;
 
-    final success = await widget.authController.register(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
+    setState(() => _isSubmitting = true);
+    late final bool success;
+    try {
+      success = await widget.authController.register(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
 
     if (!mounted) return;
 
@@ -129,6 +141,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     imageBytes: _uploadedAvatarBytes,
                     size: 122,
                     onUploadTap: _uploadAvatar,
+                    isUploading: _isPickingAvatar,
                     showUploadBadge: true,
                   ),
                 ),
@@ -214,6 +227,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   key: const Key('sign-up-button'),
                   label: 'Sign up',
                   onPressed: _submit,
+                  isLoading: _isSubmitting,
                 ),
               ],
             ),

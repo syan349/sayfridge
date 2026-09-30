@@ -93,11 +93,13 @@ class PrimaryAuthButton extends StatelessWidget {
   const PrimaryAuthButton({
     required this.label,
     required this.onPressed,
+    this.isLoading = false,
     super.key,
   });
 
   final String label;
   final VoidCallback onPressed;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -105,22 +107,31 @@ class PrimaryAuthButton extends StatelessWidget {
       width: double.infinity,
       height: 58,
       child: FilledButton(
-        onPressed: onPressed,
+        onPressed: isLoading ? null : onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.black,
           shape: const StadiumBorder(),
           textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(child: Text(label, textAlign: TextAlign.center)),
-            const SizedBox(width: 18),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 19),
-          ],
-        ),
+        child: isLoading
+            ? const SizedBox.square(
+                key: Key('auth-loading-indicator'),
+                dimension: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.black,
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(child: Text(label, textAlign: TextAlign.center)),
+                  const SizedBox(width: 18),
+                  const Icon(Icons.arrow_forward_ios_rounded, size: 19),
+                ],
+              ),
       ),
     );
   }

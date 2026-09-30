@@ -1,14 +1,285 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:sayfridge/models/agent_image.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
 import 'package:sayfridge/services/api_client.dart';
 import 'package:sayfridge/state/agent_controller.dart';
 import '../support/integration_fixtures.dart';
 
 void main() {
+  test(
+    'earlier conversations survive restart and reopen with their messages',
+    () async {
+      final store = MemoryAgentStore();
+      final api = ApiClient(
+        client: MockClient((request) async {
+          if (request.method == 'GET') {
+            return jsonResponse({'status': 'COMPLETED', 'items': []});
+          }
+          return eventResponse([
+            {'type': 'text_delta', 'delta': 'Saved reply'},
+            {
+              'type': 'done',
+              'status': 'COMPLETED',
+              'data': {'status': 'COMPLETED', 'items': []},
+            },
+          ]);
+        }),
+      );
+      addTearDown(api.close);
+      final workspace = WorkspaceRepository(api, MemoryTokens());
+      final first = AgentController(workspace, store: store);
+      await first.bindUser('alice');
+      await first.send('First question');
+      final firstId = first.conversationId!;
+      await first.newConversation();
+      expect(first.history.single.title, 'First question');
+      await first.send('Second question');
+      first.dispose();
+
+      final restored = AgentController(workspace, store: store);
+      addTearDown(restored.dispose);
+      await restored.bindUser('alice');
+      expect(restored.messages.values, contains('Second question'));
+      expect(restored.history.single.title, 'First question');
+      await restored.openConversation(firstId);
+      expect(restored.conversationId, firstId);
+      expect(
+        restored.messages.values,
+        containsAll(['First question', 'Saved reply']),
+      );
+      expect(restored.history.single.title, 'Second question');
+    },
+  );
+
+  test('image-only supplement replaces the pending proposal version', () async {
+    const oldItem = {
+      'item_id': 'item',
+      'proposal_id': 'old-proposal',
+      'status': 'NEEDS_INPUT',
+      'original_text': 'Unknown package',
+    };
+    const newItem = {
+      'item_id': 'item',
+      'proposal_id': 'new-proposal',
+      'status': 'NEEDS_CONFIRMATION',
+      'original_text': 'Milk 1 bottle',
+    };
+    final image = AgentImage.fromBytes(
+      Uint8List.fromList([0xff, 0xd8, 0xff]),
+      mimeType: 'image/jpeg',
+      imageId: '00000000-0000-4000-8000-000000000007',
+    );
+    var calls = 0;
+    final api = ApiClient(
+      client: MockClient((request) async {
+        calls++;
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        if (calls == 1) {
+          return eventResponse([
+            {
+              'type': 'done',
+              'status': 'WAITING_INPUT',
+              'data': {
+                'status': 'WAITING_INPUT',
+                'interrupt_id': 'interrupt-old',
+                'items': [oldItem],
+              },
+            },
+          ]);
+        }
+        expect(request.url.path, '/api/v1/agent/resume');
+        expect(body['interrupt_id'], 'interrupt-old');
+        expect(body['responses'], [
+          {
+            'item_id': 'item',
+            'proposal_id': 'old-proposal',
+            'decision': 'answer',
+            'images': [image.toJson()],
+          },
+        ]);
+        return eventResponse([
+          {
+            'type': 'action_required',
+            'data': {
+              'interrupt_id': 'interrupt-new',
+              'items': [newItem],
+            },
+          },
+          {
+            'type': 'done',
+            'status': 'WAITING_INPUT',
+            'data': {
+              'status': 'WAITING_INPUT',
+              'interrupt_id': 'interrupt-new',
+              'items': [newItem],
+            },
+          },
+        ]);
+      }),
+    );
+    addTearDown(api.close);
+    final agent = AgentController(
+      WorkspaceRepository(api, MemoryTokens()),
+      store: MemoryAgentStore(),
+    );
+    addTearDown(agent.dispose);
+
+    await agent.bindUser('alice');
+    await agent.send('What is this?');
+    expect(agent.items.single['proposal_id'], 'old-proposal');
+    await agent.respond(agent.items.single, 'answer', images: [image]);
+    expect(agent.items.single['proposal_id'], 'new-proposal');
+    expect(agent.interruptId, 'interrupt-new');
+    expect(agent.canRespond, isTrue);
+  });
+
+  test(
+    'image-only chat sends the backend contract and preserves retry IDs',
+    () async {
+      final posts = <Map<String, dynamic>>[];
+      final image = AgentImage.fromBytes(
+        Uint8List.fromList([0xff, 0xd8, 0xff]),
+        mimeType: 'image/jpeg',
+        imageId: '00000000-0000-4000-8000-000000000006',
+      );
+      var stateReads = 0;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          if (request.method == 'GET') {
+            stateReads++;
+            return jsonResponse({'status': 'RECOVERABLE', 'items': []});
+          }
+          posts.add(jsonDecode(request.body) as Map<String, dynamic>);
+          if (posts.length == 1) {
+            return eventResponse([
+              {
+                'type': 'start',
+                'conversation_id': posts.single['conversation_id'],
+              },
+            ]);
+          }
+          return eventResponse([
+            {
+              'type': 'done',
+              'status': 'COMPLETED',
+              'data': {'status': 'COMPLETED', 'items': []},
+            },
+          ]);
+        }),
+      );
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: MemoryAgentStore(),
+      );
+      addTearDown(agent.dispose);
+
+      await agent.bindUser('alice');
+      await agent.send('', images: [image]);
+
+      expect(stateReads, 1);
+      expect(agent.canRetry, isTrue);
+      expect(posts.single['message'], '');
+      expect(posts.single['images'], [image.toJson()]);
+      await agent.retry();
+      expect(posts, hasLength(2));
+      expect(posts[1], posts[0]);
+    },
+  );
+
+  test(
+    'failed supporting-photo response retries the exact proposal and image IDs',
+    () async {
+      const item = {
+        'item_id': 'item',
+        'proposal_id': 'proposal',
+        'status': 'NEEDS_INPUT',
+        'original_text': 'Unknown package',
+      };
+      final image = AgentImage.fromBytes(
+        Uint8List.fromList([0xff, 0xd8, 0xff]),
+        mimeType: 'image/jpeg',
+        imageId: '00000000-0000-4000-8000-000000000008',
+      );
+      final resumePosts = <Map<String, dynamic>>[];
+      var chatComplete = false;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          if (request.method == 'GET') {
+            return jsonResponse({
+              'status': 'RECOVERABLE',
+              'interrupt_id': 'interrupt',
+              'items': [item],
+            });
+          }
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          if (!chatComplete) {
+            chatComplete = true;
+            return eventResponse([
+              {
+                'type': 'done',
+                'status': 'WAITING_INPUT',
+                'data': {
+                  'status': 'WAITING_INPUT',
+                  'interrupt_id': 'interrupt',
+                  'items': [item],
+                },
+              },
+            ]);
+          }
+          resumePosts.add(body);
+          if (resumePosts.length == 1) {
+            return eventResponse([
+              {'type': 'start', 'conversation_id': body['conversation_id']},
+            ]);
+          }
+          return eventResponse([
+            {
+              'type': 'done',
+              'status': 'WAITING_INPUT',
+              'data': {
+                'status': 'WAITING_INPUT',
+                'interrupt_id': 'interrupt-new',
+                'items': [
+                  {...item, 'proposal_id': 'proposal-new'},
+                ],
+              },
+            },
+          ]);
+        }),
+      );
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: MemoryAgentStore(),
+      );
+      addTearDown(agent.dispose);
+
+      await agent.bindUser('alice');
+      await agent.send('What is this?');
+      await agent.respond(agent.items.single, 'answer', images: [image]);
+
+      expect(agent.canRetry, isTrue);
+      expect(resumePosts.single['responses'], [
+        {
+          'item_id': 'item',
+          'proposal_id': 'proposal',
+          'decision': 'answer',
+          'images': [image.toJson()],
+        },
+      ]);
+      await agent.retry();
+      expect(resumePosts, hasLength(2));
+      expect(resumePosts[1], resumePosts[0]);
+      expect(agent.items.single['proposal_id'], 'proposal-new');
+    },
+  );
+
   test(
     'rejected stale proposal reloads current state and unlocks the new proposal',
     () async {

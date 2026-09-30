@@ -2,6 +2,8 @@
 
 SayFridge 的 Flutter 手机端，面向 Android 和 iOS，包含登录注册、首页、库存、AI Assistant 和 Profile 页面。
 
+底部导航统一使用 `AppBottomNavigation`，固定放在页面 `SafeArea` 的底端、滚动内容之外。白色导航栏居中占可用宽度的 78%，左右入口在栏内中央 80% 的宽度中与中间入口等距排列；中间绿色图标（含外圈）的下沿与两侧图标对齐，图标与文字统一间隔 3 个逻辑像素。底部保留 28 个逻辑像素的间距，页面不要再添加导航外边距。游客和登录状态使用相同布局，只切换选中状态；输入框和内容的预留空间使用组件的 `extent`。
+
 ## 环境要求
 
 - Flutter SDK
@@ -28,6 +30,8 @@ flutter test
 
 本工程现在包含 Flutter Web 平台文件。它展示手机端 Flutter 界面，与仓库根目录的 React `web/` 是两个独立站点。
 
+电脑浏览器在足够大的窗口中自动显示居中的手机外框，内部宽度为 390px，高度最多 844px；窗口变窄或变矮时使用全部可用区域。手机触摸浏览器使用 Flutter 原有的全屏模式与键盘处理。外框覆盖所有页面和弹窗，只影响浏览器展示，不改变 Android/iOS 原生应用。
+
 ```bash
 flutter run -d chrome --web-port=5174 -t lib/main.dart --dart-define=API_BASE_URL=https://YOUR-BACKEND-HOST/api/v1
 flutter build web --release -t lib/main.dart --no-web-resources-cdn --dart-define=API_BASE_URL=https://YOUR-BACKEND-HOST/api/v1
@@ -35,7 +39,7 @@ flutter build web --release -t lib/main.dart --no-web-resources-cdn --dart-defin
 
 替换示例域名后运行。网页未配置 `API_BASE_URL` 时使用同源 `/api/v1`；在只托管静态文件的 Render 上，这只能用于先查看游客界面，登录、库存和 AI 需接通后端后再验收。Android 模拟器的默认地址保持不变。
 
-先将 `mobile-render` 的部署改动合入 GitHub 上的 `main`。Render 创建 **Static Site**，Branch 选择 `main`，Root Directory 填 `mobile`，Build Command 填 `bash scripts/render-build.sh`，Publish Directory 填 `build/web`。脚本准备 Flutter 3.44.8，并把 Render 的 `API_BASE_URL` 变量传给 Dart 编译器；不使用 React 的 `VITE_API_BASE_URL`。详细步骤和上线检查见 [手机端 Render 部署](RENDER_DEPLOY.md)。
+Render 正式站跟踪 `main`；另建测试站跟踪 `mobile-render`，每次向测试分支提交并推送即可更新测试站，稳定后再通过 PR 合入 `main`。两个站点都使用 **Static Site**，Root Directory 填 `mobile`，Build Command 填 `bash scripts/render-build.sh`，Publish Directory 填 `build/web`，Auto-Deploy 选 `On Commit`。脚本准备 Flutter 3.44.8，并把各站点的 `API_BASE_URL` 变量传给 Dart 编译器；不使用 React 的 `VITE_API_BASE_URL`。详细步骤和上线检查见 [手机端 Render 部署](RENDER_DEPLOY.md)。
 
 ## 真实 API 入口与联调
 
@@ -47,6 +51,8 @@ flutter run -t lib/main.dart --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
 - 保留注册/登录/当前用户、库存/空间查询、搜索与临期汇总；已增加空间创建/编辑/归档/恢复、私人物品定义创建、入库、元数据编辑/移动、ADD/CONSUME/RECONCILE、库存归档/丢弃与单件操作历史。
 - 新账号可从空间管理创建首个空间，从 Inventory Overview 的 Add inventory 入库。创建私有定义依赖后端已有有效公共分类。
 - 登录后的 AI Assistant 使用真实文本 Agent chat/resume/state，支持 SSE、逐项确认/补充/编辑/取消。精确操作可能直接执行，估算/新关联按后端要求确认。
+- AI 初始页复用原设计的欢迎区和三个快捷提示，快捷提示发送对应的真实 Agent 消息。白色输入栏默认按住说话，右侧键盘切换文字输入；松开语音后进入可编辑文本，选择照片后可直接发送纯图片。展示组件不处理请求身份、图片校验或语音服务，仍由原 Agent 页面和控制器负责。
+- 文字模式中的麦克风只切换回语音栏，点击或长按该图标均不启动识别。仅按住语音栏中间区域开始英文识别（`en-US`），松开停止采集并等待最终文字，上滑取消；实时文字显示在输入栏上方，识别结果需手动发送。浏览器开始监听和返回最终结果都是异步事件，首次授权后若已松手不会继续后台监听。
 - Agent 最近会话及未确认请求按用户保存在安全存储，断线后先查询再使用同一请求身份重试；没有完整聊天历史列表接口。普通非幂等写入丢失响应后先关闭表单并重新核对数据，不能盲目重复入库。
 - 退出/换账号会重置业务列表与会话状态。没有自动刷新令牌；过期后重新登录。
 - **代码接线不等于云端已通**：共享数据库此前发现缺字段/回执表，模型 Key 及联调环境仍需后端准备。本轮没有对共享 Neon 写入、创建真实演示账号或部署。
@@ -73,7 +79,8 @@ flutter run --debug -t lib/main_preview.dart
 - 登录后可进入个人资料、密码重置、提醒设置、语音用量页；子页返回 Profile。
 - 姓名、头像、提醒开关、提前天数和时间通过 `ProfilePreferencesRepository` 按用户 ID 保存在本机，未同步到后端。保存失败会提示，取消编辑不覆盖已保存的资料。
 - 登录邮箱由后端管理；当前没有邮箱或密码修改 API，界面不会伪造修改成功。密码只存在于表单内存中。
-- 提醒偏好可保存，但当前版本没有系统通知权限及通知调度实现；设备通知行显示 `Not available`。
+- 提醒偏好按用户保存在本机。用户从提醒设置页主动开启设备通知后，Android/iOS 会按所选时间安排每日库存/临期提醒；网页端受浏览器限制，关闭网页后不能后台定时发送，但每次打开 SayFridge 时会根据实时临期汇总显示仍未读的浏览器通知和首页通知卡。
+- 首页分别显示过期、即将到期和每日检查提醒。未读提醒在重新打开应用时仍会出现；用户选择 `Mark as read` 后当天不再重复，次日若条件仍成立会重新出现。过期提醒的 `Process now` 会打开仅显示过期物品的列表，用户进入物品详情后使用现有 `Discard` 二次确认流程处理，记录不会被删除。
 - 效果图以 requests 统计语音额度；当前后端模型的 `voice_*_seconds` 以秒计量，且 `/auth/me` 不返回这些字段。生产页面显示用量暂不可用，待确认请求次数接口后传入 `VoiceUsage`。测试中的 12 / 50 仅用于效果图核对。
 
 Profile 跳转、表单校验、本地保存、账号切换隔离和小屏布局测试在 `test/screens/profile_flow_test.dart` 与 `test/state/profile_controller_test.dart`。
