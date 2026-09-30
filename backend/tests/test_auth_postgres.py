@@ -24,7 +24,18 @@ def test_register_login_me_database_lifecycle(database):
         async with sessions() as s:
             row = (await s.execute(text('SELECT password_hash, auth_provider FROM "user"'))).one()
             assert row.auth_provider == "LOCAL" and verify_password(payload["password"], row.password_hash)
-            assert (await s.execute(text('SELECT count(*) FROM storage_space'))).scalar_one() == 0
+            space = (
+                await s.execute(
+                    text(
+                        "SELECT name, type, status FROM storage_space "
+                        "WHERE user_id = :user_id"
+                    ),
+                    {"user_id": user["id"]},
+                )
+            ).one()
+            assert space.name == "Default Space"
+            assert space.type == "FRIDGE"
+            assert space.status == "ACTIVE"
         assert (await client.post("/api/v1/auth/register", json=payload)).status_code == 409
         login = await client.post("/api/v1/auth/login", json=payload)
         assert login.status_code == 200 and login.json()["expires_in"] == 900

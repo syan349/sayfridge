@@ -174,6 +174,39 @@ void main() {
     expect(find.text('3 items'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('user home automatically selects the only storage space', (
+    tester,
+  ) async {
+    _phoneSize(tester);
+    final repository = _InventoryFixtureRepository();
+    final inventory = InventoryController(repository);
+    final expiry = ExpirySummaryController(repository);
+    final spaces = StorageSpaceController(_SingleStorageFixtureRepository());
+    addTearDown(inventory.dispose);
+    addTearDown(expiry.dispose);
+    addTearDown(spaces.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: HomeScreen(
+          onAssistantTap: () {},
+          inventoryController: inventory,
+          expirySummaryController: expiry,
+          storageSpaceController: spaces,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fridge'), findsOneWidget);
+    expect(find.text('All Spaces'), findsNothing);
+    expect(repository.lastStorageSpaceId, 'fridge');
+    expect(inventory.total, 2);
+    expect(expiry.storageSpaceId, 'fridge');
+    expect(tester.takeException(), isNull);
+  });
 }
 
 void _phoneSize(WidgetTester tester) {
@@ -285,6 +318,20 @@ class _StorageFixtureRepository implements StorageSpaceRepository {
       _space('pantry', 'Pantry', 'PANTRY'),
     ],
     total: 2,
+    page: page,
+    pageSize: pageSize,
+  );
+}
+
+class _SingleStorageFixtureRepository implements StorageSpaceRepository {
+  @override
+  Future<StorageSpacePage> getStorageSpaces({
+    String status = 'ACTIVE',
+    int page = 1,
+    int pageSize = 20,
+  }) async => StorageSpacePage(
+    items: [_space('fridge', 'Fridge', 'FRIDGE')],
+    total: 1,
     page: page,
     pageSize: pageSize,
   );
