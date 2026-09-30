@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/page_scroll_fade.dart';
+
 import '../models/inventory_item.dart';
 import '../state/inventory_detail_controller.dart';
 import '../repositories/workspace_repository.dart';
@@ -46,9 +48,11 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                 children: [
                   const OverviewHeader(title: 'Item details'),
                   Expanded(
-                    child: AnimatedBuilder(
-                      animation: widget.controller,
-                      builder: (context, child) => _buildContent(),
+                    child: PageScrollFade(
+                      child: AnimatedBuilder(
+                        animation: widget.controller,
+                        builder: (context, child) => _buildContent(),
+                      ),
                     ),
                   ),
                 ],
@@ -105,54 +109,98 @@ class _DetailContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(25, 7, 25, 36),
-      children: [
-        _DetailPanel(item: item),
-        const SizedBox(height: 16),
-        const QuantityLegend(),
-        const SizedBox(height: 45),
-        InventoryActions(item: item, workspace: workspace, reload: reload),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 540;
+        final small = constraints.maxHeight < 460;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(25, 7, 25, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _DetailPanel(item: item, compact: compact, small: small),
+              const SizedBox(height: 12),
+              const QuantityLegend(),
+              SizedBox(height: small ? 12 : 24),
+              InventoryActions(
+                item: item,
+                workspace: workspace,
+                reload: reload,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
 class _DetailPanel extends StatelessWidget {
-  const _DetailPanel({required this.item});
+  const _DetailPanel({
+    required this.item,
+    this.compact = false,
+    this.small = false,
+  });
+
+  final bool compact, small;
 
   final InventoryItem item;
+
+  Widget _row({required String label, required String value, Color? color}) =>
+      _DetailRow(
+        label: label,
+        value: value,
+        color: color,
+        fontSize: small
+            ? 14
+            : compact
+            ? 15
+            : 16,
+        verticalPadding: small
+            ? 3
+            : compact
+            ? 6
+            : 10,
+      );
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(17, 18, 17, 18),
+      padding: EdgeInsets.all(small ? 10 : 16),
       decoration: BoxDecoration(
         border: Border.all(color: const Color(0xFFA8D589)),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        color: const Color(0x35FFFFFF),
       ),
       child: Column(
         children: [
-          InventoryArtwork(item: item, size: 135),
-          const SizedBox(height: 19),
-          _DetailRow(label: 'Item name', value: item.itemDefinitionName),
-          _DetailRow(
+          InventoryArtwork(
+            item: item,
+            size: small
+                ? 54
+                : compact
+                ? 88
+                : 130,
+          ),
+          SizedBox(height: compact ? 8 : 14),
+          _row(label: 'Item name', value: item.itemDefinitionName),
+          _row(
             label: 'Quantity',
             value: quantityLabel(item),
             color: item.isEstimated
                 ? const Color(0xFFD75A20)
                 : const Color(0xFF388D38),
           ),
-          _DetailRow(
+          _row(
             label: 'Added on',
             value: _date(item.purchaseDate ?? item.createdAt),
           ),
-          _DetailRow(
+          _row(
             label: 'Expiry date',
             value: _date(item.expiryDate),
             color: const Color(0xFF388D38),
           ),
-          _DetailRow(label: 'Storage space', value: item.storageSpaceName),
+          _row(label: 'Storage space', value: item.storageSpaceName),
         ],
       ),
     );
@@ -160,7 +208,14 @@ class _DetailPanel extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value, this.color});
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.color,
+    this.fontSize = 16,
+    this.verticalPadding = 10,
+  });
+  final double fontSize, verticalPadding;
 
   final String label;
   final String value;
@@ -169,16 +224,16 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 13),
+      padding: EdgeInsets.symmetric(vertical: verticalPadding),
       child: Row(
         children: [
           Expanded(
             flex: 5,
             child: Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF757575),
-                fontSize: 17,
+              style: TextStyle(
+                color: const Color(0xFF757575),
+                fontSize: fontSize,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -189,7 +244,10 @@ class _DetailRow extends StatelessWidget {
               value,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 17, color: color ?? Colors.black),
+              style: TextStyle(
+                fontSize: fontSize,
+                color: color ?? Colors.black,
+              ),
             ),
           ),
         ],

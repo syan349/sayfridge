@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:sayfridge/models/app_user.dart';
@@ -14,11 +15,126 @@ import 'package:sayfridge/services/notification_service.dart';
 import 'package:sayfridge/state/app_notification_controller.dart';
 import 'package:sayfridge/state/auth_controller.dart';
 import 'package:sayfridge/state/expiry_summary_controller.dart';
+import 'package:sayfridge/state/inventory_controller.dart';
 import 'package:sayfridge/state/profile_controller.dart';
+import 'package:sayfridge/screens/home_screen.dart';
+import 'package:sayfridge/theme/app_theme.dart';
 
 import '../support/integration_fixtures.dart';
 
 void main() {
+  testWidgets(
+    'home opens notifications separately and updates the bell after reading',
+    (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final auth = AuthController(_Accounts());
+      await auth.initialize();
+      final profile = ProfileController(auth, _Preferences());
+      await tester.runAsync(() => pumpEventQueue());
+      final api = ApiClient(
+        client: MockClient(
+          (request) async => jsonResponse(
+            request.url.path.endsWith('/expiry-summary')
+                ? {
+                    'counts': {'overdue': 1, 'today': 1, 'upcoming': 0},
+                    'items': <Object>[],
+                    'total': 2,
+                    'page': 1,
+                    'page_size': 20,
+                  }
+                : {'items': <Object>[], 'total': 0, 'page': 1, 'page_size': 20},
+          ),
+        ),
+      );
+      final repository = InventoryRepository(
+        InventoryApiService(api),
+        MemoryTokens(),
+      );
+      final expiry = ExpirySummaryController(repository);
+      final inventory = InventoryController(repository);
+      final service = _NotificationService();
+      final notifications = AppNotificationController(
+        authController: auth,
+        profileController: profile,
+        expiryController: expiry,
+        service: service,
+        repository: _NotificationState(),
+      );
+      addTearDown(() {
+        notifications.dispose();
+        expiry.dispose();
+        inventory.dispose();
+        profile.dispose();
+        auth.dispose();
+        api.close();
+        service.dispose();
+      });
+      await tester.runAsync(() async {
+        await expiry.loadSummary(asOf: DateUtils.dateOnly(DateTime.now()));
+        await inventory.loadInventory();
+        await pumpEventQueue();
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: HomeScreen(
+            onAssistantTap: () {},
+            notificationController: notifications,
+            expirySummaryController: expiry,
+            inventoryController: inventory,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Home header must fit');
+      expect(find.text('Expired items'), findsNothing);
+      expect(find.text('Notifications'), findsNothing);
+      await tester.tap(find.byTooltip('Notifications, unread'));
+      await tester.pumpAndSettle();
+      expect(find.text('Notifications'), findsOneWidget);
+      expect(find.text('Expired items'), findsOneWidget);
+      expect(find.text('Items expiring soon'), findsOneWidget);
+      expect(find.text('Daily inventory check-in'), findsOneWidget);
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'Notification cards must fit',
+      );
+
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Process now'));
+        await pumpEventQueue();
+      });
+      await tester.pumpAndSettle();
+      expect(expiry.bucket, 'overdue');
+      expect(find.text('Expiry Overview'), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'Expiry actions must fit');
+      await tester.tap(find.byTooltip('Back'));
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+      expect(find.text('Notifications'), findsOneWidget);
+      expect(expiry.bucket, isNull);
+
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.byTooltip('Mark as read').first);
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('No unread notifications'), findsOneWidget);
+      expect(notifications.notifications, isEmpty);
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Notifications'), findsOneWidget);
+      expect(find.byTooltip('Notifications, unread'), findsNothing);
+      await tester.tap(find.byTooltip('Notifications'));
+      await tester.pumpAndSettle();
+      expect(find.text('No unread notifications'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test(
     'unread reminders return until explicitly marked read for the day',
     () async {

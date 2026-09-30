@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../models/expiry_summary.dart';
 import '../models/inventory_item.dart';
-import '../models/storage_space.dart';
 import '../state/expiry_summary_controller.dart';
 import '../state/inventory_controller.dart';
 import '../state/app_notification_controller.dart';
 import '../state/storage_space_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/inventory_toolbar.dart';
+import '../widgets/storage_space_picker.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../widgets/app_page_footer.dart';
 import '../widgets/home_greeting.dart';
@@ -16,7 +17,7 @@ import '../widgets/inventory_visuals.dart';
 import 'expiring_items_screen.dart';
 import 'inventory_detail_screen.dart';
 import 'inventory_screen.dart';
-import 'storage_space_screen.dart';
+import 'notifications_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
@@ -96,7 +97,60 @@ class HomeScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const HomeGreeting(),
+                                Row(
+                                  children: [
+                                    const Expanded(child: HomeGreeting()),
+                                    const SizedBox(width: 8),
+                                    ListenableBuilder(
+                                      listenable:
+                                          notificationController ??
+                                          const _IdleListenable(),
+                                      builder: (context, _) {
+                                        final hasUnread =
+                                            notificationController
+                                                ?.notifications
+                                                .isNotEmpty ??
+                                            false;
+                                        return IconButton(
+                                          tooltip: hasUnread
+                                              ? 'Notifications, unread'
+                                              : 'Notifications',
+                                          onPressed: () => Navigator.of(context).push(
+                                            MaterialPageRoute<void>(
+                                              builder: (_) =>
+                                                  NotificationsScreen(
+                                                    controller:
+                                                        notificationController,
+                                                    expiryController:
+                                                        expirySummaryController,
+                                                    inventoryController:
+                                                        inventoryController,
+                                                    storageSpaceController:
+                                                        storageSpaceController,
+                                                    onExpiringTap:
+                                                        onExpiringTap,
+                                                  ),
+                                            ),
+                                          ),
+                                          icon: Image.asset(
+                                            hasUnread
+                                                ? HomeAssets.notificationUnread
+                                                : HomeAssets.notificationEmpty,
+                                            width: 32,
+                                            height: 32,
+                                            cacheWidth:
+                                                (32 *
+                                                        MediaQuery.devicePixelRatioOf(
+                                                          context,
+                                                        ))
+                                                    .ceil(),
+                                            excludeFromSemantics: true,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
                                 const SizedBox(height: 19),
                                 _UserHomeContent(
                                   expirySummaryController:
@@ -109,8 +163,6 @@ class HomeScreen extends StatelessWidget {
                                   onExpiringTap: onExpiringTap,
                                   onInventoryTap: onInventoryTap,
                                   onAddItemTap: onAddItemTap,
-                                  notificationController:
-                                      notificationController,
                                 ),
                               ],
                             ),
@@ -227,7 +279,6 @@ class _UserHomeContent extends StatefulWidget {
     required this.onExpiringTap,
     required this.onInventoryTap,
     required this.onAddItemTap,
-    required this.notificationController,
   });
 
   final ExpirySummaryController? expirySummaryController;
@@ -238,14 +289,13 @@ class _UserHomeContent extends StatefulWidget {
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
   final VoidCallback? onAddItemTap;
-  final AppNotificationController? notificationController;
 
   @override
   State<_UserHomeContent> createState() => _UserHomeContentState();
 }
 
 class _UserHomeContentState extends State<_UserHomeContent> {
-  StorageSpace? _selectedStorageSpace;
+  String? _selectedStorageSpaceId;
 
   @override
   void initState() {
@@ -269,60 +319,21 @@ class _UserHomeContentState extends State<_UserHomeContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            _HomePill(
-              onTap: _openStorageSpaces,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 105),
-                    child: Text(
-                      _selectedStorageSpace?.name ?? 'All Spaces',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.keyboard_arrow_down, size: 21),
-                ],
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: _HomePill(
-                onTap: widget.onSearchTap ?? _openSearch,
-                child: Row(
-                  children: [
-                    Image.asset(HomeAssets.search, width: 21, height: 21),
-                    const SizedBox(width: 8),
-                    const Flexible(
-                      child: Text(
-                        'Search items ...',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 14, color: AppColors.muted),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        if (widget.notificationController != null) ...[
-          const SizedBox(height: 18),
-          AnimatedBuilder(
-            animation: widget.notificationController!,
-            builder: (context, _) => _NotificationPanel(
-              controller: widget.notificationController!,
-              onProcessExpired: _openExpiredItems,
-              onViewExpiring: _openExpiringItems,
-            ),
+        InventoryToolbar(
+          storagePicker: StoragePickerButton(
+            label: _selectedStorageSpaceId == null
+                ? 'All Spaces'
+                : {
+                        for (final space
+                            in widget.storageSpaceController?.storageSpaces ??
+                                const [])
+                          space.id: space.name,
+                      }[_selectedStorageSpaceId] ??
+                      'Selected space',
+            onTap: _openStorageSpaces,
           ),
-        ],
+          onSearch: widget.onSearchTap ?? _openSearch,
+        ),
         const SizedBox(height: 42),
         const _SectionTitle('Expiring soon'),
         const SizedBox(height: 15),
@@ -392,7 +403,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
             : Row(
                 children: [
                   SizedBox(
-                    width: 112,
+                    width: MediaQuery.sizeOf(context).width < 360 ? 76 : 100,
                     child: Column(
                       children: [
                         Text(
@@ -454,7 +465,27 @@ class _UserHomeContentState extends State<_UserHomeContent> {
             const Expanded(child: _SectionTitle('Inventory')),
             Text(
               '$total ${total == 1 ? 'item' : 'items'}',
-              style: const TextStyle(fontSize: 17),
+              style: const TextStyle(fontSize: 15),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 48,
+              height: 32,
+              child: FilledButton(
+                onPressed: widget.onAddItemTap,
+                style: FilledButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Icon(
+                  Icons.add,
+                  size: 23,
+                  semanticLabel: 'Add inventory',
+                ),
+              ),
             ),
           ],
         ),
@@ -503,166 +534,21 @@ class _UserHomeContentState extends State<_UserHomeContent> {
     }
     final controller = widget.storageSpaceController;
     if (controller == null) return;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 11, 20, 28),
-          child: AnimatedBuilder(
-            animation: controller,
-            builder: (context, child) => Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 58,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.muted,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Choose storage space',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 15),
-                _spaceOption(
-                  sheetContext,
-                  null,
-                  'All spaces',
-                  widget.inventoryController?.storageSpaceId == null
-                      ? widget.inventoryController?.total
-                      : null,
-                ),
-                if (controller.status == StorageSpaceLoadStatus.loading)
-                  const Center(child: CircularProgressIndicator()),
-                if (controller.status == StorageSpaceLoadStatus.error)
-                  TextButton(
-                    onPressed: controller.loadStorageSpaces,
-                    child: const Text('Could not load spaces. Try again'),
-                  ),
-                for (final space in controller.storageSpaces)
-                  _spaceOption(
-                    sheetContext,
-                    space,
-                    space.name,
-                    _countForSpace(space),
-                  ),
-                const Divider(color: Color(0xFFA8D589)),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 5),
-                  leading: Image.asset(
-                    HomeAssets.setting,
-                    width: 26,
-                    height: 26,
-                  ),
-                  title: const Text(
-                    'Manage storage spaces',
-                    style: TextStyle(fontSize: 17),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => StorageSpaceScreen(
-                          controller: controller,
-                          inventoryController: widget.inventoryController,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    showStorageSpacePicker(
+      context,
+      selectedId: _selectedStorageSpaceId,
+      spacesController: controller,
+      inventoryController: widget.inventoryController,
+      onSelected: _selectStorageSpace,
     );
   }
 
-  Widget _spaceOption(
-    BuildContext sheetContext,
-    StorageSpace? space,
-    String label,
-    int? count,
-  ) {
-    final selected = _selectedStorageSpace?.id == space?.id;
-    return InkWell(
-      onTap: () {
-        Navigator.pop(sheetContext);
-        _selectStorageSpace(space);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFE1F5D2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    count == null
-                        ? 'Items'
-                        : '$count ${count == 1 ? 'item' : 'items'}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              color: Colors.black,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  int? _countForSpace(StorageSpace space) {
-    final inventory = widget.inventoryController;
-    if (inventory == null || inventory.status != InventoryLoadStatus.loaded) {
-      return null;
-    }
-    if (inventory.hasNextPage || inventory.storageSpaceId != null) return null;
-    return inventory.items
-        .where((item) => item.storageSpaceId == space.id)
-        .length;
-  }
-
-  void _selectStorageSpace(StorageSpace? space) {
-    setState(() => _selectedStorageSpace = space);
-    widget.inventoryController?.loadInventory(storageSpaceId: space?.id);
+  void _selectStorageSpace(String? id) {
+    setState(() => _selectedStorageSpaceId = id);
+    widget.inventoryController?.loadInventory(storageSpaceId: id);
     widget.expirySummaryController?.loadSummary(
       asOf: DateUtils.dateOnly(DateTime.now()),
-      storageSpaceId: space?.id,
+      storageSpaceId: id,
     );
   }
 
@@ -678,7 +564,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
       ),
     );
     if (mounted) {
-      controller.loadInventory(storageSpaceId: _selectedStorageSpace?.id);
+      controller.loadInventory(storageSpaceId: _selectedStorageSpaceId);
     }
   }
 
@@ -701,7 +587,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
       ),
     );
     if (mounted) {
-      controller.loadInventory(storageSpaceId: _selectedStorageSpace?.id);
+      controller.loadInventory(storageSpaceId: _selectedStorageSpaceId);
     }
   }
 
@@ -726,23 +612,9 @@ class _UserHomeContentState extends State<_UserHomeContent> {
     if (mounted) {
       expiry.loadSummary(
         asOf: DateUtils.dateOnly(DateTime.now()),
-        storageSpaceId: _selectedStorageSpace?.id,
+        storageSpaceId: _selectedStorageSpaceId,
       );
-      inventory.loadInventory(storageSpaceId: _selectedStorageSpace?.id);
-    }
-  }
-
-  Future<void> _openExpiredItems() async {
-    final expiry = widget.expirySummaryController;
-    if (expiry == null) return;
-    await expiry.selectBucket('overdue');
-    if (!mounted) return;
-    await _openExpiringItems();
-    if (mounted) {
-      expiry.loadSummary(
-        asOf: DateUtils.dateOnly(DateTime.now()),
-        storageSpaceId: _selectedStorageSpace?.id,
-      );
+      inventory.loadInventory(storageSpaceId: _selectedStorageSpaceId);
     }
   }
 
@@ -754,129 +626,6 @@ class _UserHomeContentState extends State<_UserHomeContent> {
         builder: (_) => InventoryDetailScreen(
           itemId: item.id,
           controller: inventory.createDetailController(),
-        ),
-      ),
-    );
-  }
-}
-
-class _NotificationPanel extends StatelessWidget {
-  const _NotificationPanel({
-    required this.controller,
-    required this.onProcessExpired,
-    required this.onViewExpiring,
-  });
-
-  final AppNotificationController controller;
-  final Future<void> Function() onProcessExpired;
-  final Future<void> Function() onViewExpiring;
-
-  @override
-  Widget build(BuildContext context) {
-    final notifications = controller.notifications;
-    if (notifications.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'Notifications',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 10),
-        for (final notification in notifications)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: notification.type == AppNotificationType.expired
-                      ? const Color(0xFFD36B4A)
-                      : const Color(0xFFA8D589),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        notification.type == AppNotificationType.expired
-                            ? Icons.warning_amber_rounded
-                            : Icons.notifications_none,
-                        color: notification.type == AppNotificationType.expired
-                            ? const Color(0xFFC8532C)
-                            : AppColors.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          notification.title,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  Text(notification.message),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      if (notification.processable)
-                        FilledButton(
-                          onPressed: onProcessExpired,
-                          child: const Text('Process now'),
-                        )
-                      else if (notification.type ==
-                          AppNotificationType.expiring)
-                        TextButton(
-                          onPressed: onViewExpiring,
-                          child: const Text('View items'),
-                        ),
-                      TextButton(
-                        onPressed: () => controller.markRead(notification.type),
-                        child: const Text('Mark as read'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _HomePill extends StatelessWidget {
-  const _HomePill({required this.onTap, required this.child});
-
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(28),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
-        child: Container(
-          height: 37,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          alignment: Alignment.centerLeft,
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFE6EDDF)),
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: child,
         ),
       ),
     );
@@ -976,7 +725,6 @@ class _EmptyExpiry extends StatelessWidget {
 
 class _ExpiryPreviewRow extends StatelessWidget {
   const _ExpiryPreviewRow({required this.summaryItem, required this.onTap});
-
   final ExpirySummaryItem summaryItem;
   final VoidCallback onTap;
 
@@ -985,47 +733,64 @@ class _ExpiryPreviewRow extends StatelessWidget {
     final item = summaryItem.item;
     return InkWell(
       onTap: onTap,
-      child: Row(
-        children: [
-          InventoryArtwork(item: item, size: 47),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.itemDefinitionName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 15),
-                ),
-                Text(
-                  '${quantityLabel(item)} | ${item.storageSpaceName}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: item.isEstimated
-                        ? const Color(0xFFD75A20)
-                        : AppColors.muted,
+      borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 58),
+        child: Row(
+          children: [
+            InventoryArtwork(item: item, size: 43),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.itemDefinitionName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, height: 1.2),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              expiryLabel(item.expiryDate),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: expiryColor(item.expiryDate),
+                  const SizedBox(height: 3),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: quantityLabel(item),
+                          style: TextStyle(
+                            color: item.isEstimated
+                                ? const Color(0xFFD75A20)
+                                : const Color(0xFF388D38),
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' | ${item.storageSpaceName}',
+                          style: const TextStyle(color: AppColors.muted),
+                        ),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, height: 1.2),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 68,
+              child: Text(
+                expiryLabel(item.expiryDate),
+                maxLines: 2,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.3,
+                  color: expiryColor(item.expiryDate),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

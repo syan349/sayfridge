@@ -32,132 +32,136 @@ class VoiceRecordingOverlay extends StatelessWidget {
         ? 'Listening…'
         : words;
 
-    return ColoredBox(
-      key: const Key('voice-recording-overlay'),
-      color: const Color(0x88000000),
-      child: Stack(
-        children: [
-          SafeArea(
-            child: Stack(
-              children: [
-                Positioned(
-                  top: 15,
-                  left: 18,
-                  child: IconButton(
-                    tooltip: 'Cancel voice input',
-                    onPressed: onClose,
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                ),
-                Align(
-                  alignment: const Alignment(0, -0.12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 25),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 430),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                key: const Key('voice-input-status'),
-                                width: double.infinity,
-                                constraints: const BoxConstraints(
-                                  minHeight: 88,
-                                ),
-                                padding: const EdgeInsets.fromLTRB(
-                                  22,
-                                  22,
-                                  22,
-                                  24,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: bubbleColor,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        message,
-                                        maxLines: 5,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: cancelling
-                                              ? Colors.white
-                                              : Colors.black,
-                                          fontSize: 21,
-                                          height: 1.35,
-                                        ),
-                                      ),
-                                    ),
-                                    if (!cancelling && !finishing) ...[
-                                      const SizedBox(width: 10),
-                                      const Icon(
-                                        Icons.graphic_eq_rounded,
-                                        color: Color(0xFF4A672D),
-                                        size: 23,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              Positioned(
-                                right: 38,
-                                bottom: -8,
-                                child: Transform.rotate(
-                                  angle: math.pi / 4,
-                                  child: SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: ColoredBox(color: bubbleColor),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: Text(
-                                cancelling
-                                    ? 'Release to cancel'
-                                    : 'Release to edit',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+    return Material(
+      type: MaterialType.transparency,
+      child: ColoredBox(
+        key: const Key('voice-recording-overlay'),
+        color: const Color(0x88000000),
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 15,
+                    left: 18,
+                    child: IconButton(
+                      tooltip: 'Cancel voice input',
+                      onPressed: onClose,
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                        size: 30,
                       ),
                     ),
                   ),
-                ),
-              ],
+                  Align(
+                    alignment: const Alignment(0, -0.12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 25),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 430),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  key: const Key('voice-input-status'),
+                                  width: double.infinity,
+                                  constraints: const BoxConstraints(
+                                    minHeight: 64,
+                                  ),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    22,
+                                    18,
+                                    22,
+                                    18,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: bubbleColor,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          message,
+                                          maxLines: 5,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: cancelling
+                                                ? Colors.white
+                                                : Colors.black,
+                                            fontSize: 21,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.35,
+                                          ),
+                                        ),
+                                      ),
+                                      if (!cancelling && !finishing) ...[
+                                        const SizedBox(width: 10),
+                                        const Icon(
+                                          Icons.graphic_eq_rounded,
+                                          color: Color(0xFF4A672D),
+                                          size: 23,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 38,
+                                  bottom: -8,
+                                  child: Transform.rotate(
+                                    angle: math.pi / 4,
+                                    child: SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: ColoredBox(color: bubbleColor),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Text(
+                                  cancelling
+                                      ? 'Release to cancel'
+                                      : 'Release to edit',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 220,
-            child: _VoiceGestureFooter(
-              cancelling: cancelling,
-              onCancel: onClose,
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 220,
+              child: _VoiceGestureFooter(
+                cancelling: cancelling,
+                onCancel: onClose,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

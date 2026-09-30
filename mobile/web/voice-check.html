@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#91C35E">
+  <meta name="color-scheme" content="light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SayFridge 语音检查">
+  <title>SayFridge 语音检查</title>
+  <link rel="stylesheet" href="phone-preview.css?v=surface-v3">
+  <style>
+    * { box-sizing: border-box; }
+    body { height: auto; font: 16px/1.5 Arial, sans-serif; color: #26321e; }
+    html.desktop-preview body { height: auto; overflow: auto; }
+    main { max-width: 480px; margin: auto; padding: calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px)); }
+    h1 { font-size: 24px; margin: 0 0 20px; }
+    button { font: inherit; border: 0; border-radius: 24px; padding: 12px 20px; color: #fff; background: #4a672d; min-height: 44px; }
+    button:disabled { opacity: .5; }
+    #hold { width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+    .row button { background: #e0edce; color: #4a672d; }
+    #status, #words { min-height: 48px; padding: 12px; border-radius: 12px; background: #fff; overflow-wrap: anywhere; }
+    pre { font: 12px/1.6 monospace; padding: 14px; background: #fff; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 12px; }
+    .voice-overlay-visible main { background: #73766f; }
+    a { color: #4a672d; }
+  </style>
+</head>
+<body>
+  <div id="status-bar-surface" aria-hidden="true"></div>
+  <main>
+    <h1>语音与顶部遮罩检查</h1>
+    <p>按住说一句英文，松开后取消文字，再按住说第二句。也可在按住时，用另一根手指点“取消本次”。</p>
+    <button id="hold">按住说话</button>
+    <div class="row"><button id="cancel" disabled>取消本次</button><button id="clear">清空文字</button><button id="tint">切换顶部遮罩</button><button id="mic">单独测试麦克风</button></div>
+    <p id="status" role="status">等待开始</p>
+    <p id="words">识别文字会显示在这里</p>
+    <p>下面的诊断信息只保留事件和屏幕尺寸，不包含识别文字，不会上传。</p>
+    <button id="copy">复制诊断信息</button>
+    <pre id="diagnostics"></pre>
+    <a href="./">返回 SayFridge</a>
+  </main>
+  <script src="browser-surfaces.js?v=surface-v3"></script>
+  <script src="voice-input.js?v=stop-v2"></script>
+  <script src="voice-check.js?v=stop-v2"></script>
+</body>
+</html>

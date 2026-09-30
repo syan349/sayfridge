@@ -6,6 +6,7 @@ import '../widgets/app_bottom_navigation.dart';
 import '../widgets/app_page_footer.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
+import '../widgets/assistant_scroll_layout.dart';
 import 'camera_input_screen.dart';
 import 'conversation_history_screen.dart';
 import 'agent_conversation_screen.dart';
@@ -137,6 +138,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         onProfileTap: widget.onProfileTap,
       );
     }
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom == 0
+        ? MediaQuery.paddingOf(context).bottom
+        : 0.0;
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: AppBackground(
@@ -144,63 +148,44 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: widget.isGuest
-                  ? Column(
-                      children: [
-                        Expanded(child: _buildScrollableContent()),
-                        AppPageFooter(
-                          action: GuestLoginButton(
-                            onPressed:
-                                widget.onLoginTap ??
-                                () => Navigator.of(context).maybePop(),
-                          ),
-                          showLoginHint: true,
-                          selectedDestination:
-                              AppNavigationDestination.assistant,
-                          onHomeTap:
-                              widget.onHomeTap ??
+              child: AssistantScrollLayout(
+                bottomInset: bottomInset,
+                contentBuilder: (context, bottomPadding) =>
+                    _buildScrollableContent(bottomPadding),
+                footer: widget.isGuest
+                    ? AppPageFooter(
+                        action: GuestLoginButton(
+                          onPressed:
+                              widget.onLoginTap ??
                               () => Navigator.of(context).maybePop(),
-                          onProfileTap: widget.onProfileTap,
                         ),
-                      ],
-                    )
-                  : Stack(
-                      children: [
-                        Positioned.fill(child: _buildScrollableContent()),
-                        if (!widget.isGuest)
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            height: AppBottomNavigation.extent + 165,
-                            child: const IgnorePointer(
-                              child: _BottomListMask(),
-                            ),
-                          ),
-                        if (!widget.isGuest)
-                          Positioned(
-                            left: 22,
-                            right: 22,
-                            bottom: AppBottomNavigation.extent + 26,
+                        showLoginHint: true,
+                        selectedDestination: AppNavigationDestination.assistant,
+                        onHomeTap:
+                            widget.onHomeTap ??
+                            () => Navigator.of(context).maybePop(),
+                        onProfileTap: widget.onProfileTap,
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(22, 8, 22, 26),
                             child: AssistantComposer(
                               controller: _messageController,
                               onPhotoPressed: _openCamera,
                               onSendPressed: _showExpiryResults,
                             ),
                           ),
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: AppBottomNavigation(
+                          AppBottomNavigation(
                             onHomeTap:
                                 widget.onHomeTap ??
                                 () => Navigator.of(context).maybePop(),
                             onProfileTap: widget.onProfileTap,
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+              ),
             ),
           ),
         ),
@@ -208,15 +193,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
-  Widget _buildScrollableContent() {
+  Widget _buildScrollableContent(double bottomPadding) {
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.fromLTRB(
-        25,
-        27,
-        25,
-        widget.isGuest ? 0 : AppBottomNavigation.extent + 148,
-      ),
+      padding: EdgeInsets.fromLTRB(25, 27, 25, bottomPadding),
       children: [
         AssistantHeader(
           onNewConversation: _startNewConversation,
@@ -384,29 +364,6 @@ class _GuestAssistantReply extends StatelessWidget {
       avatarSize: 42,
       message: 'I’ll organise that for you.',
       textStyle: exampleMessageStyle,
-    );
-  }
-}
-
-class _BottomListMask extends StatelessWidget {
-  const _BottomListMask();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.background.withValues(alpha: 0),
-            AppColors.background.withValues(alpha: 0.44),
-            const Color(0xE8ECF8DF),
-            const Color(0xFFF1F9E8),
-          ],
-          stops: const [0, 0.32, 0.66, 1],
-        ),
-      ),
     );
   }
 }

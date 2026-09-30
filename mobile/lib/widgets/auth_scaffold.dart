@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_background.dart';
+import 'page_scroll_fade.dart';
 
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({required this.child, this.title, super.key});
@@ -55,7 +56,7 @@ class AuthScaffold extends StatelessWidget {
                     ],
                   ),
                 ),
-              Expanded(child: child),
+              Expanded(child: PageScrollFade(child: child)),
             ],
           ),
         ),

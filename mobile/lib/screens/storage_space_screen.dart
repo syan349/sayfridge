@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/page_scroll_fade.dart';
+
 import '../models/storage_space.dart';
 import '../state/inventory_controller.dart';
 import '../state/storage_space_controller.dart';
@@ -42,9 +44,11 @@ class StorageSpaceScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   Expanded(
-                    child: AnimatedBuilder(
-                      animation: controller,
-                      builder: (context, child) => _buildContent(context),
+                    child: PageScrollFade(
+                      child: AnimatedBuilder(
+                        animation: controller,
+                        builder: (context, child) => _buildContent(context),
+                      ),
                     ),
                   ),
                 ],

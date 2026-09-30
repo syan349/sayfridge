@@ -4,7 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/agent_image.dart';
+import '../platform/voice_overlay_chrome.dart'
+    if (dart.library.js_interop) '../platform/voice_overlay_chrome_web.dart';
 import '../services/voice_input_service.dart';
+import '../services/voice_input_factory.dart'
+    if (dart.library.js_interop) '../services/voice_input_factory_web.dart';
 import '../state/agent_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/agent_composer.dart';
@@ -12,6 +16,8 @@ import '../widgets/app_background.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
+import '../widgets/assistant_scroll_layout.dart';
+import '../widgets/inventory_visuals.dart';
 import '../widgets/business_forms.dart';
 import '../widgets/hold_to_speak_button.dart';
 import '../widgets/voice_recording_overlay.dart';
@@ -54,7 +60,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   @override
   void initState() {
     super.initState();
-    _voiceInput = widget.voiceInput ?? DeviceVoiceInputService();
+    _voiceInput = widget.voiceInput ?? createVoiceInputService();
   }
 
   @override
@@ -83,6 +89,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     );
     _voiceOverlayEntry = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
+    setVoiceOverlayVisible(true);
   }
 
   void _hideVoiceOverlay() {
@@ -90,6 +97,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     _voiceOverlayEntry = null;
     entry?.remove();
     entry?.dispose();
+    if (entry != null) setVoiceOverlayVisible(false);
   }
 
   Future<void> _startVoiceInput() async {
@@ -149,8 +157,10 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
 
   Future<void> _finishVoiceInput({bool forceCancel = false}) async {
     _holdingVoice = false;
-    if (!_recordingVoice || _finishingVoice) return;
-    final session = _voiceSession;
+    if (!_recordingVoice || (_finishingVoice && !forceCancel)) return;
+    // Closing while the final transcript is pending must cancel that pending
+    // stop too. Invalidate its callbacks before waiting for browser cleanup.
+    final session = forceCancel ? ++_voiceSession : _voiceSession;
     final cancelled = forceCancel || _cancelVoice;
     setState(() => _finishingVoice = true);
     _voiceOverlayEntry?.markNeedsBuild();
@@ -239,67 +249,49 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: Stack(
-      children: [
-        AppBackground(
-          child: SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: ListenableBuilder(
-                  listenable: widget.controller,
-                  builder: (context, _) {
-                    final agent = widget.controller;
-                    final name = widget.displayName
-                        ?.trim()
-                        .split(RegExp(r'\s+'))
-                        .first;
-                    final showWelcome =
-                        agent.messages.isEmpty &&
-                        agent.items.isEmpty &&
-                        !agent.waiting &&
-                        !agent.unresolved &&
-                        agent.error == null;
-                    return Column(
-                      children: [
-                        Expanded(
-                          child: ListView(
-                            keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior.onDrag,
-                            padding: const EdgeInsets.fromLTRB(25, 27, 25, 16),
-                            children: [
-                              AssistantHeader(
-                                onNewConversation: () async {
-                                  if (agent.canSend) {
-                                    await agent.newConversation();
-                                    if (!mounted || agent.error != null) return;
-                                    _message.clear();
-                                    setState(() {
-                                      _images.clear();
-                                      _voiceModeReset++;
-                                    });
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Resolve or cancel pending items, or recover the current request first.',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                                onHistory: () async {
-                                  final previousId = agent.conversationId;
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => ConversationHistoryScreen(
-                                        controller: agent,
-                                      ),
-                                    ),
-                                  );
-                                  if (!mounted ||
-                                      agent.conversationId == previousId) {
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom == 0
+        ? MediaQuery.paddingOf(context).bottom
+        : 0.0;
+    return Scaffold(
+      body: Stack(
+        children: [
+          AppBackground(
+            child: SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: ListenableBuilder(
+                    listenable: widget.controller,
+                    builder: (context, _) {
+                      final agent = widget.controller;
+                      final name = widget.displayName
+                          ?.trim()
+                          .split(RegExp(r'\s+'))
+                          .first;
+                      final showWelcome =
+                          agent.messages.isEmpty &&
+                          agent.items.isEmpty &&
+                          !agent.waiting &&
+                          !agent.unresolved &&
+                          agent.error == null;
+                      return AssistantScrollLayout(
+                        bottomInset: bottomInset,
+                        contentBuilder: (context, bottomPadding) => ListView(
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: EdgeInsets.fromLTRB(
+                            25,
+                            27,
+                            25,
+                            bottomPadding,
+                          ),
+                          children: [
+                            AssistantHeader(
+                              onNewConversation: () async {
+                                if (agent.canSend) {
+                                  await agent.newConversation();
+                                  if (!mounted || agent.error != null) {
                                     return;
                                   }
                                   _message.clear();
@@ -307,169 +299,213 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                     _images.clear();
                                     _voiceModeReset++;
                                   });
-                                },
-                              ),
-                              const SizedBox(height: 15),
-                              const Center(
-                                child: Text(
-                                  'Add information using voice, photos, or text.',
-                                  style: TextStyle(
-                                    color: AppColors.muted,
-                                    fontSize: 13.5,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              AssistantGreeting(
-                                message: name == null || name.isEmpty
-                                    ? 'Hey! How can I help you?'
-                                    : 'Hey, $name! How can I help you?',
-                              ),
-                              if (showWelcome)
-                                AssistantWelcome(
-                                  onSuggestionSelected: agent.canSend
-                                      ? (message) => agent.send(message)
-                                      : null,
-                                )
-                              else
-                                const SizedBox(height: 24),
-                              for (final message in agent.messages.entries)
-                                if (message.value.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 24),
-                                    child: message.key.startsWith('user:')
-                                        ? UserMessageBubble(
-                                            message: message.value,
-                                            textStyle: exampleMessageStyle,
-                                          )
-                                        : AssistantReply(
-                                            textStyle: exampleMessageStyle,
-                                            message: message.value,
-                                          ),
-                                  ),
-                              for (final item in agent.items)
-                                _AgentItemCard(
-                                  controller: agent,
-                                  item: item,
-                                  pickImages: widget.pickImages,
-                                ),
-                              if (agent.waiting)
-                                const Text(
-                                  'Waiting for your input. Pending actions have not all completed.',
-                                ),
-                              if (agent.busy)
-                                const Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: LinearProgressIndicator(),
-                                ),
-                              if (agent.error != null)
-                                Text(
-                                  agent.error!,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              if (agent.unresolved)
-                                const Text(
-                                  'An earlier request is unresolved. Do not submit it as a new request.',
-                                ),
-                              if (agent.error != null || agent.unresolved)
-                                Wrap(
-                                  spacing: 8,
-                                  children: [
-                                    TextButton(
-                                      onPressed: agent.busy
-                                          ? null
-                                          : agent.recover,
-                                      child: const Text(
-                                        'Check conversation state',
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Resolve or cancel pending items, or recover the current request first.',
                                       ),
                                     ),
-                                    FilledButton(
-                                      onPressed: agent.canRetry
-                                          ? agent.retry
-                                          : null,
-                                      child: const Text('Retry same request'),
+                                  );
+                                }
+                              },
+                              onHistory: () async {
+                                final previousId = agent.conversationId;
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => ConversationHistoryScreen(
+                                      controller: agent,
                                     ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(22, 8, 22, 26),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (_images.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      for (
-                                        var index = 0;
-                                        index < _images.length;
-                                        index++
-                                      )
-                                        _ImagePreview(
-                                          key: ValueKey(
-                                            'agent-image-${_images[index].imageId}',
-                                          ),
-                                          image: _images[index],
-                                          onRemove: agent.canSend
-                                              ? () => setState(
-                                                  () => _images.removeAt(index),
-                                                )
-                                              : null,
-                                        ),
-                                    ],
                                   ),
-                                ),
-                              AgentComposer(
-                                controller: _message,
-                                voiceModeReset: _voiceModeReset,
-                                enabled: agent.canSend,
-                                waiting: agent.waiting,
-                                hasImages: _images.isNotEmpty,
-                                voiceActive: _recordingVoice,
-                                onPhotoPressed:
-                                    agent.canSend &&
-                                        _images.length < AgentImage.maxImages
-                                    ? _pickImages
-                                    : null,
-                                onSendPressed: agent.canSend ? _send : null,
-                                voiceButton: HoldToSpeakButton(
-                                  enabled: agent.canSend && !_finishingVoice,
-                                  recording: _recordingVoice,
-                                  cancelling: _cancelVoice,
-                                  finishing: _finishingVoice,
-                                  onStart: _startVoiceInput,
-                                  onMove: _updateVoiceCancel,
-                                  onEnd: () => _finishVoiceInput(),
-                                  onCancel: () =>
-                                      _finishVoiceInput(forceCancel: true),
+                                );
+                                if (!mounted ||
+                                    agent.conversationId == previousId) {
+                                  return;
+                                }
+                                _message.clear();
+                                setState(() {
+                                  _images.clear();
+                                  _voiceModeReset++;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 15),
+                            const Center(
+                              child: Text(
+                                'Add information using voice, photos, or text.',
+                                style: TextStyle(
+                                  color: AppColors.muted,
+                                  fontSize: 13.5,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 18),
+                            AssistantGreeting(
+                              message: name == null || name.isEmpty
+                                  ? 'Hey! How can I help you?'
+                                  : 'Hey, $name! How can I help you?',
+                            ),
+                            if (showWelcome)
+                              AssistantWelcome(
+                                onSuggestionSelected: agent.canSend
+                                    ? (message) => agent.send(message)
+                                    : null,
+                              )
+                            else
+                              const SizedBox(height: 24),
+                            for (final message in agent.messages.entries)
+                              if (message.value.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 24),
+                                  child: message.key.startsWith('user:')
+                                      ? UserMessageBubble(
+                                          message: message.value,
+                                          textStyle: exampleMessageStyle,
+                                        )
+                                      : AssistantReply(
+                                          textStyle: exampleMessageStyle,
+                                          message: message.value,
+                                        ),
+                                ),
+                            for (final item in agent.items)
+                              _AgentItemCard(
+                                controller: agent,
+                                item: item,
+                                pickImages: widget.pickImages,
+                              ),
+                            if (agent.waiting)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text(
+                                  'Waiting for your input. Pending actions have not all completed.',
+                                  style: TextStyle(
+                                    color: Color(0xFF667456),
+                                    fontSize: 13,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            if (agent.busy)
+                              const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: LinearProgressIndicator(),
+                              ),
+                            if (agent.error != null)
+                              Text(
+                                agent.error!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            if (agent.unresolved)
+                              const Text(
+                                'An earlier request is unresolved. Do not submit it as a new request.',
+                              ),
+                            if (agent.error != null || agent.unresolved)
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  TextButton(
+                                    onPressed: agent.busy
+                                        ? null
+                                        : agent.recover,
+                                    child: const Text(
+                                      'Check conversation state',
+                                    ),
+                                  ),
+                                  FilledButton(
+                                    onPressed: agent.canRetry
+                                        ? agent.retry
+                                        : null,
+                                    child: const Text('Retry same request'),
+                                  ),
+                                ],
+                              ),
+                          ],
                         ),
-                        AppBottomNavigation(
-                          onHomeTap:
-                              widget.onHomeTap ??
-                              () => Navigator.of(context).maybePop(),
-                          onProfileTap: widget.onProfileTap,
+                        footer: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(22, 8, 22, 26),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_images.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          for (
+                                            var index = 0;
+                                            index < _images.length;
+                                            index++
+                                          )
+                                            _ImagePreview(
+                                              key: ValueKey(
+                                                'agent-image-${_images[index].imageId}',
+                                              ),
+                                              image: _images[index],
+                                              onRemove: agent.canSend
+                                                  ? () => setState(
+                                                      () => _images.removeAt(
+                                                        index,
+                                                      ),
+                                                    )
+                                                  : null,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  AgentComposer(
+                                    controller: _message,
+                                    voiceModeReset: _voiceModeReset,
+                                    enabled: agent.canSend,
+                                    waiting: agent.waiting,
+                                    hasImages: _images.isNotEmpty,
+                                    voiceActive: _recordingVoice,
+                                    onPhotoPressed:
+                                        agent.canSend &&
+                                            _images.length <
+                                                AgentImage.maxImages
+                                        ? _pickImages
+                                        : null,
+                                    onSendPressed: agent.canSend ? _send : null,
+                                    voiceButton: HoldToSpeakButton(
+                                      enabled:
+                                          agent.canSend && !_finishingVoice,
+                                      recording: _recordingVoice,
+                                      cancelling: _cancelVoice,
+                                      finishing: _finishingVoice,
+                                      onStart: _startVoiceInput,
+                                      onMove: _updateVoiceCancel,
+                                      onEnd: () => _finishVoiceInput(),
+                                      onCancel: () =>
+                                          _finishVoiceInput(forceCancel: true),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            AppBottomNavigation(
+                              onHomeTap:
+                                  widget.onHomeTap ??
+                                  () => Navigator.of(context).maybePop(),
+                              onProfileTap: widget.onProfileTap,
+                            ),
+                          ],
                         ),
-                      ],
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _ImagePreview extends StatelessWidget {
@@ -590,140 +626,221 @@ class _AgentItemCard extends StatelessWidget {
     final original = _text(item['original_text']);
     final heading =
         _text(display?['item_name']) ?? original ?? 'Inventory action';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              heading,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Chip(
-                avatar: Icon(_statusIcon(status), size: 18),
-                label: Text(_statusLabel(status)),
-                backgroundColor: _statusColor(status),
-                side: BorderSide.none,
-              ),
-            ),
-            if (_text(display?['recognized_text']) case final recognized?)
-              _DetailRow(label: 'Recognised text', value: recognized),
-            if (_text(display?['category_name']) case final category?)
-              _DetailRow(label: 'Category', value: category),
-            if (_text(display?['space_name']) case final space?)
-              _DetailRow(label: 'Location', value: space),
-            if (_text(display?['package_description']) case final package?)
-              _DetailRow(label: 'Package', value: package),
-            if (_quantity(after, draft) case final quantity?)
-              _DetailRow(label: 'Quantity', value: quantity),
-            if (_text(draft?['purchase_date']) case final purchaseDate?)
-              _DetailRow(label: 'Purchase date', value: purchaseDate),
-            if (_text(draft?['expiry_date']) case final expiryDate?)
-              _DetailRow(label: 'Expiry date', value: expiryDate),
-            if (_stringList(display?['missing_fields']).isNotEmpty)
-              _NoticeBox(
-                icon: Icons.help_outline,
-                title: 'Still needed',
-                values: _stringList(display?['missing_fields']),
-              ),
-            if (_stringList(display?['review_notes']).isNotEmpty)
-              _NoticeBox(
-                icon: Icons.fact_check_outlined,
-                title: 'Review notes',
-                values: _stringList(display?['review_notes']),
-              ),
-            if (original != null)
-              if (original != heading &&
-                  original != _text(display?['recognized_text']))
-                _DetailRow(label: 'Original request', value: original),
-            if (preview != null) ...[
-              Text('Calculation: ${preview['calculation_method']}'),
-              if (preview['before'] is Map)
-                Text('Before: ${_balance(preview['before'] as Map)}'),
-              if (preview['after'] is Map)
-                Text('After: ${_balance(preview['after'] as Map)}'),
-              ExpansionTile(
-                title: const Text('Server proposal and estimate basis'),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: const Color(0x70FFFFFF),
+        border: Border.all(color: const Color(0xFFA8D589)),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0879AF43),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SelectableText(
-                    const JsonEncoder.withIndent('  ').convert(preview),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE9F7DF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Image.asset(
+                      itemArtworkForName(heading),
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          heading,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Chip(
+                          avatar: Icon(_statusIcon(status), size: 18),
+                          label: Text(_statusLabel(status)),
+                          labelStyle: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          backgroundColor: _statusColor(status),
+                          side: BorderSide.none,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ],
-            if (error != null) Text('${error['message'] ?? error['code']}'),
-            if (item['result'] != null)
-              ExpansionTile(
-                title: const Text('Actual server result'),
-                children: [
-                  SelectableText(
-                    const JsonEncoder.withIndent('  ').convert(item['result']),
+              const Divider(color: Color(0xFFA8D589), height: 24),
+              if (_text(display?['recognized_text']) case final recognized?)
+                _DetailRow(label: 'Recognised text', value: recognized),
+              if (_text(display?['category_name']) case final category?)
+                _DetailRow(label: 'Category', value: category),
+              if (_text(display?['space_name']) case final space?)
+                _DetailRow(label: 'Location', value: space),
+              if (_text(display?['package_description']) case final package?)
+                _DetailRow(label: 'Package', value: package),
+              if (_quantity(after, draft) case final quantity?)
+                _DetailRow(label: 'Quantity', value: quantity),
+              if (_text(draft?['purchase_date']) case final purchaseDate?)
+                _DetailRow(label: 'Purchase date', value: purchaseDate),
+              if (_text(draft?['expiry_date']) case final expiryDate?)
+                _DetailRow(label: 'Expiry date', value: expiryDate),
+              if (_stringList(display?['missing_fields']).isNotEmpty)
+                _NoticeBox(
+                  icon: Icons.help_outline,
+                  title: 'Still needed',
+                  values: _stringList(display?['missing_fields']),
+                ),
+              if (_stringList(display?['review_notes']).isNotEmpty)
+                _NoticeBox(
+                  icon: Icons.fact_check_outlined,
+                  title: 'Review notes',
+                  values: _stringList(display?['review_notes']),
+                ),
+              if (original != null)
+                if (original != heading &&
+                    original != _text(display?['recognized_text']))
+                  _DetailRow(label: 'Original request', value: original),
+              if (preview != null) ...[
+                _DetailRow(
+                  label: 'Calculation',
+                  value: '${preview['calculation_method']}',
+                ),
+                if (preview['before'] is Map)
+                  _DetailRow(
+                    label: 'Before',
+                    value: _balance(preview['before'] as Map),
                   ),
-                ],
-              ),
-            if (waiting)
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  if (status == 'NEEDS_CONFIRMATION')
-                    FilledButton(
-                      onPressed: canRespond
-                          ? () => controller.respond(item, 'confirm')
-                          : null,
-                      child: Text(
-                        uncertain
-                            ? 'Verify original action'
-                            : 'Confirm proposal',
+                if (preview['after'] is Map &&
+                    _quantity(after, draft) !=
+                        _balance(preview['after'] as Map))
+                  _DetailRow(
+                    label: 'After',
+                    value: _balance(preview['after'] as Map),
+                  ),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: 12),
+                  title: const Text('Server proposal and estimate basis'),
+                  children: [
+                    SelectableText(
+                      const JsonEncoder.withIndent('  ').convert(preview),
+                    ),
+                  ],
+                ),
+              ],
+              if (error != null) Text('${error['message'] ?? error['code']}'),
+              if (item['result'] != null)
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text('Actual server result'),
+                  children: [
+                    SelectableText(
+                      const JsonEncoder.withIndent(
+                        '  ',
+                      ).convert(item['result']),
+                    ),
+                  ],
+                ),
+              if (waiting) ...[
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    if (status == 'NEEDS_CONFIRMATION')
+                      FilledButton(
+                        onPressed: canRespond
+                            ? () => controller.respond(item, 'confirm')
+                            : null,
+                        child: Text(
+                          uncertain
+                              ? 'Verify original action'
+                              : 'Confirm proposal',
+                        ),
                       ),
-                    ),
-                  if (!uncertain) ...[
-                    OutlinedButton(
-                      onPressed: canRespond
-                          ? () => _answer(
-                              context,
-                              status == 'NEEDS_INPUT' ? 'answer' : 'edit',
-                            )
-                          : null,
-                      child: Text(
-                        status == 'NEEDS_INPUT' ? 'Answer' : 'Edit proposal',
+                    if (!uncertain) ...[
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.black,
+                          minimumSize: const Size(0, 40),
+                        ),
+                        onPressed: canRespond
+                            ? () => _answer(
+                                context,
+                                status == 'NEEDS_INPUT' ? 'answer' : 'edit',
+                              )
+                            : null,
+                        child: Text(
+                          status == 'NEEDS_INPUT' ? 'Answer' : 'Edit proposal',
+                        ),
                       ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: canRespond
-                          ? () => _supportPhoto(context)
-                          : null,
-                      icon: const Icon(Icons.add_a_photo_outlined),
-                      label: const Text('Add supporting photo'),
-                    ),
-                    TextButton(
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFA8D589)),
+                          minimumSize: const Size(0, 40),
+                          foregroundColor: AppColors.userMessage,
+                        ),
+                        onPressed: canRespond
+                            ? () => _supportPhoto(context)
+                            : null,
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                        label: const Text('Add supporting photo'),
+                      ),
+                    ],
+                  ],
+                ),
+                if (!uncertain)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
                       onPressed: canRespond
                           ? () => controller.respond(item, 'cancel')
                           : null,
                       child: const Text('Cancel item'),
                     ),
-                  ],
-                ],
-              ),
-            if (canRespond && !uncertain)
-              for (final candidate in candidates)
-                OutlinedButton(
-                  onPressed: () => controller.respond(
-                    item,
-                    'answer',
-                    selectedId: candidate['id'] as String,
                   ),
-                  child: Text(
-                    '${candidate['item_definition_name'] ?? candidate['name'] ?? candidate['id']} · ${candidate['storage_space_name'] ?? ''} · ${candidate['expiry_date'] ?? 'No expiry date'}',
+              ],
+              if (canRespond && !uncertain)
+                for (final candidate in candidates)
+                  OutlinedButton(
+                    onPressed: () => controller.respond(
+                      item,
+                      'answer',
+                      selectedId: candidate['id'] as String,
+                    ),
+                    child: Text(
+                      '${candidate['item_definition_name'] ?? candidate['name'] ?? candidate['id']} · ${candidate['storage_space_name'] ?? ''} · ${candidate['expiry_date'] ?? 'No expiry date'}',
+                    ),
                   ),
-                ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -811,18 +928,26 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 5),
+    padding: const EdgeInsets.symmetric(vertical: 5),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 108,
+          width: 94,
           child: Text(
             label,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Color(0xFF77816D),
+              fontSize: 12.5,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
-        Expanded(child: Text(value)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(value, style: const TextStyle(fontSize: 14, height: 1.4)),
+        ),
       ],
     ),
   );
@@ -844,7 +969,7 @@ class _NoticeBox extends StatelessWidget {
     margin: const EdgeInsets.only(top: 10),
     padding: const EdgeInsets.all(10),
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: const Color(0xFFEAF4DF),
       borderRadius: BorderRadius.circular(10),
     ),
     child: Row(

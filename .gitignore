@@ -28,3 +28,12 @@ Thumbs.db
 /mobile/test-results.jsonl
 
 /backend/test-results.xml
+
+# Disposable browser E2E builds and evidence
+/web/.e2e-dist/
+/web/.e2e-artifacts/
+
+# Workflow helper caches and generated regression evidence
+/.github/scripts/__pycache__/
+/regression-summary.json
+/regression-summary.md
