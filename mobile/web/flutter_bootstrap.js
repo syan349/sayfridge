@@ -26,8 +26,14 @@ window.sayFridgeReadSafeArea = () => {
 // background/theme color, outside Flutter's canvas. Dim that surface too.
 const themeColor = document.querySelector('meta[name="theme-color"]');
 const normalThemeColor = themeColor?.getAttribute('content');
+const normalHtmlBackground = document.documentElement.style.backgroundColor;
+const normalBodyBackground = document.body.style.backgroundColor;
 window.sayFridgeSetVoiceOverlayVisible = visible => {
   document.documentElement.classList.toggle('voice-overlay-visible', visible);
+  if (!desktopBrowser) {
+    document.documentElement.style.backgroundColor = visible ? '#73766f' : normalHtmlBackground;
+    document.body.style.backgroundColor = visible ? '#73766f' : normalBodyBackground;
+  }
   if (themeColor) {
     if (visible) themeColor.setAttribute('content', '#73766f');
     else if (normalThemeColor === null) themeColor.removeAttribute('content');

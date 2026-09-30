@@ -4,6 +4,19 @@ import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+String voiceInputErrorMessage(String error) {
+  final code = error.toLowerCase();
+  return code.contains('not-allowed') || code.contains('permission')
+      ? 'Allow microphone and speech recognition access in your browser or device settings.'
+      : code.contains('network')
+      ? 'Voice recognition could not connect. Check your network and try again.'
+      : code.contains('not_supported') || code.contains('not supported')
+      ? 'Speech recognition is unavailable in this browser. Please use keyboard input.'
+      : code.contains('no-speech') || code.contains('no_match')
+      ? 'No speech was recognized. Hold the voice bar while speaking, then release.'
+      : 'Voice recognition stopped. Please try again.';
+}
+
 abstract class VoiceInputService {
   Future<bool> start({
     required void Function(String words) onWords,
@@ -170,17 +183,7 @@ class DeviceVoiceInputService implements VoiceInputService {
   }
 
   void _handleError(SpeechRecognitionError error) {
-    final code = error.errorMsg.toLowerCase();
-    final message = code.contains('not-allowed') || code.contains('permission')
-        ? 'Allow microphone and speech recognition access in your browser or device settings.'
-        : code.contains('network')
-        ? 'Voice recognition could not connect. Check your network and try again.'
-        : code.contains('not_supported') || code.contains('not supported')
-        ? 'Speech recognition is unavailable in this browser. Please use keyboard input.'
-        : code.contains('no-speech') || code.contains('no_match')
-        ? 'No speech was recognized. Hold the voice bar while speaking, then release.'
-        : 'Voice recognition stopped. Please try again.';
-    _fail(message);
+    _fail(voiceInputErrorMessage(error.errorMsg));
   }
 
   void _fail(String message) {

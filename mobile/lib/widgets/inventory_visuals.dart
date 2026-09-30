@@ -15,6 +15,8 @@ abstract final class HomeAssets {
   static const titleLine = '$root/title_line.png';
   static const morningLine = '$root/morning.png';
   static const eveningLine = '$root/evening.png';
+  static const notificationEmpty = '$root/notification_empty.png';
+  static const notificationUnread = '$root/notification_unread.png';
 }
 
 class HomeEmptyIllustration extends StatelessWidget {

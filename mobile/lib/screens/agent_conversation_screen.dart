@@ -7,6 +7,8 @@ import '../models/agent_image.dart';
 import '../platform/voice_overlay_chrome.dart'
     if (dart.library.js_interop) '../platform/voice_overlay_chrome_web.dart';
 import '../services/voice_input_service.dart';
+import '../services/voice_input_factory.dart'
+    if (dart.library.js_interop) '../services/voice_input_factory_web.dart';
 import '../state/agent_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/agent_composer.dart';
@@ -56,7 +58,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   @override
   void initState() {
     super.initState();
-    _voiceInput = widget.voiceInput ?? DeviceVoiceInputService();
+    _voiceInput = widget.voiceInput ?? createVoiceInputService();
   }
 
   @override
@@ -153,8 +155,10 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
 
   Future<void> _finishVoiceInput({bool forceCancel = false}) async {
     _holdingVoice = false;
-    if (!_recordingVoice || _finishingVoice) return;
-    final session = _voiceSession;
+    if (!_recordingVoice || (_finishingVoice && !forceCancel)) return;
+    // Closing while the final transcript is pending must cancel that pending
+    // stop too. Invalidate its callbacks before waiting for browser cleanup.
+    final session = forceCancel ? ++_voiceSession : _voiceSession;
     final cancelled = forceCancel || _cancelVoice;
     setState(() => _finishingVoice = true);
     _voiceOverlayEntry?.markNeedsBuild();

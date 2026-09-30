@@ -37,9 +37,11 @@ class ExpiringItemsScreen extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(25, 8, 25, 7),
                     child: Row(
                       children: [
-                        _SpacePicker(
-                          controller: controller,
-                          spacesController: storageSpaceController,
+                        Flexible(
+                          child: _SpacePicker(
+                            controller: controller,
+                            spacesController: storageSpaceController,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -299,11 +301,15 @@ class _SpacePicker extends StatelessWidget {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            controller.storageSpaceId == null
-                ? 'All Spaces'
-                : spaces[controller.storageSpaceId] ?? 'Selected space',
-            style: const TextStyle(fontSize: 14),
+          Flexible(
+            child: Text(
+              controller.storageSpaceId == null
+                  ? 'All Spaces'
+                  : spaces[controller.storageSpaceId] ?? 'Selected space',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14),
+            ),
           ),
           const SizedBox(width: 4),
           const Icon(Icons.keyboard_arrow_down, size: 19),

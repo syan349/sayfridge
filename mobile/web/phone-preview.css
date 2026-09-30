@@ -17,6 +17,24 @@ html.voice-overlay-visible:not(.desktop-preview) body {
   background: #73766f;
 }
 
+/* A real topmost DOM surface also supplies the tint sampled by iOS WebKit. */
+#status-bar-surface {
+  position: fixed;
+  inset: 0 0 auto;
+  height: max(1px, env(safe-area-inset-top, 0px));
+  background: #f7fded;
+  pointer-events: none;
+  z-index: 2147483647;
+}
+
+.voice-overlay-visible #status-bar-surface {
+  background: #73766f;
+}
+
+.desktop-preview #status-bar-surface {
+  display: none;
+}
+
 .desktop-preview body {
   height: 100vh;
   height: 100dvh;
