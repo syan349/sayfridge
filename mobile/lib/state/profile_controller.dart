@@ -2,19 +2,23 @@ import 'package:flutter/foundation.dart';
 
 import '../models/profile_preferences.dart';
 import '../repositories/profile_preferences_repository.dart';
+import '../services/notification_service.dart';
 import 'auth_controller.dart';
 
 class ProfileController extends ChangeNotifier {
   ProfileController(
     this.authController, [
     this._repository = const ProfilePreferencesRepository(),
-  ]) {
+    NotificationService? notificationService,
+  ]) : _notificationService = notificationService {
     authController.addListener(_syncAccount);
     _syncAccount();
+    _refreshNotificationPermission();
   }
 
   final AuthController authController;
   final ProfilePreferencesRepository _repository;
+  final NotificationService? _notificationService;
   ProfilePreferences _preferences = const ProfilePreferences();
   String? _userId;
   int _accountVersion = 0;
@@ -22,11 +26,19 @@ class ProfileController extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSaving = false;
   String? _error;
+  String? _notificationError;
+  bool _isUpdatingNotifications = false;
+  NotificationPermissionState _notificationPermission =
+      NotificationPermissionState.unknown;
 
   ProfilePreferences get preferences => _preferences;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get error => _error;
+  String? get notificationError => _notificationError;
+  bool get isUpdatingNotifications => _isUpdatingNotifications;
+  NotificationPermissionState get notificationPermission =>
+      _notificationPermission;
   String get displayName => _preferences.fullName.isNotEmpty
       ? _preferences.fullName
       : authController.user?.email.split('@').first ?? 'Guest';
@@ -58,6 +70,7 @@ class ProfileController extends ChangeNotifier {
       final preferences = await _repository.read(userId);
       if (!_isCurrent(version)) return;
       _preferences = preferences;
+      await _syncNotificationSchedule(preferences);
     } catch (_) {
       if (!_isCurrent(version)) return;
       _error = 'Unable to load your saved preferences. Please try again.';
@@ -106,6 +119,7 @@ class ProfileController extends ChangeNotifier {
       await _repository.save(userId, preferences);
       if (!_isCurrent(version)) return false;
       _preferences = preferences;
+      await _syncNotificationSchedule(preferences);
       return true;
     } catch (_) {
       if (_isCurrent(version)) {
@@ -121,6 +135,64 @@ class ProfileController extends ChangeNotifier {
   }
 
   bool _isCurrent(int version) => !_disposed && version == _accountVersion;
+
+  Future<void> _syncNotificationSchedule(ProfilePreferences preferences) async {
+    try {
+      await _notificationService?.synchronizeDailyReminder(preferences);
+      _notificationError = null;
+    } catch (_) {
+      _notificationError =
+          'Preferences were saved, but the device reminder could not be scheduled.';
+    }
+  }
+
+  Future<void> _refreshNotificationPermission() async {
+    final notificationService = _notificationService;
+    if (notificationService == null) {
+      _notificationPermission = NotificationPermissionState.unsupported;
+      return;
+    }
+    try {
+      final state = await notificationService.permissionState();
+      if (_disposed) return;
+      _notificationPermission = state;
+      notifyListeners();
+    } catch (_) {
+      if (_disposed) return;
+      _notificationPermission = NotificationPermissionState.unsupported;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> requestNotificationPermission() async {
+    final notificationService = _notificationService;
+    if (notificationService == null) return false;
+    if (_isUpdatingNotifications) return false;
+    _isUpdatingNotifications = true;
+    _notificationError = null;
+    notifyListeners();
+    try {
+      _notificationPermission = await notificationService.requestPermission();
+      if (_notificationPermission == NotificationPermissionState.enabled) {
+        await notificationService.synchronizeDailyReminder(_preferences);
+        return true;
+      }
+      _notificationError =
+          _notificationPermission == NotificationPermissionState.unsupported
+          ? 'Notifications are not supported on this device or browser.'
+          : 'Notification permission was not granted. You can enable it in device or browser settings.';
+      return false;
+    } catch (_) {
+      _notificationError =
+          'Unable to enable notifications. Check device or browser settings and try again.';
+      return false;
+    } finally {
+      if (!_disposed) {
+        _isUpdatingNotifications = false;
+        notifyListeners();
+      }
+    }
+  }
 
   @override
   void dispose() {

@@ -56,6 +56,7 @@ class ExpirySummaryController extends ChangeNotifier {
   bool get hasNextPage => _hasNextPage;
   String? get bucket => _bucket;
   String? get storageSpaceId => _storageSpaceId;
+  int get daysBefore => _daysBefore;
 
   Future<void> selectStorageSpace(String? storageSpaceId) {
     final asOf = _asOf;

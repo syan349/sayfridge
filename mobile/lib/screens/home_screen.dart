@@ -5,6 +5,7 @@ import '../models/inventory_item.dart';
 import '../models/storage_space.dart';
 import '../state/expiry_summary_controller.dart';
 import '../state/inventory_controller.dart';
+import '../state/app_notification_controller.dart';
 import '../state/storage_space_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
@@ -30,6 +31,7 @@ class HomeScreen extends StatelessWidget {
     this.onExpiringTap,
     this.onInventoryTap,
     this.onAddItemTap,
+    this.notificationController,
     this.isGuest = false,
     super.key,
   });
@@ -45,6 +47,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
   final VoidCallback? onAddItemTap;
+  final AppNotificationController? notificationController;
   final bool isGuest;
 
   @override
@@ -106,6 +109,8 @@ class HomeScreen extends StatelessWidget {
                                   onExpiringTap: onExpiringTap,
                                   onInventoryTap: onInventoryTap,
                                   onAddItemTap: onAddItemTap,
+                                  notificationController:
+                                      notificationController,
                                 ),
                               ],
                             ),
@@ -222,6 +227,7 @@ class _UserHomeContent extends StatefulWidget {
     required this.onExpiringTap,
     required this.onInventoryTap,
     required this.onAddItemTap,
+    required this.notificationController,
   });
 
   final ExpirySummaryController? expirySummaryController;
@@ -232,6 +238,7 @@ class _UserHomeContent extends StatefulWidget {
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
   final VoidCallback? onAddItemTap;
+  final AppNotificationController? notificationController;
 
   @override
   State<_UserHomeContent> createState() => _UserHomeContentState();
@@ -305,6 +312,17 @@ class _UserHomeContentState extends State<_UserHomeContent> {
             ),
           ],
         ),
+        if (widget.notificationController != null) ...[
+          const SizedBox(height: 18),
+          AnimatedBuilder(
+            animation: widget.notificationController!,
+            builder: (context, _) => _NotificationPanel(
+              controller: widget.notificationController!,
+              onProcessExpired: _openExpiredItems,
+              onViewExpiring: _openExpiringItems,
+            ),
+          ),
+        ],
         const SizedBox(height: 42),
         const _SectionTitle('Expiring soon'),
         const SizedBox(height: 15),
@@ -714,6 +732,20 @@ class _UserHomeContentState extends State<_UserHomeContent> {
     }
   }
 
+  Future<void> _openExpiredItems() async {
+    final expiry = widget.expirySummaryController;
+    if (expiry == null) return;
+    await expiry.selectBucket('overdue');
+    if (!mounted) return;
+    await _openExpiringItems();
+    if (mounted) {
+      expiry.loadSummary(
+        asOf: DateUtils.dateOnly(DateTime.now()),
+        storageSpaceId: _selectedStorageSpace?.id,
+      );
+    }
+  }
+
   void _openDetail(InventoryItem item) {
     final inventory = widget.inventoryController;
     if (inventory == null) return;
@@ -724,6 +756,100 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           controller: inventory.createDetailController(),
         ),
       ),
+    );
+  }
+}
+
+class _NotificationPanel extends StatelessWidget {
+  const _NotificationPanel({
+    required this.controller,
+    required this.onProcessExpired,
+    required this.onViewExpiring,
+  });
+
+  final AppNotificationController controller;
+  final Future<void> Function() onProcessExpired;
+  final Future<void> Function() onViewExpiring;
+
+  @override
+  Widget build(BuildContext context) {
+    final notifications = controller.notifications;
+    if (notifications.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Notifications',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 10),
+        for (final notification in notifications)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: notification.type == AppNotificationType.expired
+                      ? const Color(0xFFD36B4A)
+                      : const Color(0xFFA8D589),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        notification.type == AppNotificationType.expired
+                            ? Icons.warning_amber_rounded
+                            : Icons.notifications_none,
+                        color: notification.type == AppNotificationType.expired
+                            ? const Color(0xFFC8532C)
+                            : AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          notification.title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Text(notification.message),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      if (notification.processable)
+                        FilledButton(
+                          onPressed: onProcessExpired,
+                          child: const Text('Process now'),
+                        )
+                      else if (notification.type ==
+                          AppNotificationType.expiring)
+                        TextButton(
+                          onPressed: onViewExpiring,
+                          child: const Text('View items'),
+                        ),
+                      TextButton(
+                        onPressed: () => controller.markRead(notification.type),
+                        child: const Text('Mark as read'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
