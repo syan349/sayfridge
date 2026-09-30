@@ -301,17 +301,69 @@ class _UserHomeContentState extends State<_UserHomeContent> {
   void initState() {
     super.initState();
     final spaces = widget.storageSpaceController;
+    spaces?.addListener(_onStorageSpacesChanged);
+    _useOnlyStorageSpace(spaces, refreshData: false);
     if (spaces != null && spaces.status == StorageSpaceLoadStatus.initial) {
       spaces.loadStorageSpaces();
     }
     final inventory = widget.inventoryController;
     if (inventory != null && inventory.status == InventoryLoadStatus.initial) {
-      inventory.loadInventory();
+      inventory.loadInventory(storageSpaceId: _selectedStorageSpaceId);
     }
     final expiry = widget.expirySummaryController;
     if (expiry != null && expiry.status == ExpirySummaryLoadStatus.initial) {
-      expiry.loadSummary(asOf: DateUtils.dateOnly(DateTime.now()));
+      expiry.loadSummary(
+        asOf: DateUtils.dateOnly(DateTime.now()),
+        storageSpaceId: _selectedStorageSpaceId,
+      );
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant _UserHomeContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.storageSpaceController == widget.storageSpaceController) {
+      return;
+    }
+    oldWidget.storageSpaceController?.removeListener(_onStorageSpacesChanged);
+    widget.storageSpaceController?.addListener(_onStorageSpacesChanged);
+    _useOnlyStorageSpace(widget.storageSpaceController);
+  }
+
+  @override
+  void dispose() {
+    widget.storageSpaceController?.removeListener(_onStorageSpacesChanged);
+    super.dispose();
+  }
+
+  void _onStorageSpacesChanged() {
+    _useOnlyStorageSpace(widget.storageSpaceController);
+  }
+
+  void _useOnlyStorageSpace(
+    StorageSpaceController? controller, {
+    bool refreshData = true,
+  }) {
+    if (controller?.status != StorageSpaceLoadStatus.loaded ||
+        controller!.storageSpaces.length != 1) {
+      return;
+    }
+
+    final onlySpaceId = controller.storageSpaces.single.id;
+    if (_selectedStorageSpaceId == onlySpaceId) return;
+
+    if (mounted) {
+      setState(() => _selectedStorageSpaceId = onlySpaceId);
+    } else {
+      _selectedStorageSpaceId = onlySpaceId;
+    }
+
+    if (!refreshData) return;
+    widget.inventoryController?.loadInventory(storageSpaceId: onlySpaceId);
+    widget.expirySummaryController?.loadSummary(
+      asOf: DateUtils.dateOnly(DateTime.now()),
+      storageSpaceId: onlySpaceId,
+    );
   }
 
   @override

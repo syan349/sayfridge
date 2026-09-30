@@ -8,12 +8,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password, verify_password
-from app.db.models import User
+from app.db.models import StorageSpace, User
 
 
 LOCAL_PROVIDER = "LOCAL"
 ACTIVE_STATUS = "ACTIVE"
 USER_ROLE = "USER"
+DEFAULT_STORAGE_SPACE_NAME = "Default Space"
+DEFAULT_STORAGE_SPACE_TYPE = "FRIDGE"
 
 # Verify an Argon2id hash even for unknown users to reduce email enumeration through response timing.
 _DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
@@ -55,7 +57,13 @@ async def register_user(
         role=USER_ROLE,
         status=ACTIVE_STATUS,
     )
-    session.add(user)
+    default_space = StorageSpace(
+        user=user,
+        name=DEFAULT_STORAGE_SPACE_NAME,
+        type=DEFAULT_STORAGE_SPACE_TYPE,
+        status=ACTIVE_STATUS,
+    )
+    session.add_all((user, default_space))
     try:
         await session.commit()
     except IntegrityError as exc:
