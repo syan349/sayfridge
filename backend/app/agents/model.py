@@ -5,6 +5,7 @@ from pathlib import Path
 from langchain_openai import ChatOpenAI
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from app.agents.context_budget import Budget, BudgetModel
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -22,6 +23,11 @@ class AgentModelSettings(BaseSettings):
     api_key: SecretStr = Field(alias="AGENT_API_KEY", repr=False)
     timeout_seconds: float = Field(default=60, alias="AGENT_TIMEOUT_SECONDS", gt=0, le=600)
     max_retries: int = Field(default=2, alias="AGENT_MAX_RETRIES", ge=0, le=10)
+    context_trigger: int = Field(default=80000, alias="AGENT_CONTEXT_TRIGGER")
+    context_target: int = Field(default=40000, alias="AGENT_CONTEXT_TARGET")
+    context_limit: int = Field(default=160000, alias="AGENT_CONTEXT_LIMIT")
+    model_context_limit: int = Field(default=160000, alias="AGENT_MODEL_CONTEXT_LIMIT")
+    output_tokens: int = Field(default=8000, alias="AGENT_OUTPUT_TOKENS")
 
     @field_validator("model_name", "api_base")
     @classmethod
@@ -44,13 +50,17 @@ def get_agent_model_settings() -> AgentModelSettings:
     return AgentModelSettings()
 
 
-def create_agent_model() -> ChatOpenAI:
+def create_agent_model() -> BudgetModel:
     settings = get_agent_model_settings()
-    return ChatOpenAI(
+    budget = Budget(trigger=settings.context_trigger, target=settings.context_target,
+                    limit=settings.context_limit, model_limit=settings.model_context_limit,
+                    output=settings.output_tokens)
+    return BudgetModel(ChatOpenAI(
         model=settings.model_name,
         base_url=settings.api_base,
         api_key=settings.api_key,
         timeout=settings.timeout_seconds,
         max_retries=settings.max_retries,
         streaming=True,
-    )
+        max_tokens=settings.output_tokens,
+    ), budget)

@@ -599,18 +599,23 @@ three estimated fields, and sets EMPTY for zero or IN_STOCK for a positive total
 It performs no conversion against the old unit. Even an unchanged total records a
 new physical confirmation and increments version.
 
-**Calculation:** convert g↔kg or ml↔l to the current effective unit; identical
-casefolded units are exact. Reject other differing units. Round the applied change
-to three places using ROUND_HALF_UP before addition/subtraction. Reject changes rounded to zero
-and amounts outside NUMERIC(12,3). A valid 0.5 g addition to kg stock applies 0.001 kg;
-a raw 0.0005 kg input is invalid because it has four decimal places.
+**Calculation:** convert the effective current balance to the current request unit,
+then apply the change; a FRACTION keeps the current unit. Fixed g/kg and ml/l
+conversions are deterministic. Other dimensions need an applicable user relationship
+or an Agent proposal. Initial values remain unchanged; estimated balances stay estimated.
 
-For consumption, check the unrounded change against the balance first; rounding
-must not hide over-consumption. Fractions use exact integer-ratio arithmetic.
-Reject rounding that erases a positive remainder. Consuming `1/3` of 1 kg applies
-0.333 kg and leaves 0.667 kg; consuming `1/2` of 0.001 kg is rejected. Explicitly
-consuming all of 0.001 kg is allowed. Applied changes are positive; operation_type
-indicates addition or subtraction.
+Ordinary cross-dimension whole-count estimates round the final balance to an integer
+using ROUND_HALF_UP. For an explicit partial-item change, first round the converted
+count baseline, then subtract/add the actual partial amount. Same-unit partial
+balances remain valid. Preview, saved quantity and Agent feedback share these results.
+Physical quantities use Decimal arithmetic, round to three decimals on persistence,
+and retain NUMERIC(12,3) limits. Tiny nonzero changes and rounding that erases a
+positive physical remainder are rejected; no hidden residual is stored. A proportion
+producing a non-integral whole count returns WHOLE_COUNT_REQUIRED. Estimated zero
+does not become confirmed EMPTY. RECONCILE establishes an actual balance in the
+user's unit and clears the estimate.
+
+
 
 **Response:** `{operation, inventory, replayed}`. inventory uses the response in
 section 6. operation includes id, inventory_item_id, operation_type,
@@ -1501,8 +1506,40 @@ An explicitly named new storage space with a clear type is also created automati
 Missing location/quantity or genuine product ambiguity remains NEEDS_INPUT. The user
 answers through the existing resume request; no new category-ID field is added.
 For an already waiting proposal, `decision: "edit"` can correct the category in a
-message. Image-derived stock and estimates still require review. Completed stock
+message. Image-derived stock still requires review; estimates execute directly unless the user explicitly requests confirmation. Completed stock
 is not silently reclassified by subsequent chat.
 Changing a saved definition's category affects all inventory batches referring to
 that definition, not just one batch. Public definitions remain subject to existing
 ownership restrictions. See [category rules](DATABASE_DESIGN.md#4-public-category-catalog-table-item_category).
+
+
+### Continuous chat, default spaces, and quantity accounting
+
+- `POST /api/v1/storage-spaces/{id}/default`: empty body, authenticated ownership,
+  active space required; returns `StorageSpaceRead`. Repeated calls are idempotent.
+  Space reads/list entries include `is_default`. Login ensures exactly one active
+  default without overwriting an existing default; archive selects a replacement.
+- `POST /api/v1/agent/chat` accepts a normal message while an operation is waiting.
+  The server associates supplements/edits/cancel/confirm with pending item IDs.
+  Ambiguous association returns another question. Independent queries/new work keep
+  the existing pending work. Existing typed `/resume` and its stale-ID checks remain.
+- Keep the same `conversation_id` across automatic context compaction. Retry a
+  disconnected request with the same `request_id`; never manufacture replacement
+  operation IDs after an uncertain save. `CONTEXT_BUDGET_EXCEEDED` preserves recovery
+  state and indicates no oversized model request was sent.
+- Current balances use the operation's requested unit; a relative fraction retains
+  the existing unit. Weight can switch back to an estimated integer count. Original
+  entry and operation expressions remain unchanged. Estimates execute directly unless
+  the user asks for confirmation; image review remains required.
+- Inventory reads retain the existing display_amount/display_unit/is_estimated
+  fields. There are no extra quantity state or display override fields.
+- New conversion memories are written before stock execution. MEMORY_SAVE_UNAVAILABLE
+  leaves inventory unchanged and allows a supplement/retry. Previous quantity-policy
+  previews are prepared again; completed receipts are never executed twice.
+- Drafts support `unit_relationship` (positive source/target amounts and units,
+  source, rationale, optional verbatim user evidence), `confirmation_requested`,
+  `save_conversion_memory`, and `clear_fields` for explicitly withdrawn facts.
+  These are Agent proposal fields, not authority to write a final stock balance.
+- Missing quantity/position answers are merged with existing facts. A relative
+  fraction needs no user-supplied unit. `WHOLE_COUNT_REQUIRED` asks for the actual
+  whole/partial count when a relative whole-item operation is not integral.

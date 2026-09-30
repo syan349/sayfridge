@@ -141,7 +141,7 @@ def _response(stack, resources, config, command, context, request, request_id, r
                         elif isinstance(update, dict):
                             for event in update.get("events", []):
                                 yield _sse(event["type"], data=event["data"])
-                            if update.get("route") == "END" and not final_streamed:
+                            if update.get("route") in {"END", "WAIT"} and not final_streamed:
                                 for message in update.get("messages", []):
                                     if isinstance(message, AIMessage) and not message.tool_calls and _text(message.content):
                                         yield _sse("text_delta", delta=_text(message.content))
@@ -152,7 +152,7 @@ def _response(stack, resources, config, command, context, request, request_id, r
             raise
         except Exception as exc:
             logger.warning("Agent request failed (%s)", type(exc).__name__)
-            yield _sse("error", code="AGENT_EXECUTION_FAILED", message="Execution interrupted; query conversation state and retry with the same request ID")
+            yield _sse("error", code=getattr(exc, "code", "AGENT_EXECUTION_FAILED"), message="Execution interrupted; query conversation state and retry with the same request ID")
         finally:
             await stack.aclose()
     return StreamingResponse(events(), media_type="text/event-stream",
@@ -175,6 +175,14 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
             if previous["fingerprint"] != digest:
                 raise HTTPException(409, detail={"code": "REQUEST_ID_CONFLICT"})
             replay, command = previous, None
+            if previous.get("state", {}).get("status") == "WAITING_INPUT":
+                replay = {**previous, "state": _state(snapshot)}
+        elif str(request_id) in values.get("chat_requests", {}):
+            if values["chat_requests"][str(request_id)] != digest:
+                raise HTTPException(409, detail={"code": "REQUEST_ID_CONFLICT"})
+            command = None
+            if _interrupts(snapshot) or not snapshot.next:
+                replay = _state(snapshot)
         elif values.get("turn_id") == str(request_id):
             if values.get("request_fingerprint") != digest:
                 raise HTTPException(409, detail={"code": "REQUEST_ID_CONFLICT"})
@@ -182,17 +190,26 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
             if _interrupts(snapshot) or not snapshot.next:
                 replay = _state(snapshot)
         else:
-            if snapshot.next:
+            if _interrupts(snapshot):
+                interrupt = _interrupts(snapshot)[0]
+                command = Command(resume={interrupt.id: {"chat_message": payload.message,
+                    "images": [i.model_dump(mode="json") for i in payload.images],
+                    "request_id": str(request_id), "fingerprint": digest}})
+            elif snapshot.next:
                 raise HTTPException(409, detail={"code": "AGENT_INPUT_REQUIRED" if _interrupts(snapshot) else "AGENT_RECOVERY_REQUIRED", "state": _state(snapshot)})
-            if not validate_image_ids(payload.images, values.get("messages", [])):
+            if not validate_image_ids(payload.images, [*values.get("image_messages", []), *values.get("messages", [])]):
                 raise HTTPException(409, detail={"code": "IMAGE_ID_CONFLICT"})
-            command = {"messages": [human_message(payload.message, payload.images, str(request_id))],
+            if not _interrupts(snapshot):
+                command = {"messages": [human_message(payload.message, payload.images, str(request_id))],
                 "turn_id": str(request_id), "as_of": payload.as_of.isoformat() if payload.as_of else None,
+                "chat_requests": {**values.get("chat_requests", {}), str(request_id): digest},
                 "turn_has_images": bool(payload.images),
                 "image_task_active": bool(payload.images) or values.get("image_task_active", False),
                 "request_fingerprint": digest, "items": [], "pending_input": [],
-                "execution_results": [], "events": [], "final_only": False, "resume_requests": {}}
-        context = AgentContext(user_id=user.id, as_of=payload.as_of, conversation_id=conversation_id, user_message=payload.message)
+                "execution_results": [], "events": [], "final_only": False,
+                "resume_requests": values.get("resume_requests", {})}
+        as_of = payload.as_of or (date.fromisoformat(values["as_of"]) if snapshot.next and values.get("as_of") else None)
+        context = AgentContext(user_id=user.id, as_of=as_of, conversation_id=conversation_id, user_message=payload.message)
         return _response(stack, resources, config, command, context, request, request_id, replay)
     except BaseException:
         await stack.aclose()
@@ -216,7 +233,8 @@ async def resume_agent(payload: AgentResumeRequest, request: Request, user: User
             interrupts = _interrupts(snapshot)
             if len(interrupts) != 1 or interrupts[0].id != payload.interrupt_id:
                 raise HTTPException(409, detail={"code": "STALE_INTERRUPT"})
-            if not validate_image_ids([i for r in payload.responses for i in r.images], snapshot.values.get("messages", [])):
+            if not validate_image_ids([i for r in payload.responses for i in r.images],
+                    [*snapshot.values.get("image_messages", []), *snapshot.values.get("messages", [])]):
                 raise HTTPException(409, detail={"code": "IMAGE_ID_CONFLICT"})
             items = {i["item_id"]: i for i in snapshot.values.get("items", [])}
             for answer in payload.responses:

@@ -72,5 +72,5 @@ def test_consumption_insert_failure_rolls_back_and_allows_retry(inventory_contex
             assert await session.scalar(select(func.count()).select_from(InventoryOperation)) == 0
             result = await service.submit_inventory_operation(session, item.id, c[1].id, quantity_value="250", **arguments)
             assert result.inventory.version == 2 and not result.replayed
-            assert result.inventory.confirmed_current_amount == Decimal("2.25")
+            assert result.inventory.confirmed_current_amount == Decimal("2250")
     asyncio.run(exercise(c[0], scenario))

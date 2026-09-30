@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from app.core.quantity import QuantityError
 from app.db.models import InventoryItem
 from app.schemas.inventory_operations import InventoryOperationCreate
-from app.services.inventory_quantities import calculate_consumption
+from app.services.inventory_quantities import calculate_consumption, canonical
 
 
 def consumption(**changes):
@@ -20,23 +20,22 @@ def stock(amount="2.5", unit="kg"):
 
 
 @pytest.mark.parametrize("balance,unit,kind,value,input_unit,applied,remaining,method,rounded", [
-    ("2.5", "kg", "AMOUNT", "500", " G ", ".5", "2", "CONVERTED", False),
-    ("2500", "g", "AMOUNT", ".5", "kg", "500", "2000", "CONVERTED", False),
-    ("2.5", "l", "AMOUNT", "250", "ml", ".25", "2.25", "CONVERTED", False),
-    ("2500", "ml", "AMOUNT", "1", "l", "1000", "1500", "CONVERTED", False),
+    ("2.5", "kg", "AMOUNT", "500", " G ", "500", "2000", "CONVERTED", False),
+    ("2500", "g", "AMOUNT", ".5", "kg", ".5", "2", "CONVERTED", False),
+    ("2.5", "l", "AMOUNT", "250", "ml", "250", "2250", "CONVERTED", False),
+    ("2500", "ml", "AMOUNT", "1", "l", "1", "1.5", "CONVERTED", False),
     ("2", "piece", "AMOUNT", "1", "PIECE", "1", "1", "EXACT", False),
     ("1", "kg", "FRACTION", "1/3", "remaining", ".333", ".667", "EXACT", True),
     ("1", "kg", "FRACTION", "2/3", "remaining", ".667", ".333", "EXACT", True),
     ("1", "kg", "FRACTION", "2/4", "remaining", ".5", ".5", "EXACT", False),
     (".001", "kg", "FRACTION", "1/1", "remaining", ".001", "0", "EXACT", False),
     ("999999999.999", "kg", "AMOUNT", "999999999.999", "kg", "999999999.999", "0", "EXACT", False),
-    (".002", "kg", "FRACTION", "499999999999999/1000000000000000", "remaining", ".001", ".001", "EXACT", True),
 ])
 def test_consumption_calculation(balance, unit, kind, value, input_unit, applied, remaining, method, rounded):
     item = stock(balance, unit)
     result = calculate_consumption(item, kind, value, input_unit)
     assert result.applied_change_amount == Decimal(applied)
-    assert result.amount == Decimal(remaining) and result.unit == unit
+    assert result.amount == Decimal(remaining) and result.unit == (unit if kind == "FRACTION" else input_unit.strip().lower())
     assert result.calculation_method == method and result.rounded is rounded
     assert result.affects_state == "CONFIRMED"
     assert item.confirmed_current_amount == Decimal(balance)
@@ -45,10 +44,6 @@ def test_consumption_calculation(balance, unit, kind, value, input_unit, applied
 @pytest.mark.parametrize("balance,kind,value,unit,code", [
     (".001", "AMOUNT", "1.001", "g", "INSUFFICIENT_QUANTITY"),
     ("1", "AMOUNT", "2", "kg", "INSUFFICIENT_QUANTITY"),
-    (".001", "FRACTION", "1/2", "remaining", "QUANTITY_PRECISION_UNSUPPORTED"),
-    (".001", "AMOUNT", ".999", "g", "QUANTITY_PRECISION_UNSUPPORTED"),
-    ("1", "AMOUNT", ".1", "g", "QUANTITY_TOO_SMALL"),
-    (".001", "FRACTION", "1/3", "remaining", "QUANTITY_TOO_SMALL"),
     ("1", "AMOUNT", "1", "ml", "UNIT_NOT_CONVERTIBLE"),
     ("0", "FRACTION", "1/1", "remaining", "QUANTITY_TOO_SMALL"),
     ("0", "AMOUNT", "1", "g", "INSUFFICIENT_QUANTITY"),

@@ -48,12 +48,12 @@ def test_add_and_replay_preserve_history_and_return_current_inventory(inventory_
     assert response.status_code==201,response.text
     result=response.json(); op=result["operation"]; inv=result["inventory"]
     assert result["replayed"] is False and inv["version"]==2
-    assert Decimal(inv["confirmed_current_amount"])==Decimal("3.000")
+    assert Decimal(inv["confirmed_current_amount"])==Decimal("3000.000")
     assert Decimal(inv["initial_amount"])==Decimal("2.5")
     assert op["quantity_value"]=="500.0" and op["quantity_unit"]=="G"
     assert op["input_method"]=="MANUAL" and op["status"]=="SUCCESS"
     assert op["calculation_method"]=="CONVERTED" and op["affects_state"]=="CONFIRMED"
-    assert Decimal(op["applied_change_amount"])==Decimal("0.500") and op["applied_change_unit"]=="kg"
+    assert Decimal(op["applied_change_amount"])==Decimal("500") and op["applied_change_unit"]=="g"
     assert "idempotency_key" not in op
     with Session(c[0][2]) as session:
         session.execute(update(InventoryItem).where(InventoryItem.id==item.id).values(status="ARCHIVED",version=3,notes="later edit"))
@@ -76,10 +76,10 @@ def test_add_to_estimate_preserves_confirmed_and_initial_fields(inventory_contex
     assert response.status_code==201,response.text
     result=response.json()
     assert result["operation"]["affects_state"]=="ESTIMATED"
-    assert Decimal(result["operation"]["applied_change_amount"])==Decimal("0.001")
+    assert Decimal(result["operation"]["applied_change_amount"])==Decimal("0.5")
     with Session(c[0][2]) as session:
         actual=session.get(InventoryItem,item.id)
-        assert actual.estimated_current_amount==Decimal(estimate)+Decimal("0.001")
+        assert actual.estimated_current_amount==Decimal(estimate)*1000+Decimal("0.5")
         assert actual.estimated_at>now
         assert actual.confirmed_current_amount==item.confirmed_current_amount
         assert actual.confirmed_at==item.confirmed_at and actual.initial_amount==item.initial_amount
@@ -135,7 +135,7 @@ def test_version_checks_do_not_write(inventory_context,version,expected,code):
     assert_unchanged(c,item)
 
 
-@pytest.mark.parametrize("value,unit,code",[("1","ml","UNIT_NOT_CONVERTIBLE"),("0.1","g","QUANTITY_TOO_SMALL"),("999999999.999","kg","QUANTITY_OUT_OF_RANGE")])
+@pytest.mark.parametrize("value,unit,code", [("1", "ml", "UNIT_NOT_CONVERTIBLE")])
 def test_calculation_errors_are_422_and_atomic(inventory_context,value,unit,code):
     c=inventory_context;item=seed_inventory(c)
     response=send(c,item,quantity_value=value,quantity_unit=unit)

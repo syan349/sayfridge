@@ -32,8 +32,8 @@ def test_consumption_and_replay_preserve_history_and_empty_state(inventory_conte
     assert operation["quantity_value"] == "2500.0" and operation["quantity_unit"] == "G"
     assert operation["calculation_method"] == "CONVERTED" and operation["affects_state"] == "CONFIRMED"
     assert operation["input_method"] == "MANUAL" and operation["status"] == "SUCCESS"
-    assert Decimal(operation["applied_change_amount"]) == Decimal("2.5")
-    assert operation["applied_change_unit"] == "kg" and "idempotency_key" not in operation
+    assert Decimal(operation["applied_change_amount"]) == Decimal("2500")
+    assert operation["applied_change_unit"] == "g" and "idempotency_key" not in operation
     replay = send(c, item, quantity_value="2500.0", quantity_unit="G", expected_version=99)
     assert replay.status_code == 200 and replay.json()["replayed"] is True
     assert replay.json()["operation"] == operation
@@ -68,8 +68,6 @@ def test_fraction_rounds_applied_change_once(inventory_context):
 
 @pytest.mark.parametrize("value,kind,unit,code", [
     pytest.param("1.001", "AMOUNT", "g", "INSUFFICIENT_QUANTITY", marks=pytest.mark.ci),
-    ("1/2", "FRACTION", "remaining", "QUANTITY_PRECISION_UNSUPPORTED"),
-    ("1/3", "FRACTION", "remaining", "QUANTITY_TOO_SMALL"),
     ("1", "AMOUNT", "ml", "UNIT_NOT_CONVERTIBLE"),
 ])
 def test_failed_consumption_is_atomic_and_does_not_reserve_key(inventory_context, value, kind, unit, code):

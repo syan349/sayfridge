@@ -118,6 +118,7 @@ class MemoryConditions(BaseModel):
     source_unit: ShortText | None = None
     target_unit: ShortText | None = None
     utensil: ShortText | None = None
+    package_description: ShortText | None = None
     valid_from: CalendarDate | None = None
     valid_until: CalendarDate | None = None
 

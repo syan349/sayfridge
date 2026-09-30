@@ -488,8 +488,8 @@ API usage; they never use the production inventory connection for test actions.
 
 The intake step records every stock request before conversational replies. Clear
 new products and explicitly named new spaces are created automatically with the
-stock transaction; missing details remain resumable items. Image review and
-estimate confirmation are still required. Run the first-purchase regression with
+stock transaction; missing details remain resumable items. Image review remains
+required. Estimates execute directly unless the user explicitly requests confirmation. Run the first-purchase regression with
 `python -m pytest -q tests/test_agent_stock_entry_postgres.py`; the opt-in live-model
 suite also covers English/Chinese purchases and ambiguous storage locations.
 
@@ -503,8 +503,8 @@ HEIC conversion/compression is required. Do not log request bodies.
 
 Images remain in PostgreSQL conversation checkpoints with no separate expiry or
 automatic cleanup. Allow for database/backup growth and increasing model context
-cost as image history grows. There is no new business table or migration in this
-change; existing Agent/checkpoint and action-receipt storage must already exist.
+cost as image history grows. Existing Agent/checkpoint and action-receipt storage must already exist. The
+quantity/default-space update additionally requires migration `a260929_defaults`.
 No application startup DDL is added. Full chat/image history retrieval is not
 provided by the recovery endpoint.
 
@@ -515,3 +515,69 @@ Run image-specific checks with:
 $env:AGENT_LIVE_MODEL='1'
 .\.venv\Scripts\python.exe -m pytest -q tests/test_agent_multimodal_live.py
 ```
+
+
+## Quantity, defaults, and continuous chat
+
+Apply incremental Alembic revision `a260929_defaults` after checking the target
+schema. Its ONLY changes are `storage_space.is_default`, an active-default check,
+and a unique per-user default index. All quantity columns remain NUMERIC(12,3).
+There is no startup DDL, inventory backfill, or remote migration implied by code changes.
+
+A successful login ensures a default in the same transaction before issuing a
+token. With no default, choose the earliest active space (created_at, then ID),
+or create “默认空间” of type OTHER. `POST /api/v1/storage-spaces/{id}/default`
+changes it. Archiving a default atomically ensures a replacement. Restoring an old
+space does not override a current default. Space mutations lock user then space.
+
+New stock uses an explicitly named space, otherwise the default. Consumption
+searches actual inventory across spaces; ambiguous batches still require an answer.
+`/agent/chat` now accepts supplements, edits, confirmations and cancellations while
+work is pending; `/resume` remains supported. Queries and independent new requests
+preserve suspended work. Clients must retain request IDs when retrying.
+
+Quantity operations first convert the effective balance to the current input unit,
+then add/subtract. Fractions without a new unit keep the current unit. Initial
+entry fields never change. A cross-dimension conversion uses the current explicit
+user basis, otherwise applicable user memory, otherwise a labeled model estimate.
+An estimated balance stays estimated until an explicit physical stocktake.
+
+Cross-dimension whole-count estimates round to integer balances (ROUND_HALF_UP),
+including preview, saved stock and Agent feedback. Explicit partial-item changes
+first use a rounded whole-count baseline, then apply the partial amount. Exact
+same-unit partial stock is preserved. Physical quantities round only at persistence
+to the existing three-decimal precision; there is no secondary hidden balance.
+Unsupported tiny changes/positive remainders return a quantity error rather than
+silently deleting stock. Relative non-integral whole counts ask the actual count.
+
+A new conversion relationship is saved idempotently in existing user memory at
+execution time, after any required approval and before stock writes. Memory failure
+leaves stock unchanged and the item resumable. If memory succeeds but the stock
+transaction fails, the relationship remains reusable; it is not proof of a stock
+change. User instructions not to save memory are honored. Receipts remain ordinary
+business receipts, not a memory synchronization queue. Older unexecuted quantity
+previews are re-prepared; committed receipts only replay their actual results.
+
+Model budgeting applies to intake, continuations, tools and retry calls:
+
+| Setting | Default |
+| --- | --- |
+| AGENT_CONTEXT_TRIGGER | 80000 |
+| AGENT_CONTEXT_TARGET | 40000 |
+| AGENT_CONTEXT_LIMIT | 160000 |
+| AGENT_MODEL_CONTEXT_LIMIT | 160000 |
+| AGENT_OUTPUT_TOKENS | 8000 |
+
+Set MODEL_CONTEXT_LIMIT to the provider's supported context size, below 275000.
+The budget uses the configured model's message/image token meter, a 25% framing
+allowance, conservative tool-schema/opaque-response accounting, and a 4096-token
+safety reserve. Unknown meters fail closed. Required input plus reserved output
+must fit the smaller limit; increasing settings cannot disable the 275k cap.
+Compaction keeps up to eight complete recent turns plus protected image evidence,
+a bounded historical excerpt summary, and separately persisted work/receipt state.
+Required task content that still cannot fit returns CONTEXT_BUDGET_EXCEEDED without
+calling the model. `agent_context_compacted` logs before/after estimates.
+
+Acceptance suites: `test_agent_quantity_context.py`, `test_agent_chat_continuation.py`,
+`test_agent_defaults_postgres.py`; optional real-model quantity cases are in
+`test_agent_live_model.py` and require AGENT_LIVE_MODEL=1 and TEST_DATABASE_URL.

@@ -40,7 +40,8 @@ def test_estimate_precise_followup_reconcile_and_replay(inventory_context):
         estimate = draft(item, quantity_value="2", quantity_unit="cup", estimate={"amount": "0.3", "unit": "kg", "source": "MODEL_KNOWLEDGE", "rationale": "About 150g per cup"})
         result, pid, preview = await submit(estimate, True)
         assert result["inventory"]["confirmed_current_amount"] == "2.500"
-        assert result["inventory"]["estimated_current_amount"] == "2.200"
+        assert result["inventory"]["estimated_current_amount"] == "14.667"
+        assert result["inventory"]["estimated_current_unit"] == "cup"
         assert result["operation"]["quantity_unit"] == "cup"
         assert result["operation"]["calculation_method"] == "AI_ESTIMATED"
         assert result["operation"]["input_method"] == "TEXT"
@@ -49,9 +50,9 @@ def test_estimate_precise_followup_reconcile_and_replay(inventory_context):
             assert replay["replayed"]
             assert await session.scalar(select(func.count()).select_from(InventoryOperation)) == 1
         result, _, _ = await submit(draft(item, quantity_value="500", quantity_unit="g"))
-        assert result["inventory"]["estimated_current_amount"] == "1.700"
+        assert result["inventory"]["estimated_current_amount"] == "1700.050"
         assert result["inventory"]["confirmed_current_amount"] == "2.500"
-        assert result["operation"]["calculation_method"] == "CONVERTED"
+        assert result["operation"]["calculation_method"] == "AI_ESTIMATED"
         result, _, _ = await submit(draft(item, "RECONCILE", quantity_value="8", quantity_unit="each"))
         assert result["inventory"]["confirmed_current_amount"] == "8.000"
         assert result["inventory"]["estimated_current_amount"] is None
@@ -70,10 +71,8 @@ def test_memory_basis_and_confirmation_are_checked(inventory_context):
         action = draft(item, quantity_value="2", quantity_unit="cup", estimate={"amount": "9", "unit": "kg", "source": "USER_MEMORY", "memory_id": saved["memory_id"], "rationale": "use remembered cup"})
         async with sessions() as session:
             preview = await prepare_action(session, c[1].id, action, memory)
-        assert preview["after"]["amount"] == "2.300"  # backend ratio overrides bad model arithmetic
-        async with sessions() as session:
-            with pytest.raises(PreparationError, match="Confirm"):
-                await execute_action(session, c[1].id, uuid4(), uuid4(), uuid4(), preview, memory)
+        assert Decimal(preview["after"]["amount"]) == Decimal("23")  # backend ratio overrides bad model arithmetic
+        assert not preview["requires_confirmation"]
         await memory.delete_memory(saved["memory_id"])
         async with sessions() as session:
             with pytest.raises(PreparationError, match="Memory changed"):
