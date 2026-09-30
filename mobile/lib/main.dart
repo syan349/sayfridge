@@ -5,17 +5,21 @@ import 'auth/auth_gate.dart';
 import 'models/inventory_item.dart';
 import 'repositories/catalog_repository.dart';
 import 'repositories/inventory_repository.dart';
+import 'repositories/profile_preferences_repository.dart';
 import 'repositories/storage_space_repository.dart';
 import 'repositories/workspace_repository.dart';
 import 'screens/ai_assistant_screen.dart';
+import 'screens/expiring_items_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/manual_stock_in_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/sign_in_screen.dart';
 import 'services/catalog_api_service.dart';
 import 'services/inventory_api_service.dart';
+import 'services/notification_service.dart';
 import 'services/storage_space_api_service.dart';
 import 'state/agent_controller.dart';
+import 'state/app_notification_controller.dart';
 import 'state/auth_controller.dart';
 import 'state/expiry_summary_controller.dart';
 import 'state/inventory_controller.dart';
@@ -39,6 +43,8 @@ class SayFridgeApp extends StatefulWidget {
 class _SayFridgeAppState extends State<SayFridgeApp> {
   late final AuthDependencies _authDependencies;
   late final ProfileController _profileController;
+  late final NotificationService _notificationService;
+  late final AppNotificationController _notificationController;
   late final StorageSpaceController _storageSpaceController;
   late final InventoryController _inventoryController;
   late final ExpirySummaryController _expirySummaryController;
@@ -53,7 +59,12 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
     super.initState();
 
     _authDependencies = AuthDependencies.create();
-    _profileController = ProfileController(_authDependencies.authController);
+    _notificationService = NotificationService();
+    _profileController = ProfileController(
+      _authDependencies.authController,
+      const ProfilePreferencesRepository(),
+      _notificationService,
+    );
     _workspace = WorkspaceRepository(
       _authDependencies.apiClient,
       _authDependencies.tokenStorage,
@@ -84,6 +95,12 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       workspace: _workspace,
     );
     _expirySummaryController = ExpirySummaryController(inventoryRepository);
+    _notificationController = AppNotificationController(
+      authController: _authDependencies.authController,
+      profileController: _profileController,
+      expiryController: _expirySummaryController,
+      service: _notificationService,
+    )..onProcessExpired = _openExpiredItemsFromNotification;
 
     final catalogRepository = CatalogRepository(
       CatalogApiService(_authDependencies.apiClient),
@@ -135,6 +152,8 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
   @override
   void dispose() {
     _authDependencies.authController.removeListener(_syncSession);
+    _notificationController.dispose();
+    _notificationService.dispose();
     _agentController.dispose();
     _manualStockInController.dispose();
     _expirySummaryController.dispose();
@@ -213,6 +232,26 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
     await _refreshBusiness();
   }
 
+  Future<void> _openExpiredItemsFromNotification() async {
+    if (!_authDependencies.authController.isAuthenticated) return;
+    await _expirySummaryController.loadSummary(
+      asOf: DateUtils.dateOnly(DateTime.now()),
+      bucket: 'overdue',
+    );
+    final navigator = _navigator.currentState;
+    if (navigator == null) return;
+    await navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => ExpiringItemsScreen(
+          controller: _expirySummaryController,
+          inventoryController: _inventoryController,
+          storageSpaceController: _storageSpaceController,
+        ),
+      ),
+    );
+    await _refreshBusiness();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -242,6 +281,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
             key: ValueKey(authController.user!.id),
             expirySummaryController: _expirySummaryController,
             inventoryController: _inventoryController,
+            notificationController: _notificationController,
             storageSpaceController: _storageSpaceController,
             onAddItemTap: () => _openManualStockIn(context),
             onAssistantTap: () =>
