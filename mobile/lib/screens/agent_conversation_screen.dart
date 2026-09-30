@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/agent_image.dart';
+import '../platform/voice_overlay_chrome.dart'
+    if (dart.library.js_interop) '../platform/voice_overlay_chrome_web.dart';
 import '../services/voice_input_service.dart';
 import '../state/agent_controller.dart';
 import '../theme/app_theme.dart';
@@ -83,6 +85,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     );
     _voiceOverlayEntry = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
+    setVoiceOverlayVisible(true);
   }
 
   void _hideVoiceOverlay() {
@@ -90,6 +93,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     _voiceOverlayEntry = null;
     entry?.remove();
     entry?.dispose();
+    if (entry != null) setVoiceOverlayVisible(false);
   }
 
   Future<void> _startVoiceInput() async {

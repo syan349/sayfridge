@@ -22,6 +22,19 @@ window.sayFridgeReadSafeArea = () => {
     .map(value => parseFloat(value) || 0);
 };
 
+// Home-screen Chrome windows can paint the status area from the document
+// background/theme color, outside Flutter's canvas. Dim that surface too.
+const themeColor = document.querySelector('meta[name="theme-color"]');
+const normalThemeColor = themeColor?.getAttribute('content');
+window.sayFridgeSetVoiceOverlayVisible = visible => {
+  document.documentElement.classList.toggle('voice-overlay-visible', visible);
+  if (themeColor) {
+    if (visible) themeColor.setAttribute('content', '#73766f');
+    else if (normalThemeColor === null) themeColor.removeAttribute('content');
+    else themeColor.setAttribute('content', normalThemeColor);
+  }
+};
+
 const engineConfig = desktopBrowser
   ? { hostElement: document.getElementById('flutter-host') }
   : {};

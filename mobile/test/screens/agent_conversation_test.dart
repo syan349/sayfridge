@@ -341,15 +341,22 @@ void main() {
     await tapGesture.up();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Type a message'));
+    // Cancelling must leave the hold gesture ready for another recording.
+    final retryGesture = await tester.startGesture(
+      tester.getCenter(microphone),
+    );
+    await tester.pump();
+    expect(find.text('discard this text'), findsOneWidget);
+    await retryGesture.up();
     await tester.pumpAndSettle();
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller!.text,
-      '',
+      'discard this text',
     );
+
     expect(voice.cancelled, isTrue);
-    expect(voice.stopped, isFalse);
-    expect(voice.starts, 3);
+    expect(voice.stopped, isTrue);
+    expect(voice.starts, 4);
   });
 
   testWidgets(

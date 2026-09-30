@@ -11,6 +11,12 @@ body {
   display: none;
 }
 
+/* Match Flutter's #88000000 dim layer over the normal #f7fded background. */
+html.voice-overlay-visible:not(.desktop-preview),
+html.voice-overlay-visible:not(.desktop-preview) body {
+  background: #73766f;
+}
+
 .desktop-preview body {
   height: 100vh;
   height: 100dvh;
