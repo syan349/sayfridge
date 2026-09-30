@@ -98,7 +98,11 @@ class _EmptyIllustrationAccents extends CustomPainter {
 }
 
 String itemArtwork(InventoryItem item) {
-  final name = item.itemDefinitionName.toLowerCase();
+  return itemArtworkForName(item.itemDefinitionName);
+}
+
+String itemArtworkForName(String itemName) {
+  final name = itemName.toLowerCase();
   const icons = <String, String>{
     'chicken thigh': 'chicken_drumstick',
     'chicken drumstick': 'chicken_drumstick',

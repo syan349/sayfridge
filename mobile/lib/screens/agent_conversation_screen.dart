@@ -17,6 +17,7 @@ import '../widgets/app_bottom_navigation.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
 import '../widgets/assistant_scroll_layout.dart';
+import '../widgets/inventory_visuals.dart';
 import '../widgets/business_forms.dart';
 import '../widgets/hold_to_speak_button.dart';
 import '../widgets/voice_recording_overlay.dart';
@@ -373,8 +374,16 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                 pickImages: widget.pickImages,
                               ),
                             if (agent.waiting)
-                              const Text(
-                                'Waiting for your input. Pending actions have not all completed.',
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text(
+                                  'Waiting for your input. Pending actions have not all completed.',
+                                  style: TextStyle(
+                                    color: Color(0xFF667456),
+                                    fontSize: 13,
+                                    height: 1.4,
+                                  ),
+                                ),
                               ),
                             if (agent.busy)
                               const Padding(
@@ -617,140 +626,221 @@ class _AgentItemCard extends StatelessWidget {
     final original = _text(item['original_text']);
     final heading =
         _text(display?['item_name']) ?? original ?? 'Inventory action';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              heading,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Chip(
-                avatar: Icon(_statusIcon(status), size: 18),
-                label: Text(_statusLabel(status)),
-                backgroundColor: _statusColor(status),
-                side: BorderSide.none,
-              ),
-            ),
-            if (_text(display?['recognized_text']) case final recognized?)
-              _DetailRow(label: 'Recognised text', value: recognized),
-            if (_text(display?['category_name']) case final category?)
-              _DetailRow(label: 'Category', value: category),
-            if (_text(display?['space_name']) case final space?)
-              _DetailRow(label: 'Location', value: space),
-            if (_text(display?['package_description']) case final package?)
-              _DetailRow(label: 'Package', value: package),
-            if (_quantity(after, draft) case final quantity?)
-              _DetailRow(label: 'Quantity', value: quantity),
-            if (_text(draft?['purchase_date']) case final purchaseDate?)
-              _DetailRow(label: 'Purchase date', value: purchaseDate),
-            if (_text(draft?['expiry_date']) case final expiryDate?)
-              _DetailRow(label: 'Expiry date', value: expiryDate),
-            if (_stringList(display?['missing_fields']).isNotEmpty)
-              _NoticeBox(
-                icon: Icons.help_outline,
-                title: 'Still needed',
-                values: _stringList(display?['missing_fields']),
-              ),
-            if (_stringList(display?['review_notes']).isNotEmpty)
-              _NoticeBox(
-                icon: Icons.fact_check_outlined,
-                title: 'Review notes',
-                values: _stringList(display?['review_notes']),
-              ),
-            if (original != null)
-              if (original != heading &&
-                  original != _text(display?['recognized_text']))
-                _DetailRow(label: 'Original request', value: original),
-            if (preview != null) ...[
-              Text('Calculation: ${preview['calculation_method']}'),
-              if (preview['before'] is Map)
-                Text('Before: ${_balance(preview['before'] as Map)}'),
-              if (preview['after'] is Map)
-                Text('After: ${_balance(preview['after'] as Map)}'),
-              ExpansionTile(
-                title: const Text('Server proposal and estimate basis'),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: const Color(0x70FFFFFF),
+        border: Border.all(color: const Color(0xFFA8D589)),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0879AF43),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SelectableText(
-                    const JsonEncoder.withIndent('  ').convert(preview),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE9F7DF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Image.asset(
+                      itemArtworkForName(heading),
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          heading,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Chip(
+                          avatar: Icon(_statusIcon(status), size: 18),
+                          label: Text(_statusLabel(status)),
+                          labelStyle: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          backgroundColor: _statusColor(status),
+                          side: BorderSide.none,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ],
-            if (error != null) Text('${error['message'] ?? error['code']}'),
-            if (item['result'] != null)
-              ExpansionTile(
-                title: const Text('Actual server result'),
-                children: [
-                  SelectableText(
-                    const JsonEncoder.withIndent('  ').convert(item['result']),
+              const Divider(color: Color(0xFFA8D589), height: 24),
+              if (_text(display?['recognized_text']) case final recognized?)
+                _DetailRow(label: 'Recognised text', value: recognized),
+              if (_text(display?['category_name']) case final category?)
+                _DetailRow(label: 'Category', value: category),
+              if (_text(display?['space_name']) case final space?)
+                _DetailRow(label: 'Location', value: space),
+              if (_text(display?['package_description']) case final package?)
+                _DetailRow(label: 'Package', value: package),
+              if (_quantity(after, draft) case final quantity?)
+                _DetailRow(label: 'Quantity', value: quantity),
+              if (_text(draft?['purchase_date']) case final purchaseDate?)
+                _DetailRow(label: 'Purchase date', value: purchaseDate),
+              if (_text(draft?['expiry_date']) case final expiryDate?)
+                _DetailRow(label: 'Expiry date', value: expiryDate),
+              if (_stringList(display?['missing_fields']).isNotEmpty)
+                _NoticeBox(
+                  icon: Icons.help_outline,
+                  title: 'Still needed',
+                  values: _stringList(display?['missing_fields']),
+                ),
+              if (_stringList(display?['review_notes']).isNotEmpty)
+                _NoticeBox(
+                  icon: Icons.fact_check_outlined,
+                  title: 'Review notes',
+                  values: _stringList(display?['review_notes']),
+                ),
+              if (original != null)
+                if (original != heading &&
+                    original != _text(display?['recognized_text']))
+                  _DetailRow(label: 'Original request', value: original),
+              if (preview != null) ...[
+                _DetailRow(
+                  label: 'Calculation',
+                  value: '${preview['calculation_method']}',
+                ),
+                if (preview['before'] is Map)
+                  _DetailRow(
+                    label: 'Before',
+                    value: _balance(preview['before'] as Map),
                   ),
-                ],
-              ),
-            if (waiting)
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  if (status == 'NEEDS_CONFIRMATION')
-                    FilledButton(
-                      onPressed: canRespond
-                          ? () => controller.respond(item, 'confirm')
-                          : null,
-                      child: Text(
-                        uncertain
-                            ? 'Verify original action'
-                            : 'Confirm proposal',
+                if (preview['after'] is Map &&
+                    _quantity(after, draft) !=
+                        _balance(preview['after'] as Map))
+                  _DetailRow(
+                    label: 'After',
+                    value: _balance(preview['after'] as Map),
+                  ),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: 12),
+                  title: const Text('Server proposal and estimate basis'),
+                  children: [
+                    SelectableText(
+                      const JsonEncoder.withIndent('  ').convert(preview),
+                    ),
+                  ],
+                ),
+              ],
+              if (error != null) Text('${error['message'] ?? error['code']}'),
+              if (item['result'] != null)
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text('Actual server result'),
+                  children: [
+                    SelectableText(
+                      const JsonEncoder.withIndent(
+                        '  ',
+                      ).convert(item['result']),
+                    ),
+                  ],
+                ),
+              if (waiting) ...[
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    if (status == 'NEEDS_CONFIRMATION')
+                      FilledButton(
+                        onPressed: canRespond
+                            ? () => controller.respond(item, 'confirm')
+                            : null,
+                        child: Text(
+                          uncertain
+                              ? 'Verify original action'
+                              : 'Confirm proposal',
+                        ),
                       ),
-                    ),
-                  if (!uncertain) ...[
-                    OutlinedButton(
-                      onPressed: canRespond
-                          ? () => _answer(
-                              context,
-                              status == 'NEEDS_INPUT' ? 'answer' : 'edit',
-                            )
-                          : null,
-                      child: Text(
-                        status == 'NEEDS_INPUT' ? 'Answer' : 'Edit proposal',
+                    if (!uncertain) ...[
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.black,
+                          minimumSize: const Size(0, 40),
+                        ),
+                        onPressed: canRespond
+                            ? () => _answer(
+                                context,
+                                status == 'NEEDS_INPUT' ? 'answer' : 'edit',
+                              )
+                            : null,
+                        child: Text(
+                          status == 'NEEDS_INPUT' ? 'Answer' : 'Edit proposal',
+                        ),
                       ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: canRespond
-                          ? () => _supportPhoto(context)
-                          : null,
-                      icon: const Icon(Icons.add_a_photo_outlined),
-                      label: const Text('Add supporting photo'),
-                    ),
-                    TextButton(
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFA8D589)),
+                          minimumSize: const Size(0, 40),
+                          foregroundColor: AppColors.userMessage,
+                        ),
+                        onPressed: canRespond
+                            ? () => _supportPhoto(context)
+                            : null,
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                        label: const Text('Add supporting photo'),
+                      ),
+                    ],
+                  ],
+                ),
+                if (!uncertain)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
                       onPressed: canRespond
                           ? () => controller.respond(item, 'cancel')
                           : null,
                       child: const Text('Cancel item'),
                     ),
-                  ],
-                ],
-              ),
-            if (canRespond && !uncertain)
-              for (final candidate in candidates)
-                OutlinedButton(
-                  onPressed: () => controller.respond(
-                    item,
-                    'answer',
-                    selectedId: candidate['id'] as String,
                   ),
-                  child: Text(
-                    '${candidate['item_definition_name'] ?? candidate['name'] ?? candidate['id']} · ${candidate['storage_space_name'] ?? ''} · ${candidate['expiry_date'] ?? 'No expiry date'}',
+              ],
+              if (canRespond && !uncertain)
+                for (final candidate in candidates)
+                  OutlinedButton(
+                    onPressed: () => controller.respond(
+                      item,
+                      'answer',
+                      selectedId: candidate['id'] as String,
+                    ),
+                    child: Text(
+                      '${candidate['item_definition_name'] ?? candidate['name'] ?? candidate['id']} · ${candidate['storage_space_name'] ?? ''} · ${candidate['expiry_date'] ?? 'No expiry date'}',
+                    ),
                   ),
-                ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -838,18 +928,26 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 5),
+    padding: const EdgeInsets.symmetric(vertical: 5),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 108,
+          width: 94,
           child: Text(
             label,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Color(0xFF77816D),
+              fontSize: 12.5,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
-        Expanded(child: Text(value)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(value, style: const TextStyle(fontSize: 14, height: 1.4)),
+        ),
       ],
     ),
   );
@@ -871,7 +969,7 @@ class _NoticeBox extends StatelessWidget {
     margin: const EdgeInsets.only(top: 10),
     padding: const EdgeInsets.all(10),
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: const Color(0xFFEAF4DF),
       borderRadius: BorderRadius.circular(10),
     ),
     child: Row(

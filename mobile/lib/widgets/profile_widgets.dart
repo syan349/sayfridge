@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'page_scroll_fade.dart';
+
 import '../models/profile_preferences.dart';
 import 'app_background.dart';
 
@@ -169,35 +171,39 @@ class ProfilePageScaffold extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) => SingleChildScrollView(
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.symmetric(horizontal: 26),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight,
-                        ),
-                        child: IntrinsicHeight(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              SizedBox(height: topGap),
-                              ...children,
-                              if (footer != null) ...[
-                                const Spacer(),
-                                const SizedBox(height: 32),
-                                footer!,
-                                SizedBox(
-                                  height:
-                                      MediaQuery.viewInsetsOf(context).bottom >
-                                          0
-                                      ? 24
-                                      : 85,
-                                ),
-                              ] else
-                                const SizedBox(height: 32),
-                            ],
+                  child: PageScrollFade(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: const EdgeInsets.symmetric(horizontal: 26),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: IntrinsicHeight(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                SizedBox(height: topGap),
+                                ...children,
+                                if (footer != null) ...[
+                                  const Spacer(),
+                                  const SizedBox(height: 32),
+                                  footer!,
+                                  SizedBox(
+                                    height:
+                                        MediaQuery.viewInsetsOf(
+                                              context,
+                                            ).bottom >
+                                            0
+                                        ? 24
+                                        : 85,
+                                  ),
+                                ] else
+                                  const SizedBox(height: 32),
+                              ],
+                            ),
                           ),
                         ),
                       ),

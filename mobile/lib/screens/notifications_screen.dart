@@ -7,6 +7,7 @@ import '../state/storage_space_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/inventory_visuals.dart';
+import '../widgets/page_scroll_fade.dart';
 import 'expiring_items_screen.dart';
 
 class NotificationsScreen extends StatelessWidget {
@@ -36,28 +37,30 @@ class NotificationsScreen extends StatelessWidget {
               children: [
                 const OverviewHeader(title: 'Notifications'),
                 Expanded(
-                  child: controller == null
-                      ? _emptyState()
-                      : ListenableBuilder(
-                          listenable: controller!,
-                          builder: (context, _) =>
-                              controller!.notifications.isEmpty
-                              ? _emptyState()
-                              : SingleChildScrollView(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    8,
-                                    20,
-                                    28,
+                  child: PageScrollFade(
+                    child: controller == null
+                        ? _emptyState()
+                        : ListenableBuilder(
+                            listenable: controller!,
+                            builder: (context, _) =>
+                                controller!.notifications.isEmpty
+                                ? _emptyState()
+                                : SingleChildScrollView(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      8,
+                                      20,
+                                      28,
+                                    ),
+                                    child: _NotificationPanel(
+                                      controller: controller!,
+                                      onProcessExpired: () =>
+                                          _openItems(context, overdue: true),
+                                      onViewExpiring: () => _openItems(context),
+                                    ),
                                   ),
-                                  child: _NotificationPanel(
-                                    controller: controller!,
-                                    onProcessExpired: () =>
-                                        _openItems(context, overdue: true),
-                                    onViewExpiring: () => _openItems(context),
-                                  ),
-                                ),
-                        ),
+                          ),
+                  ),
                 ),
               ],
             ),
@@ -182,17 +185,38 @@ class _NotificationPanel extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.only(top: 5),
-                          child: Text(
-                            notification.title,
-                            textAlign: TextAlign.left,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              height: 1.4,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 5),
+                                child: Text(
+                                  notification.title,
+                                  textAlign: TextAlign.left,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            IconButton(
+                              tooltip: 'Mark as read',
+                              onPressed: () =>
+                                  controller.markRead(notification.type),
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size(34, 34),
+                                maximumSize: const Size(34, 34),
+                                padding: EdgeInsets.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                foregroundColor: const Color(0xFF72786C),
+                              ),
+                              icon: const Icon(Icons.close, size: 21),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -204,48 +228,32 @@ class _NotificationPanel extends StatelessWidget {
                             height: 1.55,
                           ),
                         ),
-                        const SizedBox(height: 18),
-                        Wrap(
-                          spacing: 14,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            if (notification.processable)
-                              FilledButton(
-                                style: _actionStyle(
-                                  background: AppColors.userMessage,
-                                  foreground: Colors.white,
-                                ),
-                                onPressed: onProcessExpired,
-                                child: const Text('Process now'),
-                              )
-                            else if (notification.type ==
-                                AppNotificationType.expiring)
-                              FilledButton(
-                                style: _actionStyle(
-                                  background: const Color(0xFFF0F6E9),
-                                  foreground: AppColors.userMessage,
-                                ),
-                                onPressed: onViewExpiring,
-                                child: const Text('View items'),
+                        if (notification.processable ||
+                            notification.type ==
+                                AppNotificationType.expiring) ...[
+                          const SizedBox(height: 16),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton(
+                              style: _actionStyle(
+                                background: notification.processable
+                                    ? AppColors.userMessage
+                                    : const Color(0xFFF0F6E9),
+                                foreground: notification.processable
+                                    ? Colors.white
+                                    : AppColors.userMessage,
                               ),
-                            TextButton(
-                              style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF667456),
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(0, 44),
-                                alignment: Alignment.centerLeft,
-                                textStyle: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
-                                ),
+                              onPressed: notification.processable
+                                  ? onProcessExpired
+                                  : onViewExpiring,
+                              child: Text(
+                                notification.processable
+                                    ? 'Process now'
+                                    : 'View items',
                               ),
-                              onPressed: () =>
-                                  controller.markRead(notification.type),
-                              child: const Text('Mark as read'),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

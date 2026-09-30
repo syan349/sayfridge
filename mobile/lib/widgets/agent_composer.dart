@@ -116,8 +116,10 @@ class _AgentComposerState extends State<AgentComposer> {
           keyboardType: TextInputType.multiline,
           textInputAction: TextInputAction.newline,
           style: const TextStyle(fontSize: 16, height: 1.2),
+          textAlign: TextAlign.left,
           decoration: InputDecoration(
             isCollapsed: true,
+            contentPadding: EdgeInsets.zero,
             counterText: '',
             filled: false,
             border: InputBorder.none,

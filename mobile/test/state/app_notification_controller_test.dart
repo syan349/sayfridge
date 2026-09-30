@@ -119,7 +119,7 @@ void main() {
       expect(expiry.bucket, isNull);
 
       for (var i = 0; i < 3; i++) {
-        await tester.tap(find.text('Mark as read').first);
+        await tester.tap(find.byTooltip('Mark as read').first);
         await tester.pumpAndSettle();
       }
       expect(find.text('No unread notifications'), findsOneWidget);

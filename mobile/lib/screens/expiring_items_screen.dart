@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/page_scroll_fade.dart';
+
 import '../models/inventory_item.dart';
 import '../state/expiry_summary_controller.dart';
 import '../state/inventory_controller.dart';
 import '../state/storage_space_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/inventory_toolbar.dart';
+import '../widgets/storage_space_picker.dart';
 import '../widgets/inventory_visuals.dart';
 import 'inventory_detail_screen.dart';
 import 'inventory_screen.dart';
@@ -35,49 +39,30 @@ class ExpiringItemsScreen extends StatelessWidget {
                   const OverviewHeader(title: 'Expiry Overview'),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(25, 8, 25, 7),
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: _SpacePicker(
-                            controller: controller,
-                            spacesController: storageSpaceController,
+                    child: InventoryToolbar(
+                      storagePicker: _SpacePicker(
+                        controller: controller,
+                        spacesController: storageSpaceController,
+                        inventoryController: inventoryController,
+                      ),
+                      onSearch: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => InventorySearchScreen(
+                            controller: inventoryController,
+                            storageSpaceController: storageSpaceController,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _SearchButton(
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => InventorySearchScreen(
-                                  controller: inventoryController,
-                                  storageSpaceController:
-                                      storageSpaceController,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        IconButton.filled(
-                          onPressed: () => _showBucketFilter(context),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                          ),
-                          icon: Image.asset(
-                            HomeAssets.filter,
-                            width: 22,
-                            height: 22,
-                          ),
-                          tooltip: 'Filter expiry group',
-                        ),
-                      ],
+                      ),
+                      onFilter: () => _showBucketFilter(context),
+                      filterTooltip: 'Filter expiry group',
                     ),
                   ),
                   Expanded(
-                    child: AnimatedBuilder(
-                      animation: controller,
-                      builder: (context, child) => _buildContent(context),
+                    child: PageScrollFade(
+                      child: AnimatedBuilder(
+                        animation: controller,
+                        builder: (context, child) => _buildContent(context),
+                      ),
                     ),
                   ),
                 ],
@@ -281,109 +266,39 @@ class ExpiringItemsScreen extends StatelessWidget {
 }
 
 class _SpacePicker extends StatelessWidget {
-  const _SpacePicker({required this.controller, this.spacesController});
-
+  const _SpacePicker({
+    required this.controller,
+    required this.inventoryController,
+    this.spacesController,
+  });
   final ExpirySummaryController controller;
+  final InventoryController inventoryController;
   final StorageSpaceController? spacesController;
 
   @override
-  Widget build(BuildContext context) {
-    final spaces = <String, String>{};
-    for (final entry in controller.items) {
-      spaces[entry.item.storageSpaceId] = entry.item.storageSpaceName;
-    }
-    for (final space in spacesController?.storageSpaces ?? const []) {
-      spaces[space.id] = space.name;
-    }
-    return ActionChip(
-      backgroundColor: Colors.white,
-      side: const BorderSide(color: Color(0xFFE6EDDF)),
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              controller.storageSpaceId == null
-                  ? 'All Spaces'
-                  : spaces[controller.storageSpaceId] ?? 'Selected space',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.keyboard_arrow_down, size: 19),
-        ],
-      ),
-      onPressed: () => showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: AppColors.background,
-        builder: (sheetContext) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(18),
-                child: Text(
-                  'Choose storage space',
-                  style: TextStyle(fontSize: 21),
-                ),
-              ),
-              ListTile(
-                title: const Text('All Spaces'),
-                onTap: () => _select(sheetContext, null),
-              ),
-              for (final space in spaces.entries)
-                ListTile(
-                  title: Text(space.value),
-                  onTap: () => _select(sheetContext, space.key),
-                ),
-            ],
-          ),
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([controller, spacesController]),
+    builder: (context, _) {
+      final spaces = <String, String>{};
+      for (final entry in controller.items) {
+        spaces[entry.item.storageSpaceId] = entry.item.storageSpaceName;
+      }
+      for (final space in spacesController?.storageSpaces ?? const []) {
+        spaces[space.id] = space.name;
+      }
+      return StoragePickerButton(
+        label: controller.storageSpaceId == null
+            ? 'All Spaces'
+            : spaces[controller.storageSpaceId] ?? 'Selected space',
+        onTap: () => showStorageSpacePicker(
+          context,
+          selectedId: controller.storageSpaceId,
+          fallbackSpaces: spaces,
+          spacesController: spacesController,
+          inventoryController: inventoryController,
+          onSelected: controller.selectStorageSpace,
         ),
-      ),
-    );
-  }
-
-  void _select(BuildContext sheetContext, String? id) {
-    Navigator.pop(sheetContext);
-    controller.selectStorageSpace(id);
-  }
-}
-
-class _SearchButton extends StatelessWidget {
-  const _SearchButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(28),
-      child: Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xFFE6EDDF)),
-        ),
-        child: Row(
-          children: [
-            Image.asset(HomeAssets.search, width: 21, height: 21),
-            const SizedBox(width: 6),
-            const Flexible(
-              child: Text(
-                'Search items ...',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: AppColors.muted, fontSize: 14),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+      );
+    },
+  );
 }

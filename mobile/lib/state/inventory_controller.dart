@@ -41,6 +41,13 @@ class InventoryController extends ChangeNotifier {
   String get inventoryStatus => _inventoryStatus;
   String get query => _query;
   String? get storageSpaceId => _storageSpaceId;
+  bool get hasItemFilters =>
+      _query.isNotEmpty ||
+      _categoryId != null ||
+      _purchaseFrom != null ||
+      _purchaseTo != null ||
+      _expiryFrom != null ||
+      _expiryTo != null;
 
   InventoryDetailController createDetailController() {
     return InventoryDetailController(_repository, workspace: workspace);

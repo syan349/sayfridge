@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'page_scroll_fade.dart';
+
 import '../models/inventory_item.dart';
 import '../repositories/workspace_repository.dart';
 import '../screens/stock_editor_screen.dart';
 import 'business_forms.dart';
 import 'app_background.dart';
 import 'inventory_visuals.dart';
+import '../theme/app_theme.dart';
 
 class InventoryActions extends StatelessWidget {
   const InventoryActions({
@@ -88,16 +91,133 @@ class InventoryActions extends StatelessWidget {
     if (context.mounted) await reload();
   }
 
+  Future<void> _quantityActions(BuildContext context) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.background,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text(
+                  'Manage quantity',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
+                ),
+              ),
+              for (final action in <(String, String, IconData)>[
+                ('ADD', 'Add quantity', Icons.add_circle_outline),
+                if (item.isInStock)
+                  ('CONSUME', 'Use quantity', Icons.remove_circle_outline),
+                if (item.isInStock)
+                  ('fraction', 'Use a fraction', Icons.pie_chart_outline),
+                ('RECONCILE', 'Confirm remaining', Icons.fact_check_outlined),
+              ])
+                ListTile(
+                  leading: Icon(action.$3, color: AppColors.userMessage),
+                  title: Text(action.$2),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pop(sheetContext, action.$1),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+    await _quantity(
+      context,
+      choice == 'fraction' ? 'CONSUME' : choice,
+      fraction: choice == 'fraction',
+    );
+  }
+
+  Future<void> _moreActions(BuildContext context) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.background,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text(
+                  'More actions',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.archive_outlined),
+                title: const Text('Archive'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.pop(sheetContext, 'archive'),
+              ),
+              if (item.isInStock)
+                ListTile(
+                  leading: const Icon(
+                    Icons.delete_outline,
+                    color: Color(0xFFC8532C),
+                  ),
+                  title: const Text(
+                    'Discard',
+                    style: TextStyle(color: Color(0xFFC8532C)),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pop(sheetContext, 'discard'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+    await _state(context, choice);
+  }
+
   @override
   Widget build(BuildContext context) {
     final editable = item.status == 'IN_STOCK' || item.status == 'EMPTY';
+    final secondaryStyle = OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 42),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      foregroundColor: AppColors.userMessage,
+      side: const BorderSide(color: Color(0xFFA8D589)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (workspace == null)
-          const Text('Offline preview: inventory writes are disabled.'),
-        if (editable)
+        if (workspace == null) ...[
+          const Text(
+            'Offline preview: inventory writes are disabled.',
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (editable) ...[
           FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.black,
+              minimumSize: const Size(0, 44),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             onPressed: workspace == null
                 ? null
                 : () async {
@@ -111,48 +231,13 @@ class InventoryActions extends StatelessWidget {
                     );
                     if (context.mounted) await reload();
                   },
-            icon: const Icon(Icons.edit_outlined),
+            icon: const Icon(Icons.edit_outlined, size: 20),
             label: const Text('Edit item'),
           ),
-        if (editable && workspace != null) ...[
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton(
-                onPressed: () => _quantity(context, 'ADD'),
-                child: const Text('Add quantity'),
-              ),
-              if (item.isInStock)
-                OutlinedButton(
-                  onPressed: () => _quantity(context, 'CONSUME'),
-                  child: const Text('Use quantity'),
-                ),
-              if (item.isInStock)
-                OutlinedButton(
-                  onPressed: () =>
-                      _quantity(context, 'CONSUME', fraction: true),
-                  child: const Text('Use a fraction'),
-                ),
-              OutlinedButton(
-                onPressed: () => _quantity(context, 'RECONCILE'),
-                child: const Text('Confirm remaining'),
-              ),
-              if (item.isInStock)
-                TextButton(
-                  onPressed: () => _state(context, 'discard'),
-                  child: const Text('Discard'),
-                ),
-              TextButton(
-                onPressed: () => _state(context, 'archive'),
-                child: const Text('Archive'),
-              ),
-            ],
-          ),
+          const SizedBox(height: 8),
         ],
-        const SizedBox(height: 17),
         OutlinedButton.icon(
+          style: secondaryStyle,
           onPressed: workspace == null
               ? null
               : () => Navigator.of(context).push(
@@ -163,9 +248,37 @@ class InventoryActions extends StatelessWidget {
                     ),
                   ),
                 ),
-          icon: const Icon(Icons.schedule),
+          icon: const Icon(Icons.schedule, size: 20),
           label: const Text('Operation history'),
         ),
+        if (editable) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: secondaryStyle,
+                  onPressed: workspace == null
+                      ? null
+                      : () => _quantityActions(context),
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('Quantity'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: secondaryStyle,
+                  onPressed: workspace == null
+                      ? null
+                      : () => _moreActions(context),
+                  icon: const Icon(Icons.more_horiz, size: 18),
+                  label: const Text('More actions'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -195,66 +308,68 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
           children: [
             const OverviewHeader(title: 'Operation history'),
             Expanded(
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _history,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(businessError(snapshot.error!)),
-                          TextButton(
-                            onPressed: () => setState(
-                              () => _history = widget.workspace.history(
-                                widget.item.id,
+              child: PageScrollFade(
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _history,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(businessError(snapshot.error!)),
+                            TextButton(
+                              onPressed: () => setState(
+                                () => _history = widget.workspace.history(
+                                  widget.item.id,
+                                ),
+                              ),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final history = snapshot.data!;
+                    if (history.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No quantity operations yet.\nInitial stock entry is not an ADD operation.',
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }
+                    return ListView(
+                      padding: const EdgeInsets.all(24),
+                      children: [
+                        const Text(
+                          'Quantity operations only. Metadata edits, moves and archival are not recorded here.',
+                        ),
+                        for (final operation in history)
+                          Card(
+                            child: ListTile(
+                              title: Text(
+                                '${operation['operation_type']} · ${operation['status']}',
+                              ),
+                              subtitle: Text(
+                                '${operation['quantity_value']} ${operation['quantity_unit']}\n'
+                                '${operation['input_method']} · ${operation['calculation_method']}\n'
+                                '${operation['created_at']}\n'
+                                '${operation['status'] != 'SUCCESS'
+                                    ? 'Not an effective successful change'
+                                    : operation['operation_type'] == 'RECONCILE'
+                                    ? 'Confirmed remaining total'
+                                    : 'Applied change: ${operation['applied_change_amount']} ${operation['applied_change_unit']}'}',
                               ),
                             ),
-                            child: const Text('Retry'),
                           ),
-                        ],
-                      ),
+                      ],
                     );
-                  }
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final history = snapshot.data!;
-                  if (history.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No quantity operations yet.\nInitial stock entry is not an ADD operation.',
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  }
-                  return ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      const Text(
-                        'Quantity operations only. Metadata edits, moves and archival are not recorded here.',
-                      ),
-                      for (final operation in history)
-                        Card(
-                          child: ListTile(
-                            title: Text(
-                              '${operation['operation_type']} · ${operation['status']}',
-                            ),
-                            subtitle: Text(
-                              '${operation['quantity_value']} ${operation['quantity_unit']}\n'
-                              '${operation['input_method']} · ${operation['calculation_method']}\n'
-                              '${operation['created_at']}\n'
-                              '${operation['status'] != 'SUCCESS'
-                                  ? 'Not an effective successful change'
-                                  : operation['operation_type'] == 'RECONCILE'
-                                  ? 'Confirmed remaining total'
-                                  : 'Applied change: ${operation['applied_change_amount']} ${operation['applied_change_unit']}'}',
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
+                  },
+                ),
               ),
             ),
           ],
