@@ -18,7 +18,6 @@ from app.db.schema_verification import SchemaVerificationError, verify_schema
 pytestmark = pytest.mark.postgres
 
 
-@pytest.mark.ci
 def test_fresh_database_initializer_is_complete_and_repeatable(database):
     url, schema, engine = database
     agent_schema = f"{schema}_agent"

@@ -14,7 +14,7 @@ from catalog_test_support import CATEGORIES, DEFINITIONS, catalog_context, seed_
 pytestmark = pytest.mark.postgres
 
 
-@pytest.mark.parametrize("operation", [pytest.param("create", marks=pytest.mark.ci), "rename"])
+@pytest.mark.parametrize("operation", [pytest.param("create"), "rename"])
 def test_concurrent_normalized_name_claims_in_different_categories_have_one_winner(catalog_context, monkeypatch, operation):
     """Force both name checks to finish before either write; the real unique index arbitrates."""
     db, owner, _, category, headers = catalog_context
@@ -44,7 +44,7 @@ def test_concurrent_normalized_name_claims_in_different_categories_have_one_winn
     asyncio.run(exercise(db, scenario))
 
 
-@pytest.mark.parametrize("operation", ["create", pytest.param("restore", marks=pytest.mark.ci), "moved_definition"])
+@pytest.mark.parametrize("operation", ["create", pytest.param("restore"), "moved_definition"])
 def test_category_lock_wait_rechecks_state_and_planned_relationship(catalog_context, monkeypatch, operation):
     """Observe a real PostgreSQL lock wait before releasing a concurrent category change."""
     db, owner, _, category, headers = catalog_context

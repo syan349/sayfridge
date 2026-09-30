@@ -54,6 +54,21 @@ beforeEach(() => {
 afterEach(() => sessionStorage.clear())
 
 describe('AssistantPage (W07)', () => {
+  it('renders hostile model text as text, never executable HTML', async () => {
+    const payload = '<img src=x onerror="window.pwned=true"><script>alert(1)</script>'
+    server.use(http.post('/api/v1/agent/chat', () => sse(
+      start,
+      { type: 'text_delta', delta: payload },
+      { type: 'done', status: 'COMPLETED', data: { status: 'COMPLETED', items: [] } },
+    )))
+    const user = userEvent.setup()
+    renderApp('/assistant')
+    await user.type(await screen.findByLabelText('Message the assistant'), 'hello')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText(payload)).toBeInTheDocument()
+    expect(document.body.querySelector('script, img[src="x"], [onerror]')).toBeNull()
+  })
+
   it('streams the answer into the chat, and sends today’s local date and a request id', async () => {
     let body: Record<string, unknown> = {}
     server.use(
@@ -170,7 +185,7 @@ describe('AssistantPage (W07)', () => {
     renderApp('/assistant')
 
     expect(await screen.findByRole('region', { name: 'One proposed change' })).toBeInTheDocument()
-    expect(screen.getByText(/Earlier messages aren’t shown after a reload/)).toBeInTheDocument()
+    expect(screen.getByText(/The server may retain conversation history/)).toBeInTheDocument()
   })
 
   it('offers Try again when the answer breaks off, and retries with the same request id', async () => {

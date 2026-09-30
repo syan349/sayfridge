@@ -68,7 +68,7 @@ def test_add_and_replay_preserve_history_and_return_current_inventory(inventory_
         assert session.scalar(select(InventoryOperation.idempotency_key))==f"{c[1].id}:addition-1"
 
 
-@pytest.mark.parametrize("estimate",[pytest.param("0",marks=pytest.mark.ci),"1.5"])
+@pytest.mark.parametrize("estimate",[pytest.param("0",marks=[]),"1.5"])
 def test_add_to_estimate_preserves_confirmed_and_initial_fields(inventory_context,estimate):
     c=inventory_context; now=datetime.now(timezone.utc)
     item=seed_inventory(c,estimated_current_amount=Decimal(estimate),estimated_current_unit="kg",estimated_at=now)
@@ -112,7 +112,6 @@ def test_archived_catalog_does_not_block_existing_stock(inventory_context):
     assert send(c,item).status_code==201
 
 
-@pytest.mark.ci
 def test_authentication_ownership_and_header_validation(inventory_context):
     c=inventory_context;item=seed_inventory(c)
     assert request(c[0],"POST",url(item),json=addition(),headers={"Idempotency-Key":"x"}).status_code==401

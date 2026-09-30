@@ -23,6 +23,7 @@ from app.agents.persistence import close_agent_resources
 from app.api.routes.agent import router as agent_router
 from app.agents.request_limits import AgentBodyLimitMiddleware
 from app.core.config import Settings, get_settings
+from app.middleware.safe_errors import SafeErrorsMiddleware
 from app.schemas.system import HealthResponse, VersionResponse
 
 
@@ -78,6 +79,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(AgentBodyLimitMiddleware)
+app.add_middleware(SafeErrorsMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

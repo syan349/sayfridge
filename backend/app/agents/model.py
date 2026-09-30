@@ -15,6 +15,7 @@ class AgentModelSettings(BaseSettings):
         env_file=BACKEND_DIR / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     model_name: str = Field(alias="AGENT_MODEL")

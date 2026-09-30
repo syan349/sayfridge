@@ -129,7 +129,6 @@ def test_batch_archive_rolls_back_first_item_when_later_item_fails(
         assert unchanged.status == "IN_STOCK" and unchanged.version == 1
 
 
-@pytest.mark.ci
 def test_batch_archive_rejects_duplicate_ids_without_writes(inventory_context):
     context = inventory_context
     item = seed_inventory(context)

@@ -92,7 +92,6 @@ def test_item_history_remains_visible_for_terminal_inventory(inventory_context, 
     assert [row["id"] for row in response.json()] == [str(operation.id)]
 
 
-@pytest.mark.ci
 def test_item_history_hides_foreign_and_missing_inventory(inventory_context):
     context = inventory_context
     foreign_space = seed_space(context[0], context[2].id)

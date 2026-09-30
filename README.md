@@ -223,6 +223,15 @@ Web, preview, and deployment details.
 
 ## Run the tests
 
+See the [testing guide and CI policy](docs/testing/README.md) for automated
+checks, test scope, and result artifacts. Every PR runs Backend core checks
+(for PRs targeting `main`) and the Web/Flutter fast checks.
+
+GitHub Actions is the automated entry point: [Backend CI](.github/workflows/backend-ci.yml)
+and [Frontend CI](.github/workflows/frontend-ci.yml). For local verification, use
+the per-module commands below and the testing guide. Backend **Run workflow**
+executes full regression; its automatic PR/main runs execute the fast selection.
+
 ### Backend
 
 Backend database tests require a direct connection to an isolated PostgreSQL
@@ -269,7 +278,7 @@ deployed Backend.
 cd mobile
 flutter pub get
 flutter analyze
-flutter test
+flutter test --exclude-tags manual_preview
 flutter build web --release --no-web-resources-cdn \
   --dart-define=API_BASE_URL=https://sayfridge-backend-preview.vercel.app/api/v1
 ```
@@ -297,3 +306,7 @@ path and record the tested commit and result:
 - UQwinder (`qche584`)
 - DaryaRastegar (`dras728`)
 - hrainy (`rhan637`)
+
+## Privacy and security
+
+- [Security and Privacy](docs/SECURITY_AND_PRIVACY.md): controls, data handling, findings and fixes, test/audit evidence, and remaining risks.

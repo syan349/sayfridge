@@ -190,8 +190,22 @@ def test_me_reads_and_returns_current_active_user_without_password_hash(database
     assert "password_hash" not in response.json()
 
 
+def test_me_tolerates_legacy_invalid_stored_email(database) -> None:
+    user = make_user(email="legacy@example.test")
+    token = create_access_token(user.id, get_settings().jwt_secret_key, 15)
+
+    response = request(
+        seed_users(database, user),
+        "GET",
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["email"] == "legacy@example.test"
+
+
 @pytest.mark.parametrize("token_kind", ["missing", "invalid", "expired"])
-@pytest.mark.ci
 def test_me_rejects_missing_invalid_or_expired_token(database, token_kind: str) -> None:
     headers = None
     if token_kind == "invalid":

@@ -10,7 +10,6 @@ import pytest
 from scripts.smoke_deployment import SmokeConfig, SmokeFailure, run_smoke
 
 
-pytestmark = pytest.mark.ci
 
 
 def test_smoke_flow_is_repeatable_without_duplicate_business_resources():

@@ -116,7 +116,7 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(overlay, findsNothing);
-  });
+  }, tags: ['manual_preview']);
 }
 
 class _PreviewVoiceInput implements VoiceInputService {

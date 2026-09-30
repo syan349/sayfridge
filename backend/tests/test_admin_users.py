@@ -47,7 +47,6 @@ def admin_request(context, method, path="", *, query="", json=None):
     )
 
 
-@pytest.mark.ci
 def test_admin_lists_filters_and_paginates_safe_user_fields(admin_context):
     context = admin_context
     response = admin_request(context, "GET")
@@ -100,6 +99,17 @@ def test_admin_reads_user_detail_and_hides_missing_account(admin_context):
     missing = admin_request(context, "GET", "/" + str(uuid.uuid4()))
     assert missing.status_code == 404
     assert missing.json()["detail"]["code"] == "NOT_FOUND"
+
+
+def test_admin_list_tolerates_legacy_invalid_stored_email(admin_context):
+    legacy = make_user(email="legacy@example.test")
+    seed_users(admin_context[0], legacy)
+
+    response = admin_request(admin_context, "GET", query="?q=legacy")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["email"] == "legacy@example.test"
 
 
 @pytest.mark.ci
