@@ -50,9 +50,11 @@
   // Local diagnostics only: viewport gaps cannot be repaired by extending a DOM
   // element if iOS itself has reserved that area above the web view.
   window.sayFridgeBrowserDiagnostics = () => ({
-    revision: 'overlay-surface-v3',
+    revision: 'status-bar-default-v4',
     userAgent: navigator.userAgent,
     standalone: !!navigator.standalone || matchMedia('(display-mode: standalone)').matches,
+    statusBarStyle: document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.content,
+    viewportMeta: Array.from(document.querySelectorAll('meta[name="viewport"]'), meta => meta.content),
     screenHeight: screen.height,
     innerHeight,
     documentHeight: document.documentElement.clientHeight,

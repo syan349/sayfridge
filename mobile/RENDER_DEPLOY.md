@@ -84,6 +84,7 @@ CORS_ORIGINS=["https://YOUR-REACT-SITE.onrender.com","https://YOUR-FLUTTER-SITE.
 - [ ] 创建空间→入库→修改/消耗→刷新后的库存一致，数据来自同一后端。
 - [ ] 文本 AI 确实流式展示；确认/取消、断线恢复和库存刷新通过。
 - [ ] iPhone Safari 与 Android Chrome 分别真机验证。电脑模拟手机视口只能验证布局的一部分。
+- [ ] iPhone 从 Safari 和 Chrome 添加到主屏幕后，冷启动、页面切换及键盘收起后无额外底部留白；记录 iOS 版本。
 - [ ] 拍照、语音、提醒和历史等仍未完成的功能没有被当作已完成演示。
 
 当前使用普通 JavaScript Web 构建，未启用 Wasm；CanvasKit 资源随站点发布，避免额外依赖 Flutter 资源 CDN。Flutter 官方产物目录说明见 [Build and release a web app](https://docs.flutter.dev/deployment/web)。
@@ -99,5 +100,10 @@ CORS_ORIGINS=["https://YOUR-REACT-SITE.onrender.com","https://YOUR-FLUTTER-SITE.
 | 依赖锁文件检查失败 | 在相同 SDK 上核对 `pubspec.yaml` / `pubspec.lock`，一起提交正确版本 |
 | 页面能开，登录失败 | 检查编译时 API 地址、后端实际版本、CORS、数据库和测试账号 |
 | 浏览器显示旧版本 | 确认最新部署成功后刷新；检查实际 URL 和部署 commit |
+| iPhone 桌面 App 所有页面底部留白 | 核对发布的 `index.html` 中状态栏模式为 `default`；重新添加桌面图标后对照，记录 iOS 版本与添加图标的浏览器 |
+
+iPhone 桌面模式已将 `apple-mobile-web-app-status-bar-style` 从 `black-translucent` 改为 `default`，准备绕开透明状态栏与视口高度处理异常。依据是 [WebKit 的透明状态栏/底部位置报告](https://bugs.webkit.org/show_bug.cgi?id=236445#c9) 及 [iOS 27 beta 的全屏问题确认](https://bugs.webkit.org/show_bug.cgi?id=301994#c14)；这些报告不能替代本站的真机验证。按照 [Apple 的状态栏定义](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariHTMLRef/Articles/MetaTags.html)，网页会布局在系统状态栏下方，语音遮罩无法保证覆盖该系统区域。
+
+先在测试站部署并按上面的步骤验证，再合入正式站。已有桌面 App 可能仍使用安装时的设置；需要重新添加时只处理对应图标，不清空整个网站的存储。普通 Safari 标签页显示底部地址栏和浏览器按钮是正常行为。
 
 老师使用正式站的公开访问链接；开发期间使用测试链接。两者都不需要 Render 后台账号或安装 APK。登录后的业务功能仍需要应用自身账号和可用后端。
