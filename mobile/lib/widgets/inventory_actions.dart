@@ -21,6 +21,15 @@ class InventoryActions extends StatelessWidget {
   final WorkspaceRepository? workspace;
   final Future<void> Function() reload;
 
+  bool get _isExpired {
+    final expiryDate = item.expiryDate;
+    if (expiryDate == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+    return expiry.isBefore(today);
+  }
+
   Future<void> _quantity(
     BuildContext context,
     String operation, {
@@ -89,6 +98,28 @@ class InventoryActions extends StatelessWidget {
       },
     );
     if (context.mounted) await reload();
+  }
+
+  Future<void> _markUsedUp(BuildContext context) async {
+    final key = requestId();
+    final confirmed = await businessForm(
+      context,
+      title: 'Mark this item as used up?',
+      fields: const [],
+      idempotentRetry: true,
+      explanation:
+          '${item.itemDefinitionName}\nThe remaining quantity will be set to 0 and the item will move out of the active inventory. Its history will be kept.',
+      submit: (_) async {
+        await workspace!.quantityOperation(item.id, {
+          'expected_version': item.version,
+          'operation_type': 'RECONCILE',
+          'quantity_kind': 'AMOUNT',
+          'quantity_value': '0',
+          'quantity_unit': item.displayUnit,
+        }, key);
+      },
+    );
+    if (confirmed == true && context.mounted) await reload();
   }
 
   Future<void> _quantityActions(BuildContext context) async {
@@ -164,7 +195,7 @@ class InventoryActions extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.pop(sheetContext, 'archive'),
               ),
-              if (item.isInStock)
+              if (item.isInStock && !_isExpired)
                 ListTile(
                   leading: const Icon(
                     Icons.delete_outline,
@@ -278,6 +309,30 @@ class InventoryActions extends StatelessWidget {
               ),
             ],
           ),
+          if (item.isInStock) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              style: secondaryStyle,
+              onPressed: workspace == null ? null : () => _markUsedUp(context),
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              label: const Text('Mark as used up'),
+            ),
+          ],
+          if (item.isInStock && _isExpired) ...[
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+                minimumSize: const Size(0, 44),
+              ),
+              onPressed: workspace == null
+                  ? null
+                  : () => _state(context, 'discard'),
+              icon: const Icon(Icons.delete_forever_outlined),
+              label: const Text('Discard expired item'),
+            ),
+          ],
         ],
       ],
     );
