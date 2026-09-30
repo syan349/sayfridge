@@ -883,6 +883,7 @@ async def submit_inventory_operation(session: AsyncSession, item_id: UUID, user_
                         expected_version: int, operation_type: str, quantity_kind: str,
                         quantity_value: str, quantity_unit: str, idempotency_key: str,
                         commit: bool = True, input_method: str = "MANUAL",
+                        unit_relationship: dict | None = None,
                         estimated_change: tuple[Decimal, str] | None = None) -> OperationResult:
     """Apply one ADD/CONSUME/RECONCILE atomically, or return its prior record and current inventory.
 
@@ -914,7 +915,11 @@ async def submit_inventory_operation(session: AsyncSession, item_id: UUID, user_
                     _validate_new_operation(item, space, expected_version, operation_type)
                     now = datetime.now(timezone.utc)
 
-                    if estimated_change is not None:
+                    if unit_relationship is not None and operation_type != "RECONCILE":
+                        from app.services.inventory_quantities import calculate_change
+                        calculation = calculate_change(item, operation_type, quantity_kind, quantity_value,
+                                                       quantity_unit, relationship=unit_relationship)
+                    elif estimated_change is not None:
                         from app.services.inventory_quantities import calculate_estimated_change
                         calculation = calculate_estimated_change(item, operation_type, *estimated_change)
                     elif operation_type == "ADD":
@@ -951,7 +956,7 @@ async def submit_inventory_operation(session: AsyncSession, item_id: UUID, user_
                             item.confirmed_current_unit = calculation.unit
                             item.confirmed_at = now
                         item.status = ("EMPTY" if calculation.affects_state == "CONFIRMED"
-                                       and calculation.amount == 0 else "IN_STOCK")
+                                       and calculation.is_empty else "IN_STOCK")
                         operation_calculation_method = calculation.calculation_method
                         operation_affects_state = calculation.affects_state
                         operation_applied_change_amount = calculation.applied_change_amount

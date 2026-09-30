@@ -1,7 +1,7 @@
 """Pure quantity calculations shared by submission and future preview."""
 from dataclasses import dataclass
 from fractions import Fraction
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP, localcontext
 
 from app.db.models import InventoryItem
 from app.core.quantity import (
@@ -11,7 +11,7 @@ from app.core.quantity import (
 
 @dataclass(frozen=True)
 class QuantityCalculation:
-    """Calculated values only; no mutation, database writes, or new storage fields."""
+    """Pure result in the unit of the current operation."""
 
     amount: Decimal
     unit: str
@@ -19,6 +19,7 @@ class QuantityCalculation:
     applied_change_amount: Decimal
     calculation_method: str
     rounded: bool
+    is_empty: bool = False
 
 
 def get_addition_base(item: InventoryItem) -> tuple[Decimal, str, str]:
@@ -63,89 +64,116 @@ def convert_addition_amount(added_amount: Decimal, input_unit: str, target_unit:
     raise QuantityError("UNIT_NOT_CONVERTIBLE", "Units cannot be converted")
 
 
-def calculate_addition(item: InventoryItem, added_amount: Decimal, input_unit: str) -> QuantityCalculation:
-    """Round the applied change once, then add it to the effective balance."""
-    validate_addition_amount(added_amount)
-    current_amount, current_unit, amount_type = get_addition_base(item)
-    converted = convert_addition_amount(added_amount, input_unit, current_unit)
-    applied = converted.quantize(QUANTITY_PRECISION, rounding=ROUND_HALF_UP)
-    if applied > MAX_QUANTITY:
-        raise QuantityError("QUANTITY_OUT_OF_RANGE", "Converted added amount is above the maximum")
-    if applied == 0:
-        raise QuantityError("QUANTITY_TOO_SMALL", "Added amount rounds to zero in the inventory unit")
-    output_amount = calculate_addition_amount(current_amount, applied)
-    if output_amount > MAX_QUANTITY:
-        raise QuantityError("QUANTITY_OUT_OF_RANGE", "Inventory amount is above the maximum")
-    method = "EXACT" if input_unit.strip().casefold() == current_unit.strip().casefold() else "CONVERTED"
-    return QuantityCalculation(output_amount, current_unit, amount_type, applied, method, applied != converted)
+COUNT_UNITS = {"个", "颗", "只", "枚", "件", "袋", "瓶", "盒", "包", "罐", "根", "条", "块",
+               "each", "pcs", "pc", "piece", "pieces", "count", "item", "items", "bottle", "bottles",
+               "bag", "bags", "box", "boxes", "pack", "packs", "can", "cans"}
 
 
-def prepare_addition(item: InventoryItem, added_amount: Decimal, input_unit: str) -> tuple[Decimal, str, str]:
-    """Keep the learned tuple interface; submission also needs calculation details."""
+def canonical(unit):
+    from app.core.quantity import normalize_standard_unit
+    unit = normalize_standard_unit(unit)
+    return {"kg": ("g", 1000), "l": ("ml", 1000)}.get(unit, (unit, 1))
+
+
+def _ratio(relation):
+    source, sf = canonical(relation["source_unit"])
+    target, tf = canonical(relation["target_unit"])
+    a, b = Fraction(Decimal(relation["source_amount"])) * sf, Fraction(Decimal(relation["target_amount"])) * tf
+    if a <= 0 or b <= 0:
+        raise ValueError("Conversion amounts must be positive")
+    return source, target, b / a
+
+
+def calculate_change(item, operation, kind, value, input_unit, *, relationship=None, estimated=False):
+    """Convert the effective balance to the requested unit, then apply the change."""
+    from app.core.quantity import normalize_standard_unit
+    if operation not in {"ADD", "CONSUME"} or kind not in {"AMOUNT", "FRACTION"}:
+        raise ValueError("Unsupported quantity operation")
+    if kind == "FRACTION" and operation != "CONSUME":
+        raise ValueError("Fractions only support consumption")
+    current, current_unit, affects = get_addition_base(item)
+    estimated_input = estimated
+    unit = normalize_standard_unit(current_unit if kind == "FRACTION" else input_unit)
+    base_unit, base_factor = canonical(current_unit)
+    target_unit, target_factor = canonical(unit)
+    cross_dimension = base_unit != target_unit
+    with localcontext() as context:
+        context.prec = 80
+        balance = current * base_factor
+        if cross_dimension:
+            if not relationship:
+                raise QuantityError("UNIT_NOT_CONVERTIBLE", "A unit relationship is required")
+            left, right, ratio = _ratio(relationship)
+            rate = Decimal(ratio.numerator) / Decimal(ratio.denominator)
+            if (base_unit, target_unit) == (left, right):
+                balance *= rate
+            elif (base_unit, target_unit) == (right, left):
+                balance /= rate
+            else:
+                raise QuantityError("UNIT_NOT_CONVERTIBLE", "Relationship does not match units")
+            estimated = True
+        balance /= target_factor
+        if kind == "FRACTION":
+            numerator, denominator = parse_consumption_fraction(value)
+            delta = balance * Decimal(numerator) / Decimal(denominator)
+            if unit in COUNT_UNITS and delta != delta.to_integral_value():
+                raise QuantityError("WHOLE_COUNT_REQUIRED", "Specify the actual whole or partial count consumed")
+        else:
+            delta = Decimal(value)
+            if estimated_input:
+                if not delta.is_finite() or delta <= 0:
+                    raise ValueError("Estimated amount must be positive and finite")
+                if delta > MAX_QUANTITY:
+                    raise QuantityError("QUANTITY_OUT_OF_RANGE", "Estimated amount exceeds storage capacity")
+                if delta < QUANTITY_PRECISION:
+                    raise QuantityError("QUANTITY_TOO_SMALL", "Estimated change is below the supported precision")
+            else:
+                validate_addition_amount(delta)
+            if estimated_input and unit in COUNT_UNITS:
+                delta = delta.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        # Check unrounded stock before integer estimation can manufacture inventory.
+        if operation == "CONSUME" and delta > balance:
+            raise QuantityError("INSUFFICIENT_QUANTITY", "Consumption exceeds the current balance")
+        if delta <= 0:
+            raise QuantityError("QUANTITY_TOO_SMALL", "No positive quantity to consume")
+        count_estimate = (cross_dimension or estimated_input) and unit in COUNT_UNITS
+        explicit_partial = not estimated_input and delta != delta.to_integral_value()
+        if count_estimate and explicit_partial:
+            balance = balance.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+            if operation == "CONSUME" and delta > balance:
+                raise QuantityError("INSUFFICIENT_QUANTITY", "Consumption exceeds the estimated whole count")
+        exact = balance + delta if operation == "ADD" else balance - delta
+        precision = Decimal("1") if count_estimate and not explicit_partial else QUANTITY_PRECISION
+        rounded = exact.quantize(precision, rounding=ROUND_HALF_UP).quantize(QUANTITY_PRECISION)
+        applied = delta.quantize(QUANTITY_PRECISION, rounding=ROUND_HALF_UP)
+        if applied == 0:
+            raise QuantityError("QUANTITY_TOO_SMALL", "Change is below the supported quantity precision")
+        if not count_estimate and operation == "CONSUME" and exact > 0 and (rounded == 0 or applied >= balance):
+            raise QuantityError("QUANTITY_PRECISION_UNSUPPORTED", "Rounding would erase a positive remaining quantity")
+        if rounded > MAX_QUANTITY or applied > MAX_QUANTITY:
+            raise QuantityError("QUANTITY_OUT_OF_RANGE", "Quantity exceeds storage capacity")
+        method = "AI_ESTIMATED" if estimated else "EXACT" if normalize_standard_unit(current_unit) == unit else "CONVERTED"
+        return QuantityCalculation(rounded, unit, "ESTIMATED" if estimated else affects,
+            applied, method, rounded != exact, rounded == 0)
+
+
+def calculate_addition(item, added_amount, input_unit):
+    return calculate_change(item, "ADD", "AMOUNT", str(added_amount), input_unit)
+
+
+def prepare_addition(item, added_amount, input_unit):
     result = calculate_addition(item, added_amount, input_unit)
-    return (result.amount, result.unit, result.affects_state)
+    return result.amount, result.unit, result.affects_state
 
 
-def calculate_consumption(item: InventoryItem, quantity_kind: str, quantity_value: str,
-                          input_unit: str) -> QuantityCalculation:
-    """Consume an amount or exact fraction without silently erasing a remainder.
-
-    Fraction arithmetic keeps arbitrary valid integer ratios exact. Only the final
-    applied change is rounded to 0.001 using integer half-up arithmetic.
-    """
-    current_amount, current_unit, amount_type = get_addition_base(item)
-    balance = Fraction(current_amount)
-    if quantity_kind == "FRACTION":
-        numerator, denominator = parse_consumption_fraction(quantity_value)
-        if input_unit != "remaining":
-            raise ValueError("Fraction quantity_unit must be remaining")
-        unrounded = balance * Fraction(numerator, denominator)
-        method = "EXACT"
-    elif quantity_kind == "AMOUNT":
-        amount = Decimal(quantity_value)
-        validate_addition_amount(amount)
-        unrounded = Fraction(convert_addition_amount(amount, input_unit, current_unit))
-        method = "EXACT" if input_unit.strip().casefold() == current_unit.strip().casefold() else "CONVERTED"
-    else:
-        raise ValueError("Unsupported quantity kind")
-    if unrounded > balance:
-        raise QuantityError("INSUFFICIENT_QUANTITY", "Consumption exceeds the current balance")
-
-    scaled = unrounded * 1000
-    whole, remainder = divmod(scaled.numerator, scaled.denominator)
-    milliunits = whole + (2 * remainder >= scaled.denominator)
-    applied = (Decimal(milliunits) / 1000).quantize(QUANTITY_PRECISION)
-    if applied == 0:
-        raise QuantityError("QUANTITY_TOO_SMALL", "Consumed amount rounds to zero in the inventory unit")
-    if applied > MAX_QUANTITY:
-        raise QuantityError("QUANTITY_OUT_OF_RANGE", "Consumed amount is above the maximum")
-    output_amount = current_amount - applied
-    if unrounded < balance and output_amount == 0:
-        raise QuantityError("QUANTITY_PRECISION_UNSUPPORTED", "Rounding would erase a positive remaining quantity")
-    return QuantityCalculation(output_amount, current_unit, amount_type, applied, method,
-                               Fraction(applied) != unrounded)
-
-def calculate_estimated_change(item: InventoryItem, operation: str, amount: Decimal, unit: str) -> QuantityCalculation:
-    """Apply an approved estimated delta, never promote it to a confirmed fact."""
-    if operation not in {"ADD", "CONSUME"}:
-        raise ValueError("Estimates only apply to ADD/CONSUME")
-    if not amount.is_finite() or amount <= 0 or amount > MAX_QUANTITY:
-        raise ValueError("Estimated change must be a positive finite supported amount")
-    base, base_unit, _ = get_addition_base(item)
-    converted = convert_addition_amount(amount, unit, base_unit)
-    if operation == "CONSUME" and converted > base:
-        raise QuantityError("INSUFFICIENT_QUANTITY", "Consumption exceeds current balance")
-    applied = converted.quantize(QUANTITY_PRECISION, rounding=ROUND_HALF_UP)
-    if applied == 0:
-        raise QuantityError("QUANTITY_TOO_SMALL", "Estimated change rounds to zero")
-    result = base + applied if operation == "ADD" else base - applied
-    if operation == "CONSUME" and converted < base and result == 0:
-        raise QuantityError("QUANTITY_PRECISION_UNSUPPORTED", "Rounding erases positive remainder")
-    validate_quantity_amount(result, allow_zero=True)
-    return QuantityCalculation(result, base_unit, "ESTIMATED", applied, "AI_ESTIMATED", applied != converted)
+def calculate_consumption(item, quantity_kind, quantity_value, input_unit):
+    return calculate_change(item, "CONSUME", quantity_kind, quantity_value, input_unit)
 
 
-def prepare_reconciliation(amount: Decimal, unit: str) -> tuple[Decimal, str]:
-    """Validate and return a confirmed stocktake total without unit conversion."""
+def calculate_estimated_change(item, operation, amount, unit):
+    return calculate_change(item, operation, "AMOUNT", str(amount), unit, estimated=True)
+
+
+def prepare_reconciliation(amount, unit):
     validate_quantity_amount(amount, allow_zero=True)
-    return (amount, unit)
+    return amount, unit

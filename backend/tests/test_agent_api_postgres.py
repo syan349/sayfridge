@@ -32,7 +32,7 @@ def test_api_confirm_stale_replay_and_user_isolation(inventory_context, monkeypa
     monkeypatch.setattr(api, "get_agent_persistence_settings", lambda: SimpleNamespace(workflow_step_limit=128))
     async def scenario(client, sessions):
         proposed = {"item_key": "rice", "original_text": "two cups", "action": "CONSUME", "inventory_item_id": str(item.id),
-            "quantity_value": "2", "quantity_unit": "cup", "estimate": {"amount": "0.2", "unit": "kg", "source": "MODEL_KNOWLEDGE", "rationale": "about 100g per cup"}}
+            "confirmation_requested": True, "quantity_value": "2", "quantity_unit": "cup", "estimate": {"amount": "0.2", "unit": "kg", "source": "MODEL_KNOWLEDGE", "rationale": "about 100g per cup"}}
         graph = build_agent_graph(ScriptModel([call([proposed])], intents=[intake([proposed])]), checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=sessions, tools=[])
         async def resources():
             return SimpleNamespace(graph=graph)
@@ -47,8 +47,6 @@ def test_api_confirm_stale_replay_and_user_isolation(inventory_context, monkeypa
         waiting = pause["items"][0]
         state = (await client.get(f"/api/v1/agent/conversations/{conversation_id}/state", headers=c[6])).json()
         assert state["status"] == "WAITING_INPUT" and "messages" not in state
-        blocked = await client.post("/api/v1/agent/chat", json={**body, "request_id": str(uuid4())}, headers=c[6])
-        assert blocked.status_code == 409
         resume = {"conversation_id": conversation_id, "interrupt_id": pause["interrupt_id"], "request_id": str(uuid4()),
             "responses": [{"item_id": waiting["item_id"], "proposal_id": str(uuid4()), "decision": "confirm"}]}
         assert (await client.post("/api/v1/agent/resume", json=resume, headers=c[6])).status_code == 409

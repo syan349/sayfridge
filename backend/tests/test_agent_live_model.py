@@ -48,7 +48,8 @@ def test_real_model_exact_and_knowledge_estimate(inventory_context, monkeypatch,
         if estimated:
             assert record["status"] == "NEEDS_CONFIRMATION", record.get("error")
             assert record["preview"]["calculation_method"] == "AI_ESTIMATED"
-            assert record["preview"]["draft"]["estimate"]["source"] == "MODEL_KNOWLEDGE"
+            basis = record["preview"]["draft"].get("unit_relationship") or record["preview"]["draft"]["estimate"]
+            assert basis["source"] == "MODEL_KNOWLEDGE"
         else:
             assert record["status"] == "SUCCEEDED"
             assert record["result"]["inventory"]["confirmed_current_amount"] == "2.400"
@@ -162,4 +163,81 @@ def test_real_model_ambiguous_storage_does_not_write(inventory_context, monkeypa
         assert len(result["items"]) == 1 and result["items"][0]["status"] == "NEEDS_INPUT"
         async with sessions() as session:
             assert await session.scalar(select(func.count()).select_from(InventoryItem)) == 0
+    live_runner.run(exercise(c[0], scenario))
+
+
+@pytest.mark.parametrize("case", ["relative", "weight", "odd_count", "count", "switch"])
+def test_real_model_quantity_and_chat_continuation(inventory_context, monkeypatch, case, live_runner):
+    from decimal import Decimal
+    from langgraph.types import Command
+    from app.services.storage_spaces import ensure_default_space
+    c = inventory_context
+    if case != "relative":
+        from sqlalchemy.orm import Session
+        from app.db.models import ItemDefinition
+        with Session(c[0][2]) as session:
+            definition = session.get(ItemDefinition, c[5].id)
+            definition.name = "苹果"
+            definition.normalized_name = "苹果"
+            session.commit()
+    initial_amount = {"relative": "2", "odd_count": "3", "count": "3400"}.get(case, "20")
+    initial_unit = "kg" if case == "relative" else "g" if case == "count" else "个"
+    item = seed_inventory(c, initial_amount=Decimal(initial_amount), initial_unit=initial_unit,
+        confirmed_current_amount=Decimal(initial_amount), confirmed_current_unit=initial_unit)
+    async def scenario(client, sessions):
+        monkeypatch.setattr(agent_tools, "AsyncSessionFactory", sessions)
+        async with sessions() as session:
+            await ensure_default_space(session, c[1].id)
+        store = InMemoryStore()
+        if case == "count":
+            from app.agents.memory import MemoryService
+            await MemoryService(store, c[1].id).save_conversion({"item_definition_id": str(c[5].id), "item_name": "苹果",
+                "relationship": {"source_amount": "1", "source_unit": "个", "target_amount": "180", "target_unit": "g",
+                    "source": "USER_INPUT", "rationale": "An apple weighs about 180g"}})
+        graph = build_agent_graph(create_agent_model(), checkpointer=InMemorySaver(), store=store, session_factory=sessions)
+        message = (f"库存批次 {item.id}：消耗一半。" if case in {"relative", "odd_count"} else
+                   f"库存批次 {item.id}：我吃了一个苹果，按已有记忆换算后扣减。" if case == "count" else
+                   f"库存批次 {item.id} 是苹果：我吃了200 g，直接按一般苹果重量估算并扣减。")
+        turn = str(uuid4())
+        config = {"configurable": {"thread_id": f"quantity-{turn}"}, "recursion_limit": 128}
+        context = AgentContext(c[1].id, None, uuid4(), user_message=message)
+        try:
+            result = await graph.ainvoke({"messages": [HumanMessage(content=message)], "turn_id": turn,
+                "request_fingerprint": fingerprint(message), "items": [], "requests": {}, "resume_requests": {}},
+                config, context=context)
+            record = result["items"][0]
+            if case == "odd_count":
+                assert record["status"] == "NEEDS_INPUT" and record["error"]["code"] == "WHOLE_COUNT_REQUIRED"
+                snapshot = await graph.aget_state(config)
+                intr = snapshot.tasks[0].interrupts[0]
+                result = await graph.ainvoke(Command(resume={intr.id: {"chat_message": "实际吃了一个半",
+                    "request_id": str(uuid4()), "fingerprint": "explicit-half"}}), config, context=context)
+                record = result["items"][0]
+            assert record["status"] == "SUCCEEDED", record.get("error")
+            saved = record["result"]["inventory"]
+            if case == "relative":
+                assert Decimal(saved["confirmed_current_amount"]) == 1 and saved["confirmed_current_unit"] == "kg"
+            elif case == "odd_count":
+                assert Decimal(saved["confirmed_current_amount"]) == Decimal("1.5")
+            elif case == "count":
+                assert saved["estimated_current_unit"] in {"个", "each"}
+                assert Decimal(saved["estimated_current_amount"]) == 18
+                assert "18.1" not in str(result["messages"][-1].content)
+            else:
+                assert saved["estimated_current_unit"] == "g"
+                assert record["result"]["operation"]["quantity_unit"] == "g"
+                if case == "switch":
+                    followup = f"库存批次 {item.id}：再消耗0.2 kg。"
+                    next_turn = str(uuid4())
+                    updated = await graph.ainvoke({"messages": [HumanMessage(content=followup)], "turn_id": next_turn,
+                        "request_fingerprint": fingerprint(followup), "items": [], "final_only": False},
+                        config, context=AgentContext(c[1].id, None, context.conversation_id, user_message=followup))
+                    changed = updated["items"][0]
+                    assert changed["status"] == "SUCCEEDED", changed.get("error")
+                    balance = changed["result"]["inventory"]
+                    assert balance["estimated_current_unit"] == "kg"
+                    assert Decimal(balance["estimated_current_amount"]) == (Decimal(saved["estimated_current_amount"]) / 1000 - Decimal(".2")).quantize(Decimal(".001"))
+                    assert balance["initial_unit"] == "个"
+        except Exception as exc:
+            pytest.fail(f"Live quantity acceptance failed ({type(exc).__name__}); credentials suppressed", pytrace=False)
     live_runner.run(exercise(c[0], scenario))

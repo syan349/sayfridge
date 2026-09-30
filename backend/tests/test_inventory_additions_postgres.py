@@ -47,7 +47,7 @@ def test_concurrent_additions_apply_once_for_one_version(inventory_context, monk
             assert responses[0].json()["operation"]["id"]==responses[1].json()["operation"]["id"]
         async with sessions() as session:
             actual=await session.get(InventoryItem,item.id)
-            assert actual.version==2 and actual.confirmed_current_amount==Decimal("3.000")
+            assert actual.version==2 and actual.confirmed_current_amount==Decimal("3000.000")
             assert await session.scalar(select(func.count()).select_from(InventoryOperation))==1
     asyncio.run(exercise(c[0],scenario))
 
@@ -79,7 +79,7 @@ def test_concurrent_same_key_across_spaces_uses_unique_constraint(inventory_cont
         async with sessions() as session:
             rows=(await session.scalars(select(InventoryItem))).all()
             assert sorted(row.version for row in rows)==[1,2]
-            assert sum(row.confirmed_current_amount for row in rows)==Decimal("5.5")
+            assert sum(row.confirmed_current_amount * (1000 if row.confirmed_current_unit == "kg" else 1) for row in rows)==Decimal("5500")
             assert await session.scalar(select(func.count()).select_from(InventoryOperation))==1
     asyncio.run(exercise(c[0],scenario))
 

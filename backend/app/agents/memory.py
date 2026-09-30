@@ -127,6 +127,48 @@ class MemoryService:
             size += n
         return {"items": output, "truncated": len(output) < len(selected)}
 
+    async def find_conversion_relationship(self, context):
+        from app.services.inventory_quantities import canonical
+        units = {canonical(context["source_unit"] or "")[0], canonical(context["target_unit"])[0]}
+        if len(units) == 1 or "remaining" in units:
+            return {"status": "NO_MATCH", "items": []}
+        matches, incomplete = [], []
+        for record in await self._read("UNIT_RELATIONSHIP"):
+            relation = record.get("structured_value") or {}
+            if {canonical(relation.get("source_unit", ""))[0], canonical(relation.get("target_unit", ""))[0]} != units:
+                continue
+            conditions = {k: v for k, v in record.get("conditions", {}).items() if k not in {"source_unit", "target_unit"}}
+            applicable = self._applies({"conditions": conditions}, context)
+            if applicable == "MATCH":
+                matches.append(record)
+            elif applicable == "NEEDS_CONTEXT":
+                incomplete.append(record)
+        if not matches:
+            return {"status": "NEEDS_CONTEXT" if incomplete else "NO_MATCH", "items": incomplete}
+        rank = lambda r: (r.get("source", "USER_INPUT") != "MODEL_KNOWLEDGE", len(r.get("conditions", {})))
+        best = max(map(rank, matches))
+        matches = [r for r in matches if rank(r) == best]
+        from app.services.inventory_quantities import _ratio
+        meanings = set()
+        for record in matches:
+            a, b, ratio = _ratio(record["structured_value"])
+            meanings.add((min(a, b), max(a, b), str(ratio if a < b else 1 / ratio)))
+        return {"status": "MATCH" if len(meanings) == 1 else "CONFLICT", "items": matches}
+
+    async def save_conversion(self, pending):
+        """Backend-only automatic memory; separate from user editing authorization."""
+        relation = pending["relationship"]
+        data = {"schema_version": 3, "category": "UNIT_RELATIONSHIP", "approximate": True,
+                "source": relation.get("source", "MODEL_KNOWLEDGE"),
+                "content": relation.get("rationale", "Estimated unit relationship"),
+                "structured_value": {k: relation[k] for k in ("source_amount", "source_unit", "target_amount", "target_unit")},
+                "conditions": {"item_definition_id": pending["item_definition_id"],
+                    "item_name": pending["item_name"], "source_unit": relation["source_unit"], "target_unit": relation["target_unit"],
+                    **pending.get("conditions", {})}}
+        key = str(uuid5(NAMESPACE_URL, str(self.user_id) + fingerprint(data)))
+        await self.store.aput(namespace(self.user_id), key, data)
+        self.cache.clear()
+
     async def verify_snapshots(self, snapshots):
         for record in snapshots:
             current = await self.store.aget(namespace(self.user_id), record["memory_id"])

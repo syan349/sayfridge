@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.db.models import InventoryItem, StorageSpace
+from app.db.models import InventoryItem, StorageSpace, User
 
 
 class StorageSpaceError(Exception):
@@ -23,6 +23,52 @@ class SpaceNameConflictError(StorageSpaceError):
 
 class SpaceStateConflictError(StorageSpaceError):
     pass
+
+
+async def lock_space_owner(session, user_id):
+    """All space mutations acquire owner before space locks."""
+    # Serialize default/space changes without blocking FK key-share locks from
+    # concurrent inventory receipt inserts (which already hold a space lock).
+    owner = await session.scalar(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
+    if owner is None:
+        raise SpaceNotFoundError("User not found")
+
+
+async def ensure_default_space(session, user_id, *, commit=True):
+    try:
+        await lock_space_owner(session, user_id)
+        spaces = list(await session.scalars(select(StorageSpace).where(
+            StorageSpace.user_id == user_id, StorageSpace.status == "ACTIVE"
+        ).order_by(StorageSpace.created_at, StorageSpace.id).execution_options(populate_existing=True)))
+        chosen = next((s for s in spaces if s.is_default), None)
+        if chosen is None:
+            chosen = spaces[0] if spaces else StorageSpace(
+                user_id=user_id, name="默认空间", type="OTHER", status="ACTIVE")
+            if not spaces:
+                session.add(chosen)
+            chosen.is_default = True
+        return await _commit_space(session, chosen, commit=commit)
+    except Exception:
+        await session.rollback()
+        raise
+
+
+async def set_default_space(session, space_id, user_id):
+    try:
+        await lock_space_owner(session, user_id)
+        chosen = await get_storage_space_by_id(session, space_id, user_id, lock=True)
+        if chosen.status != "ACTIVE":
+            raise SpaceStateConflictError("Default space must be active")
+        current = await session.scalar(select(StorageSpace).where(
+            StorageSpace.user_id == user_id, StorageSpace.is_default.is_(True)))
+        if current and current.id != chosen.id:
+            current.is_default = False
+            await session.flush()
+        chosen.is_default = True
+        return await _commit_space(session, chosen)
+    except Exception:
+        await session.rollback()
+        raise
 
 
 async def get_storage_space_by_id(
@@ -87,6 +133,7 @@ async def create_storage_space(
     session: AsyncSession, user_id: UUID, *, name: str, type: str, commit: bool = True,
 ) -> StorageSpace:
     try:
+        await lock_space_owner(session, user_id)
         space = StorageSpace(user_id=user_id, name=name, type=type, status="ACTIVE")
         session.add(space)
         return await _commit_space(session, space, commit=commit)
@@ -99,6 +146,7 @@ async def update_storage_space(
     session: AsyncSession, space_id: UUID, user_id: UUID, *, changes: dict[str, str],
 ) -> StorageSpace:
     try:
+        await lock_space_owner(session, user_id)
         space = await get_storage_space_by_id(session, space_id, user_id, lock=True)
         if space.status != "ACTIVE":
             raise SpaceStateConflictError("Restore the storage space before editing it")
@@ -116,6 +164,7 @@ async def set_storage_space_status(
     session: AsyncSession, space_id: UUID, user_id: UUID, *, target_status: str,
 ) -> StorageSpace:
     try:
+        await lock_space_owner(session, user_id)
         space = await get_storage_space_by_id(session, space_id, user_id, lock=True)
         if space.status != target_status:
             if target_status == "ARCHIVED":
@@ -126,7 +175,13 @@ async def set_storage_space_status(
                 )))
                 if has_stock:
                     raise SpaceStateConflictError("Storage space still contains in-stock inventory")
+            was_default = space.is_default
+            if target_status == "ARCHIVED":
+                space.is_default = False
             space.status = target_status
+            await session.flush()
+            if was_default and target_status == "ARCHIVED":
+                await ensure_default_space(session, user_id, commit=False)
         return await _commit_space(session, space)
     except Exception as error:
         await _rollback_write(session, error)

@@ -15,8 +15,8 @@ from app.schemas.inventory import InventoryCreate
 from app.schemas.inventory_operations import InventoryOperationCreate
 from app.services import inventory, catalog, storage_spaces
 from app.services.inventory_quantities import (
-    calculate_addition, calculate_consumption, calculate_estimated_change,
-    prepare_reconciliation, get_addition_base,
+    calculate_addition, calculate_consumption, calculate_estimated_change, calculate_change,
+    prepare_reconciliation, get_addition_base, convert_addition_amount,
 )
 
 
@@ -50,6 +50,15 @@ async def resolve_targets(session, user_id, queries, storage_space_id=None, memo
         storage_space_id = matches[0].id
     matched = {}
     for query in queries:
+        try:
+            explicit_id = UUID(query.strip())
+        except ValueError:
+            explicit_id = None
+        if explicit_id:
+            row = await inventory.get_inventory(session, explicit_id, user_id)
+            if row.status == "IN_STOCK" and (not storage_space_id or str(row.storage_space_id) == str(storage_space_id)):
+                matched[str(row.id)] = row.model_dump(mode="json")
+            continue
         terms = [query]
         alias_ids = set()
         for record in aliases:
@@ -87,6 +96,11 @@ async def resolve_targets(session, user_id, queries, storage_space_id=None, memo
 
 async def _creation_values(session, user_id, draft, *, create=False):
     space_id, definition_id = draft.storage_space_id, draft.item_definition_id
+    if create:
+        await storage_spaces.lock_space_owner(session, user_id)
+    if not space_id and not draft.new_space:
+        space_id = await session.scalar(select(StorageSpace.id).where(
+            StorageSpace.user_id == user_id, StorageSpace.status == "ACTIVE", StorageSpace.is_default.is_(True)))
     if draft.new_space:
         found = await session.scalar(select(StorageSpace).where(StorageSpace.user_id == user_id,
             func.lower(StorageSpace.name) == draft.new_space.name.lower(), StorageSpace.status == "ACTIVE"))
@@ -160,6 +174,10 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
         raise PreparationError("CLARIFICATION_REQUIRED", draft.clarification_question)
     validate_new_space_source(draft, source_texts)
     snapshots = []
+    if draft.unit_relationship and draft.unit_relationship.source == "USER_INPUT":
+        quote = draft.unit_relationship.evidence
+        if not quote or not any(quote in value for value in source_texts):
+            raise PreparationError("QUANTITY_REQUIRED", "The user-provided relationship needs original source evidence")
     if draft.action == "CREATE_STOCK":
         if draft.estimate or draft.quantity_kind != "AMOUNT" or draft.quantity_value is None or not draft.quantity_unit:
             raise PreparationError("INITIAL_QUANTITY_REQUIRED", "Provide the initial quantity and unit; counts such as two bags are sufficient")
@@ -179,79 +197,93 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
                         "space_name": space.name if space else draft.new_space.name,
                         "category_id": str(category.id), "category_name": category.name},
             "image_policy": image_policy or {},
+            "default_space_id": str(space_id) if not draft.storage_space_id and not draft.new_space and space_id else None,
             "confirmation_reasons": ["IMAGE_REVIEW"] if image_review else [],
             "creation_policy": {"version": 1, "new_space_authorized": bool(draft.new_space)},
             "after": {"confirmed_current_amount": values.amount, "confirmed_current_unit": values.unit,
                       "estimated_current_amount": None}, "calculation_method": "EXACT",
             "affects_state": "CONFIRMED", "memory_snapshots": [],
-            "requires_confirmation": bool(image_review), "expected_version": None}
+            "requires_confirmation": bool(image_review or draft.confirmation_requested), "expected_version": None}
     if not draft.inventory_item_id:
         if not draft.item_query:
             raise PreparationError("TARGET_REQUIRED", "Identify the inventory item")
-        targets = await resolve_targets(session, user_id, [draft.item_query], draft.storage_space_id, memory)
-        chosen = targets["preferred_id"] or (targets["candidates"][0]["id"] if targets["total"] == 1 else None)
+        try:
+            explicit_id = UUID(draft.item_query.strip())
+        except ValueError:
+            explicit_id = None
+        targets = await resolve_targets(session, user_id, [draft.item_query], draft.storage_space_id, memory) if explicit_id is None else None
+        chosen = str(explicit_id) if explicit_id else targets["preferred_id"] or (targets["candidates"][0]["id"] if targets["total"] == 1 else None)
         if not chosen:
             raise PreparationError("TARGET_REQUIRED", "Select a specific inventory batch", targets)
         draft = draft.model_copy(update={"inventory_item_id": UUID(chosen)})
     item = await inventory.get_inventory(session, draft.inventory_item_id, user_id)
     if draft.storage_space_id and item.storage_space_id != draft.storage_space_id:
         raise PreparationError("TARGET_CONFLICT", "The selected batch is in a different space")
+    if draft.quantity_kind == "FRACTION":
+        draft = draft.model_copy(update={"quantity_unit": "remaining"})
     if draft.quantity_value is None or (not draft.quantity_unit and draft.quantity_kind != "QUALITATIVE"):
         raise PreparationError("QUANTITY_REQUIRED", "Provide a quantity expression and unit")
     context = {"item_definition_id": str(item.item_definition_id), "item_name": item.item_definition_name,
         "storage_space_id": str(item.storage_space_id), "source_unit": draft.quantity_unit,
         "target_unit": get_addition_base(item)[1], "utensil": draft.utensil, "as_of": str(as_of) if as_of else None}
-    matching = await memory.find_applicable_memories(context)
+    context["package_description"] = draft.package_description
     estimated_change = None
+    relationship = None
     if draft.action == "RECONCILE":
-        if draft.estimate:
-            raise PreparationError("STOCKTAKE_REQUIRED", "A stocktake requires the user's actual remaining total")
-        payload = InventoryOperationCreate(expected_version=item.version, operation_type=draft.action,
-            quantity_kind=draft.quantity_kind, quantity_value=draft.quantity_value, quantity_unit=draft.quantity_unit)
-        amount, unit = prepare_reconciliation(Decimal(payload.quantity_value), payload.quantity_unit)
+        relationship = None
+        if draft.estimate or draft.unit_relationship:
+            raise PreparationError("STOCKTAKE_REQUIRED", "A stocktake requires the actual remaining quantity")
+        amount, unit = prepare_reconciliation(Decimal(draft.quantity_value), draft.quantity_unit)
         calc = {"amount": str(amount), "unit": unit, "affects_state": "CONFIRMED", "calculation_method": "EXACT"}
     else:
-        needs_estimate = draft.estimate is not None or draft.quantity_kind == "QUALITATIVE"
-        calculation = None
-        if not needs_estimate:
-            payload = InventoryOperationCreate(expected_version=item.version, operation_type=draft.action,
-                quantity_kind=draft.quantity_kind, quantity_value=draft.quantity_value, quantity_unit=draft.quantity_unit)
-            try:
-                calculation = calculate_addition(item, Decimal(payload.quantity_value), payload.quantity_unit) if draft.action == "ADD" else calculate_consumption(item, payload.quantity_kind, payload.quantity_value, payload.quantity_unit)
-            except ValueError as exc:
-                if getattr(exc, "code", None) != "UNIT_NOT_CONVERTIBLE":
-                    raise
-                needs_estimate = True
-        if needs_estimate:
-            if not draft.estimate or draft.estimate.source != "USER_INPUT":
-                if matching["status"] in {"CONFLICT", "NEEDS_CONTEXT"}:
-                    raise PreparationError("MEMORY_CONTEXT_REQUIRED", "Clarify the applicable unit relationship", matching)
-                if matching["status"] == "MATCH":
-                    snapshots = matching["items"]
-                    if not draft.estimate or str(draft.estimate.memory_id) not in {r["memory_id"] for r in snapshots}:
-                        raise PreparationError("REESTIMATE", "Use these applicable memories to propose an estimate", matching)
+        if not relationship and draft.unit_relationship and draft.unit_relationship.source == "USER_INPUT":
+            relationship = draft.unit_relationship.model_dump()
+        if not relationship:
+            matching = await memory.find_conversion_relationship(context)
+            if matching["status"] in {"CONFLICT", "NEEDS_CONTEXT"}:
+                raise PreparationError("MEMORY_CONTEXT_REQUIRED", "Clarify the applicable unit relationship", matching)
+            if matching["status"] == "MATCH":
+                snapshots = matching["items"]
+                relationship = {**snapshots[0]["structured_value"], "source": snapshots[0].get("source", "USER_MEMORY"),
+                                "rationale": snapshots[0].get("content", "Saved unit relationship")}
+        if not relationship and draft.unit_relationship:
+            if draft.unit_relationship.source == "USER_MEMORY":
+                raise PreparationError("REESTIMATE", "No applicable saved relationship exists")
+            relationship = draft.unit_relationship.model_dump()
+        try:
+            if draft.quantity_kind == "QUALITATIVE":
+                if not draft.estimate:
+                    raise PreparationError("REESTIMATE", "Propose an estimated amount for this qualitative expression")
+                unit = draft.quantity_unit or get_addition_base(item)[1]
+                try:
+                    amount = convert_addition_amount(Decimal(draft.estimate.amount), draft.estimate.unit, unit)
+                except ValueError:
+                    raise PreparationError("REESTIMATE", f"Provide the qualitative estimate directly in {unit}") from None
+                relationship, snapshots = None, []
+                calculation = calculate_estimated_change(item, draft.action, amount, unit)
+                estimated_change = (str(calculation.applied_change_amount), calculation.unit)
+            else:
+                calculation = calculate_change(item, draft.action, draft.quantity_kind,
+                    draft.quantity_value, draft.quantity_unit, relationship=relationship)
+        except ValueError as exc:
+            if getattr(exc, "code", None) != "UNIT_NOT_CONVERTIBLE":
+                raise
             if not draft.estimate:
-                raise PreparationError("REESTIMATE", "No fixed conversion. Propose an estimate using model knowledge if no applicable memory exists", matching)
-            if draft.estimate.source == "USER_MEMORY" and not snapshots:
-                raise PreparationError("REESTIMATE", "The old memory no longer applies. Reconsider the estimate using current information or model knowledge")
-            estimated_change = (draft.estimate.amount, draft.estimate.unit)
-            # Structured ratios are calculated by the backend, not by model arithmetic.
-            if snapshots:
-                relation = snapshots[0].get("structured_value") or {}
-                if all(k in relation for k in ("source_amount", "target_amount", "target_unit")) and draft.quantity_kind == "AMOUNT":
-                    source = Decimal(str(relation["source_amount"]))
-                    target = Decimal(str(relation["target_amount"]))
-                    if not source.is_finite() or source <= 0 or not target.is_finite() or target <= 0:
-                        raise PreparationError("MEMORY_CONTEXT_REQUIRED", "Invalid stored conversion ratio")
-                    amount = Decimal(draft.quantity_value) / source * target
-                    estimated_change = (str(amount), relation["target_unit"])
-            calculation = calculate_estimated_change(item, draft.action, Decimal(estimated_change[0]), estimated_change[1])
+                raise PreparationError("REESTIMATE", "Provide unit_relationship with a ratio and its source; do not calculate final balances")
+            # Compatibility for outstanding v2 proposals: derive a relation from their delta.
+            relationship = {"source_amount": draft.quantity_value, "source_unit": draft.quantity_unit,
+                "target_amount": draft.estimate.amount, "target_unit": draft.estimate.unit,
+                "source": draft.estimate.source, "rationale": draft.estimate.rationale}
+            calculation = calculate_change(item, draft.action, draft.quantity_kind,
+                draft.quantity_value, draft.quantity_unit, relationship=relationship)
         calc = json_value(asdict(calculation))
+        if calc["calculation_method"] != "AI_ESTIMATED":
+            relationship, snapshots = None, []
     after = {"amount": calc["amount"], "unit": calc["unit"], "is_estimated": calc["affects_state"] == "ESTIMATED"}
     return {"draft": draft.model_dump(mode="json"), "before": item.model_dump(mode="json"), "after": after,
-        "calculation": calc, "calculation_method": calc["calculation_method"], "affects_state": calc["affects_state"],
-        "estimated_change": estimated_change, "memory_snapshots": snapshots,
-        "requires_confirmation": calc["calculation_method"] == "AI_ESTIMATED", "expected_version": item.version}
+        "quantity_policy": "request_unit_v1", "calculation": calc, "calculation_method": calc["calculation_method"], "affects_state": calc["affects_state"],
+        "estimated_change": estimated_change, "unit_relationship": relationship, "memory_snapshots": snapshots,
+        "requires_confirmation": draft.confirmation_requested, "expected_version": item.version}
 
 
 async def execute_action(session, user_id, conversation_id, turn_id, proposal_id, preview, memory, *, approved=False, image_policy=None):
@@ -264,7 +296,9 @@ async def execute_action(session, user_id, conversation_id, turn_id, proposal_id
         if prior:
             if prior.user_id != user_id or prior.request_fingerprint != digest:
                 raise PreparationError("IDEMPOTENCY_CONFLICT", "Action identifier already used")
-            return {**prior.result_snapshot, "replayed": True}
+            output = {**prior.result_snapshot, "replayed": True}
+            await session.commit()
+            return output
         draft = ActionDraft.model_validate(preview["draft"])
         validate_image_policy(draft, image_policy, approved=approved)
         validate_image_policy(draft, preview.get("image_policy"), approved=approved)
@@ -276,8 +310,22 @@ async def execute_action(session, user_id, conversation_id, turn_id, proposal_id
             raise PreparationError("CONFIRMATION_REQUIRED", "Confirm the current proposal")
         if not await memory.verify_snapshots(preview["memory_snapshots"]):
             raise PreparationError("MEMORY_CHANGED", "Memory changed; prepare a new proposal")
+        if draft.action != "CREATE_STOCK" and preview.get("quantity_policy") != "request_unit_v1":
+            raise PreparationError("QUANTITY_POLICY_CHANGED", "Reprepare this pending operation using current quantity rules")
+        relation = preview.get("unit_relationship")
+        if relation and draft.save_conversion_memory:
+            before = preview["before"]
+            try:
+                await memory.save_conversion({"relationship": relation,
+                    "item_definition_id": before["item_definition_id"], "item_name": before["item_definition_name"],
+                    "conditions": {k: v for k, v in {"utensil": draft.utensil,
+                        "package_description": draft.package_description}.items() if v}})
+            except Exception:
+                raise PreparationError("MEMORY_SAVE_UNAVAILABLE", "Conversion memory could not be saved; inventory has not changed") from None
         if draft.action == "CREATE_STOCK":
             space_id, definition_id = await _creation_values(session, user_id, draft, create=True)
+            if preview.get("default_space_id") and str(space_id) != preview["default_space_id"]:
+                raise PreparationError("RESOURCE_CHANGED", "Default space changed; refresh the proposal")
             values = InventoryCreate(storage_space_id=space_id, item_definition_id=definition_id,
                 amount=draft.quantity_value, unit=draft.quantity_unit,
                 purchase_date=draft.purchase_date, expiry_date=draft.expiry_date)
@@ -290,7 +338,8 @@ async def execute_action(session, user_id, conversation_id, turn_id, proposal_id
                 quantity_kind=draft.quantity_kind, quantity_value=draft.quantity_value,
                 quantity_unit=draft.quantity_unit, idempotency_key=f"agent:{proposal_id}",
                 commit=False, input_method="TEXT",
-                estimated_change=(Decimal(delta[0]), delta[1]) if delta else None)
+                estimated_change=(Decimal(delta[0]), delta[1]) if delta else None,
+                unit_relationship=preview.get("unit_relationship"))
             output = result.model_dump(mode="json")
         session.add(AgentInventoryAction(id=UUID(str(proposal_id)), user_id=user_id,
             conversation_id=conversation_id, turn_id=UUID(str(turn_id)), action=draft.action,
