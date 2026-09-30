@@ -14,6 +14,12 @@ String voiceInputErrorMessage(String error) {
       ? 'Speech recognition is unavailable in this browser. Please use keyboard input.'
       : code.contains('no-speech') || code.contains('no_match')
       ? 'No speech was recognized. Hold the voice bar while speaking, then release.'
+      : code.contains('audio timeout')
+      ? 'The microphone did not start. Close and reopen the app, then try again.'
+      : code.contains('result timeout')
+      ? 'Speech recognition did not respond. Release and try again, or use keyboard input.'
+      : code.contains('busy')
+      ? 'The microphone is still finishing. Wait a moment, then hold to speak again.'
       : 'Voice recognition stopped. Please try again.';
 }
 

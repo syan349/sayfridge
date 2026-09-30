@@ -16,7 +16,7 @@ external JSPromise<JSAny?> _stop();
 external JSPromise<JSAny?> _cancel();
 
 /// Start inside the pointer-down gesture and use a new browser recognizer for
-/// every hold. WebKit can stop producing results when an instance is reused.
+/// every hold, then stop and discard cancelled audio before another hold.
 class BrowserVoiceInputService implements VoiceInputService {
   @override
   Future<bool> start({

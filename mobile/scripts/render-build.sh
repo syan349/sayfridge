@@ -37,4 +37,7 @@ flutter --suppress-analytics build web --release --no-pub \
   --target lib/main.dart --dart-define="API_BASE_URL=$api_base_url"
 
 test -f build/web/index.html
+printf '{"commit":"%s","built_at":"%s"}\n' \
+  "${RENDER_GIT_COMMIT:-$(git rev-parse HEAD)}" \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > build/web/build-info.json
 echo "Flutter Web build ready: build/web"

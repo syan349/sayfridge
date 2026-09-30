@@ -45,9 +45,9 @@ class NotificationsScreen extends StatelessWidget {
                               ? _emptyState()
                               : SingleChildScrollView(
                                   padding: const EdgeInsets.fromLTRB(
-                                    25,
+                                    20,
                                     8,
-                                    25,
+                                    20,
                                     28,
                                   ),
                                   child: _NotificationPanel(
@@ -142,65 +142,112 @@ class _NotificationPanel extends StatelessWidget {
       children: [
         for (final notification in notifications)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 14),
             child: Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: notification.type == AppNotificationType.expired
-                      ? const Color(0xFFD36B4A)
-                      : const Color(0xFFA8D589),
+                      ? const Color(0xFFE8BDA9)
+                      : const Color(0xFFD7E6C7),
                 ),
               ),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        notification.type == AppNotificationType.expired
-                            ? Icons.warning_amber_rounded
-                            : Icons.notifications_none,
-                        color: notification.type == AppNotificationType.expired
-                            ? const Color(0xFFC8532C)
-                            : AppColors.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          notification.title,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                  Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: notification.type == AppNotificationType.expired
+                          ? const Color(0xFFFFF1E8)
+                          : const Color(0xFFF0F7E9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      notification.type == AppNotificationType.expired
+                          ? Icons.warning_amber_rounded
+                          : Icons.notifications_none,
+                      color: notification.type == AppNotificationType.expired
+                          ? const Color(0xFFC8532C)
+                          : AppColors.primary,
+                      size: 23,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 5),
+                          child: Text(
+                            notification.title,
+                            textAlign: TextAlign.left,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              height: 1.4,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  Text(notification.message),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      if (notification.processable)
-                        FilledButton(
-                          onPressed: onProcessExpired,
-                          child: const Text('Process now'),
-                        )
-                      else if (notification.type ==
-                          AppNotificationType.expiring)
-                        TextButton(
-                          onPressed: onViewExpiring,
-                          child: const Text('View items'),
+                        const SizedBox(height: 12),
+                        Text(
+                          notification.message,
+                          textAlign: TextAlign.left,
+                          style: const TextStyle(
+                            color: Color(0xFF596050),
+                            fontSize: 15.5,
+                            height: 1.55,
+                          ),
                         ),
-                      TextButton(
-                        onPressed: () => controller.markRead(notification.type),
-                        child: const Text('Mark as read'),
-                      ),
-                    ],
+                        const SizedBox(height: 18),
+                        Wrap(
+                          spacing: 14,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (notification.processable)
+                              FilledButton(
+                                style: _actionStyle(
+                                  background: AppColors.userMessage,
+                                  foreground: Colors.white,
+                                ),
+                                onPressed: onProcessExpired,
+                                child: const Text('Process now'),
+                              )
+                            else if (notification.type ==
+                                AppNotificationType.expiring)
+                              FilledButton(
+                                style: _actionStyle(
+                                  background: const Color(0xFFF0F6E9),
+                                  foreground: AppColors.userMessage,
+                                ),
+                                onPressed: onViewExpiring,
+                                child: const Text('View items'),
+                              ),
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF667456),
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(0, 44),
+                                alignment: Alignment.centerLeft,
+                                textStyle: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              onPressed: () =>
+                                  controller.markRead(notification.type),
+                              child: const Text('Mark as read'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -209,4 +256,15 @@ class _NotificationPanel extends StatelessWidget {
       ],
     );
   }
+
+  static ButtonStyle _actionStyle({
+    required Color background,
+    required Color foreground,
+  }) => FilledButton.styleFrom(
+    backgroundColor: background,
+    foregroundColor: foreground,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    minimumSize: const Size(0, 40),
+    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+  );
 }

@@ -1,45 +1,8 @@
 {{flutter_js}}
 {{flutter_build_config}}
 
-// Keep Flutter's full-page viewport/keyboard behavior on touch devices. Desktop
-// browsers render into a resizable host, so every route stays inside the frame.
-const desktopBrowser = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-if (desktopBrowser) {
-  document.documentElement.classList.add('desktop-preview');
-}
-
-// Flutter Web reports no device safe-area padding. Read CSS insets so the
-// app's SafeArea widgets protect controls while backgrounds fill the screen.
-const safeAreaProbe = document.createElement('div');
-safeAreaProbe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;'
-  + 'padding:env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) '
-  + 'env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);';
-document.body.appendChild(safeAreaProbe);
-window.sayFridgeReadSafeArea = () => {
-  if (desktopBrowser) return [0, 0, 0, 0];
-  const style = getComputedStyle(safeAreaProbe);
-  return [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft]
-    .map(value => parseFloat(value) || 0);
-};
-
-// Home-screen Chrome windows can paint the status area from the document
-// background/theme color, outside Flutter's canvas. Dim that surface too.
-const themeColor = document.querySelector('meta[name="theme-color"]');
-const normalThemeColor = themeColor?.getAttribute('content');
-const normalHtmlBackground = document.documentElement.style.backgroundColor;
-const normalBodyBackground = document.body.style.backgroundColor;
-window.sayFridgeSetVoiceOverlayVisible = visible => {
-  document.documentElement.classList.toggle('voice-overlay-visible', visible);
-  if (!desktopBrowser) {
-    document.documentElement.style.backgroundColor = visible ? '#73766f' : normalHtmlBackground;
-    document.body.style.backgroundColor = visible ? '#73766f' : normalBodyBackground;
-  }
-  if (themeColor) {
-    if (visible) themeColor.setAttribute('content', '#73766f');
-    else if (normalThemeColor === null) themeColor.removeAttribute('content');
-    else themeColor.setAttribute('content', normalThemeColor);
-  }
-};
+// Keep Flutter's full-page viewport/keyboard behavior on touch devices.
+const desktopBrowser = window.sayFridgeIsDesktopBrowser;
 
 const engineConfig = desktopBrowser
   ? { hostElement: document.getElementById('flutter-host') }
