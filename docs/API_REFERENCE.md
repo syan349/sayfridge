@@ -111,8 +111,9 @@ No authentication. Required JSON:
 
 - Password: 8–128 characters, without silent truncation; valid email required.
 - Success: **201**, User response. No token; log in separately.
-- Database effect: create one USER/ACTIVE account with an Argon2id password hash;
-  do not create spaces or inventory. Clients cannot set role, state, or ID.
+- Database effect: create one USER/ACTIVE account with an Argon2id password hash
+  and one active `Default Space` of type `FRIDGE` in the same transaction. Do not
+  create inventory. Clients cannot set role, state, Space ownership, or ID.
 - Duplicate normalized email: **409**, `Email is already registered`.
 - Invalid, missing, or extra fields: **422**.
 
