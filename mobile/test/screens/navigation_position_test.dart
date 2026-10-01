@@ -19,7 +19,7 @@ void main() {
     (const Size(430, 932), const EdgeInsets.only(top: 59, bottom: 34)),
   ]) {
     testWidgets(
-      'all guest and signed-in tabs keep navigation fixed at ${size.width}px',
+      'main navigation and secondary assistant controls stay fixed at ${size.width}px',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -93,17 +93,36 @@ void main() {
           );
           await tester.pumpAndSettle();
           final bar = find.byKey(const Key('app-navigation-bar'));
-          expect(tester.getRect(bar), expected, reason: entry.key);
+          final isAssistant = entry.key.endsWith('assistant');
+          final bottomAction = find.byKey(const Key('assistant-bottom-action'));
+          if (isAssistant) {
+            expect(bar, findsNothing, reason: entry.key);
+            expect(find.byTooltip('Back'), findsOneWidget);
+            expect(
+              tester.getRect(bottomAction).bottom,
+              closeTo(size.height - safeArea.bottom - 28, 0.1),
+            );
+          } else {
+            expect(tester.getRect(bar), expected, reason: entry.key);
+          }
           await tester.drag(
             find.byType(Scrollable).first,
             const Offset(0, -220),
           );
           await tester.pumpAndSettle();
-          expect(
-            tester.getRect(bar),
-            expected,
-            reason: '${entry.key} scrolled',
-          );
+          if (isAssistant) {
+            expect(
+              tester.getRect(bottomAction).bottom,
+              closeTo(size.height - safeArea.bottom - 28, 0.1),
+              reason: '${entry.key} scrolled',
+            );
+          } else {
+            expect(
+              tester.getRect(bar),
+              expected,
+              reason: '${entry.key} scrolled',
+            );
+          }
           expect(tester.takeException(), isNull, reason: entry.key);
         }
         await tester.pumpWidget(const SizedBox.shrink());

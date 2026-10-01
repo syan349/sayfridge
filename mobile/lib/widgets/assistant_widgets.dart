@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'app_bottom_navigation.dart';
 import 'inventory_card_trailing.dart';
+import 'page_back_button.dart';
 
 const inventoryExactColor = Color(0xFF3F9E36);
 const inventoryEstimatedColor = Color(0xFFE95A18);
@@ -33,14 +34,19 @@ class AssistantHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        const PageBackButton(),
         const Expanded(
-          child: Text(
-            'AI Assistant',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 30,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.4,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'AI Assistant',
+              style: TextStyle(
+                color: AppColors.text,
+                fontSize: 28,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.4,
+              ),
             ),
           ),
         ),

@@ -55,6 +55,8 @@ void main() {
       await tester.tap(find.text('AI Assistant'));
       await tester.pumpAndSettle();
       expect(find.text('Log in / Sign up'), findsNothing);
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Log out'));

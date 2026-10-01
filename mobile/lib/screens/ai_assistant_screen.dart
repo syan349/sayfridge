@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
-import '../widgets/app_bottom_navigation.dart';
 import '../widgets/app_page_footer.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
@@ -15,8 +14,6 @@ import '../state/agent_controller.dart';
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({
     this.isGuest = false,
-    this.onHomeTap,
-    this.onProfileTap,
     this.onLoginTap,
     this.agentController,
     this.displayName,
@@ -24,8 +21,6 @@ class AiAssistantScreen extends StatefulWidget {
   });
 
   final bool isGuest;
-  final VoidCallback? onHomeTap;
-  final VoidCallback? onProfileTap;
   final VoidCallback? onLoginTap;
   final AgentController? agentController;
   final String? displayName;
@@ -134,8 +129,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       return AgentConversationScreen(
         controller: widget.agentController!,
         displayName: widget.displayName,
-        onHomeTap: widget.onHomeTap,
-        onProfileTap: widget.onProfileTap,
       );
     }
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom == 0
@@ -153,35 +146,41 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 contentBuilder: (context, bottomPadding) =>
                     _buildScrollableContent(bottomPadding),
                 footer: widget.isGuest
-                    ? AppPageFooter(
-                        action: GuestLoginButton(
-                          onPressed:
-                              widget.onLoginTap ??
-                              () => Navigator.of(context).maybePop(),
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(25, 14, 25, 28),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Log in to start your own inventory.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 17),
+                            GuestLoginButton(
+                              key: const Key('assistant-bottom-action'),
+                              onPressed:
+                                  widget.onLoginTap ??
+                                  () => Navigator.of(context).maybePop(),
+                            ),
+                          ],
                         ),
-                        showLoginHint: true,
-                        selectedDestination: AppNavigationDestination.assistant,
-                        onHomeTap:
-                            widget.onHomeTap ??
-                            () => Navigator.of(context).maybePop(),
-                        onProfileTap: widget.onProfileTap,
                       )
                     : Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(22, 8, 22, 26),
+                            padding: const EdgeInsets.fromLTRB(25, 8, 25, 28),
                             child: AssistantComposer(
+                              key: const Key('assistant-bottom-action'),
                               controller: _messageController,
                               onPhotoPressed: _openCamera,
                               onSendPressed: _showExpiryResults,
                             ),
-                          ),
-                          AppBottomNavigation(
-                            onHomeTap:
-                                widget.onHomeTap ??
-                                () => Navigator.of(context).maybePop(),
-                            onProfileTap: widget.onProfileTap,
                           ),
                         ],
                       ),
