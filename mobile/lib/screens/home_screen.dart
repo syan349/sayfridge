@@ -32,6 +32,7 @@ class HomeScreen extends StatelessWidget {
     this.onExpiringTap,
     this.onInventoryTap,
     this.onAddItemTap,
+    this.onDailyConsumptionSubmit,
     this.notificationController,
     this.isGuest = false,
     super.key,
@@ -48,6 +49,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
   final VoidCallback? onAddItemTap;
+  final ValueChanged<String>? onDailyConsumptionSubmit;
   final AppNotificationController? notificationController;
   final bool isGuest;
 
@@ -129,6 +131,8 @@ class HomeScreen extends StatelessWidget {
                                                         storageSpaceController,
                                                     onExpiringTap:
                                                         onExpiringTap,
+                                                    onDailyConsumptionSubmit:
+                                                        onDailyConsumptionSubmit,
                                                   ),
                                             ),
                                           ),

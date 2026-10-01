@@ -100,6 +100,8 @@ async def login(
         )
 
     login_rate_limiter.clear(limit_key)
+    from app.services.storage_spaces import ensure_default_space
+    await ensure_default_space(session, user.id)
     return LoginResponse(
         access_token=create_access_token(
             user.id,

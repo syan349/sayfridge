@@ -7,7 +7,7 @@ from pydantic import TypeAdapter, ValidationError
 from app.core.quantity import MAX_QUANTITY, QuantityError
 from app.db.models import InventoryItem
 from app.schemas.inventory_operations import InventoryOperationCreate, IdempotencyKey
-from app.services.inventory_quantities import calculate_addition, prepare_addition
+from app.services.inventory_quantities import calculate_addition, prepare_addition, canonical
 
 
 def body(**changes):
@@ -16,18 +16,18 @@ def body(**changes):
 
 
 @pytest.mark.parametrize("amount,source,unit,expected,method", [
-    ("500", "g", "kg", "0.500", "CONVERTED"),
+    ("500", "g", "kg", "500", "CONVERTED"),
     ("0.5", "kg", "g", "500.000", "CONVERTED"),
-    ("250", "ml", "l", "0.250", "CONVERTED"),
+    ("250", "ml", "l", "250", "CONVERTED"),
     ("2.25", "l", "ml", "2250.000", "CONVERTED"),
-    ("2", "KG", "kg", "2.000", "EXACT"),
+    ("2", "KG", "kg", "2000", "EXACT"),
     ("2", "each", "each", "2.000", "EXACT"),
 ])
 def test_supported_conversion_and_exact_units(amount, source, unit, expected, method):
     item = InventoryItem(confirmed_current_amount=Decimal("7"), confirmed_current_unit=unit)
     result = calculate_addition(item, Decimal(amount), source)
-    assert result.applied_change_amount == Decimal(expected)
-    assert result.amount == Decimal("7") + Decimal(expected)
+    assert result.applied_change_amount == Decimal(amount)
+    assert result.amount == Decimal("7") * canonical(unit)[1] / canonical(source)[1] + Decimal(amount)
     assert result.calculation_method == method and not result.rounded
     assert item.confirmed_current_amount == Decimal("7")
 
@@ -39,10 +39,10 @@ def test_rounding_uses_correct_balance_without_mutation(estimate):
                          estimated_current_unit="kg" if estimate is not None else None)
     before = dict(item.__dict__)
     result = calculate_addition(item, Decimal("0.5"), "g")
-    assert result.rounded and result.applied_change_amount == Decimal("0.001")
-    assert result.amount == (Decimal("7") if estimate is None else estimate) + Decimal("0.001")
+    assert not result.rounded and result.applied_change_amount == Decimal("0.5")
+    assert result.amount == (Decimal("7") if estimate is None else estimate) * 1000 + Decimal("0.5")
     assert result.affects_state == ("CONFIRMED" if estimate is None else "ESTIMATED")
-    assert prepare_addition(item, Decimal("0.5"), "g") == (result.amount, "kg", result.affects_state)
+    assert prepare_addition(item, Decimal("0.5"), "g") == (result.amount, "g", result.affects_state)
     assert item.__dict__ == before
 
 
@@ -54,12 +54,10 @@ def test_parsed_invalid_amounts_rejected(value):
 
 
 @pytest.mark.parametrize("value,unit,base,target,code", [
-    ("0.499", "g", "7", "kg", "QUANTITY_TOO_SMALL"),
     ("1", "ml", "7", "kg", "UNIT_NOT_CONVERTIBLE"),
     ("1", "piece", "7", "each", "UNIT_NOT_CONVERTIBLE"),
     ("1000000000", "g", "0", "kg", "QUANTITY_OUT_OF_RANGE"),
-    ("1000000", "kg", "0", "g", "QUANTITY_OUT_OF_RANGE"),
-    ("0.002", "kg", "999999999.998", "kg", "QUANTITY_OUT_OF_RANGE"),
+    ("0.002", "g", "999999999999999.998", "g", "QUANTITY_OUT_OF_RANGE"),
 ])
 def test_calculation_errors_have_stable_codes(value, unit, base, target, code):
     item = InventoryItem(confirmed_current_amount=Decimal(base), confirmed_current_unit=target)

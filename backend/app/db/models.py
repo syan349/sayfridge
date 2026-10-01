@@ -5,6 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -86,6 +87,9 @@ class User(Base):
 class StorageSpace(Base):
     __tablename__ = "storage_space"
     __table_args__ = (
+        CheckConstraint("NOT is_default OR status = 'ACTIVE'", name="default_space_active"),
+        Index("uq_storage_space_user_default", "user_id", unique=True,
+              postgresql_where=text("is_default")),
         CheckConstraint(
             "type IN ('FRIDGE', 'FREEZER', 'PANTRY', 'WAREHOUSE', 'OTHER')",
             name="type_allowed",
@@ -107,6 +111,7 @@ class StorageSpace(Base):
         UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     type: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="ACTIVE"

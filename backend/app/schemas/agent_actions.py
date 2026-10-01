@@ -20,6 +20,26 @@ class Estimate(BaseModel):
     memory_id: UUID | None = None
 
 
+class UnitRelationship(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_amount: str
+    source_unit: str
+    target_amount: str
+    target_unit: str
+    source: Literal["USER_INPUT", "USER_MEMORY", "MODEL_KNOWLEDGE"]
+    rationale: Text
+    evidence: Text | None = None
+
+    @model_validator(mode="after")
+    def valid_ratio(self):
+        from decimal import Decimal
+        for value in (self.source_amount, self.target_amount):
+            number = Decimal(value)
+            if not number.is_finite() or not 0 < number <= 10**12 or number.as_tuple().exponent < -9 or len(value) > 32:
+                raise ValueError("A relationship requires positive finite amounts")
+        return self
+
+
 class ActionDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
     item_key: Annotated[str, StringConstraints(min_length=1, max_length=80)]
@@ -42,6 +62,11 @@ class ActionDraft(BaseModel):
     expiry_date: CalendarDate | None = None
     utensil: str | None = Field(default=None, max_length=200)
     estimate: Estimate | None = None
+    unit_relationship: UnitRelationship | None = None
+    confirmation_requested: bool = False
+    save_conversion_memory: bool = True
+    clear_fields: list[Literal["quantity_value", "quantity_unit", "storage_space_id", "inventory_item_id",
+                               "purchase_date", "expiry_date", "unit_relationship", "estimate"]] = Field(default_factory=list, max_length=8)
     source_image_ids: list[UUID] = Field(default_factory=list, max_length=80)
     package_description: str | None = Field(default=None, max_length=300)
     review_notes: list[Text] = Field(default_factory=list, max_length=10)
@@ -109,7 +134,7 @@ class ResumeAnswer(BaseModel):
     item_id: UUID
     proposal_id: UUID
     decision: Literal["confirm", "answer", "edit", "cancel"]
-    message: Text | None = None
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=8000)] | None = None
     selected_inventory_item_id: UUID | None = None
     images: list[AgentImage] = Field(default_factory=list, max_length=4)
 

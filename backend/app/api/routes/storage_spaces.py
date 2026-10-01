@@ -29,6 +29,14 @@ CONFLICT_RESPONSE = {409: {"model": BusinessErrorResponse, "description": "Name 
 WRITE_RESPONSES = {**NOT_FOUND_RESPONSE, **CONFLICT_RESPONSE}
 
 
+@router.post("/{space_id}/default", response_model=StorageSpaceRead,
+             dependencies=[Depends(require_empty_body)], responses=WRITE_RESPONSES)
+async def set_default_space(space_id: UUID, session: AsyncSession = Depends(get_db_session),
+                            current_user: User = Depends(get_current_user)):
+    """Set this active owned space as the user's only default space."""
+    return await service.set_default_space(session, space_id, current_user.id)
+
+
 async def storage_space_error_handler(request: Request, exc: service.StorageSpaceError) -> JSONResponse:
     if isinstance(exc, service.SpaceNotFoundError):
         code, http_status = "NOT_FOUND", status.HTTP_404_NOT_FOUND

@@ -36,6 +36,11 @@ def waiting_question(item, language):
     if code == "CLARIFICATION_REQUIRED":
         return draft.get("clarification_question") or item["error"]["message"]
     questions = {
+        "MEMORY_SAVE_UNAVAILABLE": ("换算依据暂时未能保存，库存尚未修改，请稍后重试。", "The conversion could not be saved; inventory is unchanged. Please retry."),
+        "QUANTITY_PRECISION_UNSUPPORTED": ("这个数量超出了当前支持的精度，请明确本次实际用量或盘点剩余数量。", "Please specify a supported amount or the actual remaining total."),
+        "QUANTITY_TOO_SMALL": ("本次用量小于当前支持的精度，请调整用量后重试。", "The change is below the supported precision; please adjust the amount."),
+        "QUANTITY_OUT_OF_RANGE": ("换算后的数量超出当前单位的保存范围，请使用更大的单位或确认实际数量。", "The quantity exceeds the supported range in this unit; use a larger unit or confirm the actual amount."),
+        "WHOLE_COUNT_REQUIRED": (f"你实际消耗了几个{name}？如果有半个，请直接说明。", f"How many {name} did you consume? Include any partial item."),
         "SPACE_REQUIRED": (f"{name}放在哪里？", f"Where would you like to store {name}?"),
         "INITIAL_QUANTITY_REQUIRED": (f"{name}有多少？请带上单位。", f"How much {name} do you have, and in what unit?"),
         "DEFINITION_REQUIRED": (f"请具体说明{name}是什么物品。", f"Which product do you mean by {name}?"),
@@ -82,6 +87,15 @@ def outcome_text(items, language):
                              else (f"Added {quantity} of {name} to {space}." if space else f"Added {quantity} of {name}."))
             else:
                 estimated = saved.get("is_estimated", saved.get("estimated_current_amount") is not None)
-                lines.append(f"已更新{name}，剩余{'约' if estimated else ''}{quantity}。" if zh
-                             else f"Updated {name}. Remaining: {'about ' if estimated else ''}{quantity}.")
+                relation = item.get("preview", {}).get("unit_relationship")
+                operation = item.get("result", {}).get("operation") or {}
+                input_amount = operation.get("quantity_value", draft.get("quantity_value"))
+                input_unit = operation.get("quantity_unit", draft.get("quantity_unit"))
+                if relation:
+                    action = "消耗" if draft.get("action") == "CONSUME" else "添加"
+                    lines.append(f"已{action}{input_amount} {input_unit} {name}，按换算关系估算，剩余约{quantity}。" if zh
+                        else f"Updated {name} by {input_amount} {input_unit} using an estimated conversion. Remaining: about {quantity}.")
+                else:
+                    lines.append(f"已更新{name}，剩余{'约' if estimated else ''}{quantity}。" if zh
+                                 else f"Updated {name}. Remaining: {'about ' if estimated else ''}{quantity}.")
     return "\n".join(lines)

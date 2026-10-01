@@ -57,6 +57,14 @@ user
 
 ## 3. Storage Space Table: `storage_space`
 
+`is_default BOOLEAN NOT NULL DEFAULT false` marks the default. A partial unique
+index on user_id WHERE is_default enforces at most one per user; a check requires
+default spaces to be ACTIVE. Login and default-space mutations ensure a replacement
+when needed, serialized by a user row lock before space locks. Existing defaults
+are preserved; absent defaults use the earliest active (created_at, id) or a new
+OTHER space named “默认空间”. Incremental revision: `a260929_defaults`.
+
+
 | Field | Description |
 | --- | --- |
 | id | Storage space primary key |
@@ -208,7 +216,7 @@ estimated_current_*
 
 - On inventory creation, `confirmed_current_*` equals `initial_*`; `estimated_current_*` and `estimated_at` are all NULL.
 - `estimated_current_amount` and `estimated_current_unit` must either both be NULL or both have values. `estimated_at` must be NULL or populated together with them.
-- All quantities use `NUMERIC(12,3)`, never floating-point types. Stored quantities must be nonnegative.
+- All quantities retain `NUMERIC(12,3)`, never floating point. Current amount/unit fields hold the effective balance; no auxiliary quantity state or residual column is added.
 - Display `estimated_current_*` when it is non-NULL, labeled "Approximately / AI estimate". Otherwise, display `confirmed_current_*`.
 - Automatically change `status` to EMPTY only when the inventory quantity is confirmed to be zero. An estimate of zero may produce a "Possibly used up" indication but must not automatically hide the inventory item.
 
