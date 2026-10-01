@@ -135,6 +135,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
     _inventoryController.reset();
     _storageSpaceController.reset();
     _expirySummaryController.reset();
+    _manualStockInController.reset();
     _agentController.bindUser(nextUser);
 
     if (previousUser != null) {
