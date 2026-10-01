@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'auth/auth_dependencies.dart';
@@ -9,6 +11,7 @@ import 'repositories/profile_preferences_repository.dart';
 import 'repositories/storage_space_repository.dart';
 import 'repositories/workspace_repository.dart';
 import 'screens/ai_assistant_screen.dart';
+import 'screens/daily_consumption_recall_screen.dart';
 import 'screens/expiring_items_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/manual_stock_in_screen.dart';
@@ -95,12 +98,15 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       workspace: _workspace,
     );
     _expirySummaryController = ExpirySummaryController(inventoryRepository);
-    _notificationController = AppNotificationController(
-      authController: _authDependencies.authController,
-      profileController: _profileController,
-      expiryController: _expirySummaryController,
-      service: _notificationService,
-    )..onProcessExpired = _openExpiredItemsFromNotification;
+    _notificationController =
+        AppNotificationController(
+            authController: _authDependencies.authController,
+            profileController: _profileController,
+            expiryController: _expirySummaryController,
+            service: _notificationService,
+          )
+          ..onProcessExpired = _openExpiredItemsFromNotification
+          ..onDailyCheckIn = _openDailyConsumptionRecall;
 
     final catalogRepository = CatalogRepository(
       CatalogApiService(_authDependencies.apiClient),
@@ -129,6 +135,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
     _inventoryController.reset();
     _storageSpaceController.reset();
     _expirySummaryController.reset();
+    _manualStockInController.reset();
     _agentController.bindUser(nextUser);
 
     if (previousUser != null) {
@@ -252,6 +259,52 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
     await _refreshBusiness();
   }
 
+  Future<void> _openDailyConsumptionRecall() async {
+    if (!_authDependencies.authController.isAuthenticated) return;
+    final navigator = _navigator.currentState;
+    if (navigator == null) return;
+    if (!_agentController.canSend) {
+      _openAssistant(
+        navigator.context,
+        _authDependencies.authController,
+        isGuest: false,
+      );
+      return;
+    }
+    final summary = await navigator.push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => const DailyConsumptionRecallScreen(),
+      ),
+    );
+    if (!mounted || summary == null || summary.trim().isEmpty) return;
+    await _notificationController.markRead(AppNotificationType.daily);
+    if (!mounted) return;
+    _openDailyConsumptionInAssistant(summary.trim());
+  }
+
+  void _openDailyConsumptionInAssistant(String summary) {
+    final navigator = _navigator.currentState;
+    final authController = _authDependencies.authController;
+    if (navigator == null || !authController.isAuthenticated) return;
+    navigator.popUntil((route) => route.isFirst);
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (assistantContext) => AiAssistantScreen(
+          agentController: _agentController,
+          displayName: _profileController.displayName,
+          onHomeTap: () =>
+              Navigator.of(assistantContext).popUntil((route) => route.isFirst),
+          onProfileTap: () => _openProfile(assistantContext, authController),
+        ),
+      ),
+    );
+    unawaited(
+      _agentController.send(
+        'Today I used: $summary. Please propose the inventory deductions and wait for my confirmation.',
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -284,6 +337,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
             notificationController: _notificationController,
             storageSpaceController: _storageSpaceController,
             onAddItemTap: () => _openManualStockIn(context),
+            onDailyConsumptionSubmit: _openDailyConsumptionInAssistant,
             onAssistantTap: () =>
                 _openAssistant(context, authController, isGuest: false),
             onProfileTap: () => _openProfile(context, authController),

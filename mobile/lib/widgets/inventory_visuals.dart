@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/inventory_item.dart';
 import '../theme/app_theme.dart';
 import 'inventory_card_trailing.dart';
+import 'page_back_button.dart';
 
 abstract final class HomeAssets {
   static const root = 'assets/icons/home';
@@ -189,10 +190,18 @@ class InventoryArtwork extends StatelessWidget {
 }
 
 class InventoryItemTile extends StatelessWidget {
-  const InventoryItemTile({required this.item, required this.onTap, super.key});
+  const InventoryItemTile({
+    required this.item,
+    required this.onTap,
+    this.selectionControl,
+    this.selected = false,
+    super.key,
+  });
 
   final InventoryItem item;
   final VoidCallback onTap;
+  final Widget? selectionControl;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -204,6 +213,7 @@ class InventoryItemTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
+            color: selected ? AppColors.primarySoft : null,
             border: Border.all(color: const Color(0xFFA8D589)),
             borderRadius: BorderRadius.circular(13),
           ),
@@ -263,6 +273,7 @@ class InventoryItemTile extends StatelessWidget {
               InventoryCardTrailing(
                 expiryText: expiryLabel(item.expiryDate),
                 expiryColor: expiryColor(item.expiryDate),
+                action: selectionControl,
               ),
             ],
           ),
@@ -273,40 +284,58 @@ class InventoryItemTile extends StatelessWidget {
 }
 
 class OverviewHeader extends StatelessWidget {
-  const OverviewHeader({required this.title, super.key});
+  const OverviewHeader({
+    required this.title,
+    this.actions,
+    this.actionWidth = 48,
+    super.key,
+  });
 
   final String title;
+  final Widget? actions;
+  final double actionWidth;
 
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 76),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 8),
         child: Row(
           children: [
             SizedBox(
-              width: 48,
-              child: IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.arrow_back_ios_new, size: 23),
-                tooltip: 'Back',
+              width: actionWidth,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: const PageBackButton(),
               ),
             ),
             Expanded(
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: actions == null
+                  ? Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
             ),
-            // Match the back button's width so the title stays page-centred.
-            const SizedBox(width: 48),
+            // Reserve equal space on both sides to keep the title centred.
+            SizedBox(width: actionWidth, child: actions),
           ],
         ),
       ),

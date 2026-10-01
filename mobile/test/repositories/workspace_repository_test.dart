@@ -10,6 +10,81 @@ import '../support/integration_fixtures.dart';
 
 void main() {
   test(
+    'batch archive sends one versioned request and refreshes only after a complete acknowledgement',
+    () async {
+      var refreshes = 0;
+      final items = [
+        InventoryItem.fromJson(stockJson()),
+        InventoryItem.fromJson({...stockJson(version: 4), 'id': 'item-2'}),
+      ];
+      final api = ApiClient(
+        client: MockClient((request) async {
+          expect(request.url.path, '/api/v1/inventory-items/batch-archive');
+          expect(request.headers['Authorization'], 'Bearer test-token');
+          expect(jsonDecode(request.body), {
+            'items': [
+              {'id': 'item-1', 'expected_version': 1},
+              {'id': 'item-2', 'expected_version': 4},
+            ],
+          });
+          return jsonResponse({
+            'count': 2,
+            'items': [
+              {...stockJson(version: 2), 'status': 'ARCHIVED'},
+              {...stockJson(version: 5), 'id': 'item-2', 'status': 'ARCHIVED'},
+            ],
+          });
+        }),
+      );
+      addTearDown(api.close);
+      final repository = WorkspaceRepository(
+        api,
+        MemoryTokens(),
+        onChanged: () async {
+          refreshes++;
+        },
+      );
+      await repository.archiveItems(items);
+      expect(refreshes, 1);
+    },
+  );
+
+  test(
+    'batch archive rejects a partial acknowledgement and never automatically retries',
+    () async {
+      var calls = 0, refreshes = 0;
+      final api = ApiClient(
+        client: MockClient((_) async {
+          calls++;
+          return jsonResponse({'count': 0, 'items': []});
+        }),
+      );
+      addTearDown(api.close);
+      final repository = WorkspaceRepository(
+        api,
+        MemoryTokens(),
+        onChanged: () async {
+          refreshes++;
+        },
+      );
+      await expectLater(
+        repository.archiveItems([InventoryItem.fromJson(stockJson())]),
+        throwsA(
+          isA<ApiException>().having((e) => e.code, 'code', 'INVALID_RESPONSE'),
+        ),
+      );
+      expect(calls, 1);
+      expect(refreshes, 0);
+      await expectLater(repository.archiveItems([]), throwsArgumentError);
+      final item = InventoryItem.fromJson(stockJson());
+      await expectLater(
+        repository.archiveItems([item, item]),
+        throwsArgumentError,
+      );
+      expect(calls, 1);
+    },
+  );
+  test(
     'space archive and restore send zero body bytes with authentication',
     () async {
       final paths = <String>[];

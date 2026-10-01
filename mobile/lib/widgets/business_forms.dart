@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../repositories/workspace_repository.dart';
 import '../services/api_exception.dart';
+import '../theme/app_theme.dart';
+import 'selection_field.dart';
 
 /// A dialog owns its controllers until its route is disposed (including exit animation).
 class BusinessField {
@@ -108,6 +110,10 @@ class _BusinessFormState extends State<_BusinessForm> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
     child: AlertDialog(
+      backgroundColor: AppColors.background,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       title: Text(widget.title),
       content: SingleChildScrollView(
         child: Form(
@@ -132,23 +138,12 @@ class _BusinessFormState extends State<_BusinessForm> {
                           decoration: InputDecoration(labelText: field.label),
                           validator: field.validator,
                         )
-                      : DropdownButtonFormField<String>(
-                          initialValue: _fields[field.keyName]!.text.isEmpty
+                      : SelectionField(
+                          label: field.label,
+                          options: field.options!,
+                          value: _fields[field.keyName]!.text.isEmpty
                               ? null
                               : _fields[field.keyName]!.text,
-                          isExpanded: true,
-                          decoration: InputDecoration(labelText: field.label),
-                          items: field.options!.entries
-                              .map(
-                                (e) => DropdownMenuItem(
-                                  value: e.key,
-                                  child: Text(
-                                    e.value,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              )
-                              .toList(),
                           onChanged: _busy || _frozen != null
                               ? null
                               : (value) =>

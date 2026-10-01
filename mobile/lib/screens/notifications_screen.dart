@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/inventory_visuals.dart';
 import '../widgets/page_scroll_fade.dart';
+import 'daily_consumption_recall_screen.dart';
 import 'expiring_items_screen.dart';
 
 class NotificationsScreen extends StatelessWidget {
@@ -17,6 +18,7 @@ class NotificationsScreen extends StatelessWidget {
     this.inventoryController,
     this.storageSpaceController,
     this.onExpiringTap,
+    this.onDailyConsumptionSubmit,
     super.key,
   });
 
@@ -25,6 +27,7 @@ class NotificationsScreen extends StatelessWidget {
   final InventoryController? inventoryController;
   final StorageSpaceController? storageSpaceController;
   final VoidCallback? onExpiringTap;
+  final ValueChanged<String>? onDailyConsumptionSubmit;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -57,6 +60,8 @@ class NotificationsScreen extends StatelessWidget {
                                       onProcessExpired: () =>
                                           _openItems(context, overdue: true),
                                       onViewExpiring: () => _openItems(context),
+                                      onDailyCheckIn: () =>
+                                          _openDailyCheckIn(context),
                                     ),
                                   ),
                           ),
@@ -123,6 +128,18 @@ class NotificationsScreen extends StatelessWidget {
     await expiry.selectBucket(previousBucket);
     await inventory.reload();
   }
+
+  Future<void> _openDailyCheckIn(BuildContext context) async {
+    final summary = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => const DailyConsumptionRecallScreen(),
+      ),
+    );
+    if (!context.mounted || summary == null || summary.trim().isEmpty) return;
+    await controller?.markRead(AppNotificationType.daily);
+    if (!context.mounted) return;
+    onDailyConsumptionSubmit?.call(summary.trim());
+  }
 }
 
 class _NotificationPanel extends StatelessWidget {
@@ -130,11 +147,13 @@ class _NotificationPanel extends StatelessWidget {
     required this.controller,
     required this.onProcessExpired,
     required this.onViewExpiring,
+    required this.onDailyCheckIn,
   });
 
   final AppNotificationController controller;
   final Future<void> Function() onProcessExpired;
   final Future<void> Function() onViewExpiring;
+  final Future<void> Function() onDailyCheckIn;
 
   @override
   Widget build(BuildContext context) {
@@ -229,8 +248,8 @@ class _NotificationPanel extends StatelessWidget {
                           ),
                         ),
                         if (notification.processable ||
-                            notification.type ==
-                                AppNotificationType.expiring) ...[
+                            notification.type == AppNotificationType.expiring ||
+                            notification.type == AppNotificationType.daily) ...[
                           const SizedBox(height: 16),
                           Align(
                             alignment: Alignment.centerRight,
@@ -245,10 +264,16 @@ class _NotificationPanel extends StatelessWidget {
                               ),
                               onPressed: notification.processable
                                   ? onProcessExpired
+                                  : notification.type ==
+                                        AppNotificationType.daily
+                                  ? onDailyCheckIn
                                   : onViewExpiring,
                               child: Text(
                                 notification.processable
                                     ? 'Process now'
+                                    : notification.type ==
+                                          AppNotificationType.daily
+                                    ? 'Record usage'
                                     : 'View items',
                               ),
                             ),

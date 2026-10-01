@@ -6,6 +6,8 @@ import '../models/inventory_item.dart';
 import '../state/manual_stock_in_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/selection_field.dart';
+import '../widgets/page_back_button.dart';
 
 class ManualStockInScreen extends StatefulWidget {
   const ManualStockInScreen({required this.controller, super.key});
@@ -76,14 +78,11 @@ class _ManualStockInScreenState extends State<ManualStockInScreen> {
       key: _formKey,
       child: PageScrollFade(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          padding: const EdgeInsets.fromLTRB(25, 12, 25, 32),
           children: [
             Row(
               children: [
-                IconButton(
-                  onPressed: isSubmitting ? null : Navigator.of(context).pop,
-                  icon: const Icon(Icons.arrow_back),
-                ),
+                PageBackButton(enabled: !isSubmitting),
                 const SizedBox(width: 8),
                 Text(
                   'Add inventory',
@@ -92,40 +91,33 @@ class _ManualStockInScreenState extends State<ManualStockInScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            DropdownButtonFormField<String>(
-              initialValue: controller.selectedStorageSpaceId,
-              decoration: const InputDecoration(labelText: 'Storage space'),
-              items: controller.storageSpaces
-                  .map(
-                    (space) => DropdownMenuItem(
-                      value: space.id,
-                      child: Text(space.name),
-                    ),
-                  )
-                  .toList(),
+            SelectionField(
+              label: 'Storage space',
+              value: controller.selectedStorageSpaceId,
+              options: {
+                for (final space in controller.storageSpaces)
+                  space.id: space.name,
+              },
               onChanged: isSubmitting ? null : controller.selectStorageSpace,
               validator: (value) =>
                   value == null ? 'Choose a storage space.' : null,
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: controller.selectedCategoryId,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: controller.categories
-                  .map(
-                    (category) => DropdownMenuItem(
-                      value: category.id,
-                      child: Text(category.name),
-                    ),
-                  )
-                  .toList(),
+            SelectionField(
+              label: 'Category',
+              value: controller.selectedCategoryId,
+              options: {
+                for (final category in controller.categories)
+                  category.id: category.name,
+              },
               onChanged: isSubmitting ? null : controller.selectCategory,
               validator: (value) => value == null ? 'Choose a category.' : null,
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
+            SelectionField(
+              label: 'Item',
               key: ValueKey(controller.selectedCategoryId),
-              initialValue: controller.selectedDefinitionId,
+              value: controller.selectedDefinitionId,
               decoration: InputDecoration(
                 labelText: 'Item',
                 suffixIcon: controller.isLoadingDefinitions
@@ -135,14 +127,10 @@ class _ManualStockInScreenState extends State<ManualStockInScreen> {
                       )
                     : null,
               ),
-              items: controller.definitions
-                  .map(
-                    (definition) => DropdownMenuItem(
-                      value: definition.id,
-                      child: Text(definition.name),
-                    ),
-                  )
-                  .toList(),
+              options: {
+                for (final definition in controller.definitions)
+                  definition.id: definition.name,
+              },
               onChanged: isSubmitting || controller.isLoadingDefinitions
                   ? null
                   : controller.selectDefinition,
