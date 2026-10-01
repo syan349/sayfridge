@@ -47,12 +47,16 @@ def create_access_token(
 
 def decode_access_token(token: str, secret_key: SecretStr) -> uuid.UUID:
     # Fix the algorithm and require key claims; do not trust the token header to determine its algorithm or purpose.
-    payload = jwt.decode(
-        token,
-        secret_key.get_secret_value(),
-        algorithms=[JWT_ALGORITHM],
-        options={"require": ["sub", "type", "iat", "exp"]},
-    )
+    try:
+        payload = jwt.decode(
+            token,
+            secret_key.get_secret_value(),
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["sub", "type", "iat", "exp"]},
+        )
+    except (TypeError, ValueError, OverflowError) as exc:
+        # Some PyJWT versions leak conversion errors for malformed numeric claims.
+        raise jwt.InvalidTokenError("invalid token claims") from exc
     if payload["type"] != ACCESS_TOKEN_TYPE:
         raise jwt.InvalidTokenError("unexpected token type")
 
