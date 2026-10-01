@@ -39,6 +39,9 @@ def test_register_login_me_database_lifecycle(database):
         assert (await client.post("/api/v1/auth/register", json=payload)).status_code == 409
         login = await client.post("/api/v1/auth/login", json=payload)
         assert login.status_code == 200 and login.json()["expires_in"] == 900
+        assert (await client.post("/api/v1/auth/login", json=payload)).status_code == 200
+        async with sessions() as s:
+            assert (await s.execute(text("SELECT count(*) FROM storage_space WHERE is_default AND status='ACTIVE'"))).scalar_one() == 1
         headers = {"Authorization": "Bearer " + login.json()["access_token"]}
         assert (await client.get("/api/v1/auth/me", headers=headers)).json() == user
         wrong = await client.post("/api/v1/auth/login", json={**payload, "password": "wrong-pass"})

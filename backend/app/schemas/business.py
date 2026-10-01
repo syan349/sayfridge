@@ -49,6 +49,7 @@ class StorageSpaceRead(BaseModel):
     name: str
     type: SpaceType
     status: SpaceStatus
+    is_default: bool = False
     created_at: datetime
     updated_at: datetime
 

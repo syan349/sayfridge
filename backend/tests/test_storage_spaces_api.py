@@ -15,7 +15,7 @@ from auth_test_support import exercise, make_user, request, seed_users
 
 pytestmark = pytest.mark.postgres
 BASE = "/api/v1/storage-spaces"
-PUBLIC_FIELDS = {"id", "name", "type", "status", "created_at", "updated_at"}
+PUBLIC_FIELDS = {"is_default", "id", "name", "type", "status", "created_at", "updated_at"}
 
 
 @pytest.fixture

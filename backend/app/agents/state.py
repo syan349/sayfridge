@@ -29,6 +29,10 @@ class AgentState(TypedDict):
     turn_intent: dict
     proposal_retries: int
     prose_retries: int
+    context_compaction: dict
+    suspended_items: list[dict]
+    chat_requests: dict
+    image_messages: list
 
 
 @dataclass(frozen=True, slots=True)

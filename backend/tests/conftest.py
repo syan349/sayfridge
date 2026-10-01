@@ -51,6 +51,16 @@ def live_runner():
 
 
 # Each database test owns a migrated schema, including committed test data.
+@pytest.fixture(autouse=True)
+def isolated_login_attempts():
+    from app.core.login_rate_limit import login_rate_limiter
+    with login_rate_limiter._lock:
+        login_rate_limiter._attempts.clear()
+    yield
+    with login_rate_limiter._lock:
+        login_rate_limiter._attempts.clear()
+
+
 @pytest.fixture
 def database():
     value = os.environ.get("TEST_DATABASE_URL")
