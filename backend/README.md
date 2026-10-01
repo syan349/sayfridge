@@ -81,11 +81,133 @@ hexadecimal Git commit. These values are public deployment metadata, not secrets
 Authentication supports local email/password accounts and short-lived Bearer access
 tokens. A successful login clears that client/account limit. The application limit is
 process-local, so a multi-instance deployment must also configure a shared limit at
-the hosting edge or gateway. Refresh tokens, server-side sessions, a logout endpoint,
-immediate token revocation, third-party login, email verification, password recovery,
-and MFA are not currently available. Clients log out by deleting their token; an
-issued token otherwise remains usable until expiry unless the account is suspended,
-disabled, or deleted.
+the hosting edge or gateway.
+
+### Persistent login
+
+Login issues a 15-minute access JWT and an opaque refresh credential. The clients
+renew access automatically and retry a rejected authenticated request once. Concurrent
+requests share one renewal. Network failures preserve credentials for a later retry.
+Agent streams are retried only when authentication fails before the stream starts.
+
+`POST /api/v1/auth/refresh` rotates the refresh credential. Only its SHA-256 hash is
+stored in PostgreSQL. Reuse of a consumed credential revokes its session, including
+all access JWTs issued for that session. `POST /api/v1/auth/logout` revokes the
+session immediately; other devices retain their independent sessions. Every
+protected request checks session expiry/revocation and the account's current status.
+
+- `REFRESH_TOKEN_IDLE_DAYS=30`: renewal extends the idle deadline.
+- `REFRESH_TOKEN_ABSOLUTE_DAYS=90`: renewal never extends the absolute deadline.
+- Flutter saves credentials in FlutterSecureStorage and restores login on restart.
+  Native device storage and Flutter Web browser storage have different protections.
+- React Web keeps credentials in memory/sessionStorage for the current tab.
+- Flutter waits for server logout before clearing credentials; offline logout can
+  be retried. React clears its local session immediately and sends server logout;
+  if that request fails, server revocation is not confirmed.
+- A revoked/expired session or inactive account requires login again. Access tokens
+  issued before this change keep their original short expiry; sign in again to
+  obtain a persistent session. Passwords are never stored by either client.
+
+### Migration runbook: persistent login on existing Neon
+
+Migration `a261001_sessions` follows `a260929_defaults`. It adds `auth_session`
+and `auth_refresh_credential`, their foreign keys and indexes. Existing users,
+passwords, spaces, inventory and conversation data are preserved. A database reset
+and demo reseed are unnecessary.
+
+1. Merge the verified change into `main` and select its commit for release. Use
+   Python 3.12 with the Backend dependencies installed. Run the commands below
+   from `backend/` in that checkout.
+2. Configure the ignored local `.env` or shell environment. `DATABASE_URL_DIRECT`
+   must point to the same Neon branch and database as the Vercel Backend's
+   `DATABASE_URL`. Use the direct, non-pooler connection for Alembic, with the
+   `postgresql+psycopg://` prefix. Verify the branch/database in Neon; do not print
+   or paste the full connection strings. The required JWT/CORS settings must also
+   be present for Settings validation. Shell variables override `.env`.
+3. Inspect the database revision and the checkout's migration head:
+
+   ```bash
+   python -m alembic current
+   python -m alembic heads
+   ```
+
+   The checkout's head must be `a261001_sessions`. An existing database at
+   `a260929_defaults` needs the new session migration. Earlier tracked revisions
+   are upgraded through the migration chain. If the database already reports
+   `a261001_sessions`, proceed to verification. If tables exist without a tracked
+   revision, or the revision is unknown to the checkout, reconcile that state
+   before continuing; `alembic stamp` does not create missing tables.
+
+4. Apply the incremental business-schema migration:
+
+   ```bash
+   python -m alembic upgrade head
+   ```
+
+   This command uses `DATABASE_URL_DIRECT`. It does not seed demo accounts or
+   initialize the separate Agent storage schema. Stop the release if it fails.
+
+5. Verify the revision and structure:
+
+   ```bash
+   python -m alembic current
+   python -m alembic check
+   python scripts/verify_database_schema.py
+   ```
+
+   Success requires revision `a261001_sessions`, no pending ORM migration changes,
+   and a successful schema verification. Confirm the two session tables are present
+   in Neon's Tables view. Record the release commit, Neon branch/database, revision,
+   verification outcome and execution time; exclude credentials from that record.
+
+6. Deploy the selected Backend commit to Vercel, then deploy the updated React Web
+   and Flutter clients. Keep the existing database URLs and JWT signing secret.
+   `REFRESH_TOKEN_IDLE_DAYS` and `REFRESH_TOKEN_ABSOLUTE_DAYS` default to 30 and 90;
+   explicit hosting values are optional unless changing those defaults.
+7. Sign in again to obtain the new persistent session. Verify login returns both
+   access and refresh credentials, automatic renewal preserves inventory access,
+   and logout causes the old access credential to return 401. Check the deployed
+   commit through `/api/v1/system/version`. Never include tokens in screenshots or
+   committed acceptance reports.
+
+#### Recovery
+
+If migration or structural verification fails, leave the currently deployed
+Backend running and resolve the reported database state before deploying the new
+code. Recheck `alembic current` after a failure. Do not reset the schema or replace
+business data as part of this migration.
+
+If application deployment fails after a successful migration, redeploy the previous
+application version and retain the added tables. They do not change the existing
+business tables. The previous version retains its access-only authentication
+behaviour; the new session-revocation behaviour returns when the new Backend is
+redeployed.
+
+The migration includes a `downgrade()` implementation. Downgrading to
+`a260929_defaults` drops the two session tables and invalidates persistent sessions;
+it is a separate operator action, not the routine application rollback path.
+
+#### Fresh databases and local verification
+
+For an empty database, use the complete initializer instead of the existing-Neon
+procedure. It applies all business migrations, seeds public categories and
+initializes Agent storage:
+
+```bash
+python scripts/initialize_database.py
+python scripts/verify_database_schema.py
+```
+
+Run migration and session checks against the isolated test database configured by
+`TEST_DATABASE_URL` or `backend/.env.test`:
+
+```bash
+python -m pytest tests/test_database_initialization_postgres.py tests/test_persistent_auth.py -v
+```
+
+Local isolated-database and browser tests have passed. No online Neon migration
+or hosted deployment has been performed for this change. Cookie login, password
+recovery and MFA are separate from these endpoints.
 
 The [Security and Privacy review (8.1–8.6)](../docs/SECURITY_AND_PRIVACY.md) records focused
 verification and remaining risks. Runtime SQLAlchemy exceptions hide bound SQL
@@ -114,9 +236,8 @@ Copy `.env.example` to `.env` and enter real connection details only in the loca
 
 Both URLs must use the `postgresql+psycopg://` prefix. Git ignores `.env`; never put real connection strings or passwords in code, migrations, or documentation.
 
-Before the first backend release, maintain the latest table definition, ORM,
-and API contracts together; record structural changes in the design handbook.
-Incremental migration histories and deployment rollback procedures are not required.
+Keep the migration history, ORM and API contracts together. Existing databases
+are upgraded through Alembic; use the [persistent-login migration runbook](#migration-runbook-persistent-login-on-existing-neon) for this release.
 Initialize a fresh database completely with:
 
 ```bash

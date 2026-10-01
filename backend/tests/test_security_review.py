@@ -138,7 +138,8 @@ PROTECTED_ROUTES = [
     (method.upper(), path)
     for path, operations in app.openapi()["paths"].items()
     if path.startswith("/api/v1/") and path not in {
-        "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/system/version"
+        "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/system/version",
+        "/api/v1/auth/refresh", "/api/v1/auth/logout"
     }
     for method in operations if method in {"get", "post", "patch", "put", "delete"}
 ]
@@ -158,3 +159,11 @@ def test_sql_exception_representation_hides_bound_private_data():
                            {"email": "PRIVATE_SQL_SENTINEL@example.com"}, RuntimeError(),
                            hide_parameters=engine.sync_engine.hide_parameters)
     assert "PRIVATE_SQL_SENTINEL" not in str(error)
+
+
+@pytest.mark.parametrize("path", ["/api/v1/auth/refresh", "/api/v1/auth/logout"])
+def test_refresh_endpoints_require_credentials_without_echoing_them(path):
+    assert send("POST", path).status_code == 422
+    response = send("POST", path, json={"refresh_token": "PRIVATE_REFRESH_SENTINEL"})
+    assert response.status_code == 422
+    assert "PRIVATE_REFRESH_SENTINEL" not in response.text

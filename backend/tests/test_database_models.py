@@ -5,6 +5,8 @@ from app.db import models  # noqa: F401  # Import models to register them with B
 
 
 EXPECTED_TABLES = {
+    "auth_session",
+    "auth_refresh_credential",
     "user",
     "storage_space",
     "item_category",

@@ -1,13 +1,8 @@
-// Holds the bearer token from POST /auth/login.
-//
-// Kept in memory for normal use and mirrored to sessionStorage so a page
-// reload keeps you signed in; sessionStorage is cleared when the tab closes.
-// The backend has no refresh tokens, so the token simply stops being used
-// once `expires_in` seconds have passed.
-
+// Credentials are tab-scoped in sessionStorage; never store passwords.
 const STORAGE_KEY = 'sayfridge.auth'
 
 interface StoredToken {
+  refreshToken?: string
   token: string
   expiresAt: number // epoch milliseconds
 }
@@ -27,7 +22,7 @@ function readStorage(): StoredToken | null {
       typeof parsed.token === 'string' &&
       typeof parsed.expiresAt === 'number'
     ) {
-      return { token: parsed.token, expiresAt: parsed.expiresAt }
+      return { token: parsed.token, expiresAt: parsed.expiresAt, refreshToken: "refreshToken" in parsed && typeof parsed.refreshToken === "string" ? parsed.refreshToken : undefined }
     }
   } catch {
     // Storage blocked or value corrupted: behave as signed out.
@@ -36,12 +31,11 @@ function readStorage(): StoredToken | null {
 }
 
 export function getToken(): string | null {
-  if (current && Date.now() >= current.expiresAt) clearToken()
-  return current?.token ?? null
+  return current && Date.now() < current.expiresAt ? current.token : null
 }
 
-export function setToken(token: string, expiresInSeconds: number): void {
-  current = { token, expiresAt: Date.now() + expiresInSeconds * 1000 }
+export function setToken(token: string, expiresInSeconds: number, refreshToken?: string): void {
+  current = { token, refreshToken, expiresAt: Date.now() + expiresInSeconds * 1000 }
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(current))
   } catch {
@@ -56,4 +50,8 @@ export function clearToken(): void {
   } catch {
     // Nothing to clean up.
   }
+}
+
+export function getRefreshToken(): string | null {
+  return current?.refreshToken ?? null
 }

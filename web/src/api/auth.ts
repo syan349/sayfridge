@@ -19,3 +19,8 @@ export function register(credentials: Credentials): Promise<User> {
 export function getMe(signal?: AbortSignal): Promise<User> {
   return apiFetch<User>('/auth/me', { signal })
 }
+
+/** Revoke the current device session, including its issued access tokens. */
+export function logout(refreshToken: string): Promise<void> {
+  return apiFetch<void>('/auth/logout', { method: 'POST', body: { refresh_token: refreshToken }, auth: false })
+}

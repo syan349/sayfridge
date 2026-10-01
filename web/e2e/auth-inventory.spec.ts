@@ -28,4 +28,25 @@ test('register, sign out, sign in and load an empty inventory from PostgreSQL', 
   await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
+
+  // Force client-side access expiry; the real backend must rotate the session.
+  const before = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sayfridge.auth')!))
+  await page.evaluate(() => {
+    const stored = JSON.parse(sessionStorage.getItem('sayfridge.auth')!)
+    stored.expiresAt = 0
+    sessionStorage.setItem('sayfridge.auth', JSON.stringify(stored))
+  })
+  const refreshed = page.waitForResponse(r => r.url().endsWith('/auth/refresh'))
+  await page.reload()
+  expect((await refreshed).status()).toBe(200)
+  await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
+  const after = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sayfridge.auth')!))
+  expect(after.refreshToken).not.toBe(before.refreshToken)
+  const revoked = page.waitForResponse(r => r.url().endsWith('/auth/logout'))
+  await page.getByRole('button', { name: 'Log out', exact: true }).click()
+  expect((await revoked).status()).toBe(204)
+  const api = process.env.VITE_API_BASE_URL!
+  expect((await page.request.get(`${api}/auth/me`, {
+    headers: { Authorization: `Bearer ${after.token}` },
+  })).status()).toBe(401)
 })

@@ -154,6 +154,11 @@ void main() {
 }
 
 class _FakeAuthRepository implements AuthRepository {
+  @override
+  void Function()? onSessionExpired;
+  @override
+  Future<String?> renewAccess(String rejected) async => null;
+
   _FakeAuthRepository(this.user);
 
   final AppUser user;
@@ -167,10 +172,7 @@ class _FakeAuthRepository implements AuthRepository {
   bool logoutCalled = false;
 
   @override
-  Future<AppUser> register({
-    required String email,
-    required String password,
-  }) {
+  Future<AppUser> register({required String email, required String password}) {
     if (registerError != null) {
       return Future<AppUser>.error(registerError!);
     }
@@ -179,10 +181,7 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AppUser> login({
-    required String email,
-    required String password,
-  }) {
+  Future<AppUser> login({required String email, required String password}) {
     if (loginError != null) {
       return Future<AppUser>.error(loginError!);
     }

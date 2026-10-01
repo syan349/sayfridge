@@ -42,6 +42,13 @@ class LoginResponse(BaseModel):
     token_type: Literal["bearer"] = "bearer"
     expires_in: int
     user: UserPublic
+    refresh_token: str
+    refresh_expires_in: int
+
+
+class RefreshRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    refresh_token: str = Field(min_length=40, max_length=128)
 
 
 class AuthErrorResponse(BaseModel):

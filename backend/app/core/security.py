@@ -30,6 +30,7 @@ def create_access_token(
     expires_minutes: int,
     *,
     now: datetime | None = None,
+    session_id: uuid.UUID | None = None,
 ) -> str:
     issued_at = now or datetime.now(timezone.utc)
     payload = {
@@ -38,6 +39,8 @@ def create_access_token(
         "iat": issued_at,
         "exp": issued_at + timedelta(minutes=expires_minutes),
     }
+    if session_id is not None:
+        payload["sid"] = str(session_id)
     return jwt.encode(
         payload,
         secret_key.get_secret_value(),

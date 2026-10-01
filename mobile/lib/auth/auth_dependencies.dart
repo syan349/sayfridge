@@ -15,11 +15,9 @@ class AuthDependencies {
     final apiClient = ApiClient();
     final authApiService = AuthApiService(apiClient);
     const tokenStorage = TokenStorage();
-    final authRepository = AuthRepository(
-      authApiService,
-      tokenStorage,
-    );
+    final authRepository = AuthRepository(authApiService, tokenStorage);
     final authController = AuthController(authRepository);
+    authRepository.onSessionExpired = authController.sessionExpired;
 
     return AuthDependencies._(
       apiClient: apiClient,
