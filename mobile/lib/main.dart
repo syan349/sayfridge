@@ -290,6 +290,7 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
           agentController: _agentController,
           displayName: _profileController.displayName,
           initialDraft: AgentInputDraft(
+            displayText: summary.text.isEmpty ? 'Photo attached' : summary.text,
             text:
                 'Today I used: ${summary.text.isEmpty ? "See the attached photos" : summary.text}. Please propose the inventory deductions and wait for my confirmation.',
             images: summary.images,

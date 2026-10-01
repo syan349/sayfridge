@@ -633,7 +633,7 @@ void main() {
     await tester.pumpAndSettle();
     await _tapAndFinish(tester, agent, find.byTooltip('Send message'));
     await tester.pumpAndSettle();
-    expect(sent?['message'], '');
+    expect(sent?['message'], contains('prepare inventory entries for review'));
     expect(sent?['images'], hasLength(1));
     expect(sent?['images'][0]['mime_type'], 'image/jpeg');
     expect(find.bySemanticsLabel('Selected photo'), findsNothing);
@@ -807,7 +807,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unknown package'), findsNothing);
-    expect(find.text('Milk 1 bottle'), findsOneWidget);
+    expect(find.text('Original request'), findsNothing);
     expect(find.text('Milk'), findsOneWidget);
     expect(find.text('Ready for review'), findsOneWidget);
     expect(find.text('MILK 1L'), findsOneWidget);
@@ -815,8 +815,10 @@ void main() {
     expect(find.text('Fridge'), findsOneWidget);
     expect(find.text('1 litre carton'), findsOneWidget);
     expect(find.text('1 bottle'), findsOneWidget);
-    expect(find.text('Still needed: expiry_date'), findsOneWidget);
-    expect(find.text('Review notes: Check the expiry date'), findsOneWidget);
+    expect(find.text('Still needed'), findsOneWidget);
+    expect(find.text('expiry date'), findsOneWidget);
+    expect(find.text('Review notes'), findsOneWidget);
+    expect(find.text('Check the expiry date'), findsOneWidget);
     expect(resumeBody?['responses'][0]['proposal_id'], 'old');
     expect(resumeBody?['responses'][0]['images'], hasLength(1));
     expect(agent.items.single['proposal_id'], 'new');
@@ -900,8 +902,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(agent.waiting, isTrue);
       expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
-      await tester.ensureVisible(find.text('Confirm proposal'));
-      await _tapAndFinish(tester, agent, find.text('Confirm proposal'));
+      await tester.ensureVisible(find.text('Confirm'));
+      await _tapAndFinish(tester, agent, find.text('Confirm'));
       await tester.pumpAndSettle();
       expect(calls, 2);
       expect(find.text('Failed'), findsOneWidget);

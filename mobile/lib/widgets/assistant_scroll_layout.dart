@@ -9,6 +9,7 @@ class AssistantScrollLayout extends StatelessWidget {
   const AssistantScrollLayout({
     required this.contentBuilder,
     required this.footer,
+    this.header,
     this.bottomInset = 0,
     super.key,
   });
@@ -16,6 +17,7 @@ class AssistantScrollLayout extends StatelessWidget {
   final Widget Function(BuildContext context, double bottomPadding)
   contentBuilder;
   final Widget footer;
+  final Widget? header;
   // Supplied from outside SafeArea, which removes this inset from MediaQuery.
   final double bottomInset;
 
@@ -23,6 +25,19 @@ class AssistantScrollLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (header != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          header!,
+          Expanded(child: _body(context)),
+        ],
+      );
+    }
+    return _body(context);
+  }
+
+  Widget _body(BuildContext context) {
     return LayoutBuilder(
       builder: (context, pageConstraints) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -38,6 +53,7 @@ class AssistantScrollLayout extends StatelessWidget {
                   minHeight: viewportHeight,
                   maxHeight: viewportHeight,
                   child: ScrollEdgeFade(
+                    topExtent: header == null ? 56 : 32,
                     bottomExtent: 0,
                     child: contentBuilder(
                       context,

@@ -147,6 +147,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               constraints: const BoxConstraints(maxWidth: 480),
               child: AssistantScrollLayout(
                 bottomInset: bottomInset,
+                header: Padding(
+                  padding: const EdgeInsets.fromLTRB(25, 27, 25, 15),
+                  child: AssistantHeader(
+                    onNewConversation: _startNewConversation,
+                    onHistory: _openHistory,
+                  ),
+                ),
                 contentBuilder: (context, bottomPadding) =>
                     _buildScrollableContent(bottomPadding),
                 footer: widget.isGuest
@@ -199,13 +206,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget _buildScrollableContent(double bottomPadding) {
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.fromLTRB(25, 27, 25, bottomPadding),
+      padding: EdgeInsets.fromLTRB(25, 0, 25, bottomPadding),
       children: [
-        AssistantHeader(
-          onNewConversation: _startNewConversation,
-          onHistory: _openHistory,
-        ),
-        const SizedBox(height: 15),
         const Center(
           child: Text(
             'Add information using voice, photos, or text.',

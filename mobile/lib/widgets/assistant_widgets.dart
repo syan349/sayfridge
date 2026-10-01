@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../models/agent_image.dart';
 import 'app_bottom_navigation.dart';
 import 'inventory_card_trailing.dart';
 import 'page_back_button.dart';
@@ -186,13 +187,60 @@ class AssistantGreeting extends StatelessWidget {
 }
 
 class UserMessageBubble extends StatelessWidget {
-  const UserMessageBubble({required this.message, this.textStyle, super.key});
+  const UserMessageBubble({
+    required this.message,
+    this.textStyle,
+    this.images = const [],
+    super.key,
+  });
 
   final String message;
   final TextStyle? textStyle;
+  final List<AgentImage> images;
 
   @override
   Widget build(BuildContext context) {
+    if (images.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _bubble(context),
+          const SizedBox(height: 10),
+          for (final photo in images)
+            Padding(
+              padding: const EdgeInsets.only(
+                bottom: 8,
+                right: _bubbleTailWidth,
+              ),
+              child: Semantics(
+                label: 'Uploaded photo',
+                image: true,
+                excludeSemantics: true,
+                child: ClipRRect(
+                  key: ValueKey('uploaded-photo-${photo.imageId}'),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.memory(
+                    photo.bytes,
+                    width: 240,
+                    height: 180,
+                    fit: BoxFit.contain,
+                    cacheWidth: 720,
+                    errorBuilder: (_, error, stack) => const SizedBox(
+                      width: 240,
+                      height: 80,
+                      child: Center(child: Text('Photo preview unavailable')),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+    return _bubble(context);
+  }
+
+  Widget _bubble(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) => Align(
         alignment: Alignment.centerRight,
