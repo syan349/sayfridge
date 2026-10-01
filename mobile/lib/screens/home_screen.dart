@@ -66,7 +66,7 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(26, 30, 26, 0),
+                            padding: const EdgeInsets.fromLTRB(25, 30, 25, 0),
                             child: const Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -91,9 +91,9 @@ class HomeScreen extends StatelessWidget {
                         Positioned.fill(
                           child: SingleChildScrollView(
                             padding: const EdgeInsets.fromLTRB(
-                              26,
+                              25,
                               30,
-                              26,
+                              25,
                               AppBottomNavigation.extent + 30,
                             ),
                             child: Column(
@@ -114,6 +114,12 @@ class HomeScreen extends StatelessWidget {
                                                 .isNotEmpty ??
                                             false;
                                         return IconButton(
+                                          padding: EdgeInsets.zero,
+                                          alignment: Alignment.centerRight,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 48,
+                                            minHeight: 48,
+                                          ),
                                           tooltip: hasUnread
                                               ? 'Notifications, unread'
                                               : 'Notifications',
@@ -533,6 +539,8 @@ class _UserHomeContentState extends State<_UserHomeContent> {
                   padding: EdgeInsets.zero,
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppColors.primary,
+                  disabledForegroundColor: Colors.white70,
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -791,10 +799,10 @@ class _ExpiryPreviewRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 58),
+        constraints: const BoxConstraints(minHeight: 64),
         child: Row(
           children: [
-            InventoryArtwork(item: item, size: 43),
+            InventoryArtwork(item: item, size: 48),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -804,7 +812,7 @@ class _ExpiryPreviewRow extends StatelessWidget {
                     item.itemDefinitionName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, height: 1.2),
+                    style: const TextStyle(fontSize: 15, height: 1.2),
                   ),
                   const SizedBox(height: 3),
                   Text.rich(
@@ -826,12 +834,12 @@ class _ExpiryPreviewRow extends StatelessWidget {
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, height: 1.2),
+                    style: const TextStyle(fontSize: 13, height: 1.2),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             SizedBox(
               width: 68,
               child: Text(
@@ -839,7 +847,7 @@ class _ExpiryPreviewRow extends StatelessWidget {
                 maxLines: 2,
                 textAlign: TextAlign.right,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   height: 1.3,
                   color: expiryColor(item.expiryDate),
                 ),

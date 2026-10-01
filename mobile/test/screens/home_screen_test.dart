@@ -98,7 +98,7 @@ void main() {
     await tester.ensureVisible(find.text('View all items'));
     await tester.tap(find.text('View all items'));
     await tester.pumpAndSettle();
-    expect(find.text('Inventory Overview'), findsOneWidget);
+    expect(find.text('Inventory'), findsOneWidget);
 
     await tester.tap(find.text('Chicken Thigh'));
     await tester.pumpAndSettle();

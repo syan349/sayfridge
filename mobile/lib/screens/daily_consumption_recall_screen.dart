@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/page_back_button.dart';
 
 class DailyConsumptionRecallScreen extends StatefulWidget {
   const DailyConsumptionRecallScreen({super.key});
@@ -36,20 +37,11 @@ class _DailyConsumptionRecallScreenState
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+              padding: const EdgeInsets.fromLTRB(25, 24, 25, 32),
               children: [
                 Row(
                   children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      padding: EdgeInsets.zero,
-                      alignment: Alignment.centerLeft,
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 27,
-                      ),
-                      tooltip: 'Back',
-                    ),
+                    const PageBackButton(),
                     const Expanded(
                       child: Text(
                         'Daily Check-in',

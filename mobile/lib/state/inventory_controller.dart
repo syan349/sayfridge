@@ -135,7 +135,9 @@ class InventoryController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> reload() {
+  Future<void> reload() => loadPage(_page);
+
+  Future<void> loadPage(int page) {
     return loadInventory(
       status: _inventoryStatus,
       query: _query,
@@ -145,7 +147,7 @@ class InventoryController extends ChangeNotifier {
       purchaseTo: _purchaseTo,
       expiryFrom: _expiryFrom,
       expiryTo: _expiryTo,
-      page: _page,
+      page: page,
       pageSize: _pageSize,
     );
   }

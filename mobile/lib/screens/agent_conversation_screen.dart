@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -743,30 +742,8 @@ class _AgentItemCard extends StatelessWidget {
                     label: 'After',
                     value: _balance(preview['after'] as Map),
                   ),
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(bottom: 12),
-                  title: const Text('Server proposal and estimate basis'),
-                  children: [
-                    SelectableText(
-                      const JsonEncoder.withIndent('  ').convert(preview),
-                    ),
-                  ],
-                ),
               ],
               if (error != null) Text('${error['message'] ?? error['code']}'),
-              if (item['result'] != null)
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: const Text('Actual server result'),
-                  children: [
-                    SelectableText(
-                      const JsonEncoder.withIndent(
-                        '  ',
-                      ).convert(item['result']),
-                    ),
-                  ],
-                ),
               if (waiting) ...[
                 const SizedBox(height: 16),
                 Wrap(

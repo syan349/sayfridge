@@ -8,6 +8,8 @@ import '../services/api_exception.dart';
 import '../widgets/app_background.dart';
 import '../widgets/business_forms.dart';
 import '../widgets/inventory_visuals.dart';
+import '../widgets/selection_field.dart';
+import '../theme/app_theme.dart';
 
 class StockEditorScreen extends StatefulWidget {
   const StockEditorScreen({required this.workspace, this.item, super.key});
@@ -208,140 +210,97 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
               child: Column(
                 children: [
                   OverviewHeader(
-                    title: widget.item == null ? 'Add inventory' : 'Edit item',
+                    title: widget.item == null
+                        ? 'Add inventory'
+                        : 'Item details',
                   ),
                   Expanded(
                     child: _loading
                         ? const Center(child: CircularProgressIndicator())
-                        : Form(
-                            key: _form,
-                            child: PageScrollFade(
-                              child: ListView(
-                                padding: const EdgeInsets.all(25),
-                                children: [
-                                  if (_error != null) ...[
-                                    Text(
-                                      _error!,
-                                      style: const TextStyle(color: Colors.red),
+                        : Theme(
+                            data: Theme.of(context).copyWith(
+                              inputDecorationTheme: Theme.of(context)
+                                  .inputDecorationTheme
+                                  .copyWith(
+                                    fillColor: const Color(0x80FFFFFF),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
                                     ),
-                                    if (!_blocked)
-                                      TextButton(
-                                        onPressed: _busy ? null : _load,
-                                        child: const Text('Reload choices'),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(9),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFA8D589),
                                       ),
-                                  ],
-                                  if (widget.item == null) ...[
-                                    _select(
-                                      'Item',
-                                      _definition,
-                                      _definitions,
-                                      (v) => setState(() => _definition = v),
                                     ),
-                                    TextButton(
+                                  ),
+                            ),
+                            child: Form(
+                              key: _form,
+                              child: PageScrollFade(
+                                child: ListView(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    25,
+                                    7,
+                                    25,
+                                    32,
+                                  ),
+                                  children: [
+                                    if (_error != null) ...[
+                                      Text(
+                                        _error!,
+                                        style: const TextStyle(
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                      if (!_blocked)
+                                        TextButton(
+                                          onPressed: _busy ? null : _load,
+                                          child: const Text('Reload choices'),
+                                        ),
+                                      const SizedBox(height: 16),
+                                    ],
+                                    Container(
+                                      padding: const EdgeInsets.all(18),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: const Color(0xFFA8D589),
+                                        ),
+                                        borderRadius: BorderRadius.circular(16),
+                                        color: const Color(0x35FFFFFF),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: widget.item == null
+                                            ? _newStockFields()
+                                            : _itemFields(widget.item!),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 28),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        foregroundColor: AppColors.text,
+                                        minimumSize: const Size.fromHeight(54),
+                                        textStyle: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
                                       onPressed: _busy || _blocked
                                           ? null
-                                          : _newDefinition,
-                                      child: _loadingDefinitionChoices
-                                          ? const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                SizedBox.square(
-                                                  key: Key(
-                                                    'definition-loading-indicator',
-                                                  ),
-                                                  dimension: 18,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2.2,
-                                                      ),
-                                                ),
-                                                SizedBox(width: 10),
-                                                Text('Loading categories…'),
-                                              ],
-                                            )
-                                          : const Text(
-                                              'Create a private item definition',
-                                            ),
-                                    ),
-                                  ] else ...[
-                                    Text(
-                                      widget.item!.itemDefinitionName,
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w600,
+                                          : _save,
+                                      child: Text(
+                                        _busy
+                                            ? 'Saving…'
+                                            : widget.item == null
+                                            ? 'Add inventory'
+                                            : 'Save changes',
                                       ),
                                     ),
-                                    const Text(
-                                      'Use Add / Use / Confirm remaining on item details to change quantities. This form changes dates, location and notes only.',
-                                    ),
-                                    const SizedBox(height: 20),
                                   ],
-                                  _select(
-                                    'Storage space',
-                                    _space,
-                                    _spaces,
-                                    (v) => setState(() => _space = v),
-                                  ),
-                                  TextButton(
-                                    onPressed: _busy || _blocked
-                                        ? null
-                                        : () async {
-                                            setState(() => _busy = true);
-                                            await editSpace(
-                                              context,
-                                              widget.workspace,
-                                            );
-                                            if (!mounted) return;
-                                            setState(() => _busy = false);
-                                            await _load();
-                                          },
-                                    child: const Text('Add storage space'),
-                                  ),
-                                  if (widget.item == null) ...[
-                                    _field(
-                                      'Amount',
-                                      _amount,
-                                      (v) => validateAmount(v),
-                                    ),
-                                    _field(
-                                      'Unit (e.g. kg, g, ml, pcs)',
-                                      _unit,
-                                      (v) =>
-                                          requiredValue(v) ??
-                                          (v!.length > 16
-                                              ? 'Maximum 16 characters'
-                                              : null),
-                                    ),
-                                  ],
-                                  _field(
-                                    'Purchase date (YYYY-MM-DD, optional)',
-                                    _purchase,
-                                    validateDate,
-                                  ),
-                                  _field(
-                                    'Expiry date (YYYY-MM-DD, optional)',
-                                    _expiry,
-                                    validateDate,
-                                  ),
-                                  _field(
-                                    'Notes (optional)',
-                                    _notes,
-                                    (v) => (v?.length ?? 0) > 1000
-                                        ? 'Maximum 1000 characters'
-                                        : null,
-                                  ),
-                                  const SizedBox(height: 24),
-                                  FilledButton(
-                                    onPressed: _busy || _blocked ? null : _save,
-                                    child: Text(
-                                      _busy
-                                          ? 'Saving…'
-                                          : widget.item == null
-                                          ? 'Add inventory'
-                                          : 'Save changes',
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -352,6 +311,271 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
           ),
         ),
       ),
+    ),
+  );
+
+  List<Widget> _newStockFields() => [
+    _select(
+      'Item',
+      _definition,
+      _definitions,
+      (v) => setState(() => _definition = v),
+    ),
+    TextButton(
+      onPressed: _busy || _blocked ? null : _newDefinition,
+      child: _loadingDefinitionChoices
+          ? const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox.square(
+                  key: Key('definition-loading-indicator'),
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                ),
+                SizedBox(width: 10),
+                Flexible(child: Text('Loading categories…')),
+              ],
+            )
+          : const Text('Create a private item definition'),
+    ),
+    const SizedBox(height: 8),
+    _storageField(),
+    _addSpaceButton(),
+    const SizedBox(height: 8),
+    _field('Amount', _amount, validateAmount),
+    _field(
+      'Unit (e.g. kg, g, ml, pcs)',
+      _unit,
+      (v) =>
+          requiredValue(v) ?? (v!.length > 16 ? 'Maximum 16 characters' : null),
+    ),
+    _dateField('Purchase date (optional)', _purchase),
+    const SizedBox(height: 18),
+    _dateField('Expiry date (optional)', _expiry),
+    const SizedBox(height: 18),
+    _notesField(),
+  ];
+
+  List<Widget> _itemFields(InventoryItem item) => [
+    Center(child: InventoryArtwork(item: item, size: 140)),
+    const SizedBox(height: 24),
+    _labelRow('Item name', _readOnlyValue(item.itemDefinitionName)),
+    const SizedBox(height: 20),
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _label('Quantity'),
+              const SizedBox(height: 8),
+              _readOnlyValue(
+                quantityLabel(item).replaceFirst(' ${item.displayUnit}', ''),
+                color: item.isEstimated
+                    ? const Color(0xFFD75A20)
+                    : const Color(0xFF388D38),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _label('Unit'),
+              const SizedBox(height: 8),
+              _readOnlyValue(item.displayUnit),
+            ],
+          ),
+        ),
+      ],
+    ),
+    const SizedBox(height: 10),
+    Wrap(
+      spacing: 14,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Text(
+          'Type',
+          style: TextStyle(color: AppColors.muted, fontSize: 14),
+        ),
+        _quantityType('AI-estimate', item.isEstimated, const Color(0xFFD75A20)),
+        _quantityType('Exact', !item.isEstimated, const Color(0xFF388D38)),
+      ],
+    ),
+    const SizedBox(height: 8),
+    const Text(
+      'Change quantities using Quantity on item details.',
+      style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4),
+    ),
+    const SizedBox(height: 22),
+    _labelRow('Added on', _readOnlyValue(_displayDate(item.createdAt))),
+    const SizedBox(height: 16),
+    _labelRow('Purchase date', _dateField(null, _purchase)),
+    const SizedBox(height: 16),
+    _labelRow('Expiry date', _dateField(null, _expiry)),
+    const SizedBox(height: 20),
+    _labelRow('Storage space', _storageField(compact: true)),
+    _addSpaceButton(),
+    const SizedBox(height: 12),
+    _notesField(),
+  ];
+
+  Widget _label(String text) => Text(
+    text,
+    style: const TextStyle(
+      fontSize: 17,
+      fontWeight: FontWeight.w600,
+      color: Color(0xFF7D8278),
+    ),
+  );
+
+  Widget _labelRow(String label, Widget field) => LayoutBuilder(
+    builder: (context, constraints) => constraints.maxWidth < 270
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [_label(label), const SizedBox(height: 8), field],
+          )
+        : Row(
+            children: [
+              Expanded(flex: 45, child: _label(label)),
+              const SizedBox(width: 10),
+              Expanded(flex: 55, child: field),
+            ],
+          ),
+  );
+
+  Widget _readOnlyValue(String value, {Color? color}) => InputDecorator(
+    decoration: const InputDecoration(),
+    child: Text(
+      value,
+      style: TextStyle(fontSize: 15, color: color),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    ),
+  );
+
+  Widget _quantityType(String label, bool active, Color color) => Semantics(
+    selected: active,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          active ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+          size: 20,
+          color: active ? color : AppColors.text,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, color: Color(0xFF7D8278)),
+        ),
+      ],
+    ),
+  );
+
+  String _displayDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
+  }
+
+  Widget _dateField(
+    String? label,
+    TextEditingController controller,
+  ) => TextFormField(
+    controller: controller,
+    enabled: !_busy && !_blocked,
+    validator: validateDate,
+    style: const TextStyle(fontSize: 15),
+    decoration: InputDecoration(
+      labelText: label,
+      hintText: 'Not set',
+      suffixIconConstraints: const BoxConstraints(minWidth: 34, minHeight: 40),
+      suffixIcon: IconButton(
+        tooltip:
+            label ??
+            (controller == _expiry
+                ? 'Choose expiry date'
+                : 'Choose purchase date'),
+        padding: EdgeInsets.zero,
+        icon: const Icon(Icons.calendar_today_outlined, size: 19),
+        onPressed: _busy || _blocked
+            ? null
+            : () async {
+                final current = DateTime.tryParse(controller.text);
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: current ?? DateUtils.dateOnly(DateTime.now()),
+                  firstDate: DateTime(
+                    current != null && current.year < 1900
+                        ? current.year
+                        : 1900,
+                  ),
+                  lastDate: DateTime(
+                    current != null && current.year > 2200
+                        ? current.year
+                        : 2200,
+                    12,
+                    31,
+                  ),
+                );
+                if (mounted && date != null) controller.text = dateInput(date);
+              },
+      ),
+    ),
+  );
+
+  Widget _notesField() => TextFormField(
+    controller: _notes,
+    enabled: !_busy && !_blocked,
+    minLines: 2,
+    maxLines: 4,
+    maxLength: 1000,
+    validator: (v) =>
+        (v?.length ?? 0) > 1000 ? 'Maximum 1000 characters' : null,
+    decoration: const InputDecoration(
+      labelText: 'Notes (optional)',
+      alignLabelWithHint: true,
+    ),
+  );
+
+  Widget _storageField({bool compact = false}) => _select(
+    'Storage space',
+    _space,
+    _spaces,
+    (v) => setState(() => _space = v),
+    compact: compact,
+  );
+
+  Widget _addSpaceButton() => Align(
+    alignment: Alignment.centerRight,
+    child: TextButton(
+      onPressed: _busy || _blocked
+          ? null
+          : () async {
+              setState(() => _busy = true);
+              await editSpace(context, widget.workspace);
+              if (!mounted) return;
+              setState(() => _busy = false);
+              await _load();
+            },
+      child: const Text('Add storage space'),
     ),
   );
 
@@ -373,24 +597,16 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
     String label,
     String? selected,
     List<Map<String, dynamic>> items,
-    ValueChanged<String?> onChange,
-  ) => DropdownButtonFormField<String>(
-    key: ValueKey('$label:$selected:${items.length}'),
-    initialValue: selected,
-    isExpanded: true,
+    ValueChanged<String?> onChange, {
+    bool compact = false,
+  }) => SelectionField(
+    label: label,
+    value: selected,
+    options: {
+      for (final item in items) item['id'] as String: item['name'] as String,
+    },
     validator: requiredValue,
-    decoration: InputDecoration(labelText: label),
-    items: items
-        .map(
-          (item) => DropdownMenuItem(
-            value: item['id'] as String,
-            child: Text(
-              item['name'] as String,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        )
-        .toList(),
+    decoration: InputDecoration(labelText: compact ? null : label),
     onChanged: _busy || _blocked ? null : onChange,
   );
 }

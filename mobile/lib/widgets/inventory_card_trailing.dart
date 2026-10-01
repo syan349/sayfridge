@@ -9,6 +9,7 @@ class InventoryCardTrailing extends StatelessWidget {
     required this.expiryColor,
     this.showWarning = false,
     this.maxWidth = 112,
+    this.action,
     super.key,
   });
 
@@ -16,6 +17,7 @@ class InventoryCardTrailing extends StatelessWidget {
   final Color expiryColor;
   final bool showWarning;
   final double maxWidth;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => ConstrainedBox(
@@ -50,27 +52,28 @@ class InventoryCardTrailing extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 13),
-        const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                'View item',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 13.5),
-              ),
+        SizedBox(height: action == null ? 13 : 4),
+        action ??
+            const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    'View item',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13.5),
+                  ),
+                ),
+                SizedBox(width: 5),
+                // Tight bounds align the visible tip with the expiry text's edge.
+                SizedBox(
+                  width: 7,
+                  height: 12,
+                  child: CustomPaint(painter: _CardChevron()),
+                ),
+              ],
             ),
-            SizedBox(width: 5),
-            // Tight bounds align the visible tip with the expiry text's edge.
-            SizedBox(
-              width: 7,
-              height: 12,
-              child: CustomPaint(painter: _CardChevron()),
-            ),
-          ],
-        ),
       ],
     ),
   );
