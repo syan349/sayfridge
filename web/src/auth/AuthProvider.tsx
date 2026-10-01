@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import * as authApi from '../api/auth'
 import { onUnauthorized } from '../api/client'
-import { clearToken, getToken, setToken } from '../api/tokenStore'
+import { clearToken, getToken, getRefreshToken, setToken } from '../api/tokenStore'
 import type { Credentials } from '../api/types'
 import { AuthContext, type AuthContextValue, type AuthStatus } from './AuthContext'
 
@@ -11,7 +11,7 @@ const ME_QUERY_KEY = ['auth', 'me'] as const
 /** Knows who is signed in. The user comes from GET /auth/me whenever a token exists. */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
-  const [hasToken, setHasToken] = useState(() => getToken() !== null)
+  const [hasToken, setHasToken] = useState(() => getToken() !== null || getRefreshToken() !== null)
 
   const me = useQuery({
     queryKey: ME_QUERY_KEY,
@@ -22,6 +22,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   const logout = useCallback(() => {
+    const refresh = getRefreshToken()
+    if (refresh) void authApi.logout(refresh).catch(() => {
+      // Local logout remains effective offline. Server session expires independently.
+    })
     clearToken()
     setHasToken(false)
     queryClient.clear() // forget every response cached for this user
@@ -33,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (credentials: Credentials) => {
       const response = await authApi.login(credentials)
-      setToken(response.access_token, response.expires_in)
+      setToken(response.access_token, response.expires_in, response.refresh_token)
       // The login response already contains the user, so skip a /auth/me round trip.
       queryClient.setQueryData(ME_QUERY_KEY, response.user)
       setHasToken(true)

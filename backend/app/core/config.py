@@ -35,6 +35,8 @@ class Settings(BaseSettings):
         ge=1,
         le=1440,
     )
+    refresh_token_idle_days: int = Field(default=30, alias="REFRESH_TOKEN_IDLE_DAYS", ge=1, le=90)
+    refresh_token_absolute_days: int = Field(default=90, alias="REFRESH_TOKEN_ABSOLUTE_DAYS", ge=1, le=365)
     login_rate_limit_attempts: int = Field(
         default=5,
         alias="LOGIN_RATE_LIMIT_ATTEMPTS",
