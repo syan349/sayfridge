@@ -20,12 +20,17 @@ test('register, sign out, sign in and load an empty inventory from PostgreSQL', 
   expect((await signedIn).status()).toBe(200)
   await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible()
 
-  const inventory = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/inventory-items' && r.request().method() === 'GET')
   await page.goto('/inventory')
-  const response = await inventory
+  await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
+  // Dashboard also loads inventory after login. A response captured before goto
+  // can belong to the old document; verify persisted data with a separate request.
+  const api = process.env.VITE_API_BASE_URL!
+  const token = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sayfridge.auth')!).token as string)
+  const response = await page.request.get(`${api}/inventory-items`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
   expect(response.status()).toBe(200)
   expect(await response.json()).toMatchObject({ total: 0, items: [] })
-  await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
 
@@ -45,7 +50,6 @@ test('register, sign out, sign in and load an empty inventory from PostgreSQL', 
   const revoked = page.waitForResponse(r => r.url().endsWith('/auth/logout'))
   await page.getByRole('button', { name: 'Log out', exact: true }).click()
   expect((await revoked).status()).toBe(204)
-  const api = process.env.VITE_API_BASE_URL!
   expect((await page.request.get(`${api}/auth/me`, {
     headers: { Authorization: `Bearer ${after.token}` },
   })).status()).toBe(401)
