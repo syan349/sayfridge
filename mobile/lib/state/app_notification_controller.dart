@@ -37,6 +37,7 @@ class AppNotificationController extends ChangeNotifier {
     expiryController.addListener(_queueEvaluate);
     _payloadSubscription = service.selectedPayloads.listen((payload) {
       if (payload == 'expired') onProcessExpired?.call();
+      if (payload == 'daily') onDailyCheckIn?.call();
     });
     _queueEvaluate();
   }
@@ -54,6 +55,7 @@ class AppNotificationController extends ChangeNotifier {
   bool _disposed = false;
 
   VoidCallback? onProcessExpired;
+  VoidCallback? onDailyCheckIn;
   List<AppNotification> get notifications => _notifications;
 
   void _queueEvaluate() {
