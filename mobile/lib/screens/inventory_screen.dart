@@ -90,6 +90,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
         child: Scaffold(
           body: AppBackground(
             child: SafeArea(
+              // The fade fills the viewport, including the home-indicator area.
+              // Keep the final cards safe with scrollable end padding instead.
+              bottom: false,
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 480),
@@ -824,7 +827,12 @@ class _InventoryResults extends StatelessWidget {
       onRefresh: onRefresh ?? controller.reload,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(25, 8, 25, 32),
+        padding: EdgeInsets.fromLTRB(
+          25,
+          8,
+          25,
+          32 + MediaQuery.paddingOf(context).bottom,
+        ),
         children: [
           for (final item in items ?? controller.items)
             Padding(

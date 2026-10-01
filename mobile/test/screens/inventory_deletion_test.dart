@@ -14,10 +14,62 @@ import 'package:sayfridge/state/inventory_controller.dart';
 import 'package:sayfridge/theme/app_theme.dart';
 import 'package:sayfridge/widgets/swipe_delete_card.dart';
 import 'package:sayfridge/widgets/inventory_visuals.dart';
+import 'package:sayfridge/widgets/page_scroll_fade.dart';
 
 import '../support/integration_fixtures.dart';
 
 void main() {
+  testWidgets(
+    'inventory fade reaches the screen bottom and end cards clear the system inset',
+    (tester) async {
+      for (final viewport in [
+        (width: 320.0, height: 568.0, inset: 0.0),
+        (width: 390.0, height: 844.0, inset: 34.0),
+        (width: 430.0, height: 932.0, inset: 34.0),
+        (width: 360.0, height: 640.0, inset: 24.0),
+      ]) {
+        final fixture = _InventoryFixture();
+        addTearDown(fixture.dispose);
+        fixture.rows = [
+          for (var index = 1; index <= 24; index++)
+            {
+              ...stockJson(),
+              'id': 'item-$index',
+              'item_definition_name': 'Item $index',
+            },
+        ];
+        await fixture.open(
+          tester,
+          width: viewport.width,
+          height: viewport.height,
+          bottomInset: viewport.inset,
+          pageSize: 100,
+        );
+        expect(
+          tester.getRect(find.byType(PageScrollFade)).bottom,
+          closeTo(viewport.height, 0.1),
+        );
+        final scroll = tester.state<ScrollableState>(
+          find.byType(Scrollable).first,
+        );
+        scroll.position.jumpTo(scroll.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        final lastCard = find.widgetWithText(InventoryItemTile, 'Item 24');
+        expect(lastCard, findsOneWidget);
+        final bounds = tester.getRect(lastCard);
+        expect(
+          bounds.top,
+          greaterThan(tester.getRect(find.byType(PageScrollFade)).top),
+        );
+        expect(
+          bounds.bottom,
+          lessThanOrEqualTo(viewport.height - viewport.inset),
+        );
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
   testWidgets(
     'short and reversed swipes cancel; long drags stay bounded and ask once on release',
     (tester) async {
@@ -284,11 +336,17 @@ class _InventoryFixture {
   Future<void> open(
     WidgetTester tester, {
     double width = 411,
+    double height = 820,
+    double bottomInset = 0,
     int pageSize = 20,
     bool filtered = false,
   }) async {
-    tester.view.physicalSize = Size(width, 820);
+    tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1;
+    tester.view.padding = FakeViewPadding(bottom: bottomInset);
+    tester.view.viewPadding = FakeViewPadding(bottom: bottomInset);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await controller.loadInventory(
