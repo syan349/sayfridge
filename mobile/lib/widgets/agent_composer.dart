@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_bottom_navigation.dart';
 
-/// Presentation only: sending, image selection and voice gestures stay with
-/// AgentConversationScreen and its existing controller/services.
+/// Presentation for the shared text, photo and voice input panel.
 class AgentComposer extends StatefulWidget {
   const AgentComposer({
     required this.controller,
@@ -15,12 +14,16 @@ class AgentComposer extends StatefulWidget {
     this.voiceModeReset = 0,
     this.waiting = false,
     this.voiceActive = false,
+    this.maxLength = 8000,
+    this.inputKey = const Key('assistant-message-field'),
     super.key,
   });
 
   final TextEditingController controller;
   final bool enabled, hasImages, waiting, voiceActive;
   final int voiceModeReset;
+  final int maxLength;
+  final Key inputKey;
   final VoidCallback? onPhotoPressed, onSendPressed;
   final Widget voiceButton;
 
@@ -107,13 +110,13 @@ class _AgentComposerState extends State<AgentComposer> {
         // Selection handles extend below the field; keep them clear of actions.
         padding: const EdgeInsets.fromLTRB(8, 6, 8, 18),
         child: TextField(
-          key: const Key('assistant-message-field'),
+          key: widget.inputKey,
           controller: widget.controller,
           focusNode: _focusNode,
           enabled: widget.enabled && !widget.voiceActive,
           maxLines: 6,
           minLines: 1,
-          maxLength: 8000,
+          maxLength: widget.maxLength,
           keyboardType: TextInputType.multiline,
           textInputAction: TextInputAction.newline,
           style: const TextStyle(fontSize: 16, height: 1.2),

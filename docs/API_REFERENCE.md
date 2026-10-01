@@ -507,19 +507,43 @@ after a lost response, reload the items before retrying.
 ```
 
 Required expected_version: integer 1–2147483647. Supply at least one of
-storage_space_id, purchase_date, expiry_date, notes. Null clears dates/notes only.
-Definition ID, quantities, states, and timestamps cannot be changed here.
+storage_space_id, purchase_date, expiry_date, notes, item_name, quantity.
+Null clears dates/notes only. Definition IDs, initial quantities, Added on and
+other timestamps cannot be supplied by the client.
+
+`item_name` is a trimmed 1–100 character name. The batch resolves or creates a
+private definition in its current active category; other batches and public
+catalog names are unchanged. Archived or differently categorized private name
+collisions return 409 / NAME_CONFLICT.
+
+The optional quantity edit supports a measured balance or a read-only estimate:
+
+```json
+{"expected_version":1,"item_name":"My milk","quantity":{"mode":"EXACT","amount":"2.5","unit":"bowls"}}
+```
+
+EXACT requires a decimal string (0 through the quantity limit, up to three
+decimal places) and a free-text unit of 1–16 characters, normalized to lowercase.
+It replaces the confirmed balance, clears its estimate, records one MANUAL/EXACT
+RECONCILE operation, and sets EMPTY for zero or IN_STOCK for a positive amount.
+Restocking an EMPTY batch requires an active storage space.
+`{"mode":"ESTIMATED"}` preserves the existing estimate or freezes the current
+confirmed balance as an estimate. It rejects supplied amount/unit fields and
+cannot classify EMPTY stock as estimated. It does not invent a model estimate.
 
 **200**, Inventory response. Only IN_STOCK/EMPTY may be edited; terminal states
 return 409 / STATE_CONFLICT. A move needs an owned ACTIVE destination (404/409).
 EMPTY stock can move out of an archived space. Version mismatch returns
 409 / VERSION_CONFLICT, including otherwise unchanged requests.
 
-Apply actual changes together and increment version once. Unchanged requests
-preserve version/timestamps. A change at the maximum version returns
+Apply all details and quantity changes atomically and increment version once.
+Unchanged metadata/estimate requests preserve version/timestamps; an explicit
+EXACT measurement records a reconciliation even if its number matches.
+A change at the maximum version returns
 409 / VERSION_LIMIT_REACHED. Location changes during lock acquisition return
-409 / RESOURCE_CHANGED. Preserve all quantity/confirmation/estimate fields and
-initial facts; write no metadata/move event. After conflicts, reload before retrying.
+409 / RESOURCE_CHANGED. Without a quantity edit, preserve all quantity and
+confirmation fields; initial facts are always preserved. Metadata/moves create
+no operation event. After conflicts or a lost response, reload before retrying.
 
 ### POST /inventory-items/{id}/discard — B13
 

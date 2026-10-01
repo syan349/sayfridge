@@ -1,4 +1,7 @@
+import 'package:image_picker/image_picker.dart';
+import 'package:sayfridge/models/agent_input_draft.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sayfridge/screens/daily_consumption_recall_screen.dart';
 import 'package:sayfridge/theme/app_theme.dart';
@@ -69,11 +72,13 @@ void main() {
         home: DailyConsumptionRecallScreen(voiceInput: voice),
       ),
     );
-    final page = find.byType(Scrollable).first;
     final input = find.byKey(const Key('daily-consumption-input'));
-    await tester.scrollUntilVisible(input, 150, scrollable: page);
+    await tester.tap(find.byTooltip('Type a message'));
+    await tester.pumpAndSettle();
     await tester.enterText(input, '3 eggs');
     FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Switch to voice input'));
     await tester.pumpAndSettle();
     final button = find.byType(HoldToSpeakButton);
     await tester.ensureVisible(button);
@@ -81,7 +86,7 @@ void main() {
     await tester.pump();
     voice.reportWords!('250 ml of milk');
     await tester.pump();
-    expect(tester.widget<TextField>(input).enabled, isFalse);
+    expect(find.byKey(const Key('voice-recording-overlay')), findsOneWidget);
     await recording.up();
     await tester.pumpAndSettle();
     expect(
@@ -89,6 +94,8 @@ void main() {
       '3 eggs 250 ml of milk',
     );
     expect(find.byType(DailyConsumptionRecallScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('Switch to voice input'));
+    await tester.pumpAndSettle();
     final cancelled = await tester.startGesture(tester.getCenter(button));
     await tester.pump();
     voice.reportWords!('last yoghurt');
@@ -97,6 +104,8 @@ void main() {
     await cancelled.up();
     await tester.pumpAndSettle();
     expect(voice.cancelled, 1);
+    await tester.tap(find.byTooltip('Type a message'));
+    await tester.pumpAndSettle();
     expect(
       tester.widget<TextField>(input).controller!.text,
       '3 eggs 250 ml of milk',
@@ -123,15 +132,15 @@ void main() {
       scrollable: page,
     );
     expect(find.text('Anything finished?'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('review-daily-consumption')),
-      180,
-      scrollable: page,
-    );
+    await tester.tap(find.byTooltip('Type a message'));
+    await tester.pumpAndSettle();
     expect(
       tester
-          .widget<FilledButton>(
-            find.byKey(const Key('review-daily-consumption')),
+          .widget<IconButton>(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is IconButton && widget.tooltip == 'Send message',
+            ),
           )
           .onPressed,
       isNull,
@@ -139,7 +148,7 @@ void main() {
   });
 
   testWidgets('daily recall returns the trimmed usage summary', (tester) async {
-    String? result;
+    AgentInputDraft? result;
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
@@ -147,8 +156,8 @@ void main() {
           builder: (context) => Scaffold(
             body: FilledButton(
               onPressed: () async {
-                result = await Navigator.of(context).push<String>(
-                  MaterialPageRoute<String>(
+                result = await Navigator.of(context).push<AgentInputDraft>(
+                  MaterialPageRoute<AgentInputDraft>(
                     builder: (_) => const DailyConsumptionRecallScreen(),
                   ),
                 );
@@ -162,20 +171,109 @@ void main() {
 
     await tester.tap(find.text('Open recall'));
     await tester.pumpAndSettle();
-    final page = find.byType(Scrollable).first;
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('daily-consumption-input')),
-      180,
-      scrollable: page,
-    );
+    await tester.tap(find.byTooltip('Type a message'));
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('daily-consumption-input')),
       '  3 eggs and 250 ml of milk  ',
     );
     await tester.pump();
-    await tester.tap(find.text('Review with AI'));
+    await tester.tap(find.byTooltip('Send message'));
     await tester.pumpAndSettle();
 
-    expect(result, '3 eggs and 250 ml of milk');
+    expect(result?.text, '3 eggs and 250 ml of milk');
+    expect(result?.images, isEmpty);
+  });
+
+  for (final text in ['', '2 eggs']) {
+    testWidgets('daily recall transfers photos with usage: "$text"', (
+      tester,
+    ) async {
+      final png = (await rootBundle.load(
+        'assets/icons/inventory/milk.png',
+      )).buffer.asUint8List();
+      AgentInputDraft? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () async {
+                  result = await Navigator.of(context).push<AgentInputDraft>(
+                    MaterialPageRoute<AgentInputDraft>(
+                      builder: (_) => DailyConsumptionRecallScreen(
+                        pickImages: () async => [
+                          XFile.fromData(png, name: 'blob'),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open recall'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open recall'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Add photos'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Selected photo'), findsOneWidget);
+      await tester.tap(find.byTooltip('Remove photo'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Selected photo'), findsNothing);
+      await tester.tap(find.byTooltip('Add photos'));
+      await tester.pumpAndSettle();
+      if (text.isNotEmpty) {
+        await tester.tap(find.byTooltip('Type a message'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const Key('daily-consumption-input')),
+          text,
+        );
+        await tester.pump();
+      }
+      await tester.tap(find.byTooltip('Send message'));
+      await tester.pumpAndSettle();
+      expect(result?.text, text);
+      expect(result?.images, hasLength(1));
+      expect(result?.images.single.bytes, png);
+      expect(result?.images.single.mimeType, 'image/png');
+    });
+  }
+
+  testWidgets('invalid photos leave the daily usage editable', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: DailyConsumptionRecallScreen(
+          pickImages: () async => [
+            XFile.fromData(Uint8List.fromList([1, 2, 3])),
+          ],
+        ),
+      ),
+    );
+    await tester.tap(find.byTooltip('Type a message'));
+    await tester.pumpAndSettle();
+    final input = find.byKey(const Key('daily-consumption-input'));
+    await tester.enterText(input, '3 eggs');
+    await tester.tap(find.byTooltip('Add photos'));
+    await tester.pumpAndSettle();
+    expect(find.text('Use a JPEG, PNG or WebP image.'), findsOneWidget);
+    expect(find.bySemanticsLabel('Selected photo'), findsNothing);
+    expect(tester.widget<TextField>(input).controller!.text, '3 eggs');
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is IconButton && widget.tooltip == 'Send message',
+            ),
+          )
+          .onPressed,
+      isNotNull,
+    );
   });
 }

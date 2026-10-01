@@ -1,24 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../models/agent_input_draft.dart';
 import '../models/agent_image.dart';
-import '../platform/voice_overlay_chrome.dart'
-    if (dart.library.js_interop) '../platform/voice_overlay_chrome_web.dart';
 import '../services/voice_input_service.dart';
-import '../services/voice_input_factory.dart'
-    if (dart.library.js_interop) '../services/voice_input_factory_web.dart';
 import '../state/agent_controller.dart';
 import '../theme/app_theme.dart';
-import '../widgets/agent_composer.dart';
+import '../widgets/agent_input_panel.dart';
 import '../widgets/app_background.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
 import '../widgets/assistant_scroll_layout.dart';
 import '../widgets/inventory_visuals.dart';
 import '../widgets/business_forms.dart';
-import '../widgets/hold_to_speak_button.dart';
-import '../widgets/voice_recording_overlay.dart';
 import 'camera_input_screen.dart';
 import 'conversation_history_screen.dart';
 
@@ -28,12 +22,14 @@ class AgentConversationScreen extends StatefulWidget {
     this.pickImages,
     this.voiceInput,
     this.displayName,
+    this.initialDraft,
     super.key,
   });
   final AgentController controller;
   final Future<List<XFile>> Function()? pickImages;
   final VoiceInputService? voiceInput;
   final String? displayName;
+  final AgentInputDraft? initialDraft;
   @override
   State<AgentConversationScreen> createState() =>
       _AgentConversationScreenState();
@@ -42,202 +38,30 @@ class AgentConversationScreen extends StatefulWidget {
 class _AgentConversationScreenState extends State<AgentConversationScreen> {
   final _message = TextEditingController();
   final _footerKey = GlobalKey();
-  OverlayEntry? _voiceOverlayEntry;
-  final List<AgentImage> _images = [];
-  late final VoiceInputService _voiceInput;
-  bool _recordingVoice = false;
-  bool _holdingVoice = false;
-  bool _finishingVoice = false;
-  bool _cancelVoice = false;
-  int _voiceModeReset = 0;
-  String _recognizedWords = '';
-  int _voiceSession = 0;
+  int _inputReset = 0;
 
   @override
   void initState() {
     super.initState();
-    _voiceInput = widget.voiceInput ?? createVoiceInputService();
+    _message.text = widget.initialDraft?.text ?? '';
   }
 
   @override
   void dispose() {
-    ++_voiceSession;
-    _holdingVoice = false;
-    if (_recordingVoice) _voiceInput.cancel();
-    _hideVoiceOverlay();
     _message.dispose();
     super.dispose();
   }
 
-  void _showVoiceOverlay() {
-    final entry = OverlayEntry(
-      builder: (context) => Positioned.fill(
-        child: AnnotatedRegion<SystemUiOverlayStyle>(
-          value: SystemUiOverlayStyle.light,
-          child: VoiceRecordingOverlay(
-            words: _recognizedWords,
-            cancelling: _cancelVoice,
-            finishing: _finishingVoice,
-            onClose: () => _finishVoiceInput(forceCancel: true),
-          ),
-        ),
-      ),
+  Future<bool> _send(AgentInputDraft draft) async {
+    if (!widget.controller.canSend) return false;
+    await widget.controller.send(
+      draft.text,
+      images: draft.images,
+      displayText: draft.text == widget.initialDraft?.text
+          ? widget.initialDraft?.displayText
+          : null,
     );
-    _voiceOverlayEntry = entry;
-    Overlay.of(context, rootOverlay: true).insert(entry);
-    setVoiceOverlayVisible(true);
-  }
-
-  void _hideVoiceOverlay() {
-    final entry = _voiceOverlayEntry;
-    _voiceOverlayEntry = null;
-    entry?.remove();
-    entry?.dispose();
-    if (entry != null) setVoiceOverlayVisible(false);
-  }
-
-  Future<void> _startVoiceInput() async {
-    if (!widget.controller.canSend || _recordingVoice) return;
-    final session = ++_voiceSession;
-    setState(() {
-      _recordingVoice = true;
-      _holdingVoice = true;
-      _finishingVoice = false;
-      _cancelVoice = false;
-      _recognizedWords = '';
-    });
-    _showVoiceOverlay();
-    final available = await _voiceInput.start(
-      onWords: (words) {
-        if (!mounted || session != _voiceSession || !_recordingVoice) return;
-        setState(() => _recognizedWords = words.trim());
-        _voiceOverlayEntry?.markNeedsBuild();
-      },
-      onError: (message) {
-        if (!mounted || session != _voiceSession) return;
-        setState(() {
-          _recordingVoice = false;
-          _holdingVoice = false;
-          _finishingVoice = false;
-          _cancelVoice = false;
-          _recognizedWords = '';
-        });
-        _hideVoiceOverlay();
-        _messageFor(message);
-      },
-      shouldContinue: () =>
-          mounted && session == _voiceSession && _holdingVoice,
-    );
-    if (!mounted || session != _voiceSession || available || !_recordingVoice) {
-      return;
-    }
-    if (!_holdingVoice) return;
-    setState(() {
-      _recordingVoice = false;
-      _holdingVoice = false;
-    });
-    _hideVoiceOverlay();
-    _messageFor(
-      'Voice recognition is not available. Check microphone permission or use a supported browser.',
-    );
-  }
-
-  void _updateVoiceCancel(Offset offset) {
-    if (!_recordingVoice) return;
-    final shouldCancel = offset.dy < -60 || offset.dx < -60;
-    if (shouldCancel != _cancelVoice) {
-      setState(() => _cancelVoice = shouldCancel);
-      _voiceOverlayEntry?.markNeedsBuild();
-    }
-  }
-
-  Future<void> _finishVoiceInput({bool forceCancel = false}) async {
-    _holdingVoice = false;
-    if (!_recordingVoice || (_finishingVoice && !forceCancel)) return;
-    // Closing while the final transcript is pending must cancel that pending
-    // stop too. Invalidate its callbacks before waiting for browser cleanup.
-    final session = forceCancel ? ++_voiceSession : _voiceSession;
-    final cancelled = forceCancel || _cancelVoice;
-    setState(() => _finishingVoice = true);
-    _voiceOverlayEntry?.markNeedsBuild();
-    if (cancelled) {
-      await _voiceInput.cancel();
-    } else {
-      await _voiceInput.stop();
-    }
-    if (!mounted || session != _voiceSession || !_recordingVoice) return;
-    final words = _recognizedWords.trim();
-    setState(() {
-      _recordingVoice = false;
-      _finishingVoice = false;
-      _cancelVoice = false;
-      _recognizedWords = '';
-      if (!cancelled && words.isNotEmpty) {
-        final existing = _message.text.trimRight();
-        _message.text = existing.isEmpty ? words : '$existing $words';
-        _message.selection = TextSelection.collapsed(
-          offset: _message.text.length,
-        );
-      }
-    });
-    _hideVoiceOverlay();
-    if (!cancelled && words.isEmpty) {
-      _messageFor('No speech was recognized. Please try again.');
-    }
-  }
-
-  Future<void> _send() async {
-    if (!widget.controller.canSend ||
-        (_message.text.trim().isEmpty && _images.isEmpty)) {
-      return;
-    }
-    final text = _message.text;
-    FocusScope.of(context).unfocus();
-    await widget.controller.send(text, images: List.unmodifiable(_images));
-    if (!mounted || widget.controller.error != null) return;
-    _message.clear();
-    setState(() {
-      _images.clear();
-      _voiceModeReset++;
-    });
-  }
-
-  Future<void> _pickImages() async {
-    if (!widget.controller.canSend || _images.length >= AgentImage.maxImages) {
-      return;
-    }
-    try {
-      final selected = widget.pickImages != null
-          ? await widget.pickImages!.call()
-          : await _openCameraInput();
-      if (!mounted || selected.isEmpty) return;
-      final additions = <AgentImage>[];
-      for (final file in selected.take(AgentImage.maxImages - _images.length)) {
-        final bytes = await file.readAsBytes();
-        final image = AgentImage.fromPickedBytes(bytes);
-        image.validateDimensions();
-        additions.add(image);
-      }
-      AgentImage.validateBatch([..._images, ...additions]);
-      if (!mounted) return;
-      setState(() => _images.addAll(additions));
-      if (selected.length > additions.length) {
-        _messageFor('Send at most 4 images at a time.');
-      }
-    } on FormatException catch (e) {
-      if (mounted) _messageFor(e.message);
-    } catch (_) {
-      if (mounted) {
-        _messageFor('Unable to open those photos. Please try again.');
-      }
-    }
-  }
-
-  Future<List<XFile>> _openCameraInput() async {
-    final selected = await Navigator.of(context).push<List<XFile>>(
-      MaterialPageRoute<List<XFile>>(builder: (_) => const CameraInputScreen()),
-    );
-    return selected ?? [];
+    return widget.controller.error == null;
   }
 
   void _messageFor(String text) {
@@ -287,55 +111,55 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                           agent.error == null;
                       return AssistantScrollLayout(
                         bottomInset: bottomInset,
+                        header: Padding(
+                          padding: const EdgeInsets.fromLTRB(25, 27, 25, 15),
+                          child: AssistantHeader(
+                            onNewConversation: () async {
+                              if (agent.canSend) {
+                                await agent.newConversation();
+                                if (!mounted || agent.error != null) {
+                                  return;
+                                }
+                                _message.clear();
+                                setState(() {
+                                  _inputReset++;
+                                });
+                              } else {
+                                _messageFor(
+                                  'Resolve or cancel pending items, or recover the current request first.',
+                                );
+                              }
+                            },
+                            onHistory: () async {
+                              final previousId = agent.conversationId;
+                              await Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => ConversationHistoryScreen(
+                                    controller: agent,
+                                  ),
+                                ),
+                              );
+                              if (!mounted ||
+                                  agent.conversationId == previousId) {
+                                return;
+                              }
+                              _message.clear();
+                              setState(() {
+                                _inputReset++;
+                              });
+                            },
+                          ),
+                        ),
                         contentBuilder: (context, bottomPadding) => ListView(
                           keyboardDismissBehavior:
                               ScrollViewKeyboardDismissBehavior.onDrag,
                           padding: EdgeInsets.fromLTRB(
                             25,
-                            27,
+                            0,
                             25,
                             bottomPadding,
                           ),
                           children: [
-                            AssistantHeader(
-                              onNewConversation: () async {
-                                if (agent.canSend) {
-                                  await agent.newConversation();
-                                  if (!mounted || agent.error != null) {
-                                    return;
-                                  }
-                                  _message.clear();
-                                  setState(() {
-                                    _images.clear();
-                                    _voiceModeReset++;
-                                  });
-                                } else {
-                                  _messageFor(
-                                    'Resolve or cancel pending items, or recover the current request first.',
-                                  );
-                                }
-                              },
-                              onHistory: () async {
-                                final previousId = agent.conversationId;
-                                await Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => ConversationHistoryScreen(
-                                      controller: agent,
-                                    ),
-                                  ),
-                                );
-                                if (!mounted ||
-                                    agent.conversationId == previousId) {
-                                  return;
-                                }
-                                _message.clear();
-                                setState(() {
-                                  _images.clear();
-                                  _voiceModeReset++;
-                                });
-                              },
-                            ),
-                            const SizedBox(height: 15),
                             const Center(
                               child: Text(
                                 'Add information using voice, photos, or text.',
@@ -367,14 +191,23 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                       ? UserMessageBubble(
                                           message: message.value,
                                           textStyle: exampleMessageStyle,
+                                          images:
+                                              agent.messageImages[message
+                                                  .key] ??
+                                              const [],
                                         )
                                       : AssistantReply(
                                           textStyle: exampleMessageStyle,
                                           message: message.value,
                                         ),
                                 ),
+                            if (agent.confirmableItems.length > 1)
+                              _BatchConfirmation(controller: agent),
                             for (final item in agent.items)
                               _AgentItemCard(
+                                key: ValueKey(
+                                  '${item['item_id']}:${item['proposal_id']}',
+                                ),
                                 controller: agent,
                                 item: item,
                                 pickImages: widget.pickImages,
@@ -433,66 +266,18 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                             Padding(
                               key: _footerKey,
                               padding: const EdgeInsets.fromLTRB(25, 8, 25, 28),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  if (_images.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: [
-                                          for (
-                                            var index = 0;
-                                            index < _images.length;
-                                            index++
-                                          )
-                                            _ImagePreview(
-                                              key: ValueKey(
-                                                'agent-image-${_images[index].imageId}',
-                                              ),
-                                              image: _images[index],
-                                              onRemove: agent.canSend
-                                                  ? () => setState(
-                                                      () => _images.removeAt(
-                                                        index,
-                                                      ),
-                                                    )
-                                                  : null,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  AgentComposer(
-                                    key: const Key('assistant-bottom-action'),
-                                    controller: _message,
-                                    voiceModeReset: _voiceModeReset,
-                                    enabled: agent.canSend,
-                                    waiting: agent.waiting,
-                                    hasImages: _images.isNotEmpty,
-                                    voiceActive: _recordingVoice,
-                                    onPhotoPressed:
-                                        agent.canSend &&
-                                            _images.length <
-                                                AgentImage.maxImages
-                                        ? _pickImages
-                                        : null,
-                                    onSendPressed: agent.canSend ? _send : null,
-                                    voiceButton: HoldToSpeakButton(
-                                      enabled:
-                                          agent.canSend && !_finishingVoice,
-                                      recording: _recordingVoice,
-                                      cancelling: _cancelVoice,
-                                      finishing: _finishingVoice,
-                                      onStart: _startVoiceInput,
-                                      onMove: _updateVoiceCancel,
-                                      onEnd: () => _finishVoiceInput(),
-                                      onCancel: () =>
-                                          _finishVoiceInput(forceCancel: true),
-                                    ),
-                                  ),
-                                ],
+                              child: AgentInputPanel(
+                                controller: _message,
+                                enabled: agent.canSend,
+                                waiting: agent.waiting,
+                                reset: _inputReset,
+                                voiceInput: widget.voiceInput,
+                                pickImages: widget.pickImages,
+                                initialImages:
+                                    widget.initialDraft?.images ?? const [],
+                                submitOnMount: widget.initialDraft != null,
+                                onMessage: _messageFor,
+                                onSend: _send,
                               ),
                             ),
                           ],
@@ -510,51 +295,45 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   }
 }
 
-class _ImagePreview extends StatelessWidget {
-  const _ImagePreview({required this.image, required this.onRemove, super.key});
-
-  final AgentImage image;
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) => Stack(
-    clipBehavior: Clip.none,
-    children: [
-      ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.memory(
-          image.bytes,
-          width: 72,
-          height: 72,
-          fit: BoxFit.cover,
-          semanticLabel: 'Selected photo',
-        ),
-      ),
-      Positioned(
-        right: -10,
-        top: -10,
-        child: IconButton.filled(
-          onPressed: onRemove,
-          tooltip: 'Remove photo',
-          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-          padding: EdgeInsets.zero,
-          iconSize: 17,
-          icon: const Icon(Icons.close),
-        ),
-      ),
-    ],
-  );
-}
-
-class _AgentItemCard extends StatelessWidget {
+class _AgentItemCard extends StatefulWidget {
   const _AgentItemCard({
     required this.controller,
     required this.item,
     this.pickImages,
+    super.key,
   });
   final AgentController controller;
   final Map<String, dynamic> item;
   final Future<List<XFile>> Function()? pickImages;
+  @override
+  State<_AgentItemCard> createState() => _AgentItemCardState();
+}
+
+class _AgentItemCardState extends State<_AgentItemCard> {
+  final _response = TextEditingController();
+  String? _selectedId;
+  AgentController get controller => widget.controller;
+  Map<String, dynamic> get item => widget.item;
+  Future<List<XFile>> Function()? get pickImages => widget.pickImages;
+
+  @override
+  void dispose() {
+    _response.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirm() async {
+    if (item['status'] == 'NEEDS_CONFIRMATION') {
+      await controller.respond(item, 'confirm');
+    } else {
+      await controller.respond(
+        item,
+        'answer',
+        selectedId: _selectedId,
+        message: _response.text,
+      );
+    }
+  }
 
   Future<void> _answer(BuildContext context, String decision) async {
     await businessForm(
@@ -625,9 +404,10 @@ class _AgentItemCard extends StatelessWidget {
     final uncertain = error?['code'] == 'EXECUTION_UNCERTAIN';
     final waiting = status == 'NEEDS_INPUT' || status == 'NEEDS_CONFIRMATION';
     final canRespond = controller.canRespond && waiting;
-    final original = _text(item['original_text']);
-    final heading =
-        _text(display?['item_name']) ?? original ?? 'Inventory action';
+    final original = _readableRequest(_text(item['original_text']));
+    final heading = _text(display?['item_name']) ?? 'Inventory action';
+    final recognized =
+        _readableRequest(_text(display?['recognized_text'])) ?? original;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
@@ -654,9 +434,9 @@ class _AgentItemCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
-                    padding: const EdgeInsets.all(5),
+                    width: 72,
+                    height: 72,
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE9F7DF),
                       borderRadius: BorderRadius.circular(12),
@@ -666,7 +446,7 @@ class _AgentItemCard extends StatelessWidget {
                       fit: BoxFit.contain,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -674,7 +454,7 @@ class _AgentItemCard extends StatelessWidget {
                         Text(
                           heading,
                           style: const TextStyle(
-                            fontSize: 17,
+                            fontSize: 18,
                             fontWeight: FontWeight.w600,
                             height: 1.3,
                           ),
@@ -698,8 +478,7 @@ class _AgentItemCard extends StatelessWidget {
                 ],
               ),
               const Divider(color: Color(0xFFA8D589), height: 24),
-              if (_text(display?['recognized_text']) case final recognized?)
-                _DetailRow(label: 'Recognised text', value: recognized),
+              if (recognized != null) _RecognisedText(text: recognized),
               if (_text(display?['category_name']) case final category?)
                 _DetailRow(label: 'Category', value: category),
               if (_text(display?['space_name']) case final space?)
@@ -724,10 +503,6 @@ class _AgentItemCard extends StatelessWidget {
                   title: 'Review notes',
                   values: _stringList(display?['review_notes']),
                 ),
-              if (original != null)
-                if (original != heading &&
-                    original != _text(display?['recognized_text']))
-                  _DetailRow(label: 'Original request', value: original),
               if (preview != null) ...[
                 _DetailRow(
                   label: 'Calculation',
@@ -746,84 +521,154 @@ class _AgentItemCard extends StatelessWidget {
                     value: _balance(preview['after'] as Map),
                   ),
               ],
-              if (error != null) Text('${error['message'] ?? error['code']}'),
+              if (error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    '${error['message'] ?? error['code']}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              if (waiting && !uncertain && status == 'NEEDS_INPUT') ...[
+                const SizedBox(height: 12),
+                for (final candidate in candidates)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        backgroundColor: _selectedId == candidate['id']
+                            ? const Color(0xFFE2F2D0)
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: canRespond
+                          ? () => setState(
+                              () => _selectedId = candidate['id'] as String,
+                            )
+                          : null,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _selectedId == candidate['id']
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '${candidate['item_definition_name'] ?? candidate['name'] ?? 'Batch'} · ${candidate['storage_space_name'] ?? ''} · ${candidate['confirmed_current_amount'] ?? candidate['display_amount'] ?? ''} ${candidate['confirmed_current_unit'] ?? candidate['display_unit'] ?? ''}',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (candidates.isEmpty)
+                  TextField(
+                    controller: _response,
+                    enabled: canRespond,
+                    maxLines: 2,
+                    maxLength: 1000,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter the missing details',
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+              ],
               if (waiting) ...[
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    if (status == 'NEEDS_CONFIRMATION')
-                      FilledButton(
-                        onPressed: canRespond
-                            ? () => controller.respond(item, 'confirm')
-                            : null,
-                        child: Text(
-                          uncertain
-                              ? 'Verify original action'
-                              : 'Confirm proposal',
+                if (uncertain)
+                  FilledButton(
+                    onPressed: canRespond ? _confirm : null,
+                    child: const Text('Verify original action'),
+                  )
+                else ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed:
+                              canRespond &&
+                                  (status == 'NEEDS_CONFIRMATION' ||
+                                      _selectedId != null ||
+                                      _response.text.trim().isNotEmpty)
+                              ? _confirm
+                              : null,
+                          child: const Text('Confirm'),
                         ),
                       ),
-                    if (!uncertain) ...[
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.black,
-                          minimumSize: const Size(0, 40),
-                        ),
-                        onPressed: canRespond
-                            ? () => _answer(
-                                context,
-                                status == 'NEEDS_INPUT' ? 'answer' : 'edit',
-                              )
-                            : null,
-                        child: Text(
-                          status == 'NEEDS_INPUT' ? 'Answer' : 'Edit proposal',
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: canRespond
+                              ? () => controller.respond(item, 'cancel')
+                              : null,
+                          child: const Text('Cancel'),
                         ),
                       ),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFA8D589)),
-                          minimumSize: const Size(0, 40),
-                          foregroundColor: AppColors.userMessage,
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      if (status == 'NEEDS_CONFIRMATION')
+                        TextButton.icon(
+                          onPressed: canRespond
+                              ? () => _answer(context, 'edit')
+                              : null,
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Edit details'),
                         ),
+                      TextButton.icon(
                         onPressed: canRespond
                             ? () => _supportPhoto(context)
                             : null,
-                        icon: const Icon(Icons.add_a_photo_outlined),
+                        icon: const Icon(Icons.add_a_photo_outlined, size: 18),
                         label: const Text('Add supporting photo'),
                       ),
                     ],
-                  ],
-                ),
-                if (!uncertain)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: canRespond
-                          ? () => controller.respond(item, 'cancel')
-                          : null,
-                      child: const Text('Cancel item'),
-                    ),
                   ),
+                ],
               ],
-              if (canRespond && !uncertain)
-                for (final candidate in candidates)
-                  OutlinedButton(
-                    onPressed: () => controller.respond(
-                      item,
-                      'answer',
-                      selectedId: candidate['id'] as String,
-                    ),
-                    child: Text(
-                      '${candidate['item_definition_name'] ?? candidate['name'] ?? candidate['id']} · ${candidate['storage_space_name'] ?? ''} · ${candidate['expiry_date'] ?? 'No expiry date'}',
-                    ),
-                  ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  String? _readableRequest(String? text) {
+    const prefix = 'Today I used: ';
+    const suffix =
+        '. Please propose the inventory deductions and wait for my confirmation.';
+    return text != null && text.startsWith(prefix) && text.endsWith(suffix)
+        ? text.substring(prefix.length, text.length - suffix.length)
+        : text;
   }
 
   String _balance(Map value) {
@@ -860,12 +705,12 @@ class _AgentItemCard extends StatelessWidget {
 
   String? _quantity(Map<String, dynamic>? after, Map<String, dynamic>? draft) {
     final amount =
-        after?['confirmed_current_amount'] ??
         after?['estimated_current_amount'] ??
+        after?['confirmed_current_amount'] ??
         draft?['quantity_value'];
     final unit =
-        after?['confirmed_current_unit'] ??
         after?['estimated_current_unit'] ??
+        after?['confirmed_current_unit'] ??
         draft?['quantity_unit'];
     if (amount == null && unit == null) return null;
     final estimated = after?['estimated_current_amount'] != null;
@@ -957,7 +802,112 @@ class _NoticeBox extends StatelessWidget {
       children: [
         Icon(icon, size: 19),
         const SizedBox(width: 8),
-        Expanded(child: Text('$title: ${values.join(', ')}')),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.userMessage,
+                ),
+              ),
+              const SizedBox(height: 4),
+              for (final value in values)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    value.replaceAll('_', ' '),
+                    style: const TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _BatchConfirmation extends StatelessWidget {
+  const _BatchConfirmation({required this.controller});
+  final AgentController controller;
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFE2F2D0),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '${controller.confirmableItems.length} items ready for review',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          key: const Key('confirm-all-items'),
+          style: FilledButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: controller.canRespond
+              ? () => controller.confirmItems(controller.confirmableItems)
+              : null,
+          icon: const Icon(Icons.done_all, size: 20),
+          label: Text('Confirm all (${controller.confirmableItems.length})'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _RecognisedText extends StatefulWidget {
+  const _RecognisedText({required this.text});
+  final String text;
+  @override
+  State<_RecognisedText> createState() => _RecognisedTextState();
+}
+
+class _RecognisedTextState extends State<_RecognisedText> {
+  bool _expanded = false;
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFEFF6E8),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Recognised text',
+          style: TextStyle(fontSize: 12, color: AppColors.muted),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          widget.text,
+          maxLines: _expanded ? null : 3,
+          overflow: _expanded ? null : TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 14, height: 1.45),
+        ),
+        if (widget.text.length > 90)
+          TextButton(
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 32),
+            ),
+            onPressed: () => setState(() => _expanded = !_expanded),
+            child: Text(_expanded ? 'Show less' : 'Show more'),
+          ),
       ],
     ),
   );
