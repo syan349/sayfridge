@@ -33,6 +33,9 @@ class AgentState(TypedDict):
     suspended_items: list[dict]
     chat_requests: dict
     image_messages: list
+    completed_items: list[dict]
+    unresolved_reply: dict | None
+    revision_scope: list[str] | None
 
 
 @dataclass(frozen=True, slots=True)

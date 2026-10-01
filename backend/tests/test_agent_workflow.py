@@ -26,6 +26,8 @@ class ScriptModel:
     async def ainvoke(self, messages, **kwargs):
         if "agent_intake" in kwargs.get("config", {}).get("tags", []):
             return next(self.intents)
+        if "agent_questions" in kwargs.get("config", {}).get("tags", []):
+            return AIMessage(content="")
         return next(self.messages, AIMessage(content="Completed results reported."))
 
 

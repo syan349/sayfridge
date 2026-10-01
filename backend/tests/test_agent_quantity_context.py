@@ -133,6 +133,14 @@ def test_opaque_provider_blocks_are_budgeted_without_being_changed():
     assert original.content[0]["encrypted_content"] == "opaque"
 
 
+def test_batch_function_blocks_share_one_message_generation_reserve():
+    blocks = [{"type": "function_call", "name": "lookup", "arguments": {"query": f"item-{n}"}} for n in range(19)]
+    original = AIMessage(content=[{"type": "reasoning", "encrypted_content": "opaque"}, *blocks])
+    guarded = BudgetModel(object(), counter=lambda messages: 10)
+    assert guarded.count([original]) == ((10 + guarded.budget.output) * 5 + 3) // 4
+    assert original.content == [{"type": "reasoning", "encrypted_content": "opaque"}, *blocks]
+
+
 def test_unknown_meter_stops_before_network_and_preserves_private_errors():
     class Meter:
         def get_num_tokens_from_messages(self, messages):

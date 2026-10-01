@@ -67,6 +67,21 @@ def _state(snapshot):
     return result
 
 
+def _replay(snapshot, result):
+    """Preserve the result of this request; attach a live interrupt only if valid."""
+    state = result.get("state", result)
+    if state.get("status") == "WAITING_INPUT":
+        current = _state(snapshot)
+        original_proposals = {i["item_id"]: i["proposal_id"] for i in state.get("items", [])
+                              if i["status"] in {"NEEDS_INPUT", "NEEDS_CONFIRMATION"}}
+        current_proposals = {i["item_id"]: i["proposal_id"] for i in current.get("items", [])
+                             if i["status"] in {"NEEDS_INPUT", "NEEDS_CONFIRMATION"}}
+        if current.get("interrupt_id") and all(current_proposals.get(k) == v for k, v in original_proposals.items()):
+            state = {**state, "interrupt_id": current["interrupt_id"],
+                     "pending": {"items": [i for i in state["items"] if i["status"] in {"NEEDS_INPUT", "NEEDS_CONFIRMATION"}]}}
+    return {**result, "state": state}
+
+
 def _sse(kind, **data):
     return f"event: {kind}\ndata: {json.dumps({'type': kind, **data}, ensure_ascii=False, default=str)}\n\n"
 
@@ -112,10 +127,11 @@ def _response(stack, resources, config, command, context, request, request_id, r
                 for item in state.get("items", []):
                     if item["status"] in {"SUCCEEDED", "FAILED", "CANCELLED"}:
                         yield _sse("operation_result", data=item)
-                if state.get("interrupt_id"):
+                if state.get("status") == "WAITING_INPUT":
                     question = _pending_text(state.get("items", []))
                     if question:
                         yield _sse("text_delta", delta=question)
+                if state.get("interrupt_id"):
                     yield _sse("action_required", data=state)
                 yield _sse("done", status=state.get("status", "COMPLETED"), data=state)
                 return
@@ -175,8 +191,7 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
             if previous["fingerprint"] != digest:
                 raise HTTPException(409, detail={"code": "REQUEST_ID_CONFLICT"})
             replay, command = previous, None
-            if previous.get("state", {}).get("status") == "WAITING_INPUT":
-                replay = {**previous, "state": _state(snapshot)}
+            replay = _replay(snapshot, previous)
         elif str(request_id) in values.get("chat_requests", {}):
             if values["chat_requests"][str(request_id)] != digest:
                 raise HTTPException(409, detail={"code": "REQUEST_ID_CONFLICT"})
@@ -200,7 +215,8 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
             if not validate_image_ids(payload.images, [*values.get("image_messages", []), *values.get("messages", [])]):
                 raise HTTPException(409, detail={"code": "IMAGE_ID_CONFLICT"})
             if not _interrupts(snapshot):
-                command = {"messages": [human_message(payload.message, payload.images, str(request_id))],
+                command = {"messages": [human_message(payload.message, payload.images, str(request_id),
+                    known_messages=[*values.get("image_messages", []), *values.get("messages", [])])],
                 "turn_id": str(request_id), "as_of": payload.as_of.isoformat() if payload.as_of else None,
                 "chat_requests": {**values.get("chat_requests", {}), str(request_id): digest},
                 "turn_has_images": bool(payload.images),
@@ -227,7 +243,8 @@ async def resume_agent(payload: AgentResumeRequest, request: Request, user: User
         if prior:
             if prior != resume_fingerprint(payload):
                 raise HTTPException(409, detail={"code": "REQUEST_ID_CONFLICT"})
-            replay = _state(snapshot) if _interrupts(snapshot) or not snapshot.next else None
+            saved = snapshot.values.get("requests", {}).get(str(payload.request_id))
+            replay = _replay(snapshot, saved) if saved else (_state(snapshot) if _interrupts(snapshot) or not snapshot.next else None)
             command = None
         else:
             interrupts = _interrupts(snapshot)
