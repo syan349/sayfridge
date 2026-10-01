@@ -20,8 +20,20 @@ test('register, sign out, sign in and load an empty inventory from PostgreSQL', 
   expect((await signedIn).status()).toBe(200)
   await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible()
 
-  const inventory = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/inventory-items' && r.request().method() === 'GET')
-  await page.goto('/inventory')
+  // Sidebar and dashboard counts use the same endpoint; wait for the inventory page's list.
+  const inventory = page.waitForResponse(r => {
+    const url = new URL(r.url())
+    return url.pathname === '/api/v1/inventory-items'
+      && r.request().method() === 'GET'
+      && url.searchParams.get('status') === 'IN_STOCK'
+      && url.searchParams.get('page') === '1'
+      && url.searchParams.get('page_size') === '20'
+      && !url.searchParams.has('storage_space_id')
+      && !url.searchParams.has('category_id')
+      && !url.searchParams.has('expiry_to')
+  })
+  await page.getByRole('navigation', { name: 'Main', exact: true })
+    .getByRole('link', { name: /^Inventory(?:\s+\d+)?$/ }).click()
   const response = await inventory
   expect(response.status()).toBe(200)
   expect(await response.json()).toMatchObject({ total: 0, items: [] })
