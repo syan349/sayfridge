@@ -6,6 +6,7 @@ import '../state/expiry_summary_controller.dart';
 import '../state/inventory_controller.dart';
 import '../state/app_notification_controller.dart';
 import '../state/storage_space_controller.dart';
+import '../models/agent_input_draft.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/inventory_toolbar.dart';
@@ -49,7 +50,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onExpiringTap;
   final VoidCallback? onInventoryTap;
   final VoidCallback? onAddItemTap;
-  final ValueChanged<String>? onDailyConsumptionSubmit;
+  final ValueChanged<AgentInputDraft>? onDailyConsumptionSubmit;
   final AppNotificationController? notificationController;
   final bool isGuest;
 

@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sayfridge/models/agent_image.dart';
+import 'package:sayfridge/models/agent_input_draft.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
 import 'package:sayfridge/screens/agent_conversation_screen.dart';
 import 'package:sayfridge/services/api_client.dart';
@@ -16,6 +17,133 @@ import 'package:sayfridge/theme/app_theme.dart';
 import '../support/integration_fixtures.dart';
 
 void main() {
+  for (final fails in [false, true]) {
+    testWidgets('transferred text and photos stay together, failure: $fails', (
+      tester,
+    ) async {
+      final png = (await rootBundle.load(
+        'assets/icons/inventory/milk.png',
+      )).buffer.asUint8List();
+      final photo = AgentImage.fromPickedBytes(png);
+      Map<String, dynamic>? sent;
+      var requests = 0;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          if (request.method == 'GET') {
+            return jsonResponse({'status': 'RECOVERABLE', 'items': []});
+          }
+          requests++;
+          sent = jsonDecode(request.body) as Map<String, dynamic>;
+          return fails
+              ? jsonResponse({'detail': 'Unavailable'}, 503)
+              : eventResponse([
+                  {
+                    'type': 'done',
+                    'status': 'COMPLETED',
+                    'data': {'status': 'COMPLETED', 'items': []},
+                  },
+                ]);
+        }),
+      );
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: MemoryAgentStore(),
+      );
+      addTearDown(agent.dispose);
+      await agent.bindUser('alice');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: AgentConversationScreen(
+            controller: agent,
+            initialDraft: AgentInputDraft(
+              text: 'Today I used 2 eggs',
+              images: [photo],
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+      expect(requests, 1);
+      expect(sent?['message'], 'Today I used 2 eggs');
+      expect(sent?['images'], [photo.toJson()]);
+      if (fails) {
+        expect(find.bySemanticsLabel('Selected photo'), findsOneWidget);
+        expect(
+          tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          'Today I used 2 eggs',
+        );
+        expect(agent.canRetry, isTrue);
+      } else {
+        expect(find.bySemanticsLabel('Selected photo'), findsNothing);
+        expect(find.text('Press and hold to speak'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('an unresolved conversation keeps a transferred draft unsent', (
+    tester,
+  ) async {
+    final photo = AgentImage.fromPickedBytes(
+      (await rootBundle.load(
+        'assets/icons/inventory/milk.png',
+      )).buffer.asUint8List(),
+    );
+    var requests = 0;
+    final api = ApiClient(
+      client: MockClient((request) async {
+        requests++;
+        return eventResponse([
+          {
+            'type': 'done',
+            'status': 'WAITING_INPUT',
+            'data': {
+              'status': 'WAITING_INPUT',
+              'interrupt_id': 'pending',
+              'items': [],
+            },
+          },
+        ]);
+      }),
+    );
+    addTearDown(api.close);
+    final agent = AgentController(
+      WorkspaceRepository(api, MemoryTokens()),
+      store: MemoryAgentStore(),
+    );
+    addTearDown(agent.dispose);
+    await agent.bindUser('alice');
+    await tester.runAsync(() => agent.send('Existing request'));
+    final conversationId = agent.conversationId;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: AgentConversationScreen(
+          controller: agent,
+          initialDraft: AgentInputDraft(
+            text: 'Today I used 2 eggs',
+            images: [photo],
+          ),
+        ),
+      ),
+    );
+    await tester.runAsync(() => pumpEventQueue());
+    await tester.pumpAndSettle();
+    expect(requests, 1);
+    expect(agent.conversationId, conversationId);
+    expect(agent.interruptId, 'pending');
+    expect(find.bySemanticsLabel('Selected photo'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'Today I used 2 eggs',
+    );
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('history opens the current conversation without sample records', (
     tester,
   ) async {

@@ -1,3 +1,4 @@
+import 'package:sayfridge/models/agent_input_draft.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -63,7 +64,7 @@ void main() {
         service: service,
         repository: _NotificationState(),
       );
-      String? dailyUsage;
+      AgentInputDraft? dailyUsage;
       addTearDown(() {
         notifications.dispose();
         expiry.dispose();
@@ -111,18 +112,16 @@ void main() {
       await tester.tap(find.text('Record usage'));
       await tester.pumpAndSettle();
       expect(find.text('What did you use today?'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('daily-consumption-input')),
-        180,
-      );
+      await tester.tap(find.byTooltip('Type a message'));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('daily-consumption-input')),
         '3 eggs and 250 ml milk',
       );
       await tester.pump();
-      await tester.tap(find.text('Review with AI'));
+      await tester.tap(find.byTooltip('Send message'));
       await tester.pumpAndSettle();
-      expect(dailyUsage, '3 eggs and 250 ml milk');
+      expect(dailyUsage?.text, '3 eggs and 250 ml milk');
       expect(find.text('Daily inventory check-in'), findsNothing);
 
       await tester.runAsync(() async {

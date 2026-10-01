@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'auth/auth_dependencies.dart';
 import 'auth/auth_gate.dart';
+import 'models/agent_input_draft.dart';
 import 'models/inventory_item.dart';
 import 'repositories/catalog_repository.dart';
 import 'repositories/inventory_repository.dart';
@@ -267,18 +268,18 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       );
       return;
     }
-    final summary = await navigator.push<String>(
-      MaterialPageRoute<String>(
+    final summary = await navigator.push<AgentInputDraft>(
+      MaterialPageRoute<AgentInputDraft>(
         builder: (_) => const DailyConsumptionRecallScreen(),
       ),
     );
-    if (!mounted || summary == null || summary.trim().isEmpty) return;
+    if (!mounted || summary == null || summary.isEmpty) return;
     await _notificationController.markRead(AppNotificationType.daily);
     if (!mounted) return;
-    _openDailyConsumptionInAssistant(summary.trim());
+    _openDailyConsumptionInAssistant(summary);
   }
 
-  void _openDailyConsumptionInAssistant(String summary) {
+  void _openDailyConsumptionInAssistant(AgentInputDraft summary) {
     final navigator = _navigator.currentState;
     final authController = _authDependencies.authController;
     if (navigator == null || !authController.isAuthenticated) return;
@@ -288,12 +289,12 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
         builder: (assistantContext) => AiAssistantScreen(
           agentController: _agentController,
           displayName: _profileController.displayName,
+          initialDraft: AgentInputDraft(
+            text:
+                'Today I used: ${summary.text.isEmpty ? "See the attached photos" : summary.text}. Please propose the inventory deductions and wait for my confirmation.',
+            images: summary.images,
+          ),
         ),
-      ),
-    );
-    unawaited(
-      _agentController.send(
-        'Today I used: $summary. Please propose the inventory deductions and wait for my confirmation.',
       ),
     );
   }
