@@ -44,6 +44,7 @@ def send(method, path, **kwargs):
     return asyncio.run(scenario())
 
 
+@pytest.mark.ci
 @pytest.mark.parametrize("claim,value", [
     ("iat", None), ("iat", {}), ("exp", None), ("exp", []),
     ("nbf", None), ("exp", float("inf")),

@@ -20,10 +20,11 @@ test('register, sign out, sign in and load an empty inventory from PostgreSQL', 
   expect((await signedIn).status()).toBe(200)
   await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible()
 
-  await page.goto('/inventory')
+  await page.getByRole('navigation', { name: 'Main', exact: true })
+    .getByRole('link', { name: /^Inventory(?:\s+\d+)?$/ }).click()
   await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
-  // Dashboard also loads inventory after login. A response captured before goto
-  // can belong to the old document; verify persisted data with a separate request.
+  // Dashboard also loads inventory after login. Verify persisted data separately
+  // so this assertion cannot capture a background count response.
   const api = process.env.VITE_API_BASE_URL!
   const token = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sayfridge.auth')!).token as string)
   const response = await page.request.get(`${api}/inventory-items`, {
