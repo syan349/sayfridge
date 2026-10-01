@@ -9,6 +9,7 @@ from sqlalchemy import select, func, text
 
 from app.agents.memory import fingerprint, MemoryService
 from app.core.catalog import normalize_catalog_name
+from app.core.quantity import validate_quantity_amount
 from app.db.models import AgentInventoryAction, StorageSpace, ItemDefinition, ItemCategory
 from app.schemas.agent_actions import ActionDraft
 from app.schemas.inventory import InventoryCreate
@@ -119,7 +120,9 @@ async def _creation_values(session, user_id, draft, *, create=False):
     if draft.new_definition:
         category = (await catalog._lock_categories(session, {draft.new_definition.category_id}))[draft.new_definition.category_id] if create else await session.get(ItemCategory, draft.new_definition.category_id)
         if category is None or category.status != "ACTIVE":
-            raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category")
+            available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE")))
+            raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category", {
+                "categories": [{"id": str(c.id), "name": c.name} for c in available]})
         matches = list(await session.scalars(select(ItemDefinition).where(
             (ItemDefinition.owner_user_id == user_id) | ItemDefinition.owner_user_id.is_(None),
             ItemDefinition.normalized_name == normalize_catalog_name(draft.new_definition.name))))
@@ -168,10 +171,8 @@ def validate_new_space_source(draft, source_texts):
         raise PreparationError("SPACE_REQUIRED", "What is the name of the storage location?")
 
 
-async def prepare_action(session, user_id, draft: ActionDraft, memory: MemoryService, as_of=None, *, image_policy=None, source_texts=()):
+async def prepare_action(session, user_id, draft: ActionDraft, memory: MemoryService, as_of=None, *, image_policy=None, source_texts=(), target_context=None):
     validate_image_policy(draft, image_policy)
-    if draft.clarification_question:
-        raise PreparationError("CLARIFICATION_REQUIRED", draft.clarification_question)
     validate_new_space_source(draft, source_texts)
     snapshots = []
     if draft.unit_relationship and draft.unit_relationship.source == "USER_INPUT":
@@ -180,7 +181,34 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
             raise PreparationError("QUANTITY_REQUIRED", "The user-provided relationship needs original source evidence")
     if draft.action == "CREATE_STOCK":
         if draft.estimate or draft.quantity_kind != "AMOUNT" or draft.quantity_value is None or not draft.quantity_unit:
-            raise PreparationError("INITIAL_QUANTITY_REQUIRED", "Provide the initial quantity and unit; counts such as two bags are sufficient")
+            missing = (["quantity_value"] if draft.quantity_value is None else []) + (["quantity_unit"] if not draft.quantity_unit else [])
+            if draft.quantity_value is not None:
+                try:
+                    validate_quantity_amount(Decimal(draft.quantity_value))
+                except (ValueError, ArithmeticError):
+                    if "quantity_value" not in missing:
+                        missing.insert(0, "quantity_value")
+            raise PreparationError("INITIAL_QUANTITY_REQUIRED", "Provide the missing initial quantity information", {"missing_fields": missing})
+        if draft.quantity_issue:
+            raise PreparationError("IMAGE_QUANTITY_UNCLEAR", "Clarify the printed purchase quantity",
+                                   {"missing_fields": ["quantity_value"], "reason": draft.quantity_issue})
+        try:
+            validate_quantity_amount(Decimal(draft.quantity_value))
+        except ValueError as exc:
+            if not getattr(exc, "code", None):
+                raise PreparationError("QUANTITY_PRECISION_UNSUPPORTED", "Specify a positive amount with at most three decimal places",
+                                       {"missing_fields": ["quantity_value"]}) from None
+            raise
+        if draft.clarification_question:
+            raise PreparationError("CLARIFICATION_REQUIRED", draft.clarification_question)
+        if draft.new_definition and draft.category_name:
+            category = await session.scalar(select(ItemCategory).where(ItemCategory.status == "ACTIVE",
+                ItemCategory.normalized_name == normalize_catalog_name(draft.category_name)))
+            if category is None:
+                available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE")))
+                raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category", {
+                    "categories": [{"id": str(c.id), "name": c.name} for c in available]})
+            draft = draft.model_copy(update={"new_definition": draft.new_definition.model_copy(update={"category_id": category.id})})
         space_id, definition_id = await _creation_values(session, user_id, draft)
         # Use placeholders only for validating quantities; never submit these IDs.
         placeholder = UUID(int=0)
@@ -217,6 +245,29 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
             raise PreparationError("TARGET_REQUIRED", "Select a specific inventory batch", targets)
         draft = draft.model_copy(update={"inventory_item_id": UUID(chosen)})
     item = await inventory.get_inventory(session, draft.inventory_item_id, user_id)
+    if target_context:
+        selected = target_context.get("selected_inventory_item_id")
+        actual_words = target_context.get("source_texts", [])
+        if selected and str(draft.inventory_item_id) != str(selected):
+            raise PreparationError("TARGET_CONFLICT", "Preserve the user's selected batch")
+        if not selected and not any(str(draft.inventory_item_id) in text for text in actual_words):
+            # Model-supplied IDs cannot silently select one of several batches or
+            # narrow usage to the default space. Use the real candidates and the
+            # user's task words; structured selections have already been checked.
+            query = target_context.get("item_query") or draft.item_query
+            queries = [item.item_definition_name]
+            if query and query != str(draft.inventory_item_id):
+                queries.append(query)
+            targets = await resolve_targets(session, user_id, queries, memory=memory)
+            if targets["total"] > 1 and targets["preferred_id"] != str(draft.inventory_item_id):
+                qualified = []
+                for text in reversed(actual_words):
+                    qualified = [c for c in targets["candidates"] if c.get("storage_space_name")
+                                 and c["storage_space_name"].casefold() in text.casefold()]
+                    if qualified:
+                        break
+                if len(qualified) != 1 or qualified[0]["id"] != str(draft.inventory_item_id):
+                    raise PreparationError("TARGET_REQUIRED", "Select a specific inventory batch", targets)
     if draft.storage_space_id and item.storage_space_id != draft.storage_space_id:
         raise PreparationError("TARGET_CONFLICT", "The selected batch is in a different space")
     if draft.quantity_kind == "FRACTION":

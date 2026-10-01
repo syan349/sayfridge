@@ -166,7 +166,7 @@ def test_chat_query_then_supplement_replays_original_request_without_recreating_
     url = c[0][0].render_as_string(hide_password=False).replace("postgresql+psycopg://", "postgresql://", 1)
     monkeypatch.setattr(locking, "get_agent_persistence_settings", lambda: SimpleNamespace(psycopg_url=lambda: url))
     monkeypatch.setattr(api, "get_agent_persistence_settings", lambda: SimpleNamespace(workflow_step_limit=128))
-    async def interpret(model, items, message):
+    async def interpret(model, items, message, **kwargs):
         if message == "How many spaces?":
             return Continuation(mode="QUERY")
         return Continuation(mode="CONTINUE", responses=[ContinuationAnswer(item_id=items[0]["item_id"],

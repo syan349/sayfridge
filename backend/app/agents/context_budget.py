@@ -90,6 +90,7 @@ class BudgetModel:
                     metered.append(message)
                     continue
                 blocks = []
+                opaque_message = 0
                 for block in message.content:
                     if not isinstance(block, dict) or block.get("type") in {"text", "image_url"}:
                         blocks.append(block)
@@ -99,11 +100,17 @@ class BudgetModel:
                         # Responses reasoning/function envelopes are not supported by
                         # the chat meter. Charge their bytes and the generation cap,
                         # without exposing, decoding or removing them from the request.
-                        opaque += max(size(block), self.budget.output)
+                        opaque_message += size(block)
+                # max_tokens caps this whole generated message, including a batch
+                # of function calls. Reserving it per block falsely charges a
+                # 19-item receipt nineteen complete generations.
+                if opaque_message:
+                    opaque += max(opaque_message, self.budget.output)
                 metered.append(message.model_copy(update={"content": blocks}))
             # Reserve 25% for provider framing differences in addition to the hard margin.
             return ((self.counter(metered) + opaque) * 5 + 3) // 4
         except Exception as exc:
+            log.warning("agent_token_meter_failed cause=%s", type(exc).__name__)
             raise ContextBudgetError("Configured model has no usable token meter") from None
 
     def bind_tools(self, tools, **kwargs):
@@ -115,5 +122,7 @@ class BudgetModel:
         messages, _ = compact(messages, self.budget, overhead, self.count)
         count = self.count(messages) + overhead + self.budget.output + self.budget.margin
         if count >= min(self.budget.limit, self.budget.model_limit, 275000):
+            log.warning("agent_context_rejected measured=%s tools=%s reserve=%s messages=%s", count, overhead,
+                        self.budget.output + self.budget.margin, len(messages))
             raise ContextBudgetError("Required task context exceeds the configured safe model budget")
         return await self.model.ainvoke(messages, **kwargs)

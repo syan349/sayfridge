@@ -66,7 +66,9 @@ def convert_addition_amount(added_amount: Decimal, input_unit: str, target_unit:
 
 COUNT_UNITS = {"个", "颗", "只", "枚", "件", "袋", "瓶", "盒", "包", "罐", "根", "条", "块",
                "each", "pcs", "pc", "piece", "pieces", "count", "item", "items", "bottle", "bottles",
-               "bag", "bags", "box", "boxes", "pack", "packs", "can", "cans"}
+               "bag", "bags", "box", "boxes", "pack", "packs", "can", "cans",
+               "package", "packages", "packet", "packets", "carton", "cartons",
+               "unit", "units", "purchase unit", "purchase units", "购买单位"}
 
 
 def canonical(unit):
