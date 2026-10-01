@@ -5,6 +5,7 @@ import '../widgets/page_scroll_fade.dart';
 import '../state/agent_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/page_back_button.dart';
 
 class ConversationHistoryScreen extends StatelessWidget {
   const ConversationHistoryScreen({this.controller, super.key});
@@ -37,25 +38,13 @@ class ConversationHistoryScreen extends StatelessWidget {
     final hasCurrentConversation = agent?.conversationId != null;
     return PageScrollFade(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 27, 24, 42),
+        padding: const EdgeInsets.fromLTRB(25, 27, 25, 42),
         children: [
           SizedBox(
             height: 48,
             child: Row(
               children: [
-                SizedBox(
-                  width: 40,
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    padding: EdgeInsets.zero,
-                    alignment: Alignment.centerLeft,
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 29,
-                    ),
-                    tooltip: 'Back',
-                  ),
-                ),
+                const PageBackButton(),
                 const Expanded(
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
@@ -69,7 +58,7 @@ class ConversationHistoryScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 40),
+                const SizedBox(width: 48),
               ],
             ),
           ),

@@ -7,16 +7,25 @@ class AuthApiService {
 
   final ApiClient _apiClient;
 
+  void setRenewal(Future<String?> Function(String) renewal) {
+    _apiClient.renewAccessToken = renewal;
+  }
+
+  Future<AuthSession> refresh(String token) async => AuthSession.fromJson(
+    await _apiClient.postJson('/auth/refresh', body: {'refresh_token': token}),
+  );
+
+  Future<void> revoke(String token) async {
+    await _apiClient.postJson('/auth/logout', body: {'refresh_token': token});
+  }
+
   Future<AppUser> register({
     required String email,
     required String password,
   }) async {
     final response = await _apiClient.postJson(
       '/auth/register',
-      body: {
-        'email': email,
-        'password': password,
-      },
+      body: {'email': email, 'password': password},
     );
 
     return AppUser.fromJson(response);
@@ -28,18 +37,13 @@ class AuthApiService {
   }) async {
     final response = await _apiClient.postJson(
       '/auth/login',
-      body: {
-        'email': email,
-        'password': password,
-      },
+      body: {'email': email, 'password': password},
     );
 
     return AuthSession.fromJson(response);
   }
 
-  Future<AppUser> getCurrentUser({
-    required String accessToken,
-  }) async {
+  Future<AppUser> getCurrentUser({required String accessToken}) async {
     final response = await _apiClient.getJson(
       '/auth/me',
       accessToken: accessToken,

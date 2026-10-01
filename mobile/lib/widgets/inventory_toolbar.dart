@@ -55,7 +55,10 @@ class InventoryToolbar extends StatelessWidget {
               tooltip: filterTooltip,
               onPressed: onFilter,
               padding: const EdgeInsets.all(10),
-              style: IconButton.styleFrom(backgroundColor: Colors.white),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: Color(0xFFE6EDDF)),
+              ),
               icon: Image.asset(HomeAssets.filter, width: 22, height: 22),
             ),
           ),

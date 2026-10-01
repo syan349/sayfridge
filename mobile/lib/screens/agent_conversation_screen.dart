@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,7 +12,6 @@ import '../state/agent_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/agent_composer.dart';
 import '../widgets/app_background.dart';
-import '../widgets/app_bottom_navigation.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
 import '../widgets/assistant_scroll_layout.dart';
@@ -27,15 +25,12 @@ import 'conversation_history_screen.dart';
 class AgentConversationScreen extends StatefulWidget {
   const AgentConversationScreen({
     required this.controller,
-    this.onHomeTap,
-    this.onProfileTap,
     this.pickImages,
     this.voiceInput,
     this.displayName,
     super.key,
   });
   final AgentController controller;
-  final VoidCallback? onHomeTap, onProfileTap;
   final Future<List<XFile>> Function()? pickImages;
   final VoiceInputService? voiceInput;
   final String? displayName;
@@ -46,6 +41,7 @@ class AgentConversationScreen extends StatefulWidget {
 
 class _AgentConversationScreenState extends State<AgentConversationScreen> {
   final _message = TextEditingController();
+  final _footerKey = GlobalKey();
   OverlayEntry? _voiceOverlayEntry;
   final List<AgentImage> _images = [];
   late final VoiceInputService _voiceInput;
@@ -245,7 +241,21 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   }
 
   void _messageFor(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    final footer = _footerKey.currentContext?.findRenderObject() as RenderBox?;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          (footer?.size.height ?? 100) +
+              MediaQuery.paddingOf(context).bottom +
+              12,
+        ),
+      ),
+    );
   }
 
   @override
@@ -300,12 +310,8 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                     _voiceModeReset++;
                                   });
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Resolve or cancel pending items, or recover the current request first.',
-                                      ),
-                                    ),
+                                  _messageFor(
+                                    'Resolve or cancel pending items, or recover the current request first.',
                                   );
                                 }
                               },
@@ -425,7 +431,8 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(22, 8, 22, 26),
+                              key: _footerKey,
+                              padding: const EdgeInsets.fromLTRB(25, 8, 25, 28),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -458,6 +465,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                       ),
                                     ),
                                   AgentComposer(
+                                    key: const Key('assistant-bottom-action'),
                                     controller: _message,
                                     voiceModeReset: _voiceModeReset,
                                     enabled: agent.canSend,
@@ -486,12 +494,6 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                   ),
                                 ],
                               ),
-                            ),
-                            AppBottomNavigation(
-                              onHomeTap:
-                                  widget.onHomeTap ??
-                                  () => Navigator.of(context).maybePop(),
-                              onProfileTap: widget.onProfileTap,
                             ),
                           ],
                         ),
@@ -743,30 +745,8 @@ class _AgentItemCard extends StatelessWidget {
                     label: 'After',
                     value: _balance(preview['after'] as Map),
                   ),
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(bottom: 12),
-                  title: const Text('Server proposal and estimate basis'),
-                  children: [
-                    SelectableText(
-                      const JsonEncoder.withIndent('  ').convert(preview),
-                    ),
-                  ],
-                ),
               ],
               if (error != null) Text('${error['message'] ?? error['code']}'),
-              if (item['result'] != null)
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: const Text('Actual server result'),
-                  children: [
-                    SelectableText(
-                      const JsonEncoder.withIndent(
-                        '  ',
-                      ).convert(item['result']),
-                    ),
-                  ],
-                ),
               if (waiting) ...[
                 const SizedBox(height: 16),
                 Wrap(

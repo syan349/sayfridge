@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_background.dart';
 import 'page_scroll_fade.dart';
+import 'page_back_button.dart';
 
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({required this.child, this.title, super.key});
@@ -20,8 +21,8 @@ class AuthScaffold extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 12, top: 4),
-                    child: _BackButton(),
+                    padding: const EdgeInsets.only(left: 25, top: 4),
+                    child: PageBackButton(key: Key('back-button')),
                   ),
                 )
               else
@@ -33,14 +34,14 @@ class AuthScaffold extends StatelessWidget {
                       const Align(
                         alignment: Alignment.centerLeft,
                         child: Padding(
-                          padding: EdgeInsets.only(left: 12),
-                          child: _BackButton(),
+                          padding: EdgeInsets.only(left: 25),
+                          child: PageBackButton(key: Key('back-button')),
                         ),
                       ),
                       IgnorePointer(
                         child: Center(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 60),
+                            padding: const EdgeInsets.symmetric(horizontal: 73),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
@@ -61,20 +62,6 @@ class AuthScaffold extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _BackButton extends StatelessWidget {
-  const _BackButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      key: const Key('back-button'),
-      onPressed: () => Navigator.of(context).maybePop(),
-      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-      tooltip: 'Back',
     );
   }
 }

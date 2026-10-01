@@ -83,6 +83,20 @@ class WorkspaceRepository {
     );
   }
 
+  Future<bool> spaceHasStock(String id) async {
+    final result = await client.getJson(
+      '/inventory-items',
+      accessToken: await accessToken(),
+      queryParameters: {
+        'storage_space_id': id,
+        'status': 'IN_STOCK',
+        'page': '1',
+        'page_size': '1',
+      },
+    );
+    return (result['total'] as int) > 0;
+  }
+
   Future<Map<String, dynamic>> createDefinition(
     String name,
     String categoryId,
@@ -141,6 +155,48 @@ class WorkspaceRepository {
       ),
     );
     return InventoryItem.fromJson(result['inventory'] as Map<String, dynamic>);
+  }
+
+  /// Remove a selection from inventory using the server's atomic archive write.
+  Future<void> archiveItems(List<InventoryItem> items) async {
+    if (items.isEmpty ||
+        items.length > 100 ||
+        items.map((item) => item.id).toSet().length != items.length) {
+      throw ArgumentError('Choose between 1 and 100 distinct inventory items.');
+    }
+    await _saved(_archiveItems(items));
+  }
+
+  Future<void> _archiveItems(List<InventoryItem> items) async {
+    final response = await client.postJson(
+      '/inventory-items/batch-archive',
+      accessToken: await accessToken(),
+      body: {
+        'items': [
+          for (final item in items)
+            {'id': item.id, 'expected_version': item.version},
+        ],
+      },
+    );
+    final rows = (response['items'] as List)
+        .map((row) => InventoryItem.fromJson(row as Map<String, dynamic>))
+        .toList();
+    final versions = {for (final item in items) item.id: item.version};
+    if (response['count'] != items.length ||
+        rows.length != items.length ||
+        rows.map((row) => row.id).toSet().length != items.length ||
+        rows.any(
+          (row) =>
+              !versions.containsKey(row.id) ||
+              row.status != 'ARCHIVED' ||
+              row.version != versions[row.id]! + 1,
+        )) {
+      throw const ApiException(
+        statusCode: 0,
+        code: 'INVALID_RESPONSE',
+        message: 'Unable to verify the deletion response.',
+      );
+    }
   }
 
   Future<List<Map<String, dynamic>>> history(String id) async => client.getList(

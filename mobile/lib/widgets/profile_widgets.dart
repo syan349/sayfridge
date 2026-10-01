@@ -7,6 +7,7 @@ import 'page_scroll_fade.dart';
 
 import '../models/profile_preferences.dart';
 import 'app_background.dart';
+import 'page_back_button.dart';
 
 abstract final class ProfileAssets {
   static const root = 'assets/icons/profile';
@@ -135,14 +136,14 @@ class ProfilePageScaffold extends StatelessWidget {
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+                  padding: const EdgeInsets.fromLTRB(25, 20, 25, 4),
                   child: SizedBox(
                     height: 48,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 38),
+                          padding: const EdgeInsets.symmetric(horizontal: 48),
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
@@ -156,14 +157,9 @@ class ProfilePageScaffold extends StatelessWidget {
                         ),
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: IconButton(
-                            key: const Key('profile-back'),
+                          child: const PageBackButton(
+                            key: Key('profile-back'),
                             tooltip: 'Back to Profile',
-                            onPressed: () => Navigator.of(context).maybePop(),
-                            icon: const Icon(
-                              CupertinoIcons.chevron_back,
-                              size: 28,
-                            ),
                           ),
                         ),
                       ],
@@ -176,7 +172,7 @@ class ProfilePageScaffold extends StatelessWidget {
                       builder: (context, constraints) => SingleChildScrollView(
                         keyboardDismissBehavior:
                             ScrollViewKeyboardDismissBehavior.onDrag,
-                        padding: const EdgeInsets.symmetric(horizontal: 26),
+                        padding: const EdgeInsets.symmetric(horizontal: 25),
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
                             minHeight: constraints.maxHeight,

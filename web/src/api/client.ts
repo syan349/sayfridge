@@ -9,7 +9,7 @@
 //   auth:            {"detail": "Invalid email or password"}
 //   auth validation: {"detail": [{"type": "...", "loc": ["body", "email"], "msg": "..."}]}
 
-import { clearToken, getToken } from './tokenStore'
+import { clearToken, getToken, getRefreshToken, setToken } from './tokenStore'
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '/api/v1').replace(/\/+$/, '')
 
@@ -91,10 +91,51 @@ export function apiStream(path: string, options: Pick<RequestOptions, 'body' | '
   return send(path, { ...options, method: 'POST', headers: { Accept: 'text/event-stream' } })
 }
 
+let refreshing: Promise<string | null> | null = null
+
+async function renewAccess(): Promise<string | null> {
+  if (refreshing) return refreshing
+  const credential = getRefreshToken()
+  if (!credential) return null
+  refreshing = (async () => {
+    let response: Response
+    try {
+      response = await fetch(buildUrl('/auth/refresh', undefined), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: credential }),
+      })
+    } catch {
+      throw new ApiError(0, 'NETWORK_ERROR', 'Could not renew your session. Please try again.')
+    }
+    // A response from a previous login must never overwrite a new session.
+    if (getRefreshToken() !== credential) return getToken()
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearToken()
+        unauthorizedListeners.forEach((listener) => listener())
+        return null
+      }
+      throw toApiError(response.status, await readBody(response))
+    }
+    const data = await readBody(response)
+    if (!isRecord(data) || typeof data.access_token !== 'string' || typeof data.refresh_token !== 'string' || typeof data.expires_in !== 'number') {
+      throw new ApiError(502, 'INVALID_RESPONSE', 'Invalid session renewal response.')
+    }
+    if (getRefreshToken() !== credential) return getToken()
+    setToken(data.access_token, data.expires_in, data.refresh_token)
+    return data.access_token
+  })()
+  try { return await refreshing } finally { refreshing = null }
+}
+
 /** Sends the request; throws ApiError for a network failure or any non-2xx answer. */
 async function send(path: string, options: RequestOptions): Promise<Response> {
   const { method = 'GET', query, body, headers, signal, auth = true } = options
-  const token = auth ? getToken() : null
+  let token = auth ? getToken() : null
+  if (auth && !token && getRefreshToken()) {
+    token = await renewAccess()
+    if (!token) throw new ApiError(401, 'UNAUTHORIZED', 'Your session has ended. Please sign in again.')
+  }
 
   const requestHeaders: Record<string, string> = { Accept: 'application/json', ...headers }
   if (body !== undefined) requestHeaders['Content-Type'] = 'application/json'
@@ -113,9 +154,25 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     throw new ApiError(0, 'NETWORK_ERROR', 'Could not reach the server. Check your connection and try again.')
   }
 
+  if (response.status === 401 && auth && token) {
+    // Coalesce refreshes; a stale request uses an already renewed access token.
+    const newer = getToken()
+    const replacement = newer && newer !== token ? newer : await renewAccess()
+    if (replacement) {
+      token = replacement
+      requestHeaders.Authorization = `Bearer ${replacement}`
+      try {
+        response = await fetch(buildUrl(path, query), { method, headers: requestHeaders,
+          body: body === undefined ? undefined : JSON.stringify(body), signal })
+      } catch (error) {
+        if (signal?.aborted) throw error
+        throw new ApiError(0, 'NETWORK_ERROR', 'Could not reach the server. Please try again.')
+      }
+    }
+  }
   if (!response.ok) {
     const data = await readBody(response)
-    if (response.status === 401 && auth) {
+    if (response.status === 401 && auth && getToken() === token) {
       clearToken()
       unauthorizedListeners.forEach((listener) => listener())
     }

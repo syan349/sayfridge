@@ -63,6 +63,7 @@ void main() {
         service: service,
         repository: _NotificationState(),
       );
+      String? dailyUsage;
       addTearDown(() {
         notifications.dispose();
         expiry.dispose();
@@ -85,6 +86,7 @@ void main() {
             notificationController: notifications,
             expirySummaryController: expiry,
             inventoryController: inventory,
+            onDailyConsumptionSubmit: (value) => dailyUsage = value,
           ),
         ),
       );
@@ -104,6 +106,25 @@ void main() {
         reason: 'Notification cards must fit',
       );
 
+      await tester.ensureVisible(find.text('Record usage'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Record usage'));
+      await tester.pumpAndSettle();
+      expect(find.text('What did you use today?'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('daily-consumption-input')),
+        180,
+      );
+      await tester.enterText(
+        find.byKey(const Key('daily-consumption-input')),
+        '3 eggs and 250 ml milk',
+      );
+      await tester.pump();
+      await tester.tap(find.text('Review with AI'));
+      await tester.pumpAndSettle();
+      expect(dailyUsage, '3 eggs and 250 ml milk');
+      expect(find.text('Daily inventory check-in'), findsNothing);
+
       await tester.runAsync(() async {
         await tester.tap(find.text('Process now'));
         await pumpEventQueue();
@@ -118,7 +139,7 @@ void main() {
       expect(find.text('Notifications'), findsOneWidget);
       expect(expiry.bucket, isNull);
 
-      for (var i = 0; i < 3; i++) {
+      for (var i = 0; i < 2; i++) {
         await tester.tap(find.byTooltip('Mark as read').first);
         await tester.pumpAndSettle();
       }
@@ -215,9 +236,55 @@ void main() {
       service.dispose();
     },
   );
+
+  test('daily notification payload opens the recall flow', () async {
+    final auth = AuthController(_Accounts());
+    await auth.initialize();
+    final profile = ProfileController(auth, _Preferences());
+    final api = ApiClient(
+      client: MockClient(
+        (_) async => jsonResponse({
+          'counts': {'overdue': 0, 'today': 0, 'upcoming': 0},
+          'items': <Object>[],
+          'total': 0,
+          'page': 1,
+          'page_size': 20,
+        }),
+      ),
+    );
+    final expiry = ExpirySummaryController(
+      InventoryRepository(InventoryApiService(api), MemoryTokens()),
+    );
+    final service = _NotificationService();
+    final notifications = AppNotificationController(
+      authController: auth,
+      profileController: profile,
+      expiryController: expiry,
+      service: service,
+      repository: _NotificationState(),
+    );
+    var opened = false;
+    notifications.onDailyCheckIn = () => opened = true;
+
+    service.select('daily');
+    await pumpEventQueue();
+
+    expect(opened, isTrue);
+    notifications.dispose();
+    expiry.dispose();
+    profile.dispose();
+    auth.dispose();
+    api.close();
+    service.dispose();
+  });
 }
 
 class _Accounts implements AuthRepository {
+  @override
+  void Function()? onSessionExpired;
+  @override
+  Future<String?> renewAccess(String rejected) async => null;
+
   final user = AppUser(
     id: 'user-1',
     email: 'user@example.com',
@@ -265,10 +332,19 @@ class _NotificationState extends NotificationStateRepository {
 
 class _NotificationService extends NotificationService {
   final cancelled = <int>[];
+  final _selected = StreamController<String>.broadcast();
 
   @override
-  Stream<String> get selectedPayloads => const Stream.empty();
+  Stream<String> get selectedPayloads => _selected.stream;
+
+  void select(String payload) => _selected.add(payload);
 
   @override
   Future<void> cancel(int id) async => cancelled.add(id);
+
+  @override
+  void dispose() {
+    _selected.close();
+    super.dispose();
+  }
 }

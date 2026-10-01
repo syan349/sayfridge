@@ -4,13 +4,7 @@ import '../models/app_user.dart';
 import '../repositories/auth_repository.dart';
 import '../services/api_exception.dart';
 
-enum AuthStatus {
-  initial,
-  checking,
-  unauthenticated,
-  authenticated,
-  error,
-}
+enum AuthStatus { initial, checking, unauthenticated, authenticated, error }
 
 class AuthController extends ChangeNotifier {
   AuthController(this._authRepository);
@@ -58,10 +52,7 @@ class AuthController extends ChangeNotifier {
     _startSubmission();
 
     try {
-      await _authRepository.register(
-        email: email,
-        password: password,
-      );
+      await _authRepository.register(email: email, password: password);
 
       _status = AuthStatus.unauthenticated;
       return true;
@@ -73,17 +64,11 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  Future<bool> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> login({required String email, required String password}) async {
     _startSubmission();
 
     try {
-      _user = await _authRepository.login(
-        email: email,
-        password: password,
-      );
+      _user = await _authRepository.login(email: email, password: password);
       _status = AuthStatus.authenticated;
       return true;
     } catch (error) {
@@ -110,6 +95,13 @@ class AuthController extends ChangeNotifier {
     } finally {
       _finishSubmission();
     }
+  }
+
+  void sessionExpired() {
+    _user = null;
+    _status = AuthStatus.unauthenticated;
+    _errorMessage = 'Your session has ended. Please sign in again.';
+    notifyListeners();
   }
 
   void clearError() {

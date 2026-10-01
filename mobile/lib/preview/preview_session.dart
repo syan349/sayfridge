@@ -87,6 +87,23 @@ class PreviewSession {
 
 class _MemoryTokens extends TokenStorage {
   String? _token;
+  String? _refresh;
+
+  @override
+  Future<void> saveSession(String access, String? refresh) async {
+    _token = access;
+    _refresh = refresh;
+  }
+
+  @override
+  Future<String?> readRefreshToken() async => _refresh;
+
+  @override
+  Future<void> clearSession() async {
+    _token = null;
+    _refresh = null;
+  }
+
 
   @override
   Future<String?> readAccessToken() async => _token;

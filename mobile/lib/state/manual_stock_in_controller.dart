@@ -22,6 +22,32 @@ class ManualStockInController extends ChangeNotifier {
   final CatalogRepository _catalogRepository;
   final InventoryRepository _inventoryRepository;
   final StorageSpaceRepository _storageSpaceRepository;
+  int _sequence = 0;
+
+  void reset() {
+    ++_sequence;
+    _clearOptions();
+    _status = ManualStockInStatus.initial;
+    notifyListeners();
+  }
+
+  void _clearOptions() {
+    _storageSpaces = const [];
+    _categories = const [];
+    _definitions = const [];
+    _selectedStorageSpaceId = null;
+    _selectedCategoryId = null;
+    _selectedDefinitionId = null;
+    _errorMessage = null;
+    _createdItem = null;
+    _isLoadingDefinitions = false;
+  }
+
+  @override
+  void dispose() {
+    ++_sequence;
+    super.dispose();
+  }
 
   ManualStockInStatus _status = ManualStockInStatus.initial;
   List<StorageSpace> _storageSpaces = const [];
@@ -51,28 +77,35 @@ class ManualStockInController extends ChangeNotifier {
       _definitions.isNotEmpty;
 
   Future<void> loadOptions() async {
+    final sequence = ++_sequence;
+    _clearOptions();
     _status = ManualStockInStatus.loading;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final spacesFuture = _storageSpaceRepository.getStorageSpaces(
+      final spaces = await _storageSpaceRepository.getStorageSpaces(
         pageSize: 100,
       );
-      final categoriesFuture = _catalogRepository.getCategories(pageSize: 100);
-      final spaces = await spacesFuture;
-      final categories = await categoriesFuture;
+      if (sequence != _sequence) return;
+      final categories = await _catalogRepository.getCategories(pageSize: 100);
+      if (sequence != _sequence) return;
       _storageSpaces = spaces.items;
       _categories = categories.items;
-      _selectedStorageSpaceId = _storageSpaces.firstOrNull?.id;
+      _selectedStorageSpaceId =
+          _storageSpaces.where((space) => space.isDefault).firstOrNull?.id ??
+          _storageSpaces.firstOrNull?.id;
       _selectedCategoryId = _categories.firstOrNull?.id;
 
       if (_selectedCategoryId != null) {
-        await _loadDefinitions(_selectedCategoryId!);
+        await _loadDefinitions(_selectedCategoryId!, sequence);
       }
 
+      if (sequence != _sequence) return;
       _status = ManualStockInStatus.ready;
     } catch (error) {
+      if (sequence != _sequence) return;
+      _clearOptions();
       _status = ManualStockInStatus.error;
       _errorMessage = _messageFor(error);
     }
@@ -87,6 +120,7 @@ class ManualStockInController extends ChangeNotifier {
 
   Future<void> selectCategory(String? categoryId) async {
     if (categoryId == null || categoryId == _selectedCategoryId) return;
+    final sequence = ++_sequence;
 
     _selectedCategoryId = categoryId;
     _selectedDefinitionId = null;
@@ -96,12 +130,15 @@ class ManualStockInController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _loadDefinitions(categoryId);
+      await _loadDefinitions(categoryId, sequence);
     } catch (error) {
+      if (sequence != _sequence) return;
       _errorMessage = _messageFor(error);
     } finally {
-      _isLoadingDefinitions = false;
-      notifyListeners();
+      if (sequence == _sequence) {
+        _isLoadingDefinitions = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -117,6 +154,7 @@ class ManualStockInController extends ChangeNotifier {
     DateTime? expiryDate,
     String? notes,
   }) async {
+    final sequence = _sequence;
     final storageSpaceId = _selectedStorageSpaceId;
     final definitionId = _selectedDefinitionId;
     if (storageSpaceId == null || definitionId == null) {
@@ -131,7 +169,7 @@ class ManualStockInController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _createdItem = await _inventoryRepository.createInventoryItem(
+      final createdItem = await _inventoryRepository.createInventoryItem(
         InventoryCreateRequest(
           storageSpaceId: storageSpaceId,
           itemDefinitionId: definitionId,
@@ -142,10 +180,13 @@ class ManualStockInController extends ChangeNotifier {
           notes: notes,
         ),
       );
+      if (sequence != _sequence) return false;
+      _createdItem = createdItem;
       _status = ManualStockInStatus.success;
       notifyListeners();
       return true;
     } catch (error) {
+      if (sequence != _sequence) return false;
       _status = ManualStockInStatus.ready;
       _errorMessage = _messageFor(error);
       notifyListeners();
@@ -153,11 +194,12 @@ class ManualStockInController extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadDefinitions(String categoryId) async {
+  Future<void> _loadDefinitions(String categoryId, int sequence) async {
     final page = await _catalogRepository.getDefinitions(
       categoryId: categoryId,
       pageSize: 100,
     );
+    if (sequence != _sequence) return;
     _definitions = page.items;
     _selectedDefinitionId = _definitions.firstOrNull?.id;
   }

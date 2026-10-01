@@ -326,3 +326,8 @@ record the tested commit and result:
 ## Privacy and security
 
 - [Security and Privacy](docs/SECURITY_AND_PRIVACY.md): controls, data handling, findings and fixes, test/audit evidence, and remaining risks.
+
+
+Persistent login uses short-lived access tokens and revocable refresh sessions.
+See the [authentication lifecycle and migration instructions](backend/README.md#persistent-login)
+and [API reference](docs/API_REFERENCE.md#post-authrefresh).

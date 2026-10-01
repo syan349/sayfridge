@@ -3,7 +3,7 @@
 ## Fast CI entry point
 
 Start from the [root README](../../README.md#run-the-tests). The fast selection
-contains **314 cases: Backend 60, Web 103, Flutter 151**. All PRs run the fast checks through Core E2E orchestration; Backend also runs
+runs the Backend core selection and all Web and Flutter automated tests, excluding the manual screenshot exporter. All PRs run the fast checks through Core E2E orchestration; Backend also runs
 after pushes to `main`. Fast CI has no path filter. Integration changes run
 Core E2E after both reusable fast workflows succeed. Manual dispatch runs
 the same gates and E2E. Backend manual dispatch retains its full suite.
@@ -88,7 +88,7 @@ reports below retain their original scope and results.
 
 This suite contains **eight browser scenarios**:
 
-1. Register, sign out, sign in, load empty inventory and reload.
+1. Register, sign out, sign in, load empty inventory, renew an expired access credential after reload, and verify logout revocation.
 2. Create, rename, archive and restore an empty storage space.
 3. Create a private definition and stock item; verify inventory and expiry summary.
 4. Edit notes and move an item; verify persistence after reload.
@@ -185,7 +185,7 @@ and tokens; keep artifacts within the team rather than publishing traces.
 npx playwright show-report .e2e-artifacts/html
 ```
 
-Vitest explicitly excludes `e2e/**`, keeping the 103 Web fast tests independent.
+Vitest explicitly excludes `e2e/**`, keeping Web unit/component tests separate from browser E2E.
 The seven database-target guard cases belong to Backend full regression; the fast
 Backend selection remains 60. Core E2E results must be reported separately from
 unit/component counts.
@@ -397,3 +397,26 @@ model/version, date, category result, clarification, and confirmation behavior.
 | dish soap / 洗洁精 | Household Supplies |
 | clearly identified item outside catalog | Propose Other and require confirmation |
 | existing private definition with user-selected category | Reuse category; do not reclassify |
+
+
+## Persistent-login validation — 2026-10-01
+
+Local verification used Python 3.12, Node.js 22 and Flutter 3.44.8. PostgreSQL
+sessions and browser E2E used isolated local schemas; these checks did not modify
+Neon or deploy to hosted platforms.
+
+- Backend fast CI: 90 passed, 679 deselected.
+- Ten [Backend session tests](../../backend/tests/test_persistent_auth.py) passed:
+  rotation, hashed storage, replay revocation, logout, independent devices,
+  concurrent rotation, inactive accounts, expired access renewal and session deadlines.
+- Web: 108 Vitest cases passed; production build passed. Existing lint warning:
+  the triple-slash type reference in `vite.config.ts`.
+- Flutter: 165 cases passed with `manual_preview` excluded; analyzer reported no issues.
+  Tests cover concurrent renewal, offline behavior, server logout, stream authentication
+  and offline preview storage isolation.
+- Eight Chromium E2E flows passed, including real session renewal and immediate
+  access revocation after logout. The first browser run timed out before executing
+  business requests; subsequent complete runs passed.
+
+Deploy migration `a261001_sessions` before the new Backend, then update both
+frontends. Existing access-only sessions require login again to use persistent login.

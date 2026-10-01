@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.login_rate_limit import login_rate_limiter
-from app.core.security import create_access_token
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas.auth import (
@@ -12,6 +11,7 @@ from app.schemas.auth import (
     AuthValidationErrorResponse,
     LoginRequest,
     LoginResponse,
+    RefreshRequest,
     RegisterRequest,
     UserPublic,
 )
@@ -72,10 +72,12 @@ async def register(
 async def login(
     payload: LoginRequest,
     request: Request,
+    response: Response,
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> LoginResponse:
     """Validate credentials and issue a short-lived access token."""
+    response.headers["Cache-Control"] = "no-store"
     client_host = request.client.host if request.client else "unknown"
     limit_key = login_rate_limiter.key(client_host, str(payload.email))
     decision = login_rate_limiter.reserve(
@@ -102,15 +104,44 @@ async def login(
     login_rate_limiter.clear(limit_key)
     from app.services.storage_spaces import ensure_default_space
     await ensure_default_space(session, user.id)
-    return LoginResponse(
-        access_token=create_access_token(
-            user.id,
-            settings.jwt_secret_key,
-            settings.access_token_expire_minutes,
-        ),
-        expires_in=settings.access_token_expire_minutes * 60,
-        user=UserPublic.model_validate(user),
-    )
+    from app.services.auth_sessions import start_session
+    return await start_session(session, user, settings)
+
+
+@router.post(
+    "/refresh", response_model=LoginResponse,
+    summary="Rotate refresh credential and renew access",
+    responses={401: {
+        "model": AuthErrorResponse,
+        "description": "Expired, revoked or reused refresh credential",
+    }},
+)
+async def refresh(
+    payload: RefreshRequest,
+    response: Response,
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> LoginResponse:
+    """Renew a device session and replace its single-use refresh credential."""
+    from app.services.auth_sessions import InvalidSession, rotate_session
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return await rotate_session(session, payload.refresh_token, settings)
+    except InvalidSession:
+        raise HTTPException(
+            status_code=401, detail="Session expired or revoked; please sign in again",
+        ) from None
+
+
+@router.post("/logout", status_code=204, summary="Revoke the device session")
+async def logout(
+    payload: RefreshRequest,
+    session: AsyncSession = Depends(get_db_session),
+) -> Response:
+    """Revoke a device session; unknown or already revoked credentials return 204."""
+    from app.services.auth_sessions import revoke_session
+    await revoke_session(session, payload.refresh_token)
+    return Response(status_code=204)
 
 
 @router.get(
