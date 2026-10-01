@@ -6,6 +6,7 @@ class StorageSpace {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.isDefault = false,
   });
 
   final String id;
@@ -14,6 +15,7 @@ class StorageSpace {
   final String status;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool isDefault;
 
   bool get isActive => status == 'ACTIVE';
 
@@ -23,6 +25,7 @@ class StorageSpace {
       name: json['name'] as String,
       type: json['type'] as String,
       status: json['status'] as String,
+      isDefault: json['is_default'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );

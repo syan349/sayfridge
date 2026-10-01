@@ -101,6 +101,10 @@ class StorageSpaceScreen extends StatelessWidget {
                 onTap: onSelected == null ? null : () => onSelected!(space),
                 onEdit: () => _edit(context, space),
                 onDelete: () => _archive(context, space),
+                isDefault: space.isDefault,
+                onDefault: space.isDefault || controller.workspace == null
+                    ? null
+                    : () => _setDefault(context, space),
               ),
             ),
           const SizedBox(height: 32),
@@ -211,16 +215,60 @@ class StorageSpaceScreen extends StatelessWidget {
       _notConnected(context);
       return;
     }
+    try {
+      final hasStock = await workspace.spaceHasStock(space.id);
+      if (!context.mounted) return;
+      if (hasStock) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Cannot archive this space'),
+            content: Text(
+              '${space.name} still contains in-stock items. Use, discard or move them before archiving.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(businessError(error))));
+      }
+      return;
+    }
     await businessForm(
       context,
       title: 'Archive ${space.name}?',
       fields: const [],
       explanation:
-          'This does not delete inventory. A space containing in-stock items cannot be archived.',
+          'This space will be hidden from active storage spaces. Inventory history will not be deleted, and the space can be restored.'
+          '${space.isDefault ? '\nThe server will assign another default space or create an empty default space if needed.' : ''}',
       submit: (_) => workspace.spaceState(space.id, 'archive'),
     );
     if (!context.mounted) return;
     await controller.loadStorageSpaces();
+  }
+
+  Future<void> _setDefault(BuildContext context, StorageSpace space) async {
+    final workspace = controller.workspace;
+    if (workspace == null) return;
+    await businessForm(
+      context,
+      title: 'Set ${space.name} as default?',
+      fields: const [],
+      explanation:
+          'New stock will use this space by default. It will replace the previous default; only one space can be default.',
+      submit: (_) => workspace.spaceState(space.id, 'default'),
+    );
+    if (context.mounted) await controller.loadStorageSpaces();
   }
 
   Future<void> _restore(BuildContext context) async {
@@ -271,6 +319,8 @@ class _SpaceCard extends StatelessWidget {
     this.onTap,
     this.onEdit,
     this.onDelete,
+    this.isDefault = false,
+    this.onDefault,
   });
 
   final String label;
@@ -279,6 +329,8 @@ class _SpaceCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final bool isDefault;
+  final VoidCallback? onDefault;
 
   @override
   Widget build(BuildContext context) {
@@ -305,12 +357,17 @@ class _SpaceCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: const TextStyle(fontSize: 17)),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 17),
+                    ),
                     const SizedBox(height: 5),
                     Text(
-                      count == null
-                          ? 'Items'
-                          : '$count ${count == 1 ? 'item' : 'items'}',
+                      '${isDefault ? 'Default · ' : ''}${count == null ? 'Items' : '$count ${count == 1 ? 'item' : 'items'}'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 14,
                         color: AppColors.muted,
@@ -319,6 +376,16 @@ class _SpaceCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (onDefault != null || isDefault)
+                IconButton(
+                  onPressed: onDefault,
+                  icon: Icon(
+                    isDefault ? Icons.star_rounded : Icons.star_outline_rounded,
+                  ),
+                  tooltip: isDefault
+                      ? 'Default storage space'
+                      : 'Set $label as default',
+                ),
               if (onEdit != null)
                 IconButton(
                   onPressed: onEdit,
