@@ -92,7 +92,9 @@ class ManualStockInController extends ChangeNotifier {
       if (sequence != _sequence) return;
       _storageSpaces = spaces.items;
       _categories = categories.items;
-      _selectedStorageSpaceId = _storageSpaces.firstOrNull?.id;
+      _selectedStorageSpaceId =
+          _storageSpaces.where((space) => space.isDefault).firstOrNull?.id ??
+          _storageSpaces.firstOrNull?.id;
       _selectedCategoryId = _categories.firstOrNull?.id;
 
       if (_selectedCategoryId != null) {

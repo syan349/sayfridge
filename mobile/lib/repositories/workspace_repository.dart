@@ -83,6 +83,20 @@ class WorkspaceRepository {
     );
   }
 
+  Future<bool> spaceHasStock(String id) async {
+    final result = await client.getJson(
+      '/inventory-items',
+      accessToken: await accessToken(),
+      queryParameters: {
+        'storage_space_id': id,
+        'status': 'IN_STOCK',
+        'page': '1',
+        'page_size': '1',
+      },
+    );
+    return (result['total'] as int) > 0;
+  }
+
   Future<Map<String, dynamic>> createDefinition(
     String name,
     String categoryId,

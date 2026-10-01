@@ -16,6 +16,19 @@ import 'package:sayfridge/state/manual_stock_in_controller.dart';
 
 void main() {
   test(
+    'stock-in selects the default space rather than the first space',
+    () async {
+      final controller = ManualStockInController(
+        _FakeCatalogRepository(),
+        _FakeInventoryRepository(),
+        _DefaultSpaceRepository(),
+      );
+      addTearDown(controller.dispose);
+      await controller.loadOptions();
+      expect(controller.selectedStorageSpaceId, 'space-default');
+    },
+  );
+  test(
     'account reset removes cached spaces, selections and created items',
     () async {
       final controller = ManualStockInController(
@@ -292,6 +305,34 @@ class _FakeInventoryRepository extends Fake implements InventoryRepository {
       version: 1,
       createdAt: DateTime(2026, 9, 26),
       updatedAt: DateTime(2026, 9, 26),
+    );
+  }
+}
+
+class _DefaultSpaceRepository extends _FakeStorageSpaceRepository {
+  @override
+  Future<StorageSpacePage> getStorageSpaces({
+    String status = 'ACTIVE',
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final original = await super.getStorageSpaces();
+    return StorageSpacePage(
+      items: [
+        ...original.items,
+        StorageSpace(
+          id: 'space-default',
+          name: 'Default pantry',
+          type: 'PANTRY',
+          status: 'ACTIVE',
+          isDefault: true,
+          createdAt: DateTime(2026, 10, 1),
+          updatedAt: DateTime(2026, 10, 1),
+        ),
+      ],
+      total: 2,
+      page: 1,
+      pageSize: 100,
     );
   }
 }

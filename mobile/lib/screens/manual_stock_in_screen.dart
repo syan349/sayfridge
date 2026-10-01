@@ -31,9 +31,8 @@ class _ManualStockInScreenState extends State<ManualStockInScreen> {
     _unitController = TextEditingController();
     _notesController = TextEditingController();
     widget.controller.addListener(_onControllerChanged);
-    if (widget.controller.status == ManualStockInStatus.initial) {
-      widget.controller.loadOptions();
-    }
+    // Space/default settings may have changed since the previous visit.
+    widget.controller.loadOptions();
   }
 
   @override
