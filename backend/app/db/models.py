@@ -337,7 +337,10 @@ class AgentInventoryAction(Base):
     """A committed business receipt, independent of LangGraph checkpoints."""
     __tablename__ = "agent_inventory_action"
     id: Mapped[uuid.UUID] = uuid_primary_key()
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
     conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     turn_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     action: Mapped[str] = mapped_column(String(24), nullable=False)
@@ -394,3 +397,28 @@ class ConversationMessage(Base):
     created_at: Mapped[datetime] = created_at_column()
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
+
+
+class AuthSession(Base):
+    """A revocable device session with sliding idle and absolute expiry."""
+    __tablename__ = "auth_session"
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    absolute_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = created_at_column()
+
+
+class RefreshCredential(Base):
+    """Only SHA-256 hashes are stored; consumed credentials detect replay."""
+    __tablename__ = "auth_refresh_credential"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("auth_session.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

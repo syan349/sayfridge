@@ -503,6 +503,11 @@ Future<void> _capture(WidgetTester tester, String name) async {
 }
 
 class _FakeAuthRepository implements AuthRepository {
+  @override
+  void Function()? onSessionExpired;
+  @override
+  Future<String?> renewAccess(String rejected) async => null;
+
   _FakeAuthRepository(this.user);
   final AppUser? user;
   @override

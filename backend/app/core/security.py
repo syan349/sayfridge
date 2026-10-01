@@ -30,6 +30,7 @@ def create_access_token(
     expires_minutes: int,
     *,
     now: datetime | None = None,
+    session_id: uuid.UUID | None = None,
 ) -> str:
     issued_at = now or datetime.now(timezone.utc)
     payload = {
@@ -38,6 +39,8 @@ def create_access_token(
         "iat": issued_at,
         "exp": issued_at + timedelta(minutes=expires_minutes),
     }
+    if session_id is not None:
+        payload["sid"] = str(session_id)
     return jwt.encode(
         payload,
         secret_key.get_secret_value(),
@@ -47,12 +50,16 @@ def create_access_token(
 
 def decode_access_token(token: str, secret_key: SecretStr) -> uuid.UUID:
     # Fix the algorithm and require key claims; do not trust the token header to determine its algorithm or purpose.
-    payload = jwt.decode(
-        token,
-        secret_key.get_secret_value(),
-        algorithms=[JWT_ALGORITHM],
-        options={"require": ["sub", "type", "iat", "exp"]},
-    )
+    try:
+        payload = jwt.decode(
+            token,
+            secret_key.get_secret_value(),
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["sub", "type", "iat", "exp"]},
+        )
+    except (TypeError, ValueError, OverflowError) as exc:
+        # Some PyJWT versions leak conversion errors for malformed numeric claims.
+        raise jwt.InvalidTokenError("invalid token claims") from exc
     if payload["type"] != ACCESS_TOKEN_TYPE:
         raise jwt.InvalidTokenError("unexpected token type")
 

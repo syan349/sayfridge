@@ -47,9 +47,9 @@ recorded selections, not a full regression run or a count of OWASP requirements.
 | Role escalation | Registration creates a USER. Registration/status-update payload validation rejects unsupported role fields. Tests verify that input cannot create an administrator. |
 | Terminal states | Discard/archive and quantity/batch tests reject illegal operations on terminal resources; failed operations do not partially write or restore resources. |
 | Agent isolation | Tests cover conversation ownership and repeated/concurrent requests. Model/graph execution uses test doubles; this is not acceptance of the deployed checkpoint service. |
-| Authentication coverage | The new route probe enumerated 34 protected OpenAPI method/path pairs, all rejecting missing identity with 401. Registration, login and public version metadata are explicitly excluded. |
+| Authentication coverage | The new route probe enumerated 34 protected OpenAPI method/path pairs, all rejecting missing identity with 401. Registration, login and public version metadata are explicitly excluded. Refresh and logout use a separate refresh credential; missing or malformed credentials return 422, and refresh rejection returns 401. |
 | Input and SQL | Pydantic types, ranges and extra-field restrictions; parameterized ORM queries. Tests cover identifiers, quantities, pagination and status values. No input-concatenated business SQL was found in the reviewed code. |
-| Token lifecycle | Default expiry is 15 minutes. Clients log out by removing their token; account suspension/disablement blocks subsequent access. Refresh and individual-token revocation are not implemented. |
+| Token lifecycle | Access JWTs expire after 15 minutes. Rotating refresh credentials provide a 30-day sliding idle window and a 90-day absolute session limit. PostgreSQL stores only refresh hashes. Server logout and refresh replay revoke the device session; protected requests check revocation and current account status. Network failure during logout cannot confirm server revocation. |
 | CORS | Explicit origin allowlist, no wildcard configuration or cookie credentials. Tests cover allowed/rejected origins and validation/body-limit responses. CORS does not replace authentication. |
 | Login throttling | Basic process-local client/account limits exist. This does not provide a shared limit across Vercel instances. |
 
@@ -92,10 +92,11 @@ has started, its status cannot change; clients must treat missing completion eve
 | Data | Location and purpose |
 | --- | --- |
 | Email, password hash, role, account status and timestamps | PostgreSQL on Neon for authentication and account administration. Passwords are hashed, not stored as plaintext. |
+| Device session IDs, expiry/revocation timestamps and refresh credential hashes | PostgreSQL on Neon. Raw refresh credentials are never stored server-side; expiry ends authorization rather than deleting session records. |
 | Spaces, private item definitions, inventory quantities/dates/notes and operation history | Neon, scoped to the authenticated user. Administrator account inspection does not grant unrestricted inventory access through ordinary inventory APIs. |
 | Agent messages, images embedded in messages, pending actions, results and request identifiers | LangGraph PostgreSQL checkpoints for conversation recovery and repeat-operation protection. Base64 is encoding, not encryption. |
 | Explicitly requested Agent memories | A user-specific PostgreSQL store namespace. |
-| Client session data | Web stores access tokens in memory/sessionStorage. Mobile uses FlutterSecureStorage for tokens and per-user Agent conversation/retry state. Flutter Web storage is subject to browser security and is not equivalent to Android device storage. |
+| Client session data | Web stores access and refresh credentials in memory/sessionStorage. Mobile uses FlutterSecureStorage for tokens and per-user Agent conversation/retry state. Flutter Web storage is subject to browser security and is not equivalent to Android device storage. |
 
 ### Third parties, text, images and voice
 
@@ -298,3 +299,17 @@ All follow-up artifacts are local verification evidence.
 
 Scope note: **Not verified on a physical Android device.** Physical-device verification is outside this
 review's agreed scope and does not reduce its completion status.
+
+
+### Persistent-session verification
+
+The persistent-login change adds database-backed device sessions and single-use
+refresh rotation. Tests cover expired access renewal, replay revocation, immediate
+logout, inactive accounts, idle/absolute expiry, and the absolute cap. Web and Flutter
+client tests cover concurrent renewal, credential replacement, and network failures.
+See [Backend tests](../backend/tests/test_persistent_auth.py),
+[Web client tests](../web/src/api/client.test.ts), and
+[Flutter repository tests](../mobile/test/repositories/auth_repository_test.dart).
+These results validate local isolated environments; cloud migration and deployment
+are separate release steps. Browser refresh credentials remain accessible to same-origin
+JavaScript, so this feature does not remove the need for XSS protections.

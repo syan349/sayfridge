@@ -37,6 +37,12 @@ async def get_current_user(
     except jwt.InvalidTokenError as exc:
         raise authentication_error() from exc
 
+    from app.services.auth_sessions import InvalidSession, validate_access_session
+    try:
+        await validate_access_session(session, credentials.credentials, settings, user_id)
+    except (InvalidSession, jwt.InvalidTokenError):
+        raise authentication_error() from None
+
     # A token proves identity at issuance; read the current role and status from the database on every request.
     user = await get_user_by_id(session, user_id)
     if user is None or user.status != ACTIVE_STATUS:

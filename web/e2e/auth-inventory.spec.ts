@@ -20,12 +20,38 @@ test('register, sign out, sign in and load an empty inventory from PostgreSQL', 
   expect((await signedIn).status()).toBe(200)
   await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible()
 
-  const inventory = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/inventory-items' && r.request().method() === 'GET')
-  await page.goto('/inventory')
-  const response = await inventory
+  await page.getByRole('navigation', { name: 'Main', exact: true })
+    .getByRole('link', { name: /^Inventory(?:\s+\d+)?$/ }).click()
+  await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
+  // Dashboard also loads inventory after login. Verify persisted data separately
+  // so this assertion cannot capture a background count response.
+  const api = process.env.VITE_API_BASE_URL!
+  const token = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sayfridge.auth')!).token as string)
+  const response = await page.request.get(`${api}/inventory-items`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
   expect(response.status()).toBe(200)
   expect(await response.json()).toMatchObject({ total: 0, items: [] })
-  await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
+
+  // Force client-side access expiry; the real backend must rotate the session.
+  const before = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sayfridge.auth')!))
+  await page.evaluate(() => {
+    const stored = JSON.parse(sessionStorage.getItem('sayfridge.auth')!)
+    stored.expiresAt = 0
+    sessionStorage.setItem('sayfridge.auth', JSON.stringify(stored))
+  })
+  const refreshed = page.waitForResponse(r => r.url().endsWith('/auth/refresh'))
+  await page.reload()
+  expect((await refreshed).status()).toBe(200)
+  await expect(page.getByText('Your inventory is empty.', { exact: true })).toBeVisible()
+  const after = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sayfridge.auth')!))
+  expect(after.refreshToken).not.toBe(before.refreshToken)
+  const revoked = page.waitForResponse(r => r.url().endsWith('/auth/logout'))
+  await page.getByRole('button', { name: 'Log out', exact: true }).click()
+  expect((await revoked).status()).toBe(204)
+  expect((await page.request.get(`${api}/auth/me`, {
+    headers: { Authorization: `Bearer ${after.token}` },
+  })).status()).toBe(401)
 })

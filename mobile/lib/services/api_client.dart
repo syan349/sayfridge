@@ -10,6 +10,23 @@ class ApiClient {
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
+  Future<String?> Function(String)? renewAccessToken;
+
+  Future<http.Response> _authorized(
+    String? token,
+    Future<http.Response> Function(String?) request,
+  ) async {
+    try {
+      return await _send(() => request(token));
+    } on ApiException catch (error) {
+      if (!error.isUnauthorized || token == null || renewAccessToken == null) {
+        rethrow;
+      }
+      final replacement = await renewAccessToken!(token);
+      if (replacement == null) rethrow;
+      return _send(() => request(replacement));
+    }
+  }
 
   Future<Map<String, dynamic>> getJson(
     String path, {
@@ -20,8 +37,9 @@ class ApiClient {
       path,
     ).replace(queryParameters: queryParameters);
 
-    final response = await _send(
-      () => _client.get(uri, headers: _headers(accessToken: accessToken)),
+    final response = await _authorized(
+      accessToken,
+      (token) => _client.get(uri, headers: _headers(accessToken: token)),
     );
 
     return _decodeSuccessfulResponse(response);
@@ -33,11 +51,12 @@ class ApiClient {
     String? accessToken,
     Map<String, String> headers = const {},
   }) async {
-    final response = await _send(
-      () => _client.post(
+    final response = await _authorized(
+      accessToken,
+      (token) => _client.post(
         ApiConfig.buildUri(path),
         headers: {
-          ..._headers(accessToken: accessToken),
+          ..._headers(accessToken: token),
           ...headers,
         },
         body: body == null ? null : jsonEncode(body),
@@ -52,10 +71,11 @@ class ApiClient {
     required Map<String, dynamic> body,
     required String accessToken,
   }) async => _decodeSuccessfulResponse(
-    await _send(
-      () => _client.patch(
+    await _authorized(
+      accessToken,
+      (token) => _client.patch(
         ApiConfig.buildUri(path),
-        headers: _headers(accessToken: accessToken),
+        headers: _headers(accessToken: token),
         body: jsonEncode(body),
       ),
     ),
@@ -65,10 +85,11 @@ class ApiClient {
     String path, {
     required String accessToken,
   }) async {
-    final response = await _send(
-      () => _client.get(
+    final response = await _authorized(
+      accessToken,
+      (token) => _client.get(
         ApiConfig.buildUri(path),
-        headers: _headers(accessToken: accessToken),
+        headers: _headers(accessToken: token),
       ),
     );
     final value = jsonDecode(response.body);
@@ -83,15 +104,28 @@ class ApiClient {
     required Map<String, dynamic> body,
     required String accessToken,
   }) async* {
-    final request = http.Request('POST', ApiConfig.buildUri(path))
-      ..headers.addAll({
-        ..._headers(accessToken: accessToken),
-        'Accept': 'text/event-stream',
-      })
-      ..body = jsonEncode(body);
-    final response = await _client
-        .send(request)
-        .timeout(ApiConfig.requestTimeout);
+    Future<http.StreamedResponse> open(String token) async {
+      final request = http.Request('POST', ApiConfig.buildUri(path))
+        ..headers.addAll({
+          ..._headers(accessToken: token),
+          'Accept': 'text/event-stream',
+        })
+        ..body = jsonEncode(body);
+      return _client.send(request).timeout(ApiConfig.requestTimeout);
+    }
+
+    var response = await open(accessToken);
+    if (response.statusCode == 401 && renewAccessToken != null) {
+      await response.stream.drain<void>();
+      final replacement = await renewAccessToken!(accessToken);
+      if (replacement == null) {
+        throw const ApiException(
+          statusCode: 401,
+          message: 'Please sign in again.',
+        );
+      }
+      response = await open(replacement);
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw _parseApiException(
         await http.Response.fromStream(
@@ -159,6 +193,7 @@ class ApiClient {
   }
 
   Map<String, dynamic> _decodeSuccessfulResponse(http.Response response) {
+    if (response.statusCode == 204) return {};
     try {
       final decoded = jsonDecode(response.body);
 

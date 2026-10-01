@@ -280,6 +280,11 @@ void main() {
 }
 
 class _Accounts implements AuthRepository {
+  @override
+  void Function()? onSessionExpired;
+  @override
+  Future<String?> renewAccess(String rejected) async => null;
+
   final user = AppUser(
     id: 'user-1',
     email: 'user@example.com',

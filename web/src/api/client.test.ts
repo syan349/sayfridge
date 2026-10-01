@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
 import { server } from '../test/server'
 import { ApiError, apiFetch, onUnauthorized } from './client'
-import { getToken, setToken } from './tokenStore'
+import { getToken, getRefreshToken, setToken } from './tokenStore'
 import type { User } from './types'
 
 const user: User = {
@@ -169,4 +169,69 @@ describe('apiFetch', () => {
 
     expect(error).toMatchObject({ status: 0, code: 'NETWORK_ERROR' })
   })
+})
+
+
+describe('persistent session renewal', () => {
+  it('coalesces concurrent 401 responses and retries with the replacement', async () => {
+    setToken('old', 900, 'refresh-old')
+    let rotations = 0
+    server.use(
+      http.post('/api/v1/auth/refresh', async ({ request }) => {
+        rotations++
+        expect(await request.json()).toEqual({ refresh_token: 'refresh-old' })
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        return HttpResponse.json({ access_token: 'new', refresh_token: 'refresh-new', expires_in: 900 })
+      }),
+      http.get('/api/v1/auth/me', ({ request }) => request.headers.get('Authorization') === 'Bearer new'
+        ? HttpResponse.json(user) : HttpResponse.json({ detail: 'Expired' }, { status: 401 })),
+    )
+    await expect(Promise.all([apiFetch('/auth/me'), apiFetch('/auth/me')])).resolves.toEqual([user, user])
+    expect(rotations).toBe(1)
+    expect(getRefreshToken()).toBe('refresh-new')
+  })
+
+  it('renews expired access before sending a request', async () => {
+    setToken('expired', -1, 'refresh-old')
+    server.use(
+      http.post('/api/v1/auth/refresh', () => HttpResponse.json({ access_token: 'new', refresh_token: 'refresh-new', expires_in: 900 })),
+      http.get('/api/v1/auth/me', ({ request }) => {
+        expect(request.headers.get('Authorization')).toBe('Bearer new')
+        return HttpResponse.json(user)
+      }),
+    )
+    await expect(apiFetch('/auth/me')).resolves.toEqual(user)
+  })
+
+  it('preserves refresh credentials after a network error', async () => {
+    setToken('expired', -1, 'refresh-old')
+    server.use(http.post('/api/v1/auth/refresh', () => HttpResponse.error()))
+    expect(await failure(apiFetch('/auth/me'))).toMatchObject({ status: 0 })
+    expect(getRefreshToken()).toBe('refresh-old')
+  })
+
+  it('clears a revoked session and stops retrying', async () => {
+    setToken('old', 900, 'refresh-old')
+    const listener = vi.fn()
+    const unsubscribe = onUnauthorized(listener)
+    server.use(
+      http.post('/api/v1/auth/refresh', () => HttpResponse.json({ detail: 'Revoked' }, { status: 401 })),
+      http.get('/api/v1/auth/me', () => HttpResponse.json({ detail: 'Expired' }, { status: 401 })),
+    )
+    expect(await failure(apiFetch('/auth/me'))).toMatchObject({ status: 401 })
+    expect(getRefreshToken()).toBeNull()
+    expect(listener).toHaveBeenCalledOnce()
+    unsubscribe()
+  })
+})
+
+
+it('notifies once when an already expired access token cannot be renewed', async () => {
+  setToken('expired', -1, 'refresh-old')
+  const listener = vi.fn()
+  const unsubscribe = onUnauthorized(listener)
+  server.use(http.post('/api/v1/auth/refresh', () => HttpResponse.json({ detail: 'Revoked' }, { status: 401 })))
+  expect(await failure(apiFetch('/auth/me'))).toMatchObject({ status: 401 })
+  expect(listener).toHaveBeenCalledOnce()
+  unsubscribe()
 })

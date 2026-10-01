@@ -129,8 +129,10 @@ Success: **200**, with these JSON fields:
 | token_type | String: `bearer` |
 | expires_in | Integer: lifetime in seconds (currently configured as 900) |
 | user | User object defined above |
+| refresh_token | Opaque, rotating credential; treat as a secret |
+| refresh_expires_in | Seconds until the current session idle deadline |
 
-- Database effect: read account and verify password; no session record or cookie.
+- Database effect: verify password and create an independent, revocable session and hashed refresh credential. Responses use `Cache-Control: no-store`. No cookies are issued.
 - Unknown email, wrong password, non-local account, missing hash, or inactive account:
   **401**, `Invalid email or password`.
 - The application allows five attempts per client/account pair in a 60-second sliding
@@ -148,11 +150,31 @@ Success: **200**, with these JSON fields:
 - Missing/invalid/expired token or unavailable user: **401**,
   `Invalid or expired access token`, with `WWW-Authenticate: Bearer`.
 
-Profile editing, password change, refresh tokens, cookie login, server-side sessions,
-and a logout endpoint are outside this delivery. Clients log out by deleting the
-Bearer token. Tokens cannot be revoked individually and remain valid until their
-configured expiry unless the account is suspended, disabled, or deleted; each
-authenticated request reads the account's current state from the database.
+### POST /auth/refresh
+
+No access JWT required. JSON: `{"refresh_token":"<credential from login or last refresh>"}`.
+Success **200** returns the same fields as login, with a replacement refresh credential.
+Store the replacement before the next renewal. Responses use `Cache-Control: no-store`.
+Unknown, consumed, revoked or expired credentials and inactive accounts return **401**.
+Reusing a consumed credential revokes the entire device session. Malformed input returns
+**422** without echoing the submitted secret.
+
+The default idle deadline is 30 days, extended by successful renewal, with an absolute
+90-day maximum from login. Both limits are configurable. Clients coalesce concurrent
+renewals and retry the original authenticated request once; a network failure preserves
+local credentials for retry. An Agent stream is never replayed after streaming starts.
+
+### POST /auth/logout
+
+JSON: `{"refresh_token":"<current refresh credential>"}`. Success **204**, empty body.
+Revokes that device session and all its access tokens immediately. Unknown or already
+revoked credentials also return **204**. Other devices remain signed in. Logout does
+not delete inventory or conversation data. A server logout requires connectivity;
+local credential deletion alone does not revoke a server session.
+
+Access JWTs issued before this change retain their original expiry and have no
+revocable session ID. Login again to obtain the new session credentials. Profile editing,
+password change and cookie login are separate from these endpoints.
 
 ## 3. Storage spaces — B04
 

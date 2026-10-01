@@ -39,20 +39,23 @@ def test_openapi_is_complete_enough_for_interactive_acceptance() -> None:
         "/api/v1/system/version",
         "/api/v1/auth/register",
         "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/logout",
     }
     for path, _method, operation in _operations(schema):
         assert operation.get("tags"), path
         assert operation.get("summary"), path
         assert operation.get("description"), path
         success_responses = [
-            response
+            (code, response)
             for code, response in operation["responses"].items()
             if str(code).startswith("2")
         ]
         assert success_responses, path
         assert all(
-            any("schema" in media for media in response.get("content", {}).values())
-            for response in success_responses
+            (str(code) == "204" and not response.get("content"))
+            or any("schema" in media for media in response.get("content", {}).values())
+            for code, response in success_responses
         ), path
         if path not in public_paths:
             unauthorized = operation["responses"].get("401", {})
@@ -73,6 +76,8 @@ def test_openapi_is_complete_enough_for_interactive_acceptance() -> None:
     assert body_operations == {
         ("/api/v1/auth/register", "post"),
         ("/api/v1/auth/login", "post"),
+        ("/api/v1/auth/refresh", "post"),
+        ("/api/v1/auth/logout", "post"),
         ("/api/v1/storage-spaces", "post"),
         ("/api/v1/storage-spaces/{space_id}", "patch"),
         ("/api/v1/item-definitions", "post"),
