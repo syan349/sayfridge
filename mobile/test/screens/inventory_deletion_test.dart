@@ -156,19 +156,31 @@ void main() {
       await tester.tap(find.byTooltip('Delete items'));
       await tester.pumpAndSettle();
       expect(find.byType(Checkbox), findsNWidgets(3));
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('batch-delete-confirm')))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const Key('batch-delete-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byType(Checkbox), findsNothing);
+      expect(fixture.writes, isEmpty);
+      await tester.tap(find.byTooltip('Delete items'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byType(Checkbox).last);
       await tester.pumpAndSettle();
       expect(find.text('1 selected'), findsOneWidget);
       await tester.tap(find.byType(Checkbox).first);
       await tester.pumpAndSettle();
       expect(find.text('2 selected'), findsOneWidget);
-      await tester.tap(find.byTooltip('Delete items'));
+      await tester.tap(find.byKey(const Key('batch-delete-confirm')));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(TextButton, 'Cancel').last);
       await tester.pumpAndSettle();
       expect(fixture.writes, isEmpty);
       expect(find.text('2 selected'), findsOneWidget);
-      await tester.tap(find.byTooltip('Delete items'));
+      await tester.tap(find.byKey(const Key('batch-delete-confirm')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirm delete'));
       await tester.pumpAndSettle();
@@ -190,7 +202,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byType(Checkbox).first);
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Delete items'));
+        await tester.tap(find.byKey(const Key('batch-delete-confirm')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Confirm delete'));
         await tester.pumpAndSettle();
@@ -247,7 +259,7 @@ void main() {
       expect(find.text('1 selected'), findsOneWidget);
       await tester.tap(find.byType(Checkbox).last);
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Delete items'));
+      await tester.tap(find.byKey(const Key('batch-delete-confirm')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirm delete'));
       await tester.pumpAndSettle();

@@ -79,8 +79,9 @@ void main() {
     expect(find.text('Guest'), findsOneWidget);
     await tester.tap(find.text('AI Assistant'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Profile'));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
+    expect(find.byType(ProfileScreen), findsOneWidget);
     expect(find.text('Guest'), findsOneWidget);
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();

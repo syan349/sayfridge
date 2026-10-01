@@ -35,6 +35,10 @@ class _PreviewAppState extends State<PreviewApp> {
 
   void _openTab(String route) {
     final navigator = _navigator.currentState!;
+    if (route == '/assistant') {
+      navigator.pushNamed(route);
+      return;
+    }
     navigator.popUntil((route) => route.isFirst);
     if (route != '/') navigator.pushNamed(route);
   }
@@ -109,8 +113,6 @@ class _PreviewAppState extends State<PreviewApp> {
         listenable: _session.auth,
         builder: (context, _) => AiAssistantScreen(
           isGuest: !_session.auth.isAuthenticated,
-          onHomeTap: () => _openTab('/'),
-          onProfileTap: () => _openTab('/profile'),
           onLoginTap: _enterPreview,
         ),
       ),

@@ -104,7 +104,8 @@ class _AgentComposerState extends State<AgentComposer> {
     mainAxisSize: MainAxisSize.min,
     children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+        // Selection handles extend below the field; keep them clear of actions.
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 18),
         child: TextField(
           key: const Key('assistant-message-field'),
           controller: widget.controller,

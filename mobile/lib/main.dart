@@ -187,16 +187,12 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
     required bool isGuest,
   }) {
     final navigator = Navigator.of(context);
-    navigator.popUntil((route) => route.isFirst);
     navigator.push(
       MaterialPageRoute<void>(
         builder: (assistantContext) => AiAssistantScreen(
           isGuest: isGuest,
           agentController: _agentController,
           displayName: isGuest ? null : _profileController.displayName,
-          onHomeTap: () =>
-              Navigator.of(assistantContext).popUntil((route) => route.isFirst),
-          onProfileTap: () => _openProfile(assistantContext, authController),
           onLoginTap: isGuest
               ? () => _openSignIn(assistantContext, authController)
               : null,
@@ -292,9 +288,6 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
         builder: (assistantContext) => AiAssistantScreen(
           agentController: _agentController,
           displayName: _profileController.displayName,
-          onHomeTap: () =>
-              Navigator.of(assistantContext).popUntil((route) => route.isFirst),
-          onProfileTap: () => _openProfile(assistantContext, authController),
         ),
       ),
     );

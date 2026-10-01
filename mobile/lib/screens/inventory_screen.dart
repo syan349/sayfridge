@@ -203,11 +203,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 widget.controller.workspace == null ||
                     _deleting ||
                     _deletionBlocked ||
-                    (_deleteMode && _selected.isEmpty)
+                    _deleteMode
                 ? null
-                : () => _deleteMode
-                      ? _deleteItems(_selected.values.toList())
-                      : setState(() => _deleteMode = true),
+                : () => setState(() => _deleteMode = true),
             icon: const Icon(Icons.delete_outline, size: 26),
           ),
         ),
@@ -222,59 +220,108 @@ class _InventoryScreenState extends State<InventoryScreen> {
       children: [
         Row(
           children: [
-            Checkbox(
-              value:
-                  _visibleItems.isNotEmpty &&
-                  _visibleItems.every((item) => _selected.containsKey(item.id)),
-              activeColor: AppColors.primaryDark,
-              onChanged: _deleting || _visibleItems.isEmpty
-                  ? null
-                  : (all) {
-                      if (all == true &&
-                          _selected.length +
-                                  _visibleItems
-                                      .where(
-                                        (item) =>
-                                            !_selected.containsKey(item.id),
-                                      )
-                                      .length >
-                              100) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Select up to 100 items per deletion.',
+            SizedBox(
+              width: 28,
+              height: 48,
+              child: Checkbox(
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                value:
+                    _visibleItems.isNotEmpty &&
+                    _visibleItems.every(
+                      (item) => _selected.containsKey(item.id),
+                    ),
+                activeColor: AppColors.primaryDark,
+                onChanged: _deleting || _visibleItems.isEmpty
+                    ? null
+                    : (all) {
+                        if (all == true &&
+                            _selected.length +
+                                    _visibleItems
+                                        .where(
+                                          (item) =>
+                                              !_selected.containsKey(item.id),
+                                        )
+                                        .length >
+                                100) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Select up to 100 items per deletion.',
+                              ),
                             ),
-                          ),
-                        );
-                        return;
-                      }
-                      setState(() {
-                        if (all == true) {
-                          for (final item in _visibleItems) {
-                            if (_selected.length < 100 ||
-                                _selected.containsKey(item.id)) {
-                              _selected[item.id] = item;
+                          );
+                          return;
+                        }
+                        setState(() {
+                          if (all == true) {
+                            for (final item in _visibleItems) {
+                              if (_selected.length < 100 ||
+                                  _selected.containsKey(item.id)) {
+                                _selected[item.id] = item;
+                              }
+                            }
+                          } else {
+                            for (final item in _visibleItems) {
+                              _selected.remove(item.id);
                             }
                           }
-                        } else {
-                          for (final item in _visibleItems) {
-                            _selected.remove(item.id);
-                          }
-                        }
-                      });
-                    },
+                        });
+                      },
+              ),
             ),
+            const SizedBox(width: 8),
             const Expanded(
-              child: Text('Select this page', style: TextStyle(fontSize: 14)),
+              child: Text(
+                'Select this page',
+                style: TextStyle(fontSize: 13, height: 1.2),
+              ),
             ),
-            TextButton(
+            const SizedBox(width: 8),
+            FilledButton(
+              key: const Key('batch-delete-confirm'),
+              onPressed: _deleting || _deletionBlocked || _selected.isEmpty
+                  ? null
+                  : () => _deleteItems(_selected.values.toList()),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.text,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(0, 40),
+                textStyle: Theme.of(context).textTheme.labelLarge!.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Confirm'),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              key: const Key('batch-delete-cancel'),
               onPressed: _deleting ? null : _clearSelection,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryDark,
+                backgroundColor: const Color(0xBFFFFFFF),
+                side: const BorderSide(color: AppColors.primary),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(0, 40),
+                textStyle: Theme.of(context).textTheme.labelLarge!.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               child: const Text('Cancel'),
             ),
           ],
         ),
         Padding(
-          padding: const EdgeInsets.only(left: 12, bottom: 8),
+          padding: const EdgeInsets.only(bottom: 8),
           child: Text(
             '${_selected.length} selected',
             style: const TextStyle(color: AppColors.muted, fontSize: 13),

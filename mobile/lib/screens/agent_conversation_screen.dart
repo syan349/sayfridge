@@ -12,7 +12,6 @@ import '../state/agent_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/agent_composer.dart';
 import '../widgets/app_background.dart';
-import '../widgets/app_bottom_navigation.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
 import '../widgets/assistant_scroll_layout.dart';
@@ -26,15 +25,12 @@ import 'conversation_history_screen.dart';
 class AgentConversationScreen extends StatefulWidget {
   const AgentConversationScreen({
     required this.controller,
-    this.onHomeTap,
-    this.onProfileTap,
     this.pickImages,
     this.voiceInput,
     this.displayName,
     super.key,
   });
   final AgentController controller;
-  final VoidCallback? onHomeTap, onProfileTap;
   final Future<List<XFile>> Function()? pickImages;
   final VoiceInputService? voiceInput;
   final String? displayName;
@@ -45,6 +41,7 @@ class AgentConversationScreen extends StatefulWidget {
 
 class _AgentConversationScreenState extends State<AgentConversationScreen> {
   final _message = TextEditingController();
+  final _footerKey = GlobalKey();
   OverlayEntry? _voiceOverlayEntry;
   final List<AgentImage> _images = [];
   late final VoiceInputService _voiceInput;
@@ -244,7 +241,21 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   }
 
   void _messageFor(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    final footer = _footerKey.currentContext?.findRenderObject() as RenderBox?;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          (footer?.size.height ?? 100) +
+              MediaQuery.paddingOf(context).bottom +
+              12,
+        ),
+      ),
+    );
   }
 
   @override
@@ -299,12 +310,8 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                     _voiceModeReset++;
                                   });
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Resolve or cancel pending items, or recover the current request first.',
-                                      ),
-                                    ),
+                                  _messageFor(
+                                    'Resolve or cancel pending items, or recover the current request first.',
                                   );
                                 }
                               },
@@ -424,7 +431,8 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(22, 8, 22, 26),
+                              key: _footerKey,
+                              padding: const EdgeInsets.fromLTRB(25, 8, 25, 28),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -457,6 +465,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                       ),
                                     ),
                                   AgentComposer(
+                                    key: const Key('assistant-bottom-action'),
                                     controller: _message,
                                     voiceModeReset: _voiceModeReset,
                                     enabled: agent.canSend,
@@ -485,12 +494,6 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                   ),
                                 ],
                               ),
-                            ),
-                            AppBottomNavigation(
-                              onHomeTap:
-                                  widget.onHomeTap ??
-                                  () => Navigator.of(context).maybePop(),
-                              onProfileTap: widget.onProfileTap,
                             ),
                           ],
                         ),
