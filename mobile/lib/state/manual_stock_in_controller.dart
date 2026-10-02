@@ -41,6 +41,7 @@ class ManualStockInController extends ChangeNotifier {
     _errorMessage = null;
     _createdItem = null;
     _isLoadingDefinitions = false;
+    _submissionUncertain = false;
   }
 
   @override
@@ -59,6 +60,7 @@ class ManualStockInController extends ChangeNotifier {
   String? _errorMessage;
   InventoryItem? _createdItem;
   bool _isLoadingDefinitions = false;
+  bool _submissionUncertain = false;
 
   ManualStockInStatus get status => _status;
   List<StorageSpace> get storageSpaces => _storageSpaces;
@@ -70,13 +72,13 @@ class ManualStockInController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   InventoryItem? get createdItem => _createdItem;
   bool get isLoadingDefinitions => _isLoadingDefinitions;
+  bool get submissionUncertain => _submissionUncertain;
 
   bool get hasRequiredOptions =>
-      _storageSpaces.isNotEmpty &&
-      _categories.isNotEmpty &&
-      _definitions.isNotEmpty;
+      _storageSpaces.isNotEmpty && _categories.isNotEmpty;
 
   Future<void> loadOptions() async {
+    _submissionUncertain = false;
     final sequence = ++_sequence;
     _clearOptions();
     _status = ManualStockInStatus.loading;
@@ -153,11 +155,19 @@ class ManualStockInController extends ChangeNotifier {
     DateTime? purchaseDate,
     DateTime? expiryDate,
     String? notes,
+    String? itemName,
   }) async {
+    if (_status == ManualStockInStatus.submitting || _submissionUncertain) {
+      return false;
+    }
     final sequence = _sequence;
     final storageSpaceId = _selectedStorageSpaceId;
-    final definitionId = _selectedDefinitionId;
-    if (storageSpaceId == null || definitionId == null) {
+    var definitionId = _selectedDefinitionId;
+    final name = itemName?.trim();
+    if (storageSpaceId == null ||
+        _selectedCategoryId == null ||
+        (name == null && definitionId == null) ||
+        name == '') {
       _errorMessage = 'Choose a storage space, category, and item.';
       notifyListeners();
       return false;
@@ -169,10 +179,30 @@ class ManualStockInController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      if (name != null) {
+        final existing = _definitions
+            .where(
+              (definition) =>
+                  definition.name.toLowerCase() == name.toLowerCase(),
+            )
+            .firstOrNull;
+        if (existing != null) {
+          definitionId = existing.id;
+        } else {
+          final created = await _catalogRepository.createDefinition(
+            name,
+            _selectedCategoryId!,
+          );
+          if (sequence != _sequence) return false;
+          _definitions = [..._definitions, created];
+          definitionId = created.id;
+        }
+        _selectedDefinitionId = definitionId;
+      }
       final createdItem = await _inventoryRepository.createInventoryItem(
         InventoryCreateRequest(
           storageSpaceId: storageSpaceId,
-          itemDefinitionId: definitionId,
+          itemDefinitionId: definitionId!,
           amount: amount.trim(),
           unit: unit,
           purchaseDate: purchaseDate,
@@ -187,20 +217,33 @@ class ManualStockInController extends ChangeNotifier {
       return true;
     } catch (error) {
       if (sequence != _sequence) return false;
+      _submissionUncertain =
+          error is! ApiException ||
+          error.statusCode == 0 ||
+          error.statusCode >= 500 ||
+          error.code == 'INVALID_RESPONSE' ||
+          error.isConflict;
       _status = ManualStockInStatus.ready;
-      _errorMessage = _messageFor(error);
+      _errorMessage =
+          '${_messageFor(error)}${_submissionUncertain ? '\nReturn to inventory and reload before trying again. The save result could not be verified.' : ''}';
       notifyListeners();
       return false;
     }
   }
 
   Future<void> _loadDefinitions(String categoryId, int sequence) async {
-    final page = await _catalogRepository.getDefinitions(
-      categoryId: categoryId,
-      pageSize: 100,
-    );
-    if (sequence != _sequence) return;
-    _definitions = page.items;
+    final definitions = <ItemDefinition>[];
+    for (var pageNumber = 1; ; pageNumber++) {
+      final page = await _catalogRepository.getDefinitions(
+        categoryId: categoryId,
+        page: pageNumber,
+        pageSize: 100,
+      );
+      if (sequence != _sequence) return;
+      definitions.addAll(page.items);
+      if (definitions.length >= page.total || page.items.isEmpty) break;
+    }
+    _definitions = definitions;
     _selectedDefinitionId = _definitions.firstOrNull?.id;
   }
 

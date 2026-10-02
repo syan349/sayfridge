@@ -1,5 +1,6 @@
 import '../models/item_category_page.dart';
 import '../models/item_definition_page.dart';
+import '../models/item_definition.dart';
 import '../services/api_exception.dart';
 import '../services/catalog_api_service.dart';
 import '../services/token_storage.dart';
@@ -9,6 +10,15 @@ class CatalogRepository {
 
   final CatalogApiService _catalogApiService;
   final TokenStorage _tokenStorage;
+
+  Future<ItemDefinition> createDefinition(
+    String name,
+    String categoryId,
+  ) async => _catalogApiService.createDefinition(
+    accessToken: await _requireAccessToken(),
+    name: name,
+    categoryId: categoryId,
+  );
 
   Future<ItemCategoryPage> getCategories({
     int page = 1,

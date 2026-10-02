@@ -1,11 +1,24 @@
 import '../models/item_category_page.dart';
 import '../models/item_definition_page.dart';
+import '../models/item_definition.dart';
 import 'api_client.dart';
 
 class CatalogApiService {
   const CatalogApiService(this._apiClient);
 
   final ApiClient _apiClient;
+
+  Future<ItemDefinition> createDefinition({
+    required String accessToken,
+    required String name,
+    required String categoryId,
+  }) async => ItemDefinition.fromJson(
+    await _apiClient.postJson(
+      '/item-definitions',
+      accessToken: accessToken,
+      body: {'name': name.trim(), 'category_id': categoryId},
+    ),
+  );
 
   Future<ItemCategoryPage> getCategories({
     required String accessToken,
