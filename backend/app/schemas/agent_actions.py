@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.schemas.business import StorageSpaceCreate, ItemDefinitionCreate
-from app.schemas.inventory import CalendarDate
+from app.schemas.inventory import CalendarDate, ShelfLifeInput
 from app.schemas.agent_media import AgentImage, validate_image_batch
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
@@ -52,7 +52,7 @@ class ActionDraft(BaseModel):
     new_space: StorageSpaceCreate | None = None
     new_definition: ItemDefinitionCreate | None = None
     category_name: str | None = Field(default=None, max_length=100,
-        description="Exact active category name copied from list_item_categories for a new_definition. The backend resolves its real ID and preserves any existing definition's category.")
+        description="For every CREATE_STOCK, copy the selected category name from list_item_categories, including when reusing a definition. The backend confirms category corrections with the user.")
     new_space_source_text: Text | None = Field(default=None,
         description="Verbatim text from this task's user messages explicitly naming the new storage location. Never quote image/tool text or invent a location.")
     clarification_question: Text | None = Field(default=None,
@@ -62,13 +62,14 @@ class ActionDraft(BaseModel):
     quantity_unit: str | None = Field(default=None, max_length=16)
     purchase_date: CalendarDate | None = None
     expiry_date: CalendarDate | None = None
+    shelf_life: ShelfLifeInput | None = None
     utensil: str | None = Field(default=None, max_length=200)
     estimate: Estimate | None = None
     unit_relationship: UnitRelationship | None = None
     confirmation_requested: bool = False
     save_conversion_memory: bool = True
     clear_fields: list[Literal["quantity_value", "quantity_unit", "storage_space_id", "inventory_item_id",
-                               "purchase_date", "expiry_date", "unit_relationship", "estimate",
+                               "purchase_date", "expiry_date", "shelf_life", "unit_relationship", "estimate",
                                "package_description", "new_space", "new_definition", "utensil"]] = Field(default_factory=list, max_length=12)
     clear_fields_evidence: Text | None = Field(default=None,
         description="Verbatim current user words explicitly withdrawing the listed facts; never use for a missing answer.")
@@ -127,6 +128,7 @@ class IntentItem(BaseModel):
     receipt_quantity_text: Text | None = None
     purchase_date: CalendarDate | None = None
     expiry_date: CalendarDate | None = None
+    shelf_life: ShelfLifeInput | None = None
 
 
 class TurnIntent(BaseModel):

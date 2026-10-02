@@ -398,7 +398,11 @@ statement. The endpoint writes nothing and sends no reminder or notification.
 {"storage_space_id":"<space UUID>","item_definition_id":"<definition UUID>","amount":"2.5","unit":"kg"}
 ```
 
-Required fields above; optional purchase_date, expiry_date, notes (≤1,000 characters).
+Required fields above; optional purchase_date, expiry_date, notes (≤1,000 characters),
+and `shelf_life` for an explicitly stated duration. `shelf_life` contains integer
+`days` (0–36500), `basis` (PURCHASE, MANUFACTURE, OPENING or EXPLICIT), optional
+`starts_on` (YYYY-MM-DD), and the original `evidence` text. Non-purchase bases
+require their actual starting date; do not substitute the purchase date.
 Amount must be a positive ordinary decimal string with at most three decimal places,
 at most 999999999.999; numeric JSON values, exponents, and nonfinite values are rejected.
 Units are trimmed, 1–16 characters, and casefolded; the stored result must fit 16
@@ -406,7 +410,8 @@ characters. g/kg/ml/l symbols are canonicalized by casing; no word aliases or co
 unit equivalences are inferred. Other literal units remain distinct. Dates must
 use YYYY-MM-DD. Expired stock and purchase dates after expiry are allowed.
 
-**201**, Inventory response. Space must be owned/ACTIVE; definition must be visible
+**201**, the usual Inventory fields plus `warnings: [{code,message,item_id}]`.
+Space must be owned/ACTIVE; definition must be visible
 (public or owned private) and ACTIVE; its category must be ACTIVE. Missing/foreign
 associations return 404; archived associations return 409 / STATE_CONFLICT.
 
@@ -414,6 +419,16 @@ Insert one IN_STOCK row: initial and confirmed amounts/units equal validated inp
 confirmed_at is server time, estimates are NULL, version is 1. No ADD event is created.
 State checks coordinate with concurrent archival. Relationship changes during lock
 acquisition return 409 / RESOURCE_CHANGED. Creation has no idempotency guarantee.
+
+Explicit expiry dates win. Otherwise a supplied shelf life is calculated by the
+backend; when absent, the existing configured Agent model estimates a duration
+using the food and storage conditions. The basis is the purchase date, Agent
+request-local date when available, or Pacific/Auckland today. An assumed basis
+does not fill the stored purchase_date. Optional estimation is bounded to 8 seconds
+or the configured shorter model timeout and runs before inventory write locks.
+`EXPIRY_ESTIMATED` reports an estimated date. If estimation fails, stock is still
+saved with null expiry_date and `EXPIRY_ESTIMATION_FAILED`; no background retry is
+scheduled. Warnings belong to creation responses, not ordinary inventory reads.
 
 ### POST /inventory-items/batch-create — B15
 
@@ -431,7 +446,10 @@ entry follows the same amount, unit, date, notes, ownership, visibility, and ACT
 association rules as `POST /inventory-items`. Identical entries are allowed because
 they may represent separate physical stock batches.
 
-**201**, `{"items":[InventoryItemRead],"count":2}`. Returned items remain in input
+**201**, `{"items":[InventoryItemRead],"count":2,"warnings":[{code,message,item_id}]}`.
+Missing expiry dates are estimated together before write locks. Failure to estimate
+one item produces its warning without failing the batch; other business validation
+and database errors still roll back the complete batch. Returned items remain in input
 order. Every row starts IN_STOCK at version 1 with equal initial and confirmed
 quantities, no estimate, and no ADD operation history.
 
@@ -1558,7 +1576,9 @@ plus all categories and search. The paginated inventory response alone is not a
 complete category-facet count; do not present one page as the whole inventory.
 
 Agent `list_item_categories` additionally returns `description`, `examples` and
-`exclusions` for each real active category. CREATE_STOCK previews expose
+`exclusions` for each real active category. Agent `list_item_definitions` includes
+each definition's real category ID and name. CREATE_STOCK proposals select the
+category independently of any existing same-name definition. Previews expose
 `display.category_id` and `display.category_name`, propagated into public item display.
 Clear products automatically reuse an existing visible definition or create a private
 definition in a real active category; a new definition alone does not require approval.
@@ -1571,6 +1591,21 @@ is not silently reclassified by subsequent chat.
 Changing a saved definition's category affects all inventory batches referring to
 that definition, not just one batch. Public definitions remain subject to existing
 ownership restrictions. See [category rules](DATABASE_DESIGN.md#4-public-category-catalog-table-item_category).
+
+A conflicting selected category produces `CATEGORY_CHANGE` and NEEDS_CONFIRMATION.
+The server explains that correcting a private definition also reclassifies existing
+batches. A public conflict instead creates a private definition on approval; the
+public catalog is unchanged. Confirmation is tied to the current proposal, and
+classification is checked again under locks. Correction, stock insertion and receipt
+commit together. Cancel performs none of those writes. Selecting Other also requires
+confirmation (`OTHER_CATEGORY`). No category schema or migration is introduced.
+
+Agent expiry calculation is fixed in `preview.expiry_resolution` and shown in
+`display.expiry_date` and `display.review_notes`. Draft dates remain the user's
+original facts. Relevant edits generate a new proposal; confirm and receipt replay
+reuse the fixed result. Creation warnings are in `result.inventory.warnings` and
+the final Agent reply. Older unexecuted creation previews are prepared again;
+committed receipts are replayed without new stock or model calls.
 
 
 ### Continuous chat, default spaces, and quantity accounting

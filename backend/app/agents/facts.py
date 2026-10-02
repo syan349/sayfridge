@@ -46,7 +46,7 @@ def merge_draft(item, proposed):
     # the purchase facts recorded by extraction.
     image_facts = bool(old.get("source_image_ids") or item.get("image_policy", {}).get("requires_review"))
     if not item.get("revision_requested"):
-        for field in ("quantity_value", "quantity_unit", "quantity_kind"):
+        for field in ("quantity_value", "quantity_unit", "quantity_kind", "purchase_date", "expiry_date", "shelf_life"):
             supplied.pop(field, None)
         if image_facts:
             for field in ("quantity_issue", "receipt_quantity_text"):

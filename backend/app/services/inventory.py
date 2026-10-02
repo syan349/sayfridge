@@ -10,7 +10,8 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import insert
 
 from app.db.models import InventoryItem, InventoryOperation, ItemCategory, ItemDefinition, StorageSpace
-from app.schemas.inventory import ExpirySummaryItem, InventoryItemRead
+from app.schemas.inventory import ExpirySummaryItem, InventoryItemRead, InventoryCreateResult
+from app.services.inventory_expiry import ExpiryInput, ExpiryResolution, resolve_expiries
 from app.schemas.inventory_operations import InventoryOperationRead, OperationResult
 from app.services.inventory_quantities import calculate_addition, calculate_consumption, prepare_reconciliation
 from app.core.quantity import QuantityError
@@ -223,7 +224,8 @@ def _active(row, description):
         raise InventoryError("STATE_CONFLICT", description + " is archived")
 
 
-async def create_inventory(session: AsyncSession, user_id: UUID, *, commit: bool = True, **values) -> InventoryItemRead:
+async def create_inventory(session: AsyncSession, user_id: UUID, *, commit: bool = True,
+                           expiry_resolution: ExpiryResolution | None = None, **values) -> InventoryCreateResult:
     try:
         planned = (await session.execute(select(ItemDefinition).where(
             ItemDefinition.id == values["item_definition_id"],
@@ -232,6 +234,22 @@ async def create_inventory(session: AsyncSession, user_id: UUID, *, commit: bool
         if planned is None:
             raise InventoryError("NOT_FOUND", "Item definition not found")
         category_id = planned.category_id
+        shelf_life = values.pop("shelf_life", None)
+        from app.schemas.inventory import ShelfLifeInput
+        if isinstance(shelf_life, dict):
+            shelf_life = ShelfLifeInput.model_validate(shelf_life)
+        planned_space = await session.scalar(select(StorageSpace).where(
+            StorageSpace.id == values["storage_space_id"], StorageSpace.user_id == user_id))
+        if planned_space is None:
+            raise InventoryError("NOT_FOUND", "Storage space not found")
+        planned_category = await session.get(ItemCategory, category_id)
+        for row, label in ((planned, "Item definition"), (planned_space, "Storage space"), (planned_category, "Item category")):
+            _active(row, label)
+        context_before = (planned.name, planned_space.type)
+        if expiry_resolution is None:
+            expiry_resolution = (await resolve_expiries([ExpiryInput(planned.name, planned_category.name, planned_space.type,
+                values.get("purchase_date"), values.get("expiry_date"), shelf_life)]))[0]
+        values["expiry_date"] = expiry_resolution.expiry_date
         # Shared lock order: space, category, definition, inventory.
         space = await _space(session, values["storage_space_id"], user_id)
         _active(space, "Storage space")
@@ -245,6 +263,8 @@ async def create_inventory(session: AsyncSession, user_id: UUID, *, commit: bool
             raise InventoryError("NOT_FOUND", "Item definition not found")
         if definition.category_id != category_id:
             raise InventoryError("RESOURCE_CHANGED", "Item category changed; refresh and retry")
+        if (definition.name, space.type) != context_before:
+            raise InventoryError("RESOURCE_CHANGED", "Item or storage conditions changed; refresh and retry")
         _active(category, "Item category")
         _active(definition, "Item definition")
         amount, unit = Decimal(values.pop("amount")), values.pop("unit")
@@ -254,6 +274,7 @@ async def create_inventory(session: AsyncSession, user_id: UUID, *, commit: bool
         session.add(item)
         await session.flush()
         result = await get_inventory(session, item.id, user_id)
+        result = InventoryCreateResult(**result.model_dump(), warnings=expiry_resolution.warnings(item.id))
         # Stock entry deliberately creates no ADD event in this phase.
         if commit:
             await session.commit()
@@ -342,6 +363,14 @@ async def create_inventory_batch(
                     raise _batch_error(error, item_index)
             planned_category_ids.append(definition.category_id)
 
+        from app.schemas.inventory import ShelfLifeInput
+        expiry_inputs = [ExpiryInput(planned_definitions[v["item_definition_id"]].name,
+            planned_categories[category_id].name, planned_spaces[v["storage_space_id"]].type,
+            v.get("purchase_date"), v.get("expiry_date"),
+            ShelfLifeInput.model_validate(v["shelf_life"]) if v.get("shelf_life") else None)
+            for v, category_id in zip(items, planned_category_ids)]
+        expiry_results = await resolve_expiries(expiry_inputs)
+
         # Acquire every row in the same resource/id order used by other inventory writes.
         spaces: dict[UUID, StorageSpace] = {}
         for space_id in sorted(space_ids):
@@ -380,6 +409,8 @@ async def create_inventory_batch(
         created: list[InventoryItem] = []
         for item_index, (submitted, category_id) in enumerate(zip(items, planned_category_ids)):
             values = dict(submitted)
+            values.pop("shelf_life", None)
+            values["expiry_date"] = expiry_results[item_index].expiry_date
             space = spaces.get(values["storage_space_id"])
             if space is None:
                 raise InventoryError(
@@ -402,6 +433,8 @@ async def create_inventory_batch(
                     "Item category changed; refresh and retry",
                     item_index=item_index,
                 )
+            if (definition.name, space.type) != (expiry_inputs[item_index].name, expiry_inputs[item_index].storage_type):
+                raise InventoryError("RESOURCE_CHANGED", "Item or storage conditions changed; refresh and retry", item_index=item_index)
             category = categories.get(category_id)
             if category is None:
                 raise InventoryError(
@@ -439,7 +472,8 @@ async def create_inventory_batch(
             )
         )).mappings().all()
         by_id = {row["id"]: _read_model(row) for row in rows}
-        result = [by_id[item.id] for item in created]
+        result = [InventoryCreateResult(**by_id[item.id].model_dump(), warnings=expiry_results[index].warnings(item.id))
+                  for index, item in enumerate(created)]
         await session.commit()
         return result
     except Exception:
