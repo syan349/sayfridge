@@ -1,4 +1,4 @@
-// Category endpoint (docs/API_REFERENCE.md §4, backend/app/schemas/business.py).
+// Category endpoint (docs/reference/API_REFERENCE.md §4, backend/app/schemas/business.py).
 import { apiFetch } from './client'
 import type { Page } from './types'
 

@@ -83,21 +83,19 @@ Key constraints and indexes:
 
 ## 4. Public Category Catalog Table: `item_category`
 
-Each row represents a public or user-owned category available for filtering. The maintained 25 public categories and boundaries are defined in `backend/app/core/category_catalog.py` and summarized below. Categories describe product identity, independently of storage location or packaging.
+Each row represents a public category available for filtering. The maintained 25-category catalog and boundaries are defined in `backend/app/core/category_catalog.py` and summarized below. Categories describe product identity, independently of storage location or packaging.
 
 | Field | Description |
 | --- | --- |
 | id | Category primary key |
 | name | Display name, such as Vegetables |
 | normalized_name | Normalized name used for searching and deduplication |
-| owner_user_id | NULL for public categories; otherwise the owning user UUID |
 | status | ACTIVE or ARCHIVED |
-| sort_order | Maintained public catalog order; category selectors sort alphabetically |
+| sort_order | Display order in the frontend |
 | created_at | Creation timestamp |
 | updated_at | Last update timestamp |
 
-- Public categories are initialized by the system or maintained by administrators. Users can create private categories visible only to their own account.
-- Public normalized names are unique where `owner_user_id IS NULL`; private `(owner_user_id, normalized_name)` pairs are unique where the owner is non-NULL. Typed names reuse an existing visible category after Unicode, case and whitespace normalization.
+- Categories are not privately owned by ordinary users. Public categories are initialized by the system or maintained by administrators.
 - Categories referenced by item definitions must not be physically deleted; set their status to ARCHIVED instead.
 
 | Category | Includes / examples | Excludes / boundary |
@@ -187,7 +185,6 @@ Each row represents a specific inventory item or batch. The same item may have m
 | id | Inventory item primary key |
 | storage_space_id | Owning storage space; foreign key referencing storage_space.id |
 | item_definition_id | Item definition; foreign key referencing item_definition.id |
-| category_override_id | Nullable batch-specific category; foreign key referencing item_category.id. Reads and filters use this category when present, otherwise the definition category |
 | notes | Optional inventory-batch notes; nullable TEXT; API accepts up to 1,000 characters; does not affect quantities |
 | purchase_date | Purchase date; nullable |
 | expiry_date | Expiry date; nullable. The AI model must not infer an unverified date on its own |
@@ -340,7 +337,7 @@ Transactions must guarantee that:
 
 ## 12. Implementation Status
 
-This document maintains business fields and constraints. See [backend design](BACKEND_DESIGN.md) for service/transaction rules, [architecture](ARCHITECTURE.md) for Agent orchestration and [API reference](API_REFERENCE.md) for HTTP/SSE contracts. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
+This document maintains business fields and constraints. See [backend design](BACKEND_DESIGN.md) for service/transaction rules, [architecture](AGENT_DESIGN.md) for Agent orchestration and [API reference](../reference/API_REFERENCE.md) for HTTP/SSE contracts. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
 
 Database structure is acceptance-tested from an empty PostgreSQL schema by running
 `alembic upgrade head` through `test_database_initialization_postgres.py`. The same
@@ -376,7 +373,7 @@ writes credential-free JSON evidence containing the environment and initializati
 date, application commit, current and expected Alembic revisions, category seed
 content version, and schema verification counts. The complete procedure and the
 real-PostgreSQL rollback/idempotency matrix are maintained in
-[`testing/DATABASE_ACCEPTANCE.md`](testing/DATABASE_ACCEPTANCE.md).
+[`testing/DATABASE_ACCEPTANCE.md`](../../../../testing/reports/DATABASE_ACCEPTANCE.md).
 
 ## 13. Agent business receipts: `agent_inventory_action`
 

@@ -1,4 +1,4 @@
-// Inventory endpoints (docs/API_REFERENCE.md §6–7, backend/app/schemas/inventory.py).
+// Inventory endpoints (docs/reference/API_REFERENCE.md §6–7, backend/app/schemas/inventory.py).
 import { apiFetch } from './client'
 import type { Page } from './types'
 

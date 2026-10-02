@@ -54,12 +54,12 @@ constraints verify rollback and are discarded with their isolated schemas.
 The existing workflow automatically discovers the new tests. It needs no YAML
 change: pull requests and pushes to main select `-m ci`; manual workflow dispatch
 runs the full suite. The job ID remains `test-job`, and CI uses its temporary
-PostgreSQL 18 service without Neon credentials. See the [selection index](README.md)
+PostgreSQL 18 service without Neon credentials. See the [selection index](../README.md)
 for the full list of core scenarios.
 
 Local OpenAPI inspection verified all seven catalog operations, their Bearer
 security requirements, and business validation response schemas. Manual Postman
 acceptance of B05–B06 and remote CI verification remain pending. Use the
-[API reference](../API_REFERENCE.md#5-item-definitions--b06) for
+[API reference](../../reference/API_REFERENCE.md#5-item-definitions--b06) for
 request examples. An active category must already exist through approved data
 initialization; B05 does not add category-management endpoints or seed shared data.

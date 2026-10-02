@@ -6,7 +6,7 @@
 
 This handbook owns backend service and transaction rules. Sections 4–7 describe the
 manual business API contracts; Agent V0.2 orchestration and its separate submission
-path are covered by [architecture](ARCHITECTURE.md) and [API reference, section 9](API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery).
+path are covered by [architecture](AGENT_DESIGN.md) and [API reference, section 9](../reference/API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery).
 
 Start with section 1 for scope. Use section 4 when implementing an endpoint, sections 5–7 for quantity, state, and concurrency rules, and sections 8–9 for file responsibilities and acceptance requirements.
 
@@ -57,7 +57,7 @@ This handbook merges the earlier API review draft, API implementation plan, and 
 
 Use this handbook for the current scope and endpoint behavior. Consult the references below for database or architectural background not covered here. Merging the documents does not resolve the questions in section 10. If implementation later differs from this handbook, record the difference explicitly and update the design and verification status.
 
-The repository's two superseded source documents are archived for traceability: [API implementation plan](archive/2026-09-25/API_IMPLEMENTATION_PLAN.md) and [API/database draft](archive/2026-09-25/API_DATABASE_IMPLEMENTATION_DRAFT.md). The earlier external review attachment is not present locally. Archived restrictions about pausing tests, specific file counts and an incremental notes migration are historical, not current instructions.
+The repository's two superseded source documents are archived for traceability: [API implementation plan](../../../2026-09-25/API_IMPLEMENTATION_PLAN.md) and [API/database draft](../../../2026-09-25/API_DATABASE_IMPLEMENTATION_DRAFT.md). The earlier external review attachment is not present locally. Archived restrictions about pausing tests, specific file counts and an incremental notes migration are historical, not current instructions.
 
 The retained rules include ownership, status transitions, original quantity expressions, rounding, version checks, shared lock ordering, manual batch atomicity, idempotent quantity submissions and archive-then-recreate semantics. Agent requests are different from manual batch endpoints: each Agent item commits independently, with its own receipt and required creation dependencies.
 
@@ -65,14 +65,14 @@ The retained rules include ownership, status transitions, original quantity expr
 | --- | --- | --- |
 | [Database design](DATABASE_DESIGN.md) | Tables, fields, and permission relationships | Compare with the ORM and initial migration |
 | [Quantity design](QUANTITY_STATE_DESIGN.md) | Confirmed quantities, estimates, reconciliation, and history goals | Define quantity updates; explicitly identify the reduced history scope |
-| [Architecture](ARCHITECTURE.md) | Frontend, backend, and Agent boundaries | FastAPI performs all business writes |
-| [Database models](../backend/app/db/models.py) | ORM fields and constraints for nine business tables | Evidence of local structure, not proof of remote migration |
-| [Initial table definition](../backend/migrations/versions/create_initial_tables.py) | Revision `02ec95582dc7`, creating nine business tables | Maintain the latest initial table definition, including notes |
-| [Database session](../backend/app/db/session.py) | Request-scoped AsyncSession | Supplies sessions without automatically committing business transactions |
-| [Application entry point](../backend/app/main.py) | Registers authentication, spaces, catalog, inventory, administrator and Agent routes | Check actual registered routes against the API reference |
-| [Authentication dependencies](../backend/app/api/dependencies.py) | Validates tokens and reads current user state | Reuse identity checks and add an administrator dependency |
-| [Authentication routes](../backend/app/api/routes/auth.py), [schemas](../backend/app/schemas/auth.py), and [service](../backend/app/services/auth.py) | Registration, login, and current-user endpoints already exist | Preserve compatibility and add password change |
-| [Backend README](../backend/README.md) | Current startup and verification instructions | Update implemented capabilities and database setup instructions |
+| [Architecture](AGENT_DESIGN.md) | Frontend, backend, and Agent boundaries | FastAPI performs all business writes |
+| [Database models](../../../../../backend/app/db/models.py) | ORM fields and constraints for nine business tables | Evidence of local structure, not proof of remote migration |
+| [Initial table definition](../../../../../backend/migrations/versions/create_initial_tables.py) | Revision `02ec95582dc7`, creating nine business tables | Maintain the latest initial table definition, including notes |
+| [Database session](../../../../../backend/app/db/session.py) | Request-scoped AsyncSession | Supplies sessions without automatically committing business transactions |
+| [Application entry point](../../../../../backend/app/main.py) | Registers authentication, spaces, catalog, inventory, administrator and Agent routes | Check actual registered routes against the API reference |
+| [Authentication dependencies](../../../../../backend/app/api/dependencies.py) | Validates tokens and reads current user state | Reuse identity checks and add an administrator dependency |
+| [Authentication routes](../../../../../backend/app/api/routes/auth.py), [schemas](../../../../../backend/app/schemas/auth.py), and [service](../../../../../backend/app/services/auth.py) | Registration, login, and current-user endpoints already exist | Preserve compatibility and add password change |
+| [Backend README](../../backend/README.md) | Current startup and verification instructions | Update implemented capabilities and database setup instructions |
 
 At the release-readiness review, the registered REST modules use the documented
 route/schema/service/ORM structure, and the initial schema includes
@@ -311,7 +311,7 @@ Each API work package includes validation, database behavior, related automated 
 
 ### 4.1 Health and authentication
 
-B01–B03 implementation and verification are documented in the [API reference](API_REFERENCE.md) and [test results](testing/B01-B03_AUTH_TEST_RESULTS.md). Registration/login validation errors retain the 422/detail-list structure and expose only type, loc, and msg, without raw input. Automated results, manual Postman acceptance, remote CI, and team review are recorded separately.
+B01–B03 implementation and verification are documented in the [API reference](../reference/API_REFERENCE.md) and [test results](../../../../testing/reports/B01-B03_AUTH_TEST_RESULTS.md). Registration/login validation errors retain the 422/detail-list structure and expose only type, loc, and msg, without raw input. Automated results, manual Postman acceptance, remote CI, and team review are recorded separately.
 
 | Existing endpoint | Database reads | Database writes or response |
 | --- | --- | --- |
@@ -334,7 +334,7 @@ Both password fields require 8–128 characters and a valid Bearer token. Succes
 
 ### 4.2 Storage spaces
 
-B04 is implemented in `app/api/routes/storage_spaces.py` and `app/services/storage_spaces.py`. See the [API manual](API_REFERENCE.md#3-storage-spaces--b04) and [B04 verification record](testing/B04_STORAGE_SPACES_TEST_RESULTS.md). No B04 schema migration is required.
+B04 is implemented in `app/api/routes/storage_spaces.py` and `app/services/storage_spaces.py`. See the [API manual](../reference/API_REFERENCE.md#3-storage-spaces--b04) and [B04 verification record](../../../../testing/reports/B04_STORAGE_SPACES_TEST_RESULTS.md). No B04 schema migration is required.
 
 | Endpoint | Reads and filters | Response and order |
 | --- | --- | --- |
@@ -370,7 +370,7 @@ B04 is implemented in `app/api/routes/storage_spaces.py` and `app/services/stora
 
 ### 4.3 Categories and item definitions
 
-B05–B06 are implemented in `app/api/routes/catalog.py` and `app/services/catalog.py`. Name normalization is shared through `app/core/catalog.py`; request/response models remain in `app/schemas/business.py`. See [API usage](API_REFERENCE.md#5-item-definitions--b06). No additional table, migration, public-catalog write endpoint, or shared-database seed is included.
+B05–B06 are implemented in `app/api/routes/catalog.py` and `app/services/catalog.py`. Name normalization is shared through `app/core/catalog.py`; request/response models remain in `app/schemas/business.py`. See [API usage](../reference/API_REFERENCE.md#5-item-definitions--b06). No additional table, migration, public-catalog write endpoint, or shared-database seed is included.
 
 All authenticated users can read public definitions. Only the owner can read and maintain private definitions. Ordinary users cannot edit public definitions.
 
@@ -414,7 +414,7 @@ B07–B09 list/detail, stock creation, and metadata/location PATCH are implement
 `app/services/inventory.py`. The initial table definition includes nullable notes. All three B15
 batch endpoints and B13 inventory discard and archival are implemented. B10 ADD, B11 CONSUME, and B12
 RECONCILE submission are implemented under section 4.6.2. See the
-[API contract](API_REFERENCE.md#6-inventory--b07b09-b13-b15-and-b22). Shared Neon schema synchronization and manual
+[API contract](../reference/API_REFERENCE.md#6-inventory--b07b09-b13-b15-and-b22). Shared Neon schema synchronization and manual
 acceptance remain separate deployment steps.
 
 Stock entry stores trimmed/casefolded units (1–16 characters before and after
@@ -738,7 +738,7 @@ Paths below are relative to `backend/` unless explicitly identified as repositor
 | Add (B05–B06 implemented) | `app/services/catalog.py` | Category/definition queries, writes, states, names | item_category, item_definition |
 | Add | `app/services/inventory.py` | Pure quantity calculations, inventory writes, versions, idempotency, batch transactions | inventory_item, inventory_operation; lock/check related spaces/catalog |
 | Update | `migrations/versions/create_initial_tables.py` | Include nullable TEXT notes in the latest initial table definition | Fresh database initialization |
-| Add | Repository-root `docs/API_REFERENCE.md` | Implemented frontend contracts, examples, and verification status | No database access |
+| Add | Repository-root `docs/reference/API_REFERENCE.md` | Implemented frontend contracts, examples, and verification status | No database access |
 | Modify | `app/main.py` | Register route groups, CORS, and business error handling | No direct business writes |
 | Modify | `app/api/dependencies.py` | require_admin, reusing current-user lookup | user |
 | Modify | `app/api/routes/auth.py`, `app/schemas/auth.py`, `app/services/auth.py` | Password-change request, validation, and update | user.password_hash |
@@ -836,7 +836,7 @@ The project owner supplies section 10 decisions. Work independent of undecided f
 
 ### 9.2 API documentation delivery
 
-This handbook owns design rules. `docs/API_REFERENCE.md` documents implemented requests, responses, and usage examples; do not duplicate design decisions or open-question lists there. Update this handbook when design changes.
+This handbook owns design rules. `docs/reference/API_REFERENCE.md` documents implemented requests, responses, and usage examples; do not duplicate design decisions or open-question lists there. Update this handbook when design changes.
 
 The API reference must describe purpose and permissions in English, request/response fields, defaults, enumerations, and error codes. Include examples for login, space creation, item selection, stock entry, preview, consumption, reconciliation, and history. Explain version conflicts, retries, and expiry dates. Link to the backend README for startup/database setup, the Postman guide for client setup, and the test index for actual verification status. Follow the file responsibilities in section 8.
 
@@ -857,7 +857,7 @@ Formal development permits and requires relevant tests, isolated test database c
 
 Run backend CI in the course GitHub repository. PR checks include tests, necessary import/OpenAPI checks, and dependency checks. Database tests use isolated services and dedicated credentials. Performance testing is repeatable manual or scheduled work, not required in full for every small change. Record commands, code version, and results, and fix failures before completion.
 
-All implemented work packages share one set of test definitions. Local pytest defaults to the full suite; automatic PR/main CI selects high-priority cases using the ci marker, and manual workflow dispatch runs the full suite. Counts are maintained in the test index rather than the design specification. See the [CI selection policy](testing/README.md#ci-selection-policy). Local tests use the isolated database configured in `.env.test`; CI sets TEST_DATABASE_URL for a disposable PostgreSQL service and does not access Neon. Missing test database configuration fails database tests rather than silently skipping them. See [B01–B03 test results](testing/B01-B03_AUTH_TEST_RESULTS.md) for evidence and limits.
+All implemented work packages share one set of test definitions. Local pytest defaults to the full suite; automatic PR/main CI selects high-priority cases using the ci marker, and manual workflow dispatch runs the full suite. Counts are maintained in the test index rather than the design specification. See the [CI selection policy](../testing/README.md#ci-selection-policy). Local tests use the isolated database configured in `.env.test`; CI sets TEST_DATABASE_URL for a disposable PostgreSQL service and does not access Neon. Missing test database configuration fails database tests rather than silently skipping them. See [B01–B03 test results](../../../../testing/reports/B01-B03_AUTH_TEST_RESULTS.md) for evidence and limits.
 
 Key business checks:
 

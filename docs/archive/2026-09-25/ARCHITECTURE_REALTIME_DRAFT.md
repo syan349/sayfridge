@@ -1,4 +1,4 @@
-> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前架构](../../ARCHITECTURE.md)、[接口参考](../../API_REFERENCE.md)与[启动说明](../../../backend/README.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
+> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前架构](../../architecture/AGENT_DESIGN.md)、[接口参考](../../reference/API_REFERENCE.md)与[启动说明](../../../backend/README.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
 
 # SayFridge Realtime + Async 双 Agent 完整架构
 
@@ -151,7 +151,7 @@ Flutter / Web 用户点击增加、减少或确认剩余
 
 Agent 负责理解新信息、检索相关记忆与确定候选适用范围；后端负责确定的算术和状态变化。记忆更新不等于库存变更，拒绝库存候选也不会自动撤销用户已明确提供的换算说明。无法确定适用范围时先追问。
 
-重算保留原始历史，不跨越最近一次盘点去改变新的确认事实。候选产生后库存版本变化，需要重新生成结果并再次确认。详细规则见 [QUANTITY_STATE_DESIGN.md](../../QUANTITY_STATE_DESIGN.md)。
+重算保留原始历史，不跨越最近一次盘点去改变新的确认事实。候选产生后库存版本变化，需要重新生成结果并再次确认。详细规则见 [QUANTITY_STATE_DESIGN.md](../../architecture/QUANTITY_STATE_DESIGN.md)。
 
 ## 用户级记忆、业务历史与 LangGraph
 

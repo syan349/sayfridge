@@ -2,7 +2,7 @@
 
 > 状态：在 Agent V0.2 六节点实现上增加统一图文输入和图片入库核对。代码与本地验收不等于已部署到远程环境。
 >
-> 旧 Realtime、LiveKit 和双 Agent 方案已归档为[历史目标架构](archive/2026-09-25/ARCHITECTURE_REALTIME_DRAFT.md)，不作为当前实施要求。
+> 旧 Realtime、LiveKit 和双 Agent 方案已归档为[历史目标架构](../../../2026-09-25/ARCHITECTURE_REALTIME_DRAFT.md)，不作为当前实施要求。
 
 ## 1. 组件与维护边界
 
@@ -12,8 +12,8 @@ Graph 调用后端业务服务，复用身份、归属、数量、状态和事�
 
 | 组件 | 当前职责 | 主要依据 |
 | --- | --- | --- |
-| Web / Flutter | 请求、展示及提交用户选择；具体页面完成度以各组件为准 | [产品范围](PROJECT_SCOPE_BILINGUAL.md) |
-| FastAPI 路由 | 登录认证、请求校验、HTTP/SSE、会话恢复 | [API 参考](API_REFERENCE.md) |
+| Web / Flutter | 请求、展示及提交用户选择；具体页面完成度以各组件为准 | [产品范围](../product/README.md) |
+| FastAPI 路由 | 登录认证、请求校验、HTTP/SSE、会话恢复 | [API 参考](../reference/API_REFERENCE.md) |
 | 后端业务服务 | 所有权、状态、数量计算、版本检查、事务与幂等 | [后端设计](BACKEND_DESIGN.md) |
 | LangGraph | 一名业务 Agent 的六节点流程、待处理项目与暂停恢复 | 本文 |
 | PostgreSQL | 业务数据、执行凭据、检查点和用户记忆 | [数据库设计](DATABASE_DESIGN.md) |
@@ -23,8 +23,8 @@ Graph 调用后端业务服务，复用身份、归属、数量、状态和事�
 所有图片入库候选均需用户核对。语音由前端转文字，后端不接收音频。
 主动通知、撤回、历史重估和独立任务队列不属于当前实现。
 
-图文消息、附件限制和补图接口见 [API 参考](API_REFERENCE.md#multimodal-messages-and-frontend-contract)，
-前端任务见 [接入清单](AGENT_FRONTEND_INTEGRATION.md)。图片保存在会话检查点中，来源 ID
+图文消息、附件限制和补图接口见 [API 参考](../reference/API_REFERENCE.md#multimodal-messages-and-frontend-contract)，
+前端任务见 [接入清单](../reference/AGENT_FRONTEND_INTEGRATION.md)。图片保存在会话检查点中，来源 ID
 和摘要随候选传递；原始图片不进入业务执行凭据。历史图片继续参与模型上下文，因此
 即使后续文字入库未显式引用图片，只要模型仍可见历史图片，也会保守要求核对。
 
@@ -158,7 +158,7 @@ prepare_context 使用同一配置模型的一次 `record_turn_intent` 结构化
 Checkpoint 保存项目、候选、问题和执行进度。await_user 使用持久化 interrupt：
 暂停后 HTTP 流结束，等待期间不保持业务事务；客户端通过 resume 接口回答，
 并绑定当前 interrupt_id 和 proposal_id。客户端契约、状态与事件见
-[API 参考第 9 节](API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)。
+[API 参考第 9 节](../reference/API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)。
 
 ## 6. 持久化与恢复边界
 
@@ -185,10 +185,10 @@ Checkpoint 使用同步持久化，写入前保存稳定的候选/动作标识�
 ## 7. 当前状态与其他入口
 
 Agent V0.2 已完成本地实现及记录在案的验收，证据见
-[Agent 验收报告](testing/AGENT_V02_TEST_RESULTS.md)和[测试索引](testing/README.md)。
+[Agent 验收报告](../../../../testing/reports/AGENT_V02_TEST_RESULTS.md)和[测试索引](../testing/README.md)。
 验收报告是特定运行的证据，不代表每次代码变化都重新执行了全部测试。
 
 远程部署必须单独检查 Agent schema 和业务执行凭据表。最近一次 V0.2 只读检查发现
 远程缺少 agent_inventory_action；本文不宣称已经执行远程建表。
 环境、Windows 事件循环、显式初始化及测试命令统一见
-[后端 README](../backend/README.md#agent-configuration-and-storage)。
+[后端 README](../../backend/README.md#agent-configuration-and-storage)。

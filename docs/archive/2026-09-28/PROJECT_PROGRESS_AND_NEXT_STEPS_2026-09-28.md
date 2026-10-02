@@ -38,7 +38,7 @@
 | AI 输入栏 | 按参考图使用图片入口、灰色描边麦克风、分隔线和发送图标；支持文字/语音模式切换 | 图片发送、手工文字发送和原 Agent 接线保留 |
 | 桌面浏览器预览 | 大屏浏览器显示居中手机外框，手机浏览器使用全屏布局 | 不是 Android 模拟器，也不代表原生系统能力全部可用 |
 
-相关实现：[共享导航](../mobile/lib/widgets/app_bottom_navigation.dart)、[Home 问候语](../mobile/lib/widgets/home_greeting.dart)、[AI 展示组件](../mobile/lib/widgets/assistant_widgets.dart)、[输入栏](../mobile/lib/widgets/agent_composer.dart)、[卡片尾部布局](../mobile/lib/widgets/inventory_card_trailing.dart)。
+相关实现：[共享导航](../../../mobile/lib/widgets/app_bottom_navigation.dart)、[Home 问候语](../../../mobile/lib/widgets/home_greeting.dart)、[AI 展示组件](../../../mobile/lib/widgets/assistant_widgets.dart)、[输入栏](../../../mobile/lib/widgets/agent_composer.dart)、[卡片尾部布局](../../../mobile/lib/widgets/inventory_card_trailing.dart)。
 
 ### 2.2 同学已经完成并合入的图片/相机工作
 
@@ -88,7 +88,7 @@
 
 验证边界：已有单元/页面测试，并在真实浏览器中使用受控语音回调检查完整交互；尚未证明 iPhone 麦克风收音、英文识别准确率和系统权限流程已通过真机验收。
 
-相关实现：[语音服务](../mobile/lib/services/voice_input_service.dart)、[按住说话组件](../mobile/lib/widgets/hold_to_speak_button.dart)、[Agent 会话页](../mobile/lib/screens/agent_conversation_screen.dart)。
+相关实现：[语音服务](../../../mobile/lib/services/voice_input_service.dart)、[按住说话组件](../../../mobile/lib/widgets/hold_to_speak_button.dart)、[Agent 会话页](../../../mobile/lib/screens/agent_conversation_screen.dart)。
 
 ## 3. 各子系统进度
 
@@ -111,7 +111,7 @@
 
 手机端当前主要覆盖单件业务。不能因 React 已有批量功能，就写成 Flutter 也有完整批量管理 UI；Flutter 的全局历史和完整私有目录管理同样需单独排期。
 
-主要依据：[Flutter API 接入记录](API_INTEGRATION_2026-09-27.md)、[Mobile README](../mobile/README.md)、[Web README](../web/README.md)、[API 参考](API_REFERENCE.md)、[系统架构](ARCHITECTURE.md)。
+主要依据：[Flutter API 接入记录](../2026-09-27/API_INTEGRATION_2026-09-27.md)、[Mobile README](../../../mobile/README.md)、[Web README](../../../web/README.md)、[API 参考](../../reference/API_REFERENCE.md)、[系统架构](../../architecture/AGENT_DESIGN.md)。
 
 ## 4. 验证证据与尚未验证的边界
 
@@ -126,7 +126,7 @@
 | 后端分类/结构修复记录（09-26） | 全量首次出现数据库连接失败，失败项定向重跑通过；报告保留首次非全绿及清理未核实说明 | 不能改写成“最新一次全量回归全部一次通过” |
 | React Web | 代码内有 Vitest、Testing Library、MSW 测试，未匹配的模拟请求会失败 | 本次只阅读代码/文档，没有新跑 lint、test、build，不新增通过数量 |
 
-本次任务仅编写总结，未为文档修改重复运行上述业务测试。历史测试详情见 [测试索引](testing/README.md)、[文本 Agent 报告](testing/AGENT_V02_TEST_RESULTS.md)、[多模态报告](testing/AGENT_MULTIMODAL_TEST_RESULTS.md)。
+本次任务仅编写总结，未为文档修改重复运行上述业务测试。历史测试详情见 [测试索引](../../testing/README.md)、[文本 Agent 报告](../../testing/reports/AGENT_V02_TEST_RESULTS.md)、[多模态报告](../../testing/reports/AGENT_MULTIMODAL_TEST_RESULTS.md)。
 
 ## 5. 部署和外部问题
 
@@ -139,7 +139,7 @@
 - 文档核对期间，最新修改已形成提交 `957dcea`；本地 `mobile-render` 与本机记录的 `origin/mobile-render` 均指向该提交。下一步核对 Render 部署是否成功使用此提交；Git 分支记录一致不能替代部署验收。
 - 排查更新问题应依次核对分支、提交、构建结果和资源版本；不要为排除缓存直接清空含未完成请求的会话存储。
 
-部署步骤见 [Flutter Web / Render 说明](../mobile/RENDER_DEPLOY.md)。
+部署步骤见 [Flutter Web / Render 说明](../deployment/RENDER_DEPLOY.md)。
 
 ### 5.2 库存接口 500 与 CORS
 
@@ -197,7 +197,7 @@
 | 管理员任务台账 / 操作审计 | Web 文档明确本阶段未做 | 仅在小组扩大本阶段范围时排期 |
 | 令牌自动刷新 | 当前使用短期 token，无 refresh token | 若当前重新登录机制满足 MVP，可作为后续增强；不要声称已有自动续期 |
 
-共享库存、空间嵌套、支付配送、智能冰箱硬件、全自动消费预测和食谱推荐属于当前范围明确排除或未来拓展项，不应混入本次必须完成的缺陷清单。依据：[项目范围](PROJECT_SCOPE_BILINGUAL.md)。
+共享库存、空间嵌套、支付配送、智能冰箱硬件、全自动消费预测和食谱推荐属于当前范围明确排除或未来拓展项，不应混入本次必须完成的缺陷清单。依据：[项目范围](../../product/README.md)。
 
 ## 7. 建议的完整验收顺序
 
@@ -247,15 +247,15 @@
 
 本机记录的 `origin/mobile-render` 同样指向 `957dcea`。本次没有重新获取远程分支或检查 Render，因此这里仅记录 Git 当前可见状态。
 
-当前尚未提交的是本文 `docs/PROJECT_PROGRESS_AND_NEXT_STEPS_2026-09-28.md`，由 Tim 自行提交/push。本次文档工作未修改业务代码、后端、数据库或部署配置，也未代替用户执行提交、push 或部署。
+当前尚未提交的是本文 `docs/archive/2026-09-28/PROJECT_PROGRESS_AND_NEXT_STEPS_2026-09-28.md`，由 Tim 自行提交/push。本次文档工作未修改业务代码、后端、数据库或部署配置，也未代替用户执行提交、push 或部署。
 
 ### 主要参考资料
 
-1. [项目范围与阶段目标](PROJECT_SCOPE_BILINGUAL.md)
-2. [系统架构与 Agent 边界](ARCHITECTURE.md)
-3. [后端设计](BACKEND_DESIGN.md)、[数据库设计](DATABASE_DESIGN.md)、[数量状态规则](QUANTITY_STATE_DESIGN.md)
-4. [API 契约](API_REFERENCE.md)、[图文 Agent 前端接入清单](AGENT_FRONTEND_INTEGRATION.md)
-5. [早期进度交接](PROGRESS_AND_E2E_HANDOFF_2026-09-27.md)、[Flutter API 接入更新](API_INTEGRATION_2026-09-27.md)
-6. [测试索引](testing/README.md)、[文本 Agent 验收](testing/AGENT_V02_TEST_RESULTS.md)、[多模态验收](testing/AGENT_MULTIMODAL_TEST_RESULTS.md)
-7. [Mobile README](../mobile/README.md)、[Render 部署说明](../mobile/RENDER_DEPLOY.md)、[Web README](../web/README.md)、[Backend README](../backend/README.md)
+1. [项目范围与阶段目标](../../product/README.md)
+2. [系统架构与 Agent 边界](../../architecture/AGENT_DESIGN.md)
+3. [后端设计](../../architecture/BACKEND_DESIGN.md)、[数据库设计](../../architecture/DATABASE_DESIGN.md)、[数量状态规则](../../architecture/QUANTITY_STATE_DESIGN.md)
+4. [API 契约](../../reference/API_REFERENCE.md)、[图文 Agent 前端接入清单](../../reference/AGENT_FRONTEND_INTEGRATION.md)
+5. [早期进度交接](../2026-09-27/PROGRESS_AND_E2E_HANDOFF_2026-09-27.md)、[Flutter API 接入更新](../2026-09-27/API_INTEGRATION_2026-09-27.md)
+6. [测试索引](../../testing/README.md)、[文本 Agent 验收](../../testing/reports/AGENT_V02_TEST_RESULTS.md)、[多模态验收](../../testing/reports/AGENT_MULTIMODAL_TEST_RESULTS.md)
+7. [Mobile README](../../../mobile/README.md)、[Render 部署说明](../deployment/RENDER_DEPLOY.md)、[Web README](../../../web/README.md)、[Backend README](../../../backend/README.md)
 8. 用户提供的 Doris 图片与语音交接文件：`MOBILE_IMAGE_AND_VOICE_HANDOFF_TO_TIM_2026-09-27.md`（2026-09-27）。
