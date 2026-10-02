@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'scroll_edge_fade.dart';
 
@@ -13,11 +14,26 @@ class PageScrollFade extends StatefulWidget {
 
 class _PageScrollFadeState extends State<PageScrollFade> {
   double _strength = 0;
+  bool _queued = false;
 
   bool _update(ScrollMetrics metrics, int depth) {
     if (depth != 0 || metrics.axis != Axis.vertical) return false;
     final strength = (metrics.extentAfter / 88).clamp(0.0, 1.0);
-    if (strength != _strength) setState(() => _strength = strength);
+    if (strength != _strength) {
+      _strength = strength;
+      if (SchedulerBinding.instance.schedulerPhase ==
+          SchedulerPhase.persistentCallbacks) {
+        if (!_queued) {
+          _queued = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _queued = false;
+            if (mounted) setState(() {});
+          });
+        }
+      } else {
+        setState(() {});
+      }
+    }
     return false;
   }
 

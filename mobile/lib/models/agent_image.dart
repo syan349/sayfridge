@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'dart:math' as math;
 
 import '../repositories/workspace_repository.dart';
 
@@ -27,6 +29,43 @@ class AgentImage {
   final String dataBase64;
   final int sizeBytes;
   final Uint8List bytes;
+
+  /// Persist a compact chat preview; requests keep the original image payload.
+  Future<AgentImage> thumbnail() async {
+    ui.Codec? codec;
+    ui.Image? frame;
+    try {
+      final (width, height) = _dimensions(bytes, mimeType);
+      final longest = math.max(width, height);
+      if (longest <= 640) return this;
+      final scale = 640 / longest;
+      codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: math.max(1, (width * scale).round()),
+        targetHeight: math.max(1, (height * scale).round()),
+      );
+      frame = (await codec.getNextFrame()).image;
+      final data = await frame.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) return this;
+      return AgentImage.fromBytes(
+        data.buffer.asUint8List(),
+        mimeType: 'image/png',
+        imageId: imageId,
+      );
+    } catch (_) {
+      return this;
+    } finally {
+      frame?.dispose();
+      codec?.dispose();
+    }
+  }
+
+  factory AgentImage.fromJson(Map<String, dynamic> json) =>
+      AgentImage.fromBytes(
+        base64Decode(json['data_base64'] as String),
+        mimeType: json['mime_type'] as String,
+        imageId: json['image_id'] as String,
+      );
 
   /// Picker files on the web can have a blob URL without a name or MIME type.
   /// Identify supported formats from the bytes that will actually be sent.

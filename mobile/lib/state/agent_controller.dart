@@ -11,11 +11,13 @@ class SavedConversation {
     required this.id,
     required this.messages,
     required this.updatedAt,
+    this.messageImages = const {},
   });
 
   final String id;
   final Map<String, String> messages;
   final DateTime updatedAt;
+  final Map<String, List<AgentImage>> messageImages;
 
   String get title {
     for (final entry in messages.entries) {
@@ -30,6 +32,7 @@ class SavedConversation {
     'id': id,
     'messages': messages,
     'updated_at': updatedAt.toUtc().toIso8601String(),
+    if (messageImages.isNotEmpty) 'message_images': _saveImages(messageImages),
   };
 
   static SavedConversation? fromJson(Object? value) {
@@ -37,6 +40,7 @@ class SavedConversation {
     return SavedConversation(
       id: value['id'] as String,
       messages: _readMessages(value['messages']),
+      messageImages: _readImages(value['message_images']),
       updatedAt:
           DateTime.tryParse(value['updated_at']?.toString() ?? '') ??
           DateTime.now(),
@@ -51,6 +55,32 @@ Map<String, String> _readMessages(Object? value) {
       if (entry.key is String && entry.value is String)
         entry.key as String: entry.value as String,
   };
+}
+
+Map<String, dynamic> _saveImages(Map<String, List<AgentImage>> images) => {
+  for (final entry in images.entries)
+    entry.key: entry.value.map((image) => image.toJson()).toList(),
+};
+
+Map<String, List<AgentImage>> _readImages(Object? value) {
+  if (value is! Map) return {};
+  final result = <String, List<AgentImage>>{};
+  for (final entry in value.entries) {
+    if (entry.key is! String || entry.value is! List) continue;
+    try {
+      final photos = (entry.value as List)
+          .map(
+            (photo) =>
+                AgentImage.fromJson(Map<String, dynamic>.from(photo as Map)),
+          )
+          .toList();
+      AgentImage.validateBatch(photos);
+      result[entry.key as String] = List.unmodifiable(photos);
+    } catch (_) {
+      // Older/corrupt photo records must not prevent transcript recovery.
+    }
+  }
+  return result;
 }
 
 class AgentController extends ChangeNotifier {
@@ -70,6 +100,7 @@ class AgentController extends ChangeNotifier {
   Map<String, dynamic>? _pending;
   final Map<String, Map<String, dynamic>> _items = {};
   final Map<String, String> messages = {};
+  final Map<String, List<AgentImage>> messageImages = {};
   final List<SavedConversation> _history = [];
   List<SavedConversation> get history => List.unmodifiable(_history);
   List<Map<String, dynamic>> get items => _items.values.toList();
@@ -102,6 +133,7 @@ class AgentController extends ChangeNotifier {
       conversationId = saved?['conversation_id'] as String?;
       _pending = saved?['pending'] as Map<String, dynamic>?;
       messages.addAll(_readMessages(saved?['messages']));
+      messageImages.addAll(_readImages(saved?['message_images']));
       final savedHistory = saved?['history'];
       if (savedHistory is List) {
         for (final record in savedHistory) {
@@ -132,17 +164,29 @@ class AgentController extends ChangeNotifier {
     status = 'COMPLETED';
     _items.clear();
     messages.clear();
+    messageImages.clear();
     _history.clear();
     busy = false;
   }
 
   Future<void> _persist() async {
     final user = _user;
+    final generation = _generation;
     if (user != null) {
+      for (final entry in Map.of(messageImages).entries) {
+        final previews = <AgentImage>[];
+        for (final image in entry.value) {
+          previews.add(await image.thumbnail());
+        }
+        if (!_current(generation)) return;
+        messageImages[entry.key] = List.unmodifiable(previews);
+      }
       await store.write(user, {
         'conversation_id': conversationId,
         'pending': _pending,
         'messages': messages,
+        if (messageImages.isNotEmpty)
+          'message_images': _saveImages(messageImages),
         'history': _history.map((entry) => entry.toJson()).toList(),
       });
     }
@@ -174,6 +218,7 @@ class AgentController extends ChangeNotifier {
       SavedConversation(
         id: id,
         messages: Map.of(messages),
+        messageImages: Map.of(messageImages),
         updatedAt: DateTime.now(),
       ),
     );
@@ -189,6 +234,7 @@ class AgentController extends ChangeNotifier {
     status = 'COMPLETED';
     _items.clear();
     messages.clear();
+    messageImages.clear();
   }
 
   Future<void> openConversation(String id) async {
@@ -200,6 +246,7 @@ class AgentController extends ChangeNotifier {
     _resetCurrent();
     conversationId = selected.id;
     messages.addAll(selected.messages);
+    messageImages.addAll(selected.messageImages);
     busy = true;
     _notify();
     final generation = _generation;
@@ -216,8 +263,17 @@ class AgentController extends ChangeNotifier {
     }
   }
 
-  Future<void> send(String text, {List<AgentImage> images = const []}) async {
-    final message = text.trim();
+  Future<void> send(
+    String text, {
+    List<AgentImage> images = const [],
+    String? displayText,
+  }) async {
+    final enteredText = text.trim();
+    final message = enteredText.isEmpty && images.isNotEmpty
+        ? 'Recognise the items in these photos and prepare inventory entries for review. '
+              'Show the recognised items directly without asking whether to read or add them. '
+              'Wait for my confirmation before saving.'
+        : enteredText;
     if (!canSend || (message.isEmpty && images.isEmpty)) return;
     if (message.length > 8000) {
       error = 'Maximum 8000 characters.';
@@ -235,7 +291,11 @@ class AgentController extends ChangeNotifier {
     conversationId ??= requestId();
     _items.clear();
     interruptId = null;
-    messages['user:$id'] = message.isEmpty ? 'Photo attached' : message;
+    messages['user:$id'] =
+        displayText ?? (enteredText.isEmpty ? 'Photo attached' : enteredText);
+    if (images.isNotEmpty) {
+      messageImages['user:$id'] = List.unmodifiable(images);
+    }
     _pending = {
       'path': '/agent/chat',
       'body': {
@@ -284,12 +344,19 @@ class AgentController extends ChangeNotifier {
       }
       if (answer.length == 3) return;
     }
+    final responseId = requestId();
+    if (images.isNotEmpty) {
+      messages['user:$responseId'] = (message ?? '').trim().isEmpty
+          ? 'Photo attached'
+          : message!.trim();
+      messageImages['user:$responseId'] = List.unmodifiable(images);
+    }
     _pending = {
       'path': '/agent/resume',
       'body': {
         'conversation_id': conversationId,
         'interrupt_id': interruptId,
-        'request_id': requestId(),
+        'request_id': responseId,
         'responses': [answer],
       },
     };
@@ -298,6 +365,50 @@ class AgentController extends ChangeNotifier {
 
   Future<void> retry() async {
     if (canRetry) await _run();
+  }
+
+  List<Map<String, dynamic>> get confirmableItems => items
+      .where(
+        (item) =>
+            item['status'] == 'NEEDS_CONFIRMATION' &&
+            (item['error'] as Map?)?['code'] != 'EXECUTION_UNCERTAIN',
+      )
+      .toList();
+
+  Future<void> confirmItems(List<Map<String, dynamic>> selected) async {
+    if (!canRespond || selected.isEmpty || selected.length > 20) return;
+    final answers = <Map<String, dynamic>>[];
+    final ids = <String>{};
+    for (final item in selected) {
+      final id = item['item_id'] as String?;
+      final current = _items[id];
+      if (id == null ||
+          !ids.add(id) ||
+          current == null ||
+          current['proposal_id'] != item['proposal_id'] ||
+          current['status'] != 'NEEDS_CONFIRMATION' ||
+          (current['error'] as Map?)?['code'] == 'EXECUTION_UNCERTAIN') {
+        error =
+            'These proposals have changed. Review the current items before confirming.';
+        _notify();
+        return;
+      }
+      answers.add({
+        'item_id': id,
+        'proposal_id': current['proposal_id'],
+        'decision': 'confirm',
+      });
+    }
+    _pending = {
+      'path': '/agent/resume',
+      'body': {
+        'conversation_id': conversationId,
+        'interrupt_id': interruptId,
+        'request_id': requestId(),
+        'responses': answers,
+      },
+    };
+    await _run();
   }
 
   Future<void> recover() async {

@@ -21,6 +21,8 @@ class StockEditorScreen extends StatefulWidget {
 
 class _StockEditorScreenState extends State<StockEditorScreen> {
   final _form = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  bool _estimated = false;
   final _amount = TextEditingController(), _unit = TextEditingController();
   final _purchase = TextEditingController(),
       _expiry = TextEditingController(),
@@ -34,6 +36,12 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
   void initState() {
     super.initState();
     final item = widget.item;
+    _name.text = item?.itemDefinitionName ?? '';
+    _estimated = item?.isEstimated ?? false;
+    if (item != null) {
+      _amount.text = _amountText(item.displayAmount);
+      _unit.text = item.displayUnit;
+    }
     _space = item?.storageSpaceId;
     _definition = item?.itemDefinitionId;
     _purchase.text = dateInput(item?.purchaseDate);
@@ -44,7 +52,7 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
 
   @override
   void dispose() {
-    for (final field in [_amount, _unit, _purchase, _expiry, _notes]) {
+    for (final field in [_name, _amount, _unit, _purchase, _expiry, _notes]) {
       field.dispose();
     }
     super.dispose();
@@ -177,6 +185,23 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
               : dateInput(item.expiryDate),
           'notes': item.notes,
         };
+        if (_name.text.trim() != item.itemDefinitionName) {
+          values['item_name'] = _name.text.trim();
+        }
+        final quantityChanged =
+            !_estimated &&
+            (double.tryParse(_amount.text.trim()) != item.displayAmount ||
+                _unit.text.trim().toLowerCase() !=
+                    item.displayUnit.toLowerCase());
+        if (_estimated != item.isEstimated || quantityChanged) {
+          values['quantity'] = _estimated
+              ? {'mode': 'ESTIMATED'}
+              : {
+                  'mode': 'EXACT',
+                  'amount': _amount.text.trim(),
+                  'unit': _unit.text.trim(),
+                };
+        }
         values.removeWhere((key, value) => before[key] == value);
         if (values.isNotEmpty) await widget.workspace.updateItem(item, values);
       }
@@ -359,7 +384,18 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
   List<Widget> _itemFields(InventoryItem item) => [
     Center(child: InventoryArtwork(item: item, size: 140)),
     const SizedBox(height: 24),
-    _labelRow('Item name', _readOnlyValue(item.itemDefinitionName)),
+    _labelRow(
+      'Item name',
+      TextFormField(
+        key: const Key('item-name-input'),
+        controller: _name,
+        enabled: !_busy && !_blocked,
+        validator: (v) =>
+            requiredValue(v) ??
+            (v!.trim().length > 100 ? 'Maximum 100 characters' : null),
+        decoration: const InputDecoration(),
+      ),
+    ),
     const SizedBox(height: 20),
     Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,11 +406,28 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
             children: [
               _label('Quantity'),
               const SizedBox(height: 8),
-              _readOnlyValue(
-                quantityLabel(item).replaceFirst(' ${item.displayUnit}', ''),
-                color: item.isEstimated
-                    ? const Color(0xFFD75A20)
-                    : const Color(0xFF388D38),
+              TextFormField(
+                key: const Key('item-quantity-input'),
+                controller: _amount,
+                enabled: !_busy && !_blocked,
+                readOnly: _estimated,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => validateAmount(v, allowZero: true),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: _estimated
+                      ? const Color(0xFFD75A20)
+                      : const Color(0xFF388D38),
+                ),
+                decoration: InputDecoration(
+                  prefixText: _estimated ? '≈ ' : null,
+                  prefixStyle: const TextStyle(
+                    color: Color(0xFFD75A20),
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ],
           ),
@@ -386,7 +439,16 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
             children: [
               _label('Unit'),
               const SizedBox(height: 8),
-              _readOnlyValue(item.displayUnit),
+              TextFormField(
+                key: const Key('item-unit-input'),
+                controller: _unit,
+                enabled: !_busy && !_blocked,
+                readOnly: _estimated,
+                validator: (v) =>
+                    requiredValue(v) ??
+                    (v!.trim().length > 16 ? 'Maximum 16 characters' : null),
+                decoration: const InputDecoration(),
+              ),
             ],
           ),
         ),
@@ -402,13 +464,13 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
           'Type',
           style: TextStyle(color: AppColors.muted, fontSize: 14),
         ),
-        _quantityType('AI-estimate', item.isEstimated, const Color(0xFFD75A20)),
-        _quantityType('Exact', !item.isEstimated, const Color(0xFF388D38)),
+        _quantityType('AI-estimate', _estimated, const Color(0xFFD75A20)),
+        _quantityType('Exact', !_estimated, const Color(0xFF388D38)),
       ],
     ),
     const SizedBox(height: 8),
     const Text(
-      'Change quantities using Quantity on item details.',
+      'Choose Exact to enter a measured quantity. AI estimates are read-only.',
       style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4),
     ),
     const SizedBox(height: 22),
@@ -458,22 +520,44 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
     ),
   );
 
+  String _amountText(double amount) => amount == amount.truncateToDouble()
+      ? amount.toStringAsFixed(0)
+      : amount.toString();
+
   Widget _quantityType(String label, bool active, Color color) => Semantics(
     selected: active,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          active ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-          size: 20,
-          color: active ? color : AppColors.text,
+    button: true,
+    child: InkWell(
+      onTap: _busy || _blocked
+          ? null
+          : () => setState(() {
+              _estimated = label == 'AI-estimate';
+              if (_estimated) {
+                _amount.text = _amountText(widget.item!.displayAmount);
+                _unit.text = widget.item!.displayUnit;
+              }
+            }),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              active
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              size: 20,
+              color: active ? color : AppColors.text,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF7D8278)),
+            ),
+          ],
         ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF7D8278)),
-        ),
-      ],
+      ),
     ),
   );
 

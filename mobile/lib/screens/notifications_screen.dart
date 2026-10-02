@@ -4,6 +4,7 @@ import '../state/app_notification_controller.dart';
 import '../state/expiry_summary_controller.dart';
 import '../state/inventory_controller.dart';
 import '../state/storage_space_controller.dart';
+import '../models/agent_input_draft.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/inventory_visuals.dart';
@@ -27,7 +28,7 @@ class NotificationsScreen extends StatelessWidget {
   final InventoryController? inventoryController;
   final StorageSpaceController? storageSpaceController;
   final VoidCallback? onExpiringTap;
-  final ValueChanged<String>? onDailyConsumptionSubmit;
+  final ValueChanged<AgentInputDraft>? onDailyConsumptionSubmit;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -130,15 +131,15 @@ class NotificationsScreen extends StatelessWidget {
   }
 
   Future<void> _openDailyCheckIn(BuildContext context) async {
-    final summary = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(
+    final summary = await Navigator.of(context).push<AgentInputDraft>(
+      MaterialPageRoute<AgentInputDraft>(
         builder: (_) => const DailyConsumptionRecallScreen(),
       ),
     );
-    if (!context.mounted || summary == null || summary.trim().isEmpty) return;
+    if (!context.mounted || summary == null || summary.isEmpty) return;
     await controller?.markRead(AppNotificationType.daily);
     if (!context.mounted) return;
-    onDailyConsumptionSubmit?.call(summary.trim());
+    onDailyConsumptionSubmit?.call(summary);
   }
 }
 

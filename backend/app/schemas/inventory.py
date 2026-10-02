@@ -96,6 +96,29 @@ class InventoryBatchArchive(BaseModel):
     items: list[InventoryBatchItem] = Field(min_length=1, max_length=100)
 
 
+class InventoryQuantityEdit(BaseModel):
+    """An explicit measured balance, or classification of the existing balance."""
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["EXACT", "ESTIMATED"]
+    amount: Annotated[str, StringConstraints(max_length=32)] | None = None
+    unit: str | None = None
+
+    @model_validator(mode="after")
+    def validate_balance(self):
+        if self.mode == "ESTIMATED":
+            if self.model_fields_set & {"amount", "unit"}:
+                raise ValueError("Estimated quantities are read-only")
+            return self
+        if self.amount is None or not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,3})?", self.amount):
+            raise ValueError("A measured amount with at most three decimal places is required")
+        if not Decimal("0") <= Decimal(self.amount) <= MAX_QUANTITY:
+            raise ValueError("Measured quantity is out of range")
+        if self.unit is None:
+            raise ValueError("A measured unit is required")
+        self.unit = InventoryCreate.normalize_unit(self.unit)
+        return self
+
+
 class InventoryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=1, le=2147483647, strict=True)
@@ -103,6 +126,8 @@ class InventoryUpdate(BaseModel):
     purchase_date: CalendarDate | None = None
     expiry_date: CalendarDate | None = None
     notes: Notes | None = None
+    item_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] | None = None
+    quantity: InventoryQuantityEdit | None = None
 
     @model_validator(mode="after")
     def validate_changes(self):
@@ -110,6 +135,10 @@ class InventoryUpdate(BaseModel):
             raise ValueError("Provide at least one metadata or location field")
         if "storage_space_id" in self.model_fields_set and self.storage_space_id is None:
             raise ValueError("Storage space must not be null")
+        if "item_name" in self.model_fields_set and self.item_name is None:
+            raise ValueError("Item name must not be null")
+        if "quantity" in self.model_fields_set and self.quantity is None:
+            raise ValueError("Quantity edit must not be null")
         return self
 
 

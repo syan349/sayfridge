@@ -184,7 +184,12 @@ void main() {
 
       expect(stateReads, 1);
       expect(agent.canRetry, isTrue);
-      expect(posts.single['message'], '');
+      expect(
+        posts.single['message'],
+        contains('prepare inventory entries for review'),
+      );
+      expect(posts.single['message'], contains('Wait for my confirmation'));
+      expect(agent.messages.values, contains('Photo attached'));
       expect(posts.single['images'], [image.toJson()]);
       await agent.retry();
       expect(posts, hasLength(2));

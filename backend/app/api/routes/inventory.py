@@ -231,12 +231,12 @@ async def create_inventory_operation(item_id:UUID, payload:InventoryOperationCre
 @router.patch(
     "/{item_id}",
     response_model=InventoryItemRead,
-    summary="Edit inventory metadata or location",
+    summary="Edit inventory details and measured balance",
     responses=WRITE_RESPONSES,
 )
 async def update_inventory(item_id: UUID, payload: InventoryUpdate,
                            session: AsyncSession = Depends(get_db_session), user: User = Depends(get_current_user)):
-    """Apply version-checked metadata changes without altering stock quantities or history."""
+    """Atomically save details; an explicit measured balance records RECONCILE."""
     values = payload.model_dump(exclude_unset=True)
     version = values.pop("expected_version")
     return await service.update_inventory(session, item_id, user.id, expected_version=version, changes=values)

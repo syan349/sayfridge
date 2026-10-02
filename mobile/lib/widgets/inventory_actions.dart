@@ -169,54 +169,6 @@ class InventoryActions extends StatelessWidget {
     );
   }
 
-  Future<void> _moreActions(BuildContext context) async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.background,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: Text(
-                  'More actions',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.archive_outlined),
-                title: const Text('Archive'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.pop(sheetContext, 'archive'),
-              ),
-              if (item.isInStock && !_isExpired)
-                ListTile(
-                  leading: const Icon(
-                    Icons.delete_outline,
-                    color: Color(0xFFC8532C),
-                  ),
-                  title: const Text(
-                    'Discard',
-                    style: TextStyle(color: Color(0xFFC8532C)),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.pop(sheetContext, 'discard'),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (choice == null || !context.mounted) return;
-    await _state(context, choice);
-  }
-
   @override
   Widget build(BuildContext context) {
     final editable = item.status == 'IN_STOCK' || item.status == 'EMPTY';
@@ -284,30 +236,13 @@ class InventoryActions extends StatelessWidget {
         ),
         if (editable) ...[
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: secondaryStyle,
-                  onPressed: workspace == null
-                      ? null
-                      : () => _quantityActions(context),
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('Quantity'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: secondaryStyle,
-                  onPressed: workspace == null
-                      ? null
-                      : () => _moreActions(context),
-                  icon: const Icon(Icons.more_horiz, size: 18),
-                  label: const Text('More actions'),
-                ),
-              ),
-            ],
+          OutlinedButton.icon(
+            style: secondaryStyle,
+            onPressed: workspace == null
+                ? null
+                : () => _quantityActions(context),
+            icon: const Icon(Icons.tune, size: 18),
+            label: const Text('Quantity'),
           ),
           if (item.isInStock) ...[
             const SizedBox(height: 8),

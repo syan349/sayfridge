@@ -1,12 +1,13 @@
 """Inventory ownership, reads, creation, quantity operations, and versioned writes."""
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import case, func, literal, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
+from sqlalchemy.dialects.postgresql import insert
 
 from app.db.models import InventoryItem, InventoryOperation, ItemCategory, ItemDefinition, StorageSpace
 from app.schemas.inventory import ExpirySummaryItem, InventoryItemRead, InventoryCreateResult
@@ -14,6 +15,7 @@ from app.services.inventory_expiry import ExpiryInput, ExpiryResolution, resolve
 from app.schemas.inventory_operations import InventoryOperationRead, OperationResult
 from app.services.inventory_quantities import calculate_addition, calculate_consumption, prepare_reconciliation
 from app.core.quantity import QuantityError
+from app.core.catalog import normalize_catalog_name
 
 
 class InventoryError(Exception):
@@ -749,9 +751,64 @@ async def archive_inventory_batch(
         raise
 
 
+async def _item_name_definition(session, user_id, category_id, name):
+    """Associate this batch with a private name, leaving other batches unchanged."""
+    category = (await session.execute(select(ItemCategory).where(
+        ItemCategory.id == category_id).with_for_update())).scalar_one_or_none()
+    if category is None or category.status != "ACTIVE":
+        raise InventoryError("STATE_CONFLICT", "The item category must be active to rename this batch")
+    normalized = normalize_catalog_name(name)
+    if not 1 <= len(normalized) <= 100:
+        raise InventoryError("VALIDATION_ERROR", "Item name is too long")
+    await session.execute(insert(ItemDefinition).values(
+        id=uuid4(), owner_user_id=user_id, category_id=category_id,
+        name=name, normalized_name=normalized, status="ACTIVE",
+    ).on_conflict_do_nothing(
+        index_elements=[ItemDefinition.owner_user_id, ItemDefinition.normalized_name],
+        index_where=ItemDefinition.owner_user_id.is_not(None),
+    ))
+    definition = (await session.execute(select(ItemDefinition).where(
+        ItemDefinition.owner_user_id == user_id,
+        ItemDefinition.normalized_name == normalized,
+    ).with_for_update())).scalar_one()
+    if definition.status != "ACTIVE" or definition.category_id != category_id:
+        raise InventoryError("NAME_CONFLICT", "This name is already used by another category or archived item")
+    return definition.id
+
+
+def _edit_quantity(item, quantity, space):
+    """Apply a measured reconciliation or freeze the existing displayed estimate."""
+    now = datetime.now(timezone.utc)
+    if quantity["mode"] == "ESTIMATED":
+        if item.estimated_current_amount is not None:
+            return None
+        if item.status == "EMPTY":
+            raise InventoryError("STATE_CONFLICT", "An empty batch requires a measured quantity")
+        item.estimated_current_amount = item.confirmed_current_amount
+        item.estimated_current_unit = item.confirmed_current_unit
+        item.estimated_at = now
+        return None
+    amount, unit = prepare_reconciliation(Decimal(quantity["amount"]), quantity["unit"])
+    if item.status == "EMPTY" and amount > 0:
+        _active(space, "Storage space")
+    item.confirmed_current_amount, item.confirmed_current_unit = amount, unit
+    item.confirmed_at = now
+    item.estimated_current_amount = item.estimated_current_unit = item.estimated_at = None
+    item.status = "EMPTY" if amount == 0 else "IN_STOCK"
+    return InventoryOperation(
+        inventory_item_id=item.id, operation_type="RECONCILE", quantity_kind="AMOUNT",
+        quantity_value=quantity["amount"], quantity_unit=unit, input_method="MANUAL",
+        calculation_method="EXACT", affects_state="CONFIRMED", status="SUCCESS",
+        idempotency_key=f"detail-edit:{uuid4().hex}",
+    )
+
+
 async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
                            *, expected_version: int, changes: dict) -> InventoryItemRead:
     try:
+        changes = dict(changes)
+        item_name = changes.pop("item_name", None)
+        quantity = changes.pop("quantity", None)
         planned = await get_inventory(session, item_id, user_id)
         source_id = planned.storage_space_id
         target_id = changes.get("storage_space_id", source_id)
@@ -770,12 +827,21 @@ async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
             raise InventoryError("STATE_CONFLICT", "Terminal inventory cannot be edited")
         if target_id != source_id:
             _active(spaces[target_id], "Target storage space")
+        if item_name is not None and item_name != planned.item_definition_name:
+            changes["item_definition_id"] = await _item_name_definition(
+                session, user_id, planned.category_id, item_name)
         changed = {key: value for key, value in changes.items() if getattr(item, key) != value}
-        if changed:
+        quantity_changed = quantity is not None and (
+            quantity["mode"] == "EXACT" or item.estimated_current_amount is None)
+        if changed or quantity_changed:
             if item.version == 2147483647:
                 raise InventoryError("VERSION_LIMIT_REACHED", "Inventory version limit reached")
             for key, value in changed.items():
                 setattr(item, key, value)
+            if quantity_changed:
+                operation = _edit_quantity(item, quantity, spaces[target_id])
+                if operation is not None:
+                    session.add(operation)
             item.version += 1
         await session.flush()
         result = await get_inventory(session, item.id, user_id)

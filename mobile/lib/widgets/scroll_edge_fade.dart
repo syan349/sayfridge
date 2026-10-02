@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 /// Fade scrolling content into its existing background without painting over
 /// fixed controls or intercepting pointer events. End items remain readable.
@@ -23,15 +24,25 @@ class ScrollEdgeFade extends StatefulWidget {
 class _ScrollEdgeFadeState extends State<ScrollEdgeFade> {
   double _before = 0;
   double _after = 0;
+  bool _queued = false;
 
   void _update(ScrollMetrics metrics) {
     final before = metrics.extentBefore;
     final after = metrics.extentAfter;
     if (before == _before && after == _after) return;
-    setState(() {
-      _before = before;
-      _after = after;
-    });
+    _before = before;
+    _after = after;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      if (_queued) return;
+      _queued = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _queued = false;
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
   }
 
   @override

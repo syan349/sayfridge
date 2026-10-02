@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sayfridge/models/agent_image.dart';
+import 'package:sayfridge/models/agent_input_draft.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
 import 'package:sayfridge/screens/agent_conversation_screen.dart';
 import 'package:sayfridge/services/api_client.dart';
@@ -16,6 +17,133 @@ import 'package:sayfridge/theme/app_theme.dart';
 import '../support/integration_fixtures.dart';
 
 void main() {
+  for (final fails in [false, true]) {
+    testWidgets('transferred text and photos stay together, failure: $fails', (
+      tester,
+    ) async {
+      final png = (await rootBundle.load(
+        'assets/icons/inventory/milk.png',
+      )).buffer.asUint8List();
+      final photo = AgentImage.fromPickedBytes(png);
+      Map<String, dynamic>? sent;
+      var requests = 0;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          if (request.method == 'GET') {
+            return jsonResponse({'status': 'RECOVERABLE', 'items': []});
+          }
+          requests++;
+          sent = jsonDecode(request.body) as Map<String, dynamic>;
+          return fails
+              ? jsonResponse({'detail': 'Unavailable'}, 503)
+              : eventResponse([
+                  {
+                    'type': 'done',
+                    'status': 'COMPLETED',
+                    'data': {'status': 'COMPLETED', 'items': []},
+                  },
+                ]);
+        }),
+      );
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: MemoryAgentStore(),
+      );
+      addTearDown(agent.dispose);
+      await agent.bindUser('alice');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: AgentConversationScreen(
+            controller: agent,
+            initialDraft: AgentInputDraft(
+              text: 'Today I used 2 eggs',
+              images: [photo],
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+      expect(requests, 1);
+      expect(sent?['message'], 'Today I used 2 eggs');
+      expect(sent?['images'], [photo.toJson()]);
+      if (fails) {
+        expect(find.bySemanticsLabel('Selected photo'), findsOneWidget);
+        expect(
+          tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          'Today I used 2 eggs',
+        );
+        expect(agent.canRetry, isTrue);
+      } else {
+        expect(find.bySemanticsLabel('Selected photo'), findsNothing);
+        expect(find.text('Press and hold to speak'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('an unresolved conversation keeps a transferred draft unsent', (
+    tester,
+  ) async {
+    final photo = AgentImage.fromPickedBytes(
+      (await rootBundle.load(
+        'assets/icons/inventory/milk.png',
+      )).buffer.asUint8List(),
+    );
+    var requests = 0;
+    final api = ApiClient(
+      client: MockClient((request) async {
+        requests++;
+        return eventResponse([
+          {
+            'type': 'done',
+            'status': 'WAITING_INPUT',
+            'data': {
+              'status': 'WAITING_INPUT',
+              'interrupt_id': 'pending',
+              'items': [],
+            },
+          },
+        ]);
+      }),
+    );
+    addTearDown(api.close);
+    final agent = AgentController(
+      WorkspaceRepository(api, MemoryTokens()),
+      store: MemoryAgentStore(),
+    );
+    addTearDown(agent.dispose);
+    await agent.bindUser('alice');
+    await tester.runAsync(() => agent.send('Existing request'));
+    final conversationId = agent.conversationId;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: AgentConversationScreen(
+          controller: agent,
+          initialDraft: AgentInputDraft(
+            text: 'Today I used 2 eggs',
+            images: [photo],
+          ),
+        ),
+      ),
+    );
+    await tester.runAsync(() => pumpEventQueue());
+    await tester.pumpAndSettle();
+    expect(requests, 1);
+    expect(agent.conversationId, conversationId);
+    expect(agent.interruptId, 'pending');
+    expect(find.bySemanticsLabel('Selected photo'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'Today I used 2 eggs',
+    );
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('history opens the current conversation without sample records', (
     tester,
   ) async {
@@ -505,7 +633,7 @@ void main() {
     await tester.pumpAndSettle();
     await _tapAndFinish(tester, agent, find.byTooltip('Send message'));
     await tester.pumpAndSettle();
-    expect(sent?['message'], '');
+    expect(sent?['message'], contains('prepare inventory entries for review'));
     expect(sent?['images'], hasLength(1));
     expect(sent?['images'][0]['mime_type'], 'image/jpeg');
     expect(find.bySemanticsLabel('Selected photo'), findsNothing);
@@ -679,7 +807,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unknown package'), findsNothing);
-    expect(find.text('Milk 1 bottle'), findsOneWidget);
+    expect(find.text('Original request'), findsNothing);
     expect(find.text('Milk'), findsOneWidget);
     expect(find.text('Ready for review'), findsOneWidget);
     expect(find.text('MILK 1L'), findsOneWidget);
@@ -687,8 +815,10 @@ void main() {
     expect(find.text('Fridge'), findsOneWidget);
     expect(find.text('1 litre carton'), findsOneWidget);
     expect(find.text('1 bottle'), findsOneWidget);
-    expect(find.text('Still needed: expiry_date'), findsOneWidget);
-    expect(find.text('Review notes: Check the expiry date'), findsOneWidget);
+    expect(find.text('Still needed'), findsOneWidget);
+    expect(find.text('expiry date'), findsOneWidget);
+    expect(find.text('Review notes'), findsOneWidget);
+    expect(find.text('Check the expiry date'), findsOneWidget);
     expect(resumeBody?['responses'][0]['proposal_id'], 'old');
     expect(resumeBody?['responses'][0]['images'], hasLength(1));
     expect(agent.items.single['proposal_id'], 'new');
@@ -772,8 +902,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(agent.waiting, isTrue);
       expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
-      await tester.ensureVisible(find.text('Confirm proposal'));
-      await _tapAndFinish(tester, agent, find.text('Confirm proposal'));
+      await tester.ensureVisible(find.text('Confirm'));
+      await _tapAndFinish(tester, agent, find.text('Confirm'));
       await tester.pumpAndSettle();
       expect(calls, 2);
       expect(find.text('Failed'), findsOneWidget);
