@@ -6,6 +6,10 @@ import '../repositories/item_artwork_repository.dart';
 import '../theme/app_theme.dart';
 import 'inventory_card_trailing.dart';
 import 'page_back_button.dart';
+import 'quantity_badge.dart';
+import 'expiry_display_scope.dart';
+
+export 'quantity_badge.dart' show QuantityLegend;
 
 abstract final class HomeAssets {
   static const root = 'assets/icons/home';
@@ -124,13 +128,12 @@ String expiryLabel(DateTime? expiryDate) {
   return '$days ${days == 1 ? 'day' : 'days'} left';
 }
 
-Color expiryColor(DateTime? expiryDate) {
+Color expiryColor(DateTime? expiryDate, {int daysBefore = 3, DateTime? asOf}) {
   if (expiryDate == null) return AppColors.muted;
   final days = DateUtils.dateOnly(
     expiryDate,
-  ).difference(DateUtils.dateOnly(DateTime.now())).inDays;
-  if (days < 0) return const Color(0xFFE75030);
-  if (days <= 2) return const Color(0xFFD75A20);
+  ).difference(DateUtils.dateOnly(asOf ?? DateTime.now())).inDays;
+  if (days <= daysBefore) return const Color(0xFFE75030);
   return const Color(0xFF388D38);
 }
 
@@ -246,16 +249,9 @@ class InventoryItemTile extends StatelessWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(
-                            quantityLabel(item),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: item.isEstimated
-                                  ? const Color(0xFFD75A20)
-                                  : const Color(0xFF388D38),
-                            ),
+                          child: QuantityBadge(
+                            text: quantityLabel(item),
+                            estimated: item.isEstimated,
                           ),
                         ),
                         const Text(
@@ -281,7 +277,10 @@ class InventoryItemTile extends StatelessWidget {
               const SizedBox(width: 4),
               InventoryCardTrailing(
                 expiryText: expiryLabel(item.expiryDate),
-                expiryColor: expiryColor(item.expiryDate),
+                expiryColor: expiryColor(
+                  item.expiryDate,
+                  daysBefore: ExpiryDisplayScope.daysBeforeExpiryOf(context),
+                ),
                 action: selectionControl,
               ),
             ],
@@ -348,32 +347,6 @@ class OverviewHeader extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class QuantityLegend extends StatelessWidget {
-  const QuantityLegend({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        CircleAvatar(radius: 6, backgroundColor: Color(0xFF388D38)),
-        SizedBox(width: 7),
-        Text('Exact', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-        SizedBox(width: 14),
-        CircleAvatar(radius: 6, backgroundColor: Color(0xFFD75A20)),
-        SizedBox(width: 7),
-        Flexible(
-          child: Text(
-            'AI - Estimated',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: AppColors.muted, fontSize: 12),
-          ),
-        ),
-      ],
     );
   }
 }

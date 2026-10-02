@@ -8,6 +8,8 @@ import '../repositories/workspace_repository.dart';
 import '../widgets/inventory_actions.dart';
 import '../widgets/app_background.dart';
 import '../widgets/inventory_visuals.dart';
+import '../widgets/quantity_badge.dart';
+import '../widgets/expiry_display_scope.dart';
 
 class InventoryDetailScreen extends StatefulWidget {
   const InventoryDetailScreen({
@@ -146,22 +148,27 @@ class _DetailPanel extends StatelessWidget {
 
   final InventoryItem item;
 
-  Widget _row({required String label, required String value, Color? color}) =>
-      _DetailRow(
-        label: label,
-        value: value,
-        color: color,
-        fontSize: small
-            ? 14
-            : compact
-            ? 15
-            : 16,
-        verticalPadding: small
-            ? 3
-            : compact
-            ? 6
-            : 10,
-      );
+  Widget _row({
+    required String label,
+    required String value,
+    Color? color,
+    Widget? valueWidget,
+  }) => _DetailRow(
+    label: label,
+    value: value,
+    color: color,
+    valueWidget: valueWidget,
+    fontSize: small
+        ? 14
+        : compact
+        ? 15
+        : 16,
+    verticalPadding: small
+        ? 3
+        : compact
+        ? 6
+        : 10,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -188,9 +195,10 @@ class _DetailPanel extends StatelessWidget {
           _row(
             label: 'Quantity',
             value: quantityLabel(item),
-            color: item.isEstimated
-                ? const Color(0xFFD75A20)
-                : const Color(0xFF388D38),
+            valueWidget: QuantityBadge(
+              text: quantityLabel(item),
+              estimated: item.isEstimated,
+            ),
           ),
           _row(
             label: 'Added on',
@@ -199,7 +207,10 @@ class _DetailPanel extends StatelessWidget {
           _row(
             label: 'Expiry date',
             value: _date(item.expiryDate),
-            color: const Color(0xFF388D38),
+            color: expiryColor(
+              item.expiryDate,
+              daysBefore: ExpiryDisplayScope.daysBeforeExpiryOf(context),
+            ),
           ),
           _row(label: 'Storage space', value: item.storageSpaceName),
         ],
@@ -213,6 +224,7 @@ class _DetailRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.color,
+    this.valueWidget,
     this.fontSize = 16,
     this.verticalPadding = 10,
   });
@@ -221,6 +233,7 @@ class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
+  final Widget? valueWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -241,15 +254,17 @@ class _DetailRow extends StatelessWidget {
           ),
           Expanded(
             flex: 5,
-            child: Text(
-              value,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: fontSize,
-                color: color ?? Colors.black,
-              ),
-            ),
+            child: valueWidget != null
+                ? Align(alignment: Alignment.centerLeft, child: valueWidget)
+                : Text(
+                    value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      color: color ?? Colors.black,
+                    ),
+                  ),
           ),
         ],
       ),

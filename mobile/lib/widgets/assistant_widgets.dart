@@ -7,9 +7,11 @@ import '../models/agent_image.dart';
 import 'app_bottom_navigation.dart';
 import 'inventory_card_trailing.dart';
 import 'page_back_button.dart';
+import 'quantity_badge.dart';
+import 'expiry_display_scope.dart';
+import 'inventory_visuals.dart' show expiryColor;
 
-const inventoryExactColor = Color(0xFF3F9E36);
-const inventoryEstimatedColor = Color(0xFFE95A18);
+const inventoryWarningColor = Color(0xFFE95A18);
 const exampleMessageStyle = TextStyle(
   color: AppColors.text,
   fontSize: 16,
@@ -537,18 +539,18 @@ class InventoryItemData {
     required this.quantity,
     required this.location,
     required this.daysLeft,
+    required this.daysUntilExpiry,
     required this.imageAsset,
     this.quantityIsEstimate = false,
-    this.expiryIsEstimate = false,
   });
 
   final String name;
   final String quantity;
   final String location;
   final String daysLeft;
+  final int daysUntilExpiry;
   final String imageAsset;
   final bool quantityIsEstimate;
-  final bool expiryIsEstimate;
 }
 
 class InventoryItemCard extends StatelessWidget {
@@ -604,30 +606,22 @@ class InventoryItemCard extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text:
-                              '${item.quantityIsEstimate ? '≈ ' : ''}${item.quantity}',
-                          style: TextStyle(
-                            color: item.quantityIsEstimate
-                                ? inventoryEstimatedColor
-                                : inventoryExactColor,
-                            fontWeight: FontWeight.w500,
-                          ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      QuantityBadge(
+                        text:
+                            '${item.quantityIsEstimate ? '≈ ' : ''}${item.quantity}',
+                        estimated: item.quantityIsEstimate,
+                      ),
+                      Text(
+                        ' | ${item.location}',
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 15,
                         ),
-                        const TextSpan(
-                          text: ' | ',
-                          style: TextStyle(color: AppColors.muted),
-                        ),
-                        TextSpan(
-                          text: item.location,
-                          style: const TextStyle(color: AppColors.muted),
-                        ),
-                      ],
-                    ),
-                    style: const TextStyle(fontSize: 15),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -636,9 +630,12 @@ class InventoryItemCard extends StatelessWidget {
           const SizedBox(width: 7),
           InventoryCardTrailing(
             expiryText: item.daysLeft,
-            expiryColor: item.expiryIsEstimate
-                ? inventoryEstimatedColor
-                : inventoryExactColor,
+            expiryColor: expiryColor(
+              DateUtils.dateOnly(
+                DateTime.now(),
+              ).add(Duration(days: item.daysUntilExpiry)),
+              daysBefore: ExpiryDisplayScope.daysBeforeExpiryOf(context),
+            ),
             showWarning: true,
             maxWidth: compact ? 100 : 112,
           ),

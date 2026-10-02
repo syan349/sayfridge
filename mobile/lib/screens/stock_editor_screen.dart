@@ -11,6 +11,7 @@ import '../services/api_exception.dart';
 import '../widgets/app_background.dart';
 import '../widgets/business_forms.dart';
 import '../widgets/inventory_visuals.dart';
+import '../widgets/quantity_badge.dart';
 import '../widgets/selection_field.dart';
 import '../theme/app_theme.dart';
 
@@ -495,14 +496,14 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
                 validator: (v) => validateAmount(v, allowZero: true),
                 style: TextStyle(
                   fontSize: 16,
-                  color: _estimated
-                      ? const Color(0xFFD75A20)
-                      : const Color(0xFF388D38),
+                  color: QuantityColors.text(_estimated),
+                  fontWeight: FontWeight.w600,
                 ),
                 decoration: InputDecoration(
                   prefixText: _estimated ? '≈ ' : null,
+                  fillColor: QuantityColors.background(_estimated),
                   prefixStyle: const TextStyle(
-                    color: Color(0xFFD75A20),
+                    color: QuantityColors.estimatedText,
                     fontSize: 16,
                   ),
                 ),
@@ -525,7 +526,13 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
                 validator: (v) =>
                     requiredValue(v) ??
                     (v!.trim().length > 16 ? 'Maximum 16 characters' : null),
-                decoration: const InputDecoration(),
+                style: TextStyle(
+                  color: QuantityColors.text(_estimated),
+                  fontSize: 16,
+                ),
+                decoration: InputDecoration(
+                  fillColor: QuantityColors.background(_estimated),
+                ),
               ),
             ],
           ),
@@ -542,8 +549,8 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
           'Type',
           style: TextStyle(color: AppColors.muted, fontSize: 14),
         ),
-        _quantityType('AI-estimate', _estimated, const Color(0xFFD75A20)),
-        _quantityType('Exact', !_estimated, const Color(0xFF388D38)),
+        _quantityType(estimated: true),
+        _quantityType(estimated: false),
       ],
     ),
     const SizedBox(height: 8),
@@ -601,36 +608,50 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
       ? amount.toStringAsFixed(0)
       : amount.toString();
 
-  Widget _quantityType(String label, bool active, Color color) => Semantics(
-    selected: active,
+  Widget _quantityType({required bool estimated}) => Semantics(
+    selected: _estimated == estimated,
     button: true,
     child: InkWell(
       onTap: _busy || _blocked
           ? null
           : () => setState(() {
-              _estimated = label == 'AI-estimate';
+              _estimated = estimated;
               if (_estimated) {
                 _amount.text = _amountText(widget.item!.displayAmount);
                 _unit.text = widget.item!.displayUnit;
               }
             }),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: QuantityColors.background(estimated),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: _estimated == estimated
+                ? QuantityColors.text(estimated)
+                : Colors.transparent,
+          ),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              active
+              _estimated == estimated
                   ? Icons.radio_button_checked
                   : Icons.radio_button_unchecked,
               size: 20,
-              color: active ? color : AppColors.text,
+              color: QuantityColors.text(estimated),
             ),
             const SizedBox(width: 6),
             Text(
-              label,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF7D8278)),
+              estimated ? '≈ AI estimate' : 'Exact',
+              style: TextStyle(
+                fontSize: 14,
+                color: QuantityColors.text(estimated),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),

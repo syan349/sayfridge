@@ -135,9 +135,9 @@ void main() {
       await tester.pumpAndSettle();
       final quantity = find.byKey(const Key('item-quantity-input'));
       await tester.enterText(quantity, '9');
-      await tester.ensureVisible(find.text('AI-estimate'));
+      await tester.ensureVisible(find.text('≈ AI estimate'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('AI-estimate'));
+      await tester.tap(find.text('≈ AI estimate'));
       await tester.pumpAndSettle();
       final input = tester.widget<TextField>(
         find.descendant(of: quantity, matching: find.byType(TextField)),

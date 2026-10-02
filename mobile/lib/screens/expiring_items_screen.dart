@@ -149,7 +149,7 @@ class ExpiringItemsScreen extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Next 3 days | ${controller.counts.today + controller.counts.upcoming} items',
+                    'Next ${controller.daysBefore} days | ${controller.counts.today + controller.counts.upcoming} items',
                     textAlign: TextAlign.right,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

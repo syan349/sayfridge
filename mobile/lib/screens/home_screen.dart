@@ -15,6 +15,8 @@ import '../widgets/app_bottom_navigation.dart';
 import '../widgets/app_page_footer.dart';
 import '../widgets/home_greeting.dart';
 import '../widgets/inventory_visuals.dart';
+import '../widgets/quantity_badge.dart';
+import '../widgets/expiry_display_scope.dart';
 import 'expiring_items_screen.dart';
 import 'inventory_detail_screen.dart';
 import 'inventory_screen.dart';
@@ -777,10 +779,10 @@ class _EmptyExpiry extends StatelessWidget {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 9),
-          const Text(
-            'Nothing is due to expire\nin the next 3 days',
+          Text(
+            'Nothing is due to expire\nin the next ${ExpiryDisplayScope.daysBeforeExpiryOf(context)} days',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, color: AppColors.muted),
+            style: const TextStyle(fontSize: 15, color: AppColors.muted),
           ),
         ],
       ),
@@ -816,26 +818,31 @@ class _ExpiryPreviewRow extends StatelessWidget {
                     style: const TextStyle(fontSize: 15, height: 1.2),
                   ),
                   const SizedBox(height: 3),
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
+                  Row(
+                    children: [
+                      Flexible(
+                        child: QuantityBadge(
                           text: quantityLabel(item),
-                          style: TextStyle(
-                            color: item.isEstimated
-                                ? const Color(0xFFD75A20)
-                                : const Color(0xFF388D38),
+                          estimated: item.isEstimated,
+                          fontSize: 13,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 3,
                           ),
                         ),
-                        TextSpan(
-                          text: ' | ${item.storageSpaceName}',
-                          style: const TextStyle(color: AppColors.muted),
+                      ),
+                      Flexible(
+                        child: Text(
+                          ' | ${item.storageSpaceName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 13,
+                          ),
                         ),
-                      ],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, height: 1.2),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -850,7 +857,10 @@ class _ExpiryPreviewRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.3,
-                  color: expiryColor(item.expiryDate),
+                  color: expiryColor(
+                    item.expiryDate,
+                    daysBefore: ExpiryDisplayScope.daysBeforeExpiryOf(context),
+                  ),
                 ),
               ),
             ),
