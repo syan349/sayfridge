@@ -1,6 +1,7 @@
-/* The rounded border sits on a wrapper: tables can't clip their own corners reliably. */
+/* The rounded border sits on a wrapper: tables can't clip their own corners reliably.
+   On a narrow window the table keeps its minimum width and this frame scrolls sideways. */
 .frame {
-  overflow: hidden;
+  overflow-x: auto;
   border: 1.2px solid var(--sf-border-card);
   border-radius: var(--sf-radius-card);
   background: var(--sf-surface);

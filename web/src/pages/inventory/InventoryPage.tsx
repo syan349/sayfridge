@@ -1,9 +1,8 @@
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listCategories } from '../../api/categories'
 import { listInventory, type InventoryItem, type InventoryQuery } from '../../api/inventory'
-import { inventoryCountQuery, storageSpacesQuery } from '../../api/queries'
+import { categoriesQuery, inventoryCountQuery, storageSpacesQuery } from '../../api/queries'
 import { Button } from '../../components/Button/Button'
 import { ButtonLink } from '../../components/Button/ButtonLink'
 import { DataTable, type Column } from '../../components/DataTable/DataTable'
@@ -63,7 +62,7 @@ export function InventoryPage() {
     placeholderData: keepPreviousData, // keep showing the old rows while the next page loads
   })
   const spaces = useQuery(storageSpacesQuery)
-  const categories = useQuery({ queryKey: ['item-categories'], queryFn: ({ signal }) => listCategories(signal) })
+  const categories = useQuery(categoriesQuery) // every page, shared with "Add items"
   const spaceList = spaces.data?.items ?? []
 
   // The number on each chip = what that chip would show, with the other filters kept.
@@ -242,7 +241,8 @@ export function InventoryPage() {
       <FilterBar
         filters={filters}
         spaces={spaceList}
-        categories={categories.data?.items ?? []}
+        categories={categories.data ?? []}
+        onRetryCategories={categories.isError ? () => void categories.refetch() : undefined}
         counts={{
           allSpaces: allSpacesTotal,
           expiringSoon: countFor(chipQueries.expiringSoon),
