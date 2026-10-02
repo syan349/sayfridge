@@ -232,7 +232,7 @@ class _GuestHomeContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 22),
-        const _SectionTitle('Expiring soon'),
+        const _SectionTitle('Expiring & Expired'),
         const SizedBox(height: 8),
         const Center(
           child: HomeEmptyIllustration(asset: HomeAssets.guestExpiry, size: 94),
@@ -400,7 +400,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
           onSearch: widget.onSearchTap ?? _openSearch,
         ),
         const SizedBox(height: 42),
-        const _SectionTitle('Expiring soon'),
+        const _SectionTitle('Expiring & Expired'),
         const SizedBox(height: 15),
         AnimatedBuilder(
           animation: widget.expirySummaryController ?? const _IdleListenable(),
@@ -420,7 +420,7 @@ class _UserHomeContentState extends State<_UserHomeContent> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: _GreenAction(
-                    label: 'View all expiring items',
+                    label: 'Expiry overview',
                     onPressed: _openExpiringItems,
                   ),
                 ),
@@ -541,9 +541,9 @@ class _UserHomeContentState extends State<_UserHomeContent> {
                 style: FilledButton.styleFrom(
                   padding: EdgeInsets.zero,
                   backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: Colors.black,
                   disabledBackgroundColor: AppColors.primary,
-                  disabledForegroundColor: Colors.white70,
+                  disabledForegroundColor: Colors.black,
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -706,7 +706,7 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     label,
-    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w500),
+    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
   );
 }
 

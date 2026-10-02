@@ -42,16 +42,12 @@ class ProfileAvatar extends StatelessWidget {
     this.asset = ProfilePreferences.defaultAvatar,
     this.bytes,
     this.size = 140,
-    this.onUpload,
-    this.uploading = false,
     super.key,
   });
 
   final String asset;
   final Uint8List? bytes;
   final double size;
-  final VoidCallback? onUpload;
-  final bool uploading;
 
   @override
   Widget build(BuildContext context) => SizedBox.square(
@@ -80,33 +76,6 @@ class ProfileAvatar extends StatelessWidget {
                   ),
           ),
         ),
-        if (onUpload != null)
-          Positioned(
-            right: -1,
-            bottom: 2,
-            child: SizedBox.square(
-              dimension: 44,
-              child: IconButton(
-                key: const Key('profile-upload-avatar'),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFFE5E9DE)),
-                ),
-                onPressed: uploading ? null : onUpload,
-                tooltip: 'Upload avatar',
-                icon: uploading
-                    ? const SizedBox.square(
-                        key: Key('profile-avatar-upload-loading'),
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.3,
-                          color: Colors.black,
-                        ),
-                      )
-                    : const Icon(CupertinoIcons.share, size: 22),
-              ),
-            ),
-          ),
       ],
     ),
   );

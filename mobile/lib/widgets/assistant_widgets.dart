@@ -367,23 +367,26 @@ class AssistantActionBubble extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Padding(
-        padding: EdgeInsets.only(top: 8),
-        child: AssistantAvatar(size: 36),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: ClipPath(
-          clipper: const _SpeechBubbleClipper(tailOnLeft: true, tailOffset: 26),
-          child: Container(
-            color: AppColors.primarySoft,
-            padding: const EdgeInsets.fromLTRB(
-              _bubbleTailWidth + 12,
-              14,
-              12,
-              14,
+      const Padding(padding: EdgeInsets.only(top: 8), child: AssistantAvatar()),
+      const SizedBox(width: 11),
+      Flexible(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _bubbleMaxWidth),
+          child: ClipPath(
+            clipper: const _SpeechBubbleClipper(
+              tailOnLeft: true,
+              tailOffset: 26,
             ),
-            child: child,
+            child: Container(
+              color: AppColors.primarySoft,
+              padding: const EdgeInsets.fromLTRB(
+                _bubbleTailWidth + 12,
+                14,
+                12,
+                14,
+              ),
+              child: child,
+            ),
           ),
         ),
       ),

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 abstract final class QuantityColors {
   static const estimatedText = Color(0xFF783C87);
   static const estimatedBackground = Color(0xFFF2EAF8);
-  static const exactText = Color(0xFF3E4958);
-  static const exactBackground = Color(0xFFEAEEF1);
+  static const exactText = Color(0xFF086B38);
+  static const exactBackground = Color(0xFFDCF3D1);
 
   static Color text(bool estimated) => estimated ? estimatedText : exactText;
   static Color background(bool estimated) =>

@@ -6,6 +6,7 @@ import '../services/notification_service.dart';
 import '../state/profile_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/profile_widgets.dart';
+import '../widgets/notification_time_picker.dart';
 
 class ReminderSettingsScreen extends StatelessWidget {
   const ReminderSettingsScreen({required this.controller, super.key});
@@ -13,13 +14,12 @@ class ReminderSettingsScreen extends StatelessWidget {
 
   Future<void> _selectTime(BuildContext context) async {
     final preferences = controller.preferences;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(
+    final time = await showNotificationTimePicker(
+      context,
+      TimeOfDay(
         hour: preferences.notificationHour,
         minute: preferences.notificationMinute,
       ),
-      helpText: 'Notification time',
     );
     if (time == null || !context.mounted) return;
     await controller.saveReminders(
@@ -31,7 +31,7 @@ class ReminderSettingsScreen extends StatelessWidget {
   Future<void> _enableNotifications(BuildContext context) async {
     if (controller.notificationPermission ==
         NotificationPermissionState.enabled) {
-      await _showStatus(context, 'Notifications are enabled.');
+      await controller.setDeviceNotificationsEnabled(true);
       return;
     }
     final continueRequest = await showDialog<bool>(
@@ -56,7 +56,7 @@ class ReminderSettingsScreen extends StatelessWidget {
       ),
     );
     if (continueRequest != true || !context.mounted) return;
-    final enabled = await controller.requestNotificationPermission();
+    final enabled = await controller.setDeviceNotificationsEnabled(true);
     if (!context.mounted) return;
     await _showStatus(
       context,
@@ -83,13 +83,6 @@ class ReminderSettingsScreen extends StatelessWidget {
         ),
       );
 
-  String _notificationStatus() => switch (controller.notificationPermission) {
-    NotificationPermissionState.enabled => 'Enabled',
-    NotificationPermissionState.denied => 'Blocked',
-    NotificationPermissionState.unsupported => 'Unavailable',
-    NotificationPermissionState.unknown => 'Set up',
-  };
-
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
@@ -99,6 +92,11 @@ class ReminderSettingsScreen extends StatelessWidget {
           controller.isSaving ||
           controller.isLoading ||
           controller.isUpdatingNotifications;
+      final notificationsEnabled =
+          preferences.deviceNotifications &&
+          controller.notificationPermission ==
+              NotificationPermissionState.enabled;
+      final canEditReminders = notificationsEnabled && !busy;
       final time = TimeOfDay(
         hour: preferences.notificationHour,
         minute: preferences.notificationMinute,
@@ -111,7 +109,11 @@ class ReminderSettingsScreen extends StatelessWidget {
             padding: EdgeInsets.zero,
             child: InkWell(
               borderRadius: BorderRadius.circular(9),
-              onTap: busy ? null : () => _enableNotifications(context),
+              onTap: busy
+                  ? null
+                  : () => notificationsEnabled
+                        ? controller.setDeviceNotificationsEnabled(false)
+                        : _enableNotifications(context),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
@@ -129,17 +131,17 @@ class ReminderSettingsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        controller.isUpdatingNotifications
-                            ? 'Checking…'
-                            : _notificationStatus(),
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.muted,
-                        ),
-                      ),
+                    CupertinoSwitch(
+                      key: const Key('device-notifications-switch'),
+                      value: notificationsEnabled,
+                      activeTrackColor: const Color(0xFF8FBB5C),
+                      onChanged: busy
+                          ? null
+                          : (value) => value
+                                ? _enableNotifications(context)
+                                : controller.setDeviceNotificationsEnabled(
+                                    false,
+                                  ),
                     ),
                   ],
                 ),
@@ -147,18 +149,19 @@ class ReminderSettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          ProfileCard(
+          _ReminderSettingsCard(
+            enabled: notificationsEnabled,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _ReminderToggle(
                   label: 'Expiry reminders',
                   description: 'Get notified before item expires.',
-                  value: preferences.expiryReminders,
-                  onChanged: busy
-                      ? null
-                      : (value) =>
-                            controller.saveReminders(expiryReminders: value),
+                  value: notificationsEnabled && preferences.expiryReminders,
+                  onChanged: canEditReminders
+                      ? (value) =>
+                            controller.saveReminders(expiryReminders: value)
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 const Divider(height: 1, color: AppColors.primary),
@@ -199,11 +202,12 @@ class ReminderSettingsScreen extends StatelessWidget {
                               ),
                             ),
                         ],
-                        onChanged: busy || !preferences.expiryReminders
-                            ? null
-                            : (value) => controller.saveReminders(
+                        onChanged:
+                            canEditReminders && preferences.expiryReminders
+                            ? (value) => controller.saveReminders(
                                 daysBeforeExpiry: value,
-                              ),
+                              )
+                            : null,
                       ),
                     ),
                   ],
@@ -212,24 +216,26 @@ class ReminderSettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          ProfileCard(
+          _ReminderSettingsCard(
+            enabled: notificationsEnabled,
             child: _ReminderToggle(
               label: 'Daily check-in',
               description: 'Daily storage space reminder.',
-              value: preferences.dailyCheckIn,
-              onChanged: busy
-                  ? null
-                  : (value) => controller.saveReminders(dailyCheckIn: value),
+              value: notificationsEnabled && preferences.dailyCheckIn,
+              onChanged: canEditReminders
+                  ? (value) => controller.saveReminders(dailyCheckIn: value)
+                  : null,
             ),
           ),
           const SizedBox(height: 24),
-          ProfileCard(
+          _ReminderSettingsCard(
+            enabled: notificationsEnabled,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 InkWell(
                   key: const Key('reminder-time'),
-                  onTap: busy ? null : () => _selectTime(context),
+                  onTap: canEditReminders ? () => _selectTime(context) : null,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(minHeight: 44),
                     child: Row(
@@ -305,6 +311,18 @@ class ReminderSettingsScreen extends StatelessWidget {
         ],
       );
     },
+  );
+}
+
+class _ReminderSettingsCard extends StatelessWidget {
+  const _ReminderSettingsCard({required this.enabled, required this.child});
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ProfileCard(
+    child: Opacity(opacity: enabled ? 1 : .45, child: child),
   );
 }
 

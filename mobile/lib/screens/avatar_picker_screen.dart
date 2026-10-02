@@ -59,6 +59,54 @@ const avatarChoices = <AvatarChoice>[
     name: 'Tomato',
     assetPath: 'assets/images/avatars/tomato_avatar.png',
   ),
+  AvatarChoice(
+    name: 'Chibi Green',
+    assetPath: 'assets/images/avatars/chibi_green_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Chibi Apricot',
+    assetPath: 'assets/images/avatars/chibi_apricot_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Chibi Blue',
+    assetPath: 'assets/images/avatars/chibi_blue_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Chibi Latte',
+    assetPath: 'assets/images/avatars/chibi_latte_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Chibi Lavender',
+    assetPath: 'assets/images/avatars/chibi_lavender_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Chibi Pink',
+    assetPath: 'assets/images/avatars/chibi_pink_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Fridge Spirit Green',
+    assetPath: 'assets/images/avatars/fridge_spirit_green_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Fridge Spirit Latte',
+    assetPath: 'assets/images/avatars/fridge_spirit_latte_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Fridge Spirit Melon',
+    assetPath: 'assets/images/avatars/fridge_spirit_melon_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Fridge Spirit Mint',
+    assetPath: 'assets/images/avatars/fridge_spirit_mint_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Fridge Spirit Periwinkle',
+    assetPath: 'assets/images/avatars/fridge_spirit_periwinkle_avatar.png',
+  ),
+  AvatarChoice(
+    name: 'Fridge Spirit Rose',
+    assetPath: 'assets/images/avatars/fridge_spirit_rose_avatar.png',
+  ),
 ];
 
 class AvatarPickerScreen extends StatefulWidget {
@@ -66,14 +114,12 @@ class AvatarPickerScreen extends StatefulWidget {
     required this.initialAvatar,
     this.isFinalStep = false,
     this.title = 'Create Account',
-    this.showUploadOption = true,
     super.key,
   });
 
   final AvatarChoice initialAvatar;
   final bool isFinalStep;
   final String title;
-  final bool showUploadOption;
 
   @override
   State<AvatarPickerScreen> createState() => _AvatarPickerScreenState();
@@ -94,14 +140,6 @@ class _AvatarPickerScreenState extends State<AvatarPickerScreen> {
       return;
     }
     Navigator.of(context).pop(_selected);
-  }
-
-  void _showUploadMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Custom image upload will be enabled with media access.'),
-      ),
-    );
   }
 
   @override
@@ -149,24 +187,6 @@ class _AvatarPickerScreenState extends State<AvatarPickerScreen> {
               },
             ),
             const SizedBox(height: 32),
-            if (widget.showUploadOption)
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  const Text('or ', style: TextStyle(fontSize: 16)),
-                  UnderlinedAction(
-                    label: 'upload your own avatar',
-                    onPressed: _showUploadMessage,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  IconButton(
-                    onPressed: _showUploadMessage,
-                    icon: const Icon(Icons.ios_share_rounded, size: 20),
-                    tooltip: 'Upload your own avatar',
-                  ),
-                ],
-              ),
             const SizedBox(height: 18),
             PrimaryAuthButton(
               key: const Key('use-avatar-button'),
@@ -186,10 +206,7 @@ class AvatarBubble extends StatelessWidget {
     this.size,
     this.imageBytes,
     this.selected = false,
-    this.showUploadBadge = false,
     this.onTap,
-    this.onUploadTap,
-    this.isUploading = false,
     super.key,
   });
 
@@ -197,10 +214,7 @@ class AvatarBubble extends StatelessWidget {
   final double? size;
   final Uint8List? imageBytes;
   final bool selected;
-  final bool showUploadBadge;
   final VoidCallback? onTap;
-  final VoidCallback? onUploadTap;
-  final bool isUploading;
 
   @override
   Widget build(BuildContext context) {
@@ -225,12 +239,20 @@ class AvatarBubble extends StatelessWidget {
                       : null,
                   child: ClipOval(
                     child: imageBytes == null
-                        ? Image.asset(choice.assetPath, fit: BoxFit.cover)
-                        : Image.memory(imageBytes!, fit: BoxFit.cover),
+                        ? Image.asset(
+                            choice.assetPath,
+                            fit: BoxFit.cover,
+                            cacheWidth: (resolvedSize * 3).ceil(),
+                          )
+                        : Image.memory(
+                            imageBytes!,
+                            fit: BoxFit.cover,
+                            cacheWidth: (resolvedSize * 3).ceil(),
+                          ),
                   ),
                 ),
               ),
-              if (selected || showUploadBadge)
+              if (selected)
                 Positioned(
                   right: -1,
                   bottom: 0,
@@ -238,34 +260,17 @@ class AvatarBubble extends StatelessWidget {
                     width: resolvedSize * 0.3,
                     height: resolvedSize * 0.3,
                     child: Material(
-                      color: showUploadBadge ? Colors.white : AppColors.primary,
+                      color: AppColors.primary,
                       shape: const CircleBorder(),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
-                        onTap: showUploadBadge && !isUploading
-                            ? onUploadTap
-                            : null,
+                        onTap: null,
                         customBorder: const CircleBorder(),
-                        child: isUploading
-                            ? Center(
-                                child: SizedBox.square(
-                                  key: const Key('avatar-upload-loading'),
-                                  dimension: resolvedSize * 0.18,
-                                  child: const CircularProgressIndicator(
-                                    strokeWidth: 2.3,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              )
-                            : Icon(
-                                showUploadBadge
-                                    ? Icons.ios_share_rounded
-                                    : Icons.check,
-                                size: resolvedSize * 0.2,
-                                color: showUploadBadge
-                                    ? AppColors.text
-                                    : Colors.white,
-                              ),
+                        child: Icon(
+                          Icons.check,
+                          size: resolvedSize * 0.2,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),

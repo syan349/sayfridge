@@ -9,7 +9,6 @@ import '../widgets/inventory_actions.dart';
 import '../widgets/app_background.dart';
 import '../widgets/inventory_visuals.dart';
 import '../widgets/quantity_badge.dart';
-import '../widgets/expiry_display_scope.dart';
 
 class InventoryDetailScreen extends StatefulWidget {
   const InventoryDetailScreen({
@@ -207,10 +206,7 @@ class _DetailPanel extends StatelessWidget {
           _row(
             label: 'Expiry date',
             value: _date(item.expiryDate),
-            color: expiryColor(
-              item.expiryDate,
-              daysBefore: ExpiryDisplayScope.daysBeforeExpiryOf(context),
-            ),
+            color: Colors.black,
           ),
           _row(label: 'Storage space', value: item.storageSpaceName),
         ],

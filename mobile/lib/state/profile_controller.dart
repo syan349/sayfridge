@@ -93,6 +93,7 @@ class ProfileController extends ChangeNotifier {
   );
 
   Future<bool> saveReminders({
+    bool? deviceNotifications,
     bool? expiryReminders,
     int? daysBeforeExpiry,
     bool? dailyCheckIn,
@@ -100,6 +101,7 @@ class ProfileController extends ChangeNotifier {
     int? notificationMinute,
   }) => _save(
     _preferences.withReminders(
+      deviceNotifications: deviceNotifications,
       expiryReminders: expiryReminders,
       daysBeforeExpiry: daysBeforeExpiry,
       dailyCheckIn: dailyCheckIn,
@@ -107,6 +109,17 @@ class ProfileController extends ChangeNotifier {
       notificationMinute: notificationMinute,
     ),
   );
+
+  Future<bool> setDeviceNotificationsEnabled(bool enabled) async {
+    if (_isSaving || _isLoading || _isUpdatingNotifications) return false;
+    final version = _accountVersion;
+    if (enabled &&
+        _notificationPermission != NotificationPermissionState.enabled) {
+      if (!await requestNotificationPermission()) return false;
+    }
+    if (!_isCurrent(version)) return false;
+    return saveReminders(deviceNotifications: enabled);
+  }
 
   Future<bool> _save(ProfilePreferences preferences) async {
     final userId = _userId;
@@ -139,6 +152,15 @@ class ProfileController extends ChangeNotifier {
   Future<void> _syncNotificationSchedule(ProfilePreferences preferences) async {
     try {
       await _notificationService?.synchronizeDailyReminder(preferences);
+      if (!preferences.deviceNotifications) {
+        for (final id in [
+          NotificationService.expiredItemsId,
+          NotificationService.expiringSoonId,
+          NotificationService.dailyCheckInId,
+        ]) {
+          await _notificationService?.cancel(id);
+        }
+      }
       _notificationError = null;
     } catch (_) {
       _notificationError =
@@ -169,10 +191,12 @@ class ProfileController extends ChangeNotifier {
     if (notificationService == null) return false;
     if (_isUpdatingNotifications) return false;
     _isUpdatingNotifications = true;
+    final version = _accountVersion;
     _notificationError = null;
     notifyListeners();
     try {
       _notificationPermission = await notificationService.requestPermission();
+      if (!_isCurrent(version)) return false;
       if (_notificationPermission == NotificationPermissionState.enabled) {
         await notificationService.synchronizeDailyReminder(_preferences);
         return true;

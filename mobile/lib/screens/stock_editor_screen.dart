@@ -358,6 +358,7 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
                                         foregroundColor: AppColors.text,
                                         minimumSize: const Size.fromHeight(54),
                                         textStyle: const TextStyle(
+                                          fontFamily: 'Arial',
                                           fontSize: 18,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -624,16 +625,7 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
       borderRadius: BorderRadius.circular(6),
       child: Container(
         constraints: const BoxConstraints(minHeight: 44),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: QuantityColors.background(estimated),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: _estimated == estimated
-                ? QuantityColors.text(estimated)
-                : Colors.transparent,
-          ),
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -649,8 +641,8 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
               estimated ? '≈ AI estimate' : 'Exact',
               style: TextStyle(
                 fontSize: 14,
-                color: QuantityColors.text(estimated),
-                fontWeight: FontWeight.w600,
+                color: AppColors.muted,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ],

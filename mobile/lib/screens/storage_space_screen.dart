@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/app_action_icon.dart';
 
 import '../widgets/page_scroll_fade.dart';
 
@@ -109,10 +110,22 @@ class StorageSpaceScreen extends StatelessWidget {
             ),
           const SizedBox(height: 32),
           if (controller.workspace != null)
-            TextButton(
+            OutlinedButton(
               onPressed: () => _restore(context),
-              child: const Text('Restore an archived space'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 53),
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.black,
+                side: const BorderSide(color: AppColors.primary, width: 1.5),
+                shape: const StadiumBorder(),
+                textStyle: const TextStyle(fontSize: 19),
+              ),
+              child: const Text(
+                'Restore an archived space',
+                style: TextStyle(fontFamily: 'Arial'),
+              ),
             ),
+          const SizedBox(height: 12),
           SizedBox(
             height: 53,
             child: FilledButton.icon(
@@ -379,8 +392,11 @@ class _SpaceCard extends StatelessWidget {
               if (onDefault != null || isDefault)
                 IconButton(
                   onPressed: onDefault,
-                  icon: Icon(
-                    isDefault ? Icons.star_rounded : Icons.star_outline_rounded,
+                  icon: AppActionIcon(
+                    isDefault
+                        ? ActionAssets.defaultSelected
+                        : ActionAssets.defaultUnselected,
+                    size: 28,
                   ),
                   tooltip: isDefault
                       ? 'Default storage space'
@@ -389,13 +405,13 @@ class _SpaceCard extends StatelessWidget {
               if (onEdit != null)
                 IconButton(
                   onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined),
+                  icon: const AppActionIcon(ActionAssets.edit),
                   tooltip: 'Edit $label',
                 ),
               if (onDelete != null)
                 IconButton(
                   onPressed: onDelete,
-                  icon: const Icon(Icons.archive_outlined),
+                  icon: const Icon(Icons.archive_outlined, size: 32),
                   tooltip: 'Archive $label',
                 ),
               if (onEdit == null && onTap != null)

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/app_action_icon.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:image_picker/image_picker.dart';
 
@@ -673,7 +674,7 @@ class _AgentItemCardState extends State<_AgentItemCard> {
                                 _answerText = null;
                               })
                             : null,
-                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        icon: const AppActionIcon(ActionAssets.edit, size: 18),
                         label: Text(
                           _editing ? 'Close editing' : 'Edit details',
                         ),

@@ -8,6 +8,7 @@ import '../screens/stock_editor_screen.dart';
 import 'business_forms.dart';
 import 'app_background.dart';
 import 'inventory_visuals.dart';
+import 'app_action_icon.dart';
 import '../theme/app_theme.dart';
 
 class InventoryActions extends StatelessWidget {
@@ -191,11 +192,12 @@ class InventoryActions extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         if (editable) ...[
-          FilledButton.icon(
+          FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.black,
               minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               textStyle: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
@@ -214,12 +216,14 @@ class InventoryActions extends StatelessWidget {
                     );
                     if (context.mounted) await reload();
                   },
-            icon: const Icon(Icons.edit_outlined, size: 20),
-            label: const Text('Edit item'),
+            child: const _ActionLabel(
+              icon: AppActionIcon(ActionAssets.edit, size: 16),
+              label: 'Edit item',
+            ),
           ),
           const SizedBox(height: 8),
         ],
-        OutlinedButton.icon(
+        OutlinedButton(
           style: secondaryStyle,
           onPressed: workspace == null
               ? null
@@ -231,47 +235,84 @@ class InventoryActions extends StatelessWidget {
                     ),
                   ),
                 ),
-          icon: const Icon(Icons.schedule, size: 20),
-          label: const Text('Operation history'),
+          child: const _ActionLabel(
+            icon: Icon(Icons.schedule, size: 20),
+            label: 'Operation history',
+          ),
         ),
         if (editable) ...[
           const SizedBox(height: 8),
-          OutlinedButton.icon(
+          OutlinedButton(
             style: secondaryStyle,
             onPressed: workspace == null
                 ? null
                 : () => _quantityActions(context),
-            icon: const Icon(Icons.tune, size: 18),
-            label: const Text('Quantity'),
+            child: const _ActionLabel(
+              icon: Icon(Icons.tune, size: 20),
+              label: 'Quantity',
+            ),
           ),
           if (item.isInStock) ...[
             const SizedBox(height: 8),
-            OutlinedButton.icon(
+            OutlinedButton(
               style: secondaryStyle,
               onPressed: workspace == null ? null : () => _markUsedUp(context),
-              icon: const Icon(Icons.check_circle_outline, size: 18),
-              label: const Text('Mark as used up'),
+              child: const _ActionLabel(
+                icon: Icon(Icons.check_circle_outline, size: 20),
+                label: 'Mark as used up',
+              ),
             ),
           ],
           if (item.isInStock && _isExpired) ...[
             const SizedBox(height: 8),
-            FilledButton.icon(
+            FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.error,
                 foregroundColor: Theme.of(context).colorScheme.onError,
                 minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
               ),
               onPressed: workspace == null
                   ? null
                   : () => _state(context, 'discard'),
-              icon: const Icon(Icons.delete_forever_outlined),
-              label: const Text('Discard expired item'),
+              child: const _ActionLabel(
+                icon: AppActionIcon(ActionAssets.deleteWhite, size: 20),
+                label: 'Discard expired item',
+              ),
             ),
           ],
         ],
       ],
     );
   }
+}
+
+class _ActionLabel extends StatelessWidget {
+  const _ActionLabel({required this.icon, required this.label});
+  final Widget icon;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 184),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16),
+        child: Row(
+          children: [
+            SizedBox(width: 24, height: 24, child: Center(child: icon)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontFamily: 'Arial'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class InventoryHistoryScreen extends StatefulWidget {
