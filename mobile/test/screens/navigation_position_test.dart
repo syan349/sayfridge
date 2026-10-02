@@ -100,7 +100,7 @@ void main() {
             expect(find.byTooltip('Back'), findsOneWidget);
             expect(
               tester.getRect(bottomAction).bottom,
-              closeTo(size.height - safeArea.bottom - 28, 0.1),
+              closeTo(size.height - safeArea.bottom - 8, 0.1),
             );
           } else {
             expect(tester.getRect(bar), expected, reason: entry.key);
@@ -113,7 +113,7 @@ void main() {
           if (isAssistant) {
             expect(
               tester.getRect(bottomAction).bottom,
-              closeTo(size.height - safeArea.bottom - 28, 0.1),
+              closeTo(size.height - safeArea.bottom - 8, 0.1),
               reason: '${entry.key} scrolled',
             );
           } else {

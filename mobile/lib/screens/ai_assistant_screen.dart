@@ -7,6 +7,7 @@ import '../widgets/app_page_footer.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
 import '../widgets/assistant_scroll_layout.dart';
+import '../widgets/quantity_badge.dart';
 import 'camera_input_screen.dart';
 import 'conversation_history_screen.dart';
 import 'agent_conversation_screen.dart';
@@ -38,18 +39,19 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   static const _expiringItems = <InventoryItemData>[
     InventoryItemData(
       name: 'Chicken Thigh',
-      quantity: '500g',
+      quantity: '500 g',
       location: 'Fridge',
       daysLeft: '1 day left',
+      daysUntilExpiry: 1,
       imageAsset: '$_inventoryRoot/chicken_drumstick.png',
       quantityIsEstimate: true,
-      expiryIsEstimate: true,
     ),
     InventoryItemData(
       name: 'Salmon Fillet',
-      quantity: '750g',
+      quantity: '750 g',
       location: 'Fridge',
       daysLeft: '1 day left',
+      daysUntilExpiry: 1,
       imageAsset: '$_inventoryRoot/salmon_fillet.png',
     ),
     InventoryItemData(
@@ -57,30 +59,32 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       quantity: '3 pcs',
       location: 'Pantry',
       daysLeft: '2 day left',
+      daysUntilExpiry: 2,
       imageAsset: '$_inventoryRoot/tomato.png',
     ),
     InventoryItemData(
       name: 'Milk',
-      quantity: '300ml',
+      quantity: '300 ml',
       location: 'Fridge',
       daysLeft: '2 day left',
+      daysUntilExpiry: 2,
       imageAsset: '$_inventoryRoot/milk.png',
       quantityIsEstimate: true,
-      expiryIsEstimate: true,
     ),
     InventoryItemData(
       name: 'Beef tenderloin',
-      quantity: '450g',
+      quantity: '450 g',
       location: 'Freezer',
       daysLeft: '3 day left',
+      daysUntilExpiry: 3,
       imageAsset: '$_inventoryRoot/beef_tenderloin.png',
-      expiryIsEstimate: true,
     ),
     InventoryItemData(
       name: 'Bacon',
-      quantity: '400g',
+      quantity: '400 g',
       location: 'Fridge',
       daysLeft: '3 day left',
+      daysUntilExpiry: 3,
       imageAsset: '$_inventoryRoot/bacon.png',
       quantityIsEstimate: true,
     ),
@@ -147,8 +151,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               constraints: const BoxConstraints(maxWidth: 480),
               child: AssistantScrollLayout(
                 bottomInset: bottomInset,
+                headerFadeExtent: 16,
                 header: Padding(
-                  padding: const EdgeInsets.fromLTRB(25, 27, 25, 15),
+                  padding: const EdgeInsets.fromLTRB(25, 8, 25, 8),
                   child: AssistantHeader(
                     onNewConversation: _startNewConversation,
                     onHistory: _openHistory,
@@ -158,7 +163,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                     _buildScrollableContent(bottomPadding),
                 footer: widget.isGuest
                     ? Padding(
-                        padding: const EdgeInsets.fromLTRB(25, 14, 25, 28),
+                        padding: const EdgeInsets.fromLTRB(25, 14, 25, 8),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -185,7 +190,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(25, 8, 25, 28),
+                            padding: const EdgeInsets.fromLTRB(25, 8, 25, 8),
                             child: AssistantComposer(
                               key: const Key('assistant-bottom-action'),
                               controller: _messageController,
@@ -251,7 +256,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               TextSpan(
                 text: '6 items',
                 style: TextStyle(
-                  color: inventoryEstimatedColor,
+                  color: inventoryWarningColor,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -261,16 +266,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           style: TextStyle(fontSize: 19, height: 1.2),
         ),
         const SizedBox(height: 10),
-        const Row(
-          children: [
-            _ValueLegendItem(label: 'Exact', color: inventoryExactColor),
-            SizedBox(width: 25),
-            _ValueLegendItem(
-              label: 'AI - Estimated',
-              color: inventoryEstimatedColor,
-            ),
-          ],
-        ),
+        const QuantityLegend(),
         const SizedBox(height: 14),
         for (var index = 0; index < _expiringItems.length; index++) ...[
           InventoryItemCard(item: _expiringItems[index]),
@@ -286,6 +282,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       quantity: '1 kg',
       location: 'Pantry',
       daysLeft: '7 day left',
+      daysUntilExpiry: 7,
       imageAsset: '$_inventoryRoot/tomato.png',
     );
 
@@ -328,32 +325,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               InventoryItemCard(item: sampleItem, compact: true),
             ],
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ValueLegendItem extends StatelessWidget {
-  const _ValueLegendItem({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 11,
-          height: 11,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF818181), fontSize: 15),
         ),
       ],
     );

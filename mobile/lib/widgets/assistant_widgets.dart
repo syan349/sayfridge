@@ -7,9 +7,11 @@ import '../models/agent_image.dart';
 import 'app_bottom_navigation.dart';
 import 'inventory_card_trailing.dart';
 import 'page_back_button.dart';
+import 'quantity_badge.dart';
+import 'expiry_display_scope.dart';
+import 'inventory_visuals.dart' show expiryColor;
 
-const inventoryExactColor = Color(0xFF3F9E36);
-const inventoryEstimatedColor = Color(0xFFE95A18);
+const inventoryWarningColor = Color(0xFFE95A18);
 const exampleMessageStyle = TextStyle(
   color: AppColors.text,
   fontSize: 16,
@@ -206,39 +208,62 @@ class UserMessageBubble extends StatelessWidget {
         children: [
           _bubble(context),
           const SizedBox(height: 10),
-          for (final photo in images)
-            Padding(
-              padding: const EdgeInsets.only(
-                bottom: 8,
-                right: _bubbleTailWidth,
-              ),
-              child: Semantics(
-                label: 'Uploaded photo',
-                image: true,
-                excludeSemantics: true,
-                child: ClipRRect(
-                  key: ValueKey('uploaded-photo-${photo.imageId}'),
-                  borderRadius: BorderRadius.circular(14),
-                  child: Image.memory(
-                    photo.bytes,
-                    width: 240,
-                    height: 180,
-                    fit: BoxFit.contain,
-                    cacheWidth: 720,
-                    errorBuilder: (_, error, stack) => const SizedBox(
-                      width: 240,
-                      height: 80,
-                      child: Center(child: Text('Photo preview unavailable')),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          for (final photo in images) _photo(context, photo),
         ],
       );
     }
     return _bubble(context);
   }
+
+  Widget _photo(BuildContext context, AgentImage photo) => LayoutBuilder(
+    builder: (context, constraints) {
+      final maxWidth = math.min(
+        _bubbleMaxWidth,
+        constraints.maxWidth - _bubbleTailWidth,
+      );
+      final maxHeight = math.min(420.0, MediaQuery.sizeOf(context).height * .5);
+      double width = maxWidth, height = 80;
+      try {
+        final (sourceWidth, sourceHeight) = photo.dimensions;
+        final scale = math.min(
+          maxWidth / sourceWidth,
+          maxHeight / sourceHeight,
+        );
+        width = sourceWidth * scale;
+        height = sourceHeight * scale;
+      } on FormatException {
+        // Keep an unavailable preview in the transcript without blocking chat.
+      }
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8, right: _bubbleTailWidth),
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Semantics(
+            label: 'Uploaded photo',
+            image: true,
+            excludeSemantics: true,
+            child: ClipRRect(
+              key: ValueKey('uploaded-photo-${photo.imageId}'),
+              borderRadius: BorderRadius.circular(14),
+              child: Image.memory(
+                photo.bytes,
+                width: width,
+                height: height,
+                fit: BoxFit.contain,
+                cacheWidth: (width * MediaQuery.devicePixelRatioOf(context))
+                    .ceil(),
+                errorBuilder: (_, error, stack) => SizedBox(
+                  width: width,
+                  height: 80,
+                  child: const Center(child: Text('Photo preview unavailable')),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 
   Widget _bubble(BuildContext context) {
     return LayoutBuilder(
@@ -249,6 +274,7 @@ class UserMessageBubble extends StatelessWidget {
             maxWidth: math.min(_bubbleMaxWidth, constraints.maxWidth * 0.9),
           ),
           child: ClipPath(
+            key: const Key('user-message-shape'),
             clipper: const _SpeechBubbleClipper(tailOnLeft: false),
             child: Container(
               padding: const EdgeInsets.fromLTRB(
@@ -332,6 +358,39 @@ class AssistantMessageBubble extends StatelessWidget {
   );
 }
 
+/// Interactive review content belongs to the same conversation as text replies.
+class AssistantActionBubble extends StatelessWidget {
+  const AssistantActionBubble({required this.child, super.key});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: AssistantAvatar(size: 36),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: ClipPath(
+          clipper: const _SpeechBubbleClipper(tailOnLeft: true, tailOffset: 26),
+          child: Container(
+            color: AppColors.primarySoft,
+            padding: const EdgeInsets.fromLTRB(
+              _bubbleTailWidth + 12,
+              14,
+              12,
+              14,
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
 List<InlineSpan> _assistantTextSpans(String message) {
   final spans = <InlineSpan>[];
   final markup = RegExp(r'\*\*([^*]+)\*\*|^#{1,3}\s+([^\n]+)', multiLine: true);
@@ -355,9 +414,10 @@ List<InlineSpan> _assistantTextSpans(String message) {
 }
 
 class _SpeechBubbleClipper extends CustomClipper<Path> {
-  const _SpeechBubbleClipper({required this.tailOnLeft});
+  const _SpeechBubbleClipper({required this.tailOnLeft, this.tailOffset});
 
   final bool tailOnLeft;
+  final double? tailOffset;
 
   @override
   Path getClip(Size size) {
@@ -365,7 +425,7 @@ class _SpeechBubbleClipper extends CustomClipper<Path> {
     const tail = _bubbleTailWidth;
     final bodyLeft = tailOnLeft ? tail : 0.0;
     final bodyRight = tailOnLeft ? size.width : size.width - tail;
-    final centerY = size.height / 2;
+    final centerY = tailOffset ?? size.height / 2;
 
     // Draw the body and tail as one continuous outline. Keeping them in a
     // single subpath avoids an anti-aliased seam where two clipped shapes meet.
@@ -422,7 +482,8 @@ class _SpeechBubbleClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(covariant _SpeechBubbleClipper oldClipper) {
-    return tailOnLeft != oldClipper.tailOnLeft;
+    return tailOnLeft != oldClipper.tailOnLeft ||
+        tailOffset != oldClipper.tailOffset;
   }
 }
 
@@ -478,18 +539,18 @@ class InventoryItemData {
     required this.quantity,
     required this.location,
     required this.daysLeft,
+    required this.daysUntilExpiry,
     required this.imageAsset,
     this.quantityIsEstimate = false,
-    this.expiryIsEstimate = false,
   });
 
   final String name;
   final String quantity;
   final String location;
   final String daysLeft;
+  final int daysUntilExpiry;
   final String imageAsset;
   final bool quantityIsEstimate;
-  final bool expiryIsEstimate;
 }
 
 class InventoryItemCard extends StatelessWidget {
@@ -545,30 +606,22 @@ class InventoryItemCard extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text:
-                              '${item.quantityIsEstimate ? '≈ ' : ''}${item.quantity}',
-                          style: TextStyle(
-                            color: item.quantityIsEstimate
-                                ? inventoryEstimatedColor
-                                : inventoryExactColor,
-                            fontWeight: FontWeight.w500,
-                          ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      QuantityBadge(
+                        text:
+                            '${item.quantityIsEstimate ? '≈ ' : ''}${item.quantity}',
+                        estimated: item.quantityIsEstimate,
+                      ),
+                      Text(
+                        ' | ${item.location}',
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 15,
                         ),
-                        const TextSpan(
-                          text: ' | ',
-                          style: TextStyle(color: AppColors.muted),
-                        ),
-                        TextSpan(
-                          text: item.location,
-                          style: const TextStyle(color: AppColors.muted),
-                        ),
-                      ],
-                    ),
-                    style: const TextStyle(fontSize: 15),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -577,9 +630,12 @@ class InventoryItemCard extends StatelessWidget {
           const SizedBox(width: 7),
           InventoryCardTrailing(
             expiryText: item.daysLeft,
-            expiryColor: item.expiryIsEstimate
-                ? inventoryEstimatedColor
-                : inventoryExactColor,
+            expiryColor: expiryColor(
+              DateUtils.dateOnly(
+                DateTime.now(),
+              ).add(Duration(days: item.daysUntilExpiry)),
+              daysBefore: ExpiryDisplayScope.daysBeforeExpiryOf(context),
+            ),
             showWarning: true,
             maxWidth: compact ? 100 : 112,
           ),

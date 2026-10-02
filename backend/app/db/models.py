@@ -128,13 +128,19 @@ class StorageSpace(Base):
 class ItemCategory(Base):
     __tablename__ = "item_category"
     __table_args__ = (
-        UniqueConstraint("normalized_name", name="uq_item_category_normalized_name"),
+        Index("uq_item_category_public_name", "normalized_name", unique=True,
+              postgresql_where=text("owner_user_id IS NULL")),
+        Index("uq_item_category_private_owner_name", "owner_user_id", "normalized_name", unique=True,
+              postgresql_where=text("owner_user_id IS NOT NULL")),
         CheckConstraint("status IN ('ACTIVE', 'ARCHIVED')", name="status_allowed"),
         CheckConstraint("sort_order >= 0", name="sort_order_nonnegative"),
         Index("ix_item_category_status_sort", "status", "sort_order"),
     )
 
     id: Mapped[uuid.UUID] = uuid_primary_key()
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="RESTRICT")
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     normalized_name: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(
@@ -237,6 +243,9 @@ class InventoryItem(Base):
         nullable=False,
     )
     notes: Mapped[str | None] = mapped_column(Text)
+    category_override_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("item_category.id", ondelete="RESTRICT")
+    )
     purchase_date: Mapped[date | None] = mapped_column(Date)
     expiry_date: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(

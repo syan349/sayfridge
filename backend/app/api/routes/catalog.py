@@ -1,4 +1,4 @@
-"""Authenticated category queries and private item-definition REST endpoints."""
+"""Authenticated category and private item-definition REST endpoints."""
 from typing import Annotated
 from uuid import UUID
 
@@ -10,7 +10,7 @@ from app.api.dependencies import get_current_user, require_empty_body
 from app.db.models import ItemDefinition, User
 from app.db.session import get_db_session
 from app.schemas.business import (
-    BusinessErrorResponse, CatalogListQuery, ItemCategoryPage, ItemDefinitionCreate,
+    BusinessErrorResponse, CatalogListQuery, ItemCategoryPage, ItemCategoryCreate, ItemCategoryRead, ItemDefinitionCreate,
     ItemDefinitionListQuery, ItemDefinitionPage, ItemDefinitionRead, ItemDefinitionUpdate,
 )
 from app.schemas.auth import AuthErrorResponse
@@ -36,14 +36,24 @@ def _read_definition(definition: ItemDefinition) -> ItemDefinitionRead:
 
 
 @router.get("/item-categories", response_model=ItemCategoryPage, status_code=status.HTTP_200_OK,
-            summary="List public item categories")
+            summary="List visible item categories")
 async def list_categories(
     query: Annotated[CatalogListQuery, Query()],
     session: AsyncSession = Depends(get_db_session), current_user: User = Depends(get_current_user),
 ) -> ItemCategoryPage:
-    """List categories with state filtering and deterministic pagination."""
-    items, total = await service.list_categories(session, **query.model_dump())
+    """List public and owned categories alphabetically with state filtering and pagination."""
+    items, total = await service.list_categories(session, current_user.id, **query.model_dump())
     return ItemCategoryPage(items=items, total=total, page=query.page, page_size=query.page_size)
+
+
+@router.post("/item-categories", response_model=ItemCategoryRead, status_code=status.HTTP_201_CREATED,
+             responses=WRITE_ERRORS, summary="Create or reuse a visible item category")
+async def create_category(
+    payload: ItemCategoryCreate, session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> ItemCategoryRead:
+    """Reuse a visible normalized name, or create a category owned by the current user."""
+    return await service.create_category(session, current_user.id, name=payload.name)
 
 
 @router.get("/item-definitions", response_model=ItemDefinitionPage, status_code=status.HTTP_200_OK,

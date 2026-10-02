@@ -4,6 +4,7 @@ import '../screens/ai_assistant_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/web_safe_area.dart';
+import '../widgets/expiry_display_scope.dart';
 import '../theme/app_theme.dart';
 import 'preview_session.dart';
 
@@ -141,50 +142,53 @@ class _PreviewAppState extends State<PreviewApp> {
       navigatorKey: _navigator,
       initialRoute: '/profile',
       onGenerateRoute: _route,
-      builder: (context, child) => WebSafeArea(
-        child: Builder(
-          builder: (context) => Stack(
-            fit: StackFit.expand,
-            children: [
-              if (snapshot.connectionState == ConnectionState.done)
-                child!
-              else
-                const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                ),
-              Positioned(
-                top: MediaQuery.paddingOf(context).top + 2,
-                right: 8,
-                child: ListenableBuilder(
-                  listenable: _session.auth,
-                  builder: (context, _) => Material(
-                    color: const Color(0xFFFFE8AE),
-                    borderRadius: BorderRadius.circular(4),
-                    child: InkWell(
-                      key: const Key('preview-inventory-menu'),
+      builder: (context, child) => ExpiryDisplayScope(
+        controller: _session.profile,
+        child: WebSafeArea(
+          child: Builder(
+            builder: (context) => Stack(
+              fit: StackFit.expand,
+              children: [
+                if (snapshot.connectionState == ConnectionState.done)
+                  child!
+                else
+                  const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  ),
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 2,
+                  right: 8,
+                  child: ListenableBuilder(
+                    listenable: _session.auth,
+                    builder: (context, _) => Material(
+                      color: const Color(0xFFFFE8AE),
                       borderRadius: BorderRadius.circular(4),
-                      onTap: _session.auth.isAuthenticated
-                          ? _chooseInventory
-                          : null,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        child: Text(
-                          'UI PREVIEW · OFFLINE',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF634400),
-                            decoration: TextDecoration.none,
+                      child: InkWell(
+                        key: const Key('preview-inventory-menu'),
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: _session.auth.isAuthenticated
+                            ? _chooseInventory
+                            : null,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          child: Text(
+                            'UI PREVIEW · OFFLINE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF634400),
+                              decoration: TextDecoration.none,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

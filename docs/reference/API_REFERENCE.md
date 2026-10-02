@@ -238,9 +238,21 @@ keep the original archived. Rename the active namesake before retrying.
 Common pagination/state parameters. **200**, page of category objects:
 `id`, `name`, `status`, `sort_order`.
 
-Read public categories filtered by category status; sort by `sort_order`, name,
-then UUID ascending. No writes. An ACTIVE category must already exist before
-creating a definition; the explicit seed SQL initializes the maintained catalog; there is no category write API.
+Read public and authenticated-user-owned categories filtered by category status;
+sort by normalized name, then UUID ascending. Other users' private categories
+are inaccessible. This endpoint is read-only. An ACTIVE visible category must
+exist before creating a definition.
+
+### POST /item-categories
+
+JSON: `{"name":"Meal Prep"}`. Name is trimmed and contains 1–100 characters.
+**201**, Category response. Reuse a matching visible category after Unicode NFKC,
+case-folding and collapsing whitespace; otherwise create a user-owned category.
+Concurrent requests for the same private name reuse one row. An existing archived
+name returns **409 / STATE_CONFLICT**. Public categories are not modified.
+
+Reuse applies to the category record, not inventory quantities or expiry dates.
+It never combines existing stock batches.
 
 ## 5. Item definitions — B06
 
@@ -258,7 +270,9 @@ Owner IDs and internal normalized keys are omitted.
   archived names remain reserved. Public/other-owner equivalent names are allowed.
   Legacy-equivalent names also conflict without rewriting existing data.
 - Mutations preserve inventory references. Later joined reads reflect the current
-  definition name/category. Conflicting writes roll back atomically.
+  definition name. Inventory category reads use a batch override when present;
+  otherwise they use the current definition category. A direct definition-category
+  edit therefore affects batches without overrides. Conflicting writes roll back atomically.
 - If the category relationship changes during a write's lock acquisition, return
   **409 / RESOURCE_CHANGED**; reload and retry. Lock implementation is in the handbook.
 
@@ -411,6 +425,10 @@ associations return 404; archived associations return 409 / STATE_CONFLICT.
 
 Insert one IN_STOCK row: initial and confirmed amounts/units equal validated input,
 confirmed_at is server time, estimates are NULL, version is 1. No ADD event is created.
+Reusing a category or item definition does not combine stock. Each successful
+creation inserts a separate batch with its own ID, quantity and expiry date, even
+when its name, category and storage space match an existing batch. Replenishment
+is a separate ADD operation targeting an explicitly selected inventory item.
 State checks coordinate with concurrent archival. Relationship changes during lock
 acquisition return 409 / RESOURCE_CHANGED. Creation has no idempotency guarantee.
 
@@ -527,14 +545,25 @@ after a lost response, reload the items before retrying.
 ```
 
 Required expected_version: integer 1–2147483647. Supply at least one of
-storage_space_id, purchase_date, expiry_date, notes, item_name, quantity.
+storage_space_id, category_id, purchase_date, expiry_date, notes, item_name, quantity.
 Null clears dates/notes only. Definition IDs, initial quantities, Added on and
 other timestamps cannot be supplied by the client.
 
 `item_name` is a trimmed 1–100 character name. The batch resolves or creates a
-private definition in its current active category; other batches and public
+private definition in its selected active category; other batches and public
 catalog names are unchanged. Archived or differently categorized private name
 collisions return 409 / NAME_CONFLICT.
+
+`category_id` must identify an ACTIVE public or user-owned category (missing or
+inaccessible: **404 / NOT_FOUND**, archived: **409 / STATE_CONFLICT**). It changes
+only this batch's effective category, reflected in inventory and expiry filters.
+The shared definition and sibling batches are unchanged. Null is invalid.
+Internally, reads use `category_override_id` when present and fall back to the
+definition category otherwise. The override field is not a client-writable API field.
+
+For example, two Carrots batches under Vegetable with expiry dates 2026-10-05
+and 2026-10-07 remain separate. Editing the first batch's quantity, expiry or
+category does not edit the second batch.
 
 The optional quantity edit supports a measured balance or a read-only estimate:
 
@@ -1516,9 +1545,11 @@ The runnable request example below is maintained here with the API contract.
 <details>
 <summary>Python example: send a photo and print SSE events</summary>
 
-在后端虚拟环境运行以下 Python 代码。环境变量 `SAYFRIDGE_TOKEN` 为已登录用户的 token，
-`SAYFRIDGE_IMAGE` 为本地图片路径，`SAYFRIDGE_API` 默认为本机服务。此示例只生成待核对候选，
-不自动确认；首次调试应使用测试账号。保存 body 以便网络失败后原样重试。
+Run the following Python code in the backend virtual environment. Set
+`SAYFRIDGE_TOKEN` to a signed-in user token, `SAYFRIDGE_IMAGE` to a local image
+path, and optionally `SAYFRIDGE_API` to the API URL. This example prepares review
+proposals without confirming them. Use a test account and retain the request
+body unchanged for retries after network failures.
 
 ```python
 import base64
@@ -1532,10 +1563,10 @@ import httpx
 
 path = Path(os.environ["SAYFRIDGE_IMAGE"])
 body = {
-    "message": "请把照片里的食品录入库存，先让我核对。",
+    "message": "Add the food in this photo to inventory, but let me review it first.",
     "request_id": str(uuid4()),
     "conversation_id": str(uuid4()),
-    "as_of": date.today().isoformat(),  # 使用用户设备当地日期
+    "as_of": date.today().isoformat(),  # Use the user device's local date
     "images": [{
         "image_id": str(uuid4()),
         "mime_type": mimetypes.guess_type(path.name)[0],
@@ -1577,17 +1608,21 @@ answers through the existing resume request; no new category-ID field is added.
 For an already waiting proposal, `decision: "edit"` can correct the category in a
 message. Image-derived stock still requires review; estimates execute directly unless the user explicitly requests confirmation. Completed stock
 is not silently reclassified by subsequent chat.
-Changing a saved definition's category affects all inventory batches referring to
-that definition, not just one batch. Public definitions remain subject to existing
-ownership restrictions. See [category rules](../architecture/DATABASE_DESIGN.md#category-boundaries).
+An inventory-details category edit uses `PATCH /inventory-items/{id}` and affects
+only the selected batch. A direct saved-definition category edit, including an
+approved Agent definition correction, changes the fallback category for batches
+referring to that definition; existing batch overrides remain effective. Public
+definitions remain subject to existing ownership restrictions. See
+[category rules](../architecture/DATABASE_DESIGN.md#category-boundaries).
 
 A conflicting selected category produces `CATEGORY_CHANGE` and NEEDS_CONFIRMATION.
 The server explains that correcting a private definition also reclassifies existing
-batches. A public conflict instead creates a private definition on approval; the
+batches that rely on its category; batches with category overrides retain them. A public conflict instead creates a private definition on approval; the
 public catalog is unchanged. Confirmation is tied to the current proposal, and
 classification is checked again under locks. Correction, stock insertion and receipt
 commit together. Cancel performs none of those writes. Selecting Other also requires
-confirmation (`OTHER_CATEGORY`). No category schema or migration is introduced.
+confirmation (`OTHER_CATEGORY`). User-owned categories and batch overrides require
+migration `a261002_categories`; this confirmation protocol adds no further schema change.
 
 Agent expiry calculation is fixed in `preview.expiry_resolution` and shown in
 `display.expiry_date` and `display.review_notes`. Draft dates remain the user's

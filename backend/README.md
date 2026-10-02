@@ -44,6 +44,27 @@ For existing Neon upgrades, demo seed/reset, acceptance records and recovery, us
 Local health: <http://127.0.0.1:8000/health>. Swagger: <http://127.0.0.1:8000/docs>.
 Endpoint contracts are maintained only in the [API reference](../docs/reference/API_REFERENCE.md).
 
+## Category and inventory migration
+
+This branch adds user-owned categories and a category override for an individual
+stock batch. Apply migration `a261002_categories` before deploying the matching
+backend and clients. From `backend/`, using the intended database configuration:
+
+```bash
+python -m alembic upgrade head
+python scripts/verify_database_schema.py
+```
+
+The migration retains existing categories and stock facts. Existing categories
+remain public; existing batches initially have no category override. Never reset
+shared inventory to apply this upgrade. Local test results do not establish the
+migration or deployment status of a shared database.
+
+Category creation/reuse, alphabetical ordering and batch-specific editing are
+defined in the [API reference](../docs/reference/API_REFERENCE.md#4-categories--b05).
+Ownership, indexes and category fallback are documented in
+[Database Design](../docs/architecture/DATABASE_DESIGN.md#item_category).
+
 ## Authentication settings
 
 `JWT_SECRET_KEY` is the shared signing secret. `ACCESS_TOKEN_EXPIRE_MINUTES`

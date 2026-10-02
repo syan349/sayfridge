@@ -34,19 +34,19 @@ DO $$
 BEGIN
     IF EXISTS (
         SELECT 1 FROM public.item_category c JOIN category_seed s USING (normalized_name)
-        WHERE c.status <> 'ACTIVE'
+        WHERE c.owner_user_id IS NULL AND c.status <> 'ACTIVE'
     ) THEN
         RAISE EXCEPTION 'A seed category is archived; review it explicitly before continuing';
     END IF;
     IF EXISTS (
         SELECT 1 FROM public.item_category c JOIN category_seed s
           ON lower(btrim(normalize(c.name, NFKC))) = s.normalized_name
-        WHERE c.normalized_name <> s.normalized_name
+        WHERE c.owner_user_id IS NULL AND c.normalized_name <> s.normalized_name
     ) THEN
         RAISE EXCEPTION 'A legacy category name has a different normalized key; review before continuing';
     END IF;
 END $$;
 INSERT INTO public.item_category (id, name, normalized_name, status, sort_order)
 SELECT gen_random_uuid(), name, normalized_name, 'ACTIVE', sort_order FROM category_seed
-ON CONFLICT (normalized_name) DO NOTHING;
+ON CONFLICT (normalized_name) WHERE owner_user_id IS NULL DO NOTHING;
 COMMIT;

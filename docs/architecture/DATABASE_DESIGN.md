@@ -9,6 +9,8 @@ owns migration, seed, reset and restore commands.
 
 The SQLAlchemy business metadata defines 11 tables. Inventory ownership follows
 inventory_item → storage_space → user. Public categories are shared;
+item_category.owner_user_id NULL denotes a public category, otherwise it belongs
+to one user. Inventory category reads prefer a batch override over its definition.
 item_definition.owner_user_id NULL denotes a public definition, otherwise it
 belongs to one user. Foreign keys protect relationships; services also enforce
 ownership and active-state rules.
@@ -16,10 +18,12 @@ ownership and active-state rules.
 ```mermaid
 erDiagram
     user ||--o{ storage_space : owns
+    user o|--o{ item_category : owns_private
     user ||--o{ item_definition : owns_private
     storage_space ||--o{ inventory_item : contains
     item_category ||--o{ item_definition : categorizes
     item_definition ||--o{ inventory_item : describes
+    item_category o|--o{ inventory_item : overrides_category
     inventory_item ||--o{ inventory_operation : records
     user ||--o{ auth_session : opens
     auth_session ||--o{ auth_refresh_credential : rotates
@@ -36,13 +40,17 @@ and the migrations. UUIDs are generated in Python; timestamps are timezone-aware
 
 ### `item_category`
 
-The 25 seeded public categories with normalized names and ordering.
+The 25 seeded public categories and optional user-owned categories. Typed names
+reuse a visible category after Unicode NFKC, case-folding and whitespace normalization.
+Selectors sort by normalized name and UUID rather than `sort_order`.
+Reuse of a category does not combine inventory batches.
 
 | Column | PostgreSQL type | Nullable |
 | --- | --- | --- |
 | `id` | `UUID` | No |
 | `name` | `VARCHAR(100)` | No |
 | `normalized_name` | `VARCHAR(100)` | No |
+| `owner_user_id` | `UUID` | Yes |
 | `status` | `VARCHAR(16)` | No |
 | `sort_order` | `INTEGER` | No |
 | `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
@@ -53,7 +61,9 @@ Constraints and indexes:
 - `ck_item_category_sort_order_nonnegative`: sort_order >= 0.
 - `ck_item_category_status_allowed`: status IN ('ACTIVE', 'ARCHIVED').
 - `pk_item_category`: PrimaryKeyConstraint: id.
-- `uq_item_category_normalized_name`: UniqueConstraint: normalized_name.
+- `owner_user_id` references user.id with RESTRICT deletion; NULL denotes public ownership.
+- `uq_item_category_public_name`: unique normalized_name where owner_user_id IS NULL.
+- `uq_item_category_private_owner_name`: unique (owner_user_id, normalized_name) where owner_user_id IS NOT NULL.
 - `ix_item_category_status_sort`: item_category.status, item_category.sort_order.
 
 ### `user`
@@ -232,6 +242,13 @@ Constraints and indexes:
 ### `inventory_item`
 
 One stock batch, initial/confirmed/estimated quantities, dates, nullable notes and version.
+Multiple batches can share a definition, category and space while retaining separate
+IDs, quantities and expiry dates. Creation does not deduplicate stock batches.
+
+`category_override_id` is nullable. Inventory reads and category/expiry filters use
+`COALESCE(inventory_item.category_override_id, item_definition.category_id)`.
+An inventory-details category edit sets an override for that batch without changing
+the definition or sibling batches.
 
 | Column | PostgreSQL type | Nullable |
 | --- | --- | --- |
@@ -239,6 +256,7 @@ One stock batch, initial/confirmed/estimated quantities, dates, nullable notes a
 | `storage_space_id` | `UUID` | No |
 | `item_definition_id` | `UUID` | No |
 | `notes` | `TEXT` | Yes |
+| `category_override_id` | `UUID` | Yes |
 | `purchase_date` | `DATE` | Yes |
 | `expiry_date` | `DATE` | Yes |
 | `status` | `VARCHAR(16)` | No |
@@ -260,6 +278,7 @@ Constraints and indexes:
 - `ck_inventory_item_nonnegative_amounts`: initial_amount >= 0 AND confirmed_current_amount >= 0 AND (estimated_current_amount IS NULL OR estimated_current_amount >= 0).
 - `ck_inventory_item_status_allowed`: status IN ('IN_STOCK', 'EMPTY', 'DISCARDED', 'ARCHIVED').
 - `ck_inventory_item_version_positive`: version >= 1.
+- `category_override_id` references item_category.id with RESTRICT deletion.
 - `fk_inventory_item_item_definition_id_item_definition`: item_definition_id → item_definition.id.
 - `fk_inventory_item_storage_space_id_storage_space`: storage_space_id → storage_space.id.
 - `pk_inventory_item`: PrimaryKeyConstraint: id.
@@ -336,30 +355,30 @@ Categories describe product identity rather than packaging or storage location.
 
 | Category | Includes / examples | Excludes / boundary |
 | --- | --- | --- |
-| Vegetables & Mushrooms | Vegetables, mushrooms and plain preserved vegetables. Examples: carrot / 胡萝卜, canned tomatoes, frozen peas. | Exclude tomato sauce, prepared meals and dried legumes. |
-| Fruit | Whole, cut, dried or plain preserved fruit. Examples: apple / 苹果, frozen berries, raisins. | Exclude juice, jam and fruit desserts. |
-| Fresh Herbs | Fresh culinary herbs. Examples: coriander / 香菜, fresh basil. | Dried herbs belong to Dried Herbs & Spices. |
-| Meat & Poultry | Raw meat and poultry, including frozen or marinated cuts. Examples: chicken breast / 鸡胸肉, beef steak. | Exclude sausages, cured meats and prepared meals. |
-| Fish & Seafood | Fish and seafood, including plain canned, smoked or frozen products. Examples: salmon / 三文鱼, canned tuna, prawns. | Exclude complete prepared meals and seafood sauces. |
-| Eggs | Shell eggs and liquid egg products. Examples: chicken eggs / 鸡蛋, egg whites. | Exclude egg dishes and mayonnaise. |
-| Processed & Deli Meats | Processed, cured and deli meat products. Examples: ham / 火腿, bacon, sausages. | Exclude raw meat cuts, seafood and complete meals. |
-| Milk & Plant-Based Milk | Dairy milk and plant-based drinks intended as milk substitutes. Examples: Anchor milk, oat milk / 燕麦奶, drinking coconut milk. | Cooking coconut milk belongs to Sauces, Condiments & Spreads; ask intended use if unclear. |
-| Yoghurt | Dairy and plant-based yoghurt. Examples: Greek yoghurt / 希腊酸奶, coconut yoghurt. | Exclude milk drinks, ice cream and frozen yoghurt. |
-| Cheese | Dairy and plant-based cheese. Examples: cheddar / 切达奶酪, vegan cheese. | Exclude butter, cream and cheese sauces. |
-| Butter & Cream | Butter, margarine and dairy or plant-based cream. Examples: butter / 黄油, whipping cream, margarine. | Exclude cooking oils and cooking coconut milk. |
-| Tofu & Meat Alternatives | Tofu, tempeh and plant-based meat substitutes. Examples: tofu / 豆腐, vegan mince. | Exclude plant milk, cheese, dried legumes and complete meals. |
-| Rice, Pasta & Grains | Unprepared rice, noodles, pasta, grains and breakfast cereals. Examples: rice / 大米, spaghetti, oats. | Exclude bread, flour, filled dumplings and complete meals. |
-| Bread & Bakery | Baked bread, wraps, buns and pastries. Examples: toast bread / 吐司, croissant, tortilla. | Exclude baking ingredients, biscuits and packaged cakes or desserts. |
-| Dried Legumes, Nuts & Seeds | Dried pulses, plain preserved beans, nuts and edible seeds. Examples: lentils / 小扁豆, canned chickpeas, almonds. | Exclude fresh green beans, tofu, nut spreads and confectionery-coated nuts. |
-| Baking Ingredients | Ingredients primarily used for baking. Examples: flour / 面粉, sugar, yeast, baking cocoa. | Eggs, milk, butter and oils retain their own categories. |
-| Sauces, Condiments & Spreads | Sauces, stocks, condiments, jams and spreads; coconut milk for cooking. Examples: Lao Gan Ma / 老干妈, tomato sauce, peanut butter, cooking coconut milk. | Exclude plain vegetables, oils, vinegar and dry spice powders. |
-| Oils & Vinegars | Edible oils and culinary vinegars. Examples: olive oil / 橄榄油, rice vinegar. | Exclude butter and prepared salad dressings. |
-| Dried Herbs & Spices | Dried herbs, spices, salt and dry seasoning blends. Examples: cumin / 孜然, dried basil, salt. | Exclude fresh herbs, sugar and liquid sauces. |
-| Prepared Meals & Leftovers | Prepared dishes, soups, meal kits and leftovers; includes filled dumplings and pizza. Examples: frozen pizza / 冷冻披萨, leftover curry, dumplings. | Plain single ingredients retain their own category regardless of storage. |
-| Snacks & Desserts | Snack foods, confectionery and non-frozen desserts. Examples: chips / 薯片, biscuits, chocolate, cake. | Exclude plain nuts, fruit, yoghurt, pastries and frozen desserts. |
-| Ice Cream & Frozen Desserts | Ice cream, frozen yoghurt, sorbet and ice pops. Examples: ice cream / 冰淇淋, sorbet. | Other frozen foods retain their product category. |
-| Drinks, Tea & Coffee | Water, juice, soft drinks, alcohol, tea and coffee. Examples: coffee / 咖啡, orange juice, beer. | Milk and plant-based milk drinks retain their own category. |
-| Household Supplies | Non-food household consumables. Examples: dish soap / 洗洁精, paper towels, shampoo. | Do not classify human food here; ask about unrecognized products. |
+| Vegetables & Mushrooms | Vegetables, mushrooms and plain preserved vegetables. Examples: carrot, canned tomatoes, frozen peas. | Exclude tomato sauce, prepared meals and dried legumes. |
+| Fruit | Whole, cut, dried or plain preserved fruit. Examples: apple, frozen berries, raisins. | Exclude juice, jam and fruit desserts. |
+| Fresh Herbs | Fresh culinary herbs. Examples: coriander, fresh basil. | Dried herbs belong to Dried Herbs & Spices. |
+| Meat & Poultry | Raw meat and poultry, including frozen or marinated cuts. Examples: chicken breast, beef steak. | Exclude sausages, cured meats and prepared meals. |
+| Fish & Seafood | Fish and seafood, including plain canned, smoked or frozen products. Examples: salmon, canned tuna, prawns. | Exclude complete prepared meals and seafood sauces. |
+| Eggs | Shell eggs and liquid egg products. Examples: chicken eggs, egg whites. | Exclude egg dishes and mayonnaise. |
+| Processed & Deli Meats | Processed, cured and deli meat products. Examples: ham, bacon, sausages. | Exclude raw meat cuts, seafood and complete meals. |
+| Milk & Plant-Based Milk | Dairy milk and plant-based drinks intended as milk substitutes. Examples: Anchor milk, oat milk, drinking coconut milk. | Cooking coconut milk belongs to Sauces, Condiments & Spreads; ask intended use if unclear. |
+| Yoghurt | Dairy and plant-based yoghurt. Examples: Greek yoghurt, coconut yoghurt. | Exclude milk drinks, ice cream and frozen yoghurt. |
+| Cheese | Dairy and plant-based cheese. Examples: cheddar, vegan cheese. | Exclude butter, cream and cheese sauces. |
+| Butter & Cream | Butter, margarine and dairy or plant-based cream. Examples: butter, whipping cream, margarine. | Exclude cooking oils and cooking coconut milk. |
+| Tofu & Meat Alternatives | Tofu, tempeh and plant-based meat substitutes. Examples: tofu, vegan mince. | Exclude plant milk, cheese, dried legumes and complete meals. |
+| Rice, Pasta & Grains | Unprepared rice, noodles, pasta, grains and breakfast cereals. Examples: rice, spaghetti, oats. | Exclude bread, flour, filled dumplings and complete meals. |
+| Bread & Bakery | Baked bread, wraps, buns and pastries. Examples: toast bread, croissant, tortilla. | Exclude baking ingredients, biscuits and packaged cakes or desserts. |
+| Dried Legumes, Nuts & Seeds | Dried pulses, plain preserved beans, nuts and edible seeds. Examples: lentils, canned chickpeas, almonds. | Exclude fresh green beans, tofu, nut spreads and confectionery-coated nuts. |
+| Baking Ingredients | Ingredients primarily used for baking. Examples: flour, sugar, yeast, baking cocoa. | Eggs, milk, butter and oils retain their own categories. |
+| Sauces, Condiments & Spreads | Sauces, stocks, condiments, jams and spreads; coconut milk for cooking. Examples: Lao Gan Ma, tomato sauce, peanut butter, cooking coconut milk. | Exclude plain vegetables, oils, vinegar and dry spice powders. |
+| Oils & Vinegars | Edible oils and culinary vinegars. Examples: olive oil, rice vinegar. | Exclude butter and prepared salad dressings. |
+| Dried Herbs & Spices | Dried herbs, spices, salt and dry seasoning blends. Examples: cumin, dried basil, salt. | Exclude fresh herbs, sugar and liquid sauces. |
+| Prepared Meals & Leftovers | Prepared dishes, soups, meal kits and leftovers; includes filled dumplings and pizza. Examples: frozen pizza, leftover curry, dumplings. | Plain single ingredients retain their own category regardless of storage. |
+| Snacks & Desserts | Snack foods, confectionery and non-frozen desserts. Examples: chips, biscuits, chocolate, cake. | Exclude plain nuts, fruit, yoghurt, pastries and frozen desserts. |
+| Ice Cream & Frozen Desserts | Ice cream, frozen yoghurt, sorbet and ice pops. Examples: ice cream, sorbet. | Other frozen foods retain their product category. |
+| Drinks, Tea & Coffee | Water, juice, soft drinks, alcohol, tea and coffee. Examples: coffee, orange juice, beer. | Milk and plant-based milk drinks retain their own category. |
+| Household Supplies | Non-food household consumables. Examples: dish soap, paper towels, shampoo. | Do not classify human food here; ask about unrecognized products. |
 | Other | No suitable catalog category after clarification; requires user confirmation. Examples: an identified product outside the listed categories. | Never silently use Other for unreadable names or uncertain product identity. |
 
 ### Classification behavior
@@ -369,7 +388,10 @@ real active category IDs and guidance. Ask about unknown products or ambiguous u
 invent IDs, categories or certainty from a brand/receipt abbreviation. Other is a confirmed
 fallback for an identified out-of-catalog item, not an automatic label for unreadable input.
 New-definition previews display the item and category and retain the existing confirmation
-and correction workflow. Category belongs to a definition; changing it affects related batches.
+and correction workflow. A definition supplies the fallback category. Direct definition
+edits and approved Agent definition corrections affect related batches without overrides.
+Inventory-details edits instead set a category override for only the selected batch.
+Batches with overrides retain those effective categories after a definition correction.
 
 Product identity and storage are separate: frozen chicken remains meat; canned tomatoes
 remain vegetables; tomato sauce is a condiment; frozen pizza is a prepared meal. Drinking
@@ -384,6 +406,20 @@ Sources inform boundaries and retail vocabulary; no standards-compliance claim i
 - [EFSA FoodEx2](https://www.efsa.europa.eu/en/data/data-standardisation): food classification and descriptive properties.
 - [GS1 GPC](https://www.gs1.org/standards/gpc/get-started): common product group definitions.
 - [New World fridge categories](https://www.newworld.co.nz/shop/category/fridge-deli-and-eggs) and [pantry categories](https://www.newworld.co.nz/shop/category/pantry): local retail vocabulary, not household usability evidence.
+
+## Category migration
+
+Migration `a261002_categories` follows `a261001_sessions`. It adds the nullable
+category owner and inventory category override foreign keys, and replaces the
+global category-name uniqueness constraint with separate public/private indexes.
+Existing category IDs, inventory IDs, quantities and dates are retained. Existing
+categories remain public and existing batches start without overrides. Deployment
+requires applying the migration to the intended database; passing local tests does
+not establish shared-database readiness. Use the
+[delivery runbook](../delivery/README.md#database-initialization-and-migration).
+
+The downgrade refuses to run while private categories or batch overrides exist;
+export and resolve that data explicitly before attempting a downgrade.
 
 ## Verification evidence
 

@@ -92,7 +92,7 @@ def _expected_ids(kind: str, keys: list[str]) -> set:
 def _category_map(session: Session) -> dict[str, ItemCategory]:
     categories = {
         row.normalized_name: row
-        for row in session.scalars(select(ItemCategory)).all()
+        for row in session.scalars(select(ItemCategory).where(ItemCategory.owner_user_id.is_(None))).all()
         if row.status == "ACTIVE"
     }
     required = {
@@ -481,6 +481,9 @@ def reset_demo_data(session: Session) -> None:
             .exists(),
             ~select(ItemDefinition.id)
             .where(ItemDefinition.owner_user_id == User.id)
+            .exists(),
+            ~select(ItemCategory.id)
+            .where(ItemCategory.owner_user_id == User.id)
             .exists(),
             ~select(Conversation.id).where(Conversation.user_id == User.id).exists(),
             ~select(AgentInventoryAction.id)

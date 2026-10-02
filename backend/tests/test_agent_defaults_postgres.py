@@ -31,11 +31,22 @@ def test_incremental_migration_preserves_existing_stock(inventory_context):
         stock_columns = {table: [(c["name"], str(c["type"])) for c in inspect(connection).get_columns(table)]
                          for table in ("inventory_item", "inventory_operation", "agent_inventory_action")}
         before = connection.execute(text("SELECT initial_amount, initial_unit, confirmed_current_amount, confirmed_current_unit FROM inventory_item WHERE id=:id"), {"id": item.id}).one()
-        command.upgrade(cfg, "head")
+        # The default-space migration itself must leave stock tables unchanged.
+        command.upgrade(cfg, "a260929_defaults")
         after = connection.execute(text("SELECT initial_amount, initial_unit, confirmed_current_amount, confirmed_current_unit FROM inventory_item WHERE id=:id"), {"id": item.id}).one()
         assert after == before
         for table, expected_columns in stock_columns.items():
             assert [(c["name"], str(c["type"])) for c in inspect(connection).get_columns(table)] == expected_columns
+        # Later category migrations add a nullable batch override, preserving
+        # all existing columns and measured stock facts.
+        command.upgrade(cfg, "head")
+        assert connection.execute(text("SELECT initial_amount, initial_unit, confirmed_current_amount, confirmed_current_unit FROM inventory_item WHERE id=:id"), {"id": item.id}).one() == before
+        for table, expected_columns in stock_columns.items():
+            additions = [("category_override_id", "UUID")] if table == "inventory_item" else []
+            assert [(c["name"], str(c["type"])) for c in inspect(connection).get_columns(table)] == expected_columns + additions
+        override = next(c for c in inspect(connection).get_columns("inventory_item") if c["name"] == "category_override_id")
+        assert override["nullable"]
+        assert connection.execute(text("SELECT category_override_id FROM inventory_item WHERE id=:id"), {"id": item.id}).scalar_one() is None
         columns = {column["name"]: column["type"] for column in inspect(connection).get_columns("inventory_item")}
         assert columns["confirmed_current_amount"].precision == 12
         assert columns["estimated_current_amount"].precision == 12

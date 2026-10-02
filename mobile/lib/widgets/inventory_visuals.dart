@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../models/inventory_item.dart';
+import '../models/item_icon.dart';
+import '../repositories/item_artwork_repository.dart';
 import '../theme/app_theme.dart';
 import 'inventory_card_trailing.dart';
 import 'page_back_button.dart';
+import 'quantity_badge.dart';
+import 'expiry_display_scope.dart';
+
+export 'quantity_badge.dart' show QuantityLegend;
 
 abstract final class HomeAssets {
   static const root = 'assets/icons/home';
@@ -103,43 +109,7 @@ String itemArtwork(InventoryItem item) {
 }
 
 String itemArtworkForName(String itemName) {
-  final name = itemName.toLowerCase();
-  const icons = <String, String>{
-    'chicken thigh': 'chicken_drumstick',
-    'chicken drumstick': 'chicken_drumstick',
-    'chicken breast': 'chicken_breast',
-    'salmon': 'salmon_fillet',
-    'tomato': 'tomato',
-    'milk': 'milk',
-    'beef': 'beef_tenderloin',
-    'bacon': 'bacon',
-    'eggplant': 'eggplant',
-    'yogurt': 'yogurt',
-    'yoghurt': 'yogurt',
-    'egg': 'eggs',
-    'cheese': 'cheese',
-    'apple': 'apple',
-    'banana': 'banana',
-    'avocado': 'avocado',
-    'broccoli': 'broccoli',
-    'carrot': 'carrot',
-    'potato': 'potato',
-    'onion': 'onion',
-    'lettuce': 'lettuce',
-    'spinach': 'spinach',
-    'mushroom': 'button_mushroom',
-    'pork': 'pork_chop',
-    'lamb': 'lamb_chop',
-    'shrimp': 'shrimp',
-    'crab': 'crab',
-    'tuna': 'tuna_steak',
-  };
-  for (final entry in icons.entries) {
-    if (name.contains(entry.key)) {
-      return 'assets/icons/inventory/${entry.value}.png';
-    }
-  }
-  return HomeAssets.avatar;
+  return ItemIcon.forName(itemName);
 }
 
 String quantityLabel(InventoryItem item) {
@@ -158,24 +128,59 @@ String expiryLabel(DateTime? expiryDate) {
   return '$days ${days == 1 ? 'day' : 'days'} left';
 }
 
-Color expiryColor(DateTime? expiryDate) {
+Color expiryColor(DateTime? expiryDate, {int daysBefore = 3, DateTime? asOf}) {
   if (expiryDate == null) return AppColors.muted;
   final days = DateUtils.dateOnly(
     expiryDate,
-  ).difference(DateUtils.dateOnly(DateTime.now())).inDays;
-  if (days < 0) return const Color(0xFFE75030);
-  if (days <= 2) return const Color(0xFFD75A20);
+  ).difference(DateUtils.dateOnly(asOf ?? DateTime.now())).inDays;
+  if (days <= daysBefore) return const Color(0xFFE75030);
   return const Color(0xFF388D38);
 }
 
-class InventoryArtwork extends StatelessWidget {
-  const InventoryArtwork({required this.item, this.size = 58, super.key});
+class InventoryArtwork extends StatefulWidget {
+  const InventoryArtwork({
+    required this.item,
+    this.size = 58,
+    this.artworkRepository = const ItemArtworkRepository(),
+    super.key,
+  });
 
   final InventoryItem item;
   final double size;
+  final ItemArtworkRepository artworkRepository;
+
+  @override
+  State<InventoryArtwork> createState() => _InventoryArtworkState();
+}
+
+class _InventoryArtworkState extends State<InventoryArtwork> {
+  late Future<String?> _artwork;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadArtwork();
+  }
+
+  void _loadArtwork() {
+    // Storage may be unavailable in an offline preview or restricted browser.
+    _artwork = widget.artworkRepository
+        .read(widget.item.id)
+        .catchError((Object _) => null);
+  }
+
+  @override
+  void didUpdateWidget(covariant InventoryArtwork oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item != widget.item ||
+        oldWidget.artworkRepository != widget.artworkRepository) {
+      _loadArtwork();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final size = widget.size;
     return Container(
       width: size,
       height: size,
@@ -184,7 +189,14 @@ class InventoryArtwork extends StatelessWidget {
         color: const Color(0xFFE9F7DF),
         borderRadius: BorderRadius.circular(size * 0.2),
       ),
-      child: Image.asset(itemArtwork(item), fit: BoxFit.contain),
+      child: FutureBuilder<String?>(
+        key: ValueKey(widget.item.id),
+        future: _artwork,
+        builder: (context, snapshot) => Image.asset(
+          snapshot.data ?? itemArtwork(widget.item),
+          fit: BoxFit.contain,
+        ),
+      ),
     );
   }
 }
@@ -237,16 +249,9 @@ class InventoryItemTile extends StatelessWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(
-                            quantityLabel(item),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: item.isEstimated
-                                  ? const Color(0xFFD75A20)
-                                  : const Color(0xFF388D38),
-                            ),
+                          child: QuantityBadge(
+                            text: quantityLabel(item),
+                            estimated: item.isEstimated,
                           ),
                         ),
                         const Text(
@@ -272,7 +277,10 @@ class InventoryItemTile extends StatelessWidget {
               const SizedBox(width: 4),
               InventoryCardTrailing(
                 expiryText: expiryLabel(item.expiryDate),
-                expiryColor: expiryColor(item.expiryDate),
+                expiryColor: expiryColor(
+                  item.expiryDate,
+                  daysBefore: ExpiryDisplayScope.daysBeforeExpiryOf(context),
+                ),
                 action: selectionControl,
               ),
             ],
@@ -339,32 +347,6 @@ class OverviewHeader extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class QuantityLegend extends StatelessWidget {
-  const QuantityLegend({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        CircleAvatar(radius: 6, backgroundColor: Color(0xFF388D38)),
-        SizedBox(width: 7),
-        Text('Exact', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-        SizedBox(width: 14),
-        CircleAvatar(radius: 6, backgroundColor: Color(0xFFD75A20)),
-        SizedBox(width: 7),
-        Flexible(
-          child: Text(
-            'AI - Estimated',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: AppColors.muted, fontSize: 12),
-          ),
-        ),
-      ],
     );
   }
 }

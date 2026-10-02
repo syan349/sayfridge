@@ -123,6 +123,7 @@ class InventoryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=1, le=2147483647, strict=True)
     storage_space_id: UUID | None = None
+    category_id: UUID | None = None
     purchase_date: CalendarDate | None = None
     expiry_date: CalendarDate | None = None
     notes: Notes | None = None
@@ -135,6 +136,8 @@ class InventoryUpdate(BaseModel):
             raise ValueError("Provide at least one metadata or location field")
         if "storage_space_id" in self.model_fields_set and self.storage_space_id is None:
             raise ValueError("Storage space must not be null")
+        if "category_id" in self.model_fields_set and self.category_id is None:
+            raise ValueError("Category must not be null")
         if "item_name" in self.model_fields_set and self.item_name is None:
             raise ValueError("Item name must not be null")
         if "quantity" in self.model_fields_set and self.quantity is None:

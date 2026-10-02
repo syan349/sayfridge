@@ -32,6 +32,7 @@ import 'state/profile_controller.dart';
 import 'state/storage_space_controller.dart';
 import 'theme/app_theme.dart';
 import 'widgets/web_safe_area.dart';
+import 'widgets/expiry_display_scope.dart';
 
 void main() {
   runApp(const SayFridgeApp());
@@ -228,8 +229,10 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
   Future<void> _openManualStockIn(BuildContext context) async {
     final createdItem = await Navigator.of(context).push<InventoryItem>(
       MaterialPageRoute<InventoryItem>(
-        builder: (_) =>
-            ManualStockInScreen(controller: _manualStockInController),
+        builder: (_) => ManualStockInScreen(
+          controller: _manualStockInController,
+          workspace: _workspace,
+        ),
       ),
     );
     if (createdItem == null) return;
@@ -307,7 +310,10 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
       title: 'SayFridge',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      builder: (context, child) => WebSafeArea(child: child!),
+      builder: (context, child) => ExpiryDisplayScope(
+        controller: _profileController,
+        child: WebSafeArea(child: child!),
+      ),
       home: AuthGate(
         authController: _authDependencies.authController,
         checkingBuilder: (context, authController) {

@@ -33,7 +33,7 @@ def test_category_list_filters_orders_paginates_and_exposes_public_fields(catalo
     old = request(db, "GET", CATEGORIES + "?status=ARCHIVED", headers=headers).json()
     assert [x["id"] for x in old["items"]] == [str(archived.id)]
     page = request(db, "GET", CATEGORIES + "?status=ALL&page=2&page_size=2", headers=headers).json()
-    assert page["total"] == 4 and [x["id"] for x in page["items"]] == [str(archived.id), str(last.id)]
+    assert page["total"] == 4 and [x["id"] for x in page["items"]] == [str(category.id), str(last.id)]
     empty = request(db, "GET", CATEGORIES + "?page=999", headers=headers).json()
     assert empty["total"] == 3 and empty["items"] == []
 

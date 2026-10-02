@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import select, func, text
 
 from app.agents.memory import fingerprint, MemoryService
-from app.core.catalog import normalize_catalog_name
+from app.core.catalog import normalize_catalog_name, normalize_category_name
 from app.core.quantity import validate_quantity_amount
 from app.db.models import AgentInventoryAction, StorageSpace, ItemDefinition, ItemCategory
 from app.schemas.agent_actions import ActionDraft
@@ -137,12 +137,15 @@ async def _creation_values(session, user_id, draft, *, create=False, expected=No
     selected_id = draft.new_definition.category_id if draft.new_definition else found.category_id
     if draft.category_name:
         selected_id = await session.scalar(select(ItemCategory.id).where(ItemCategory.status == "ACTIVE",
-            ItemCategory.normalized_name == normalize_catalog_name(draft.category_name)))
-    selected = await session.get(ItemCategory, selected_id) if selected_id else None
+            catalog.category_visibility(user_id),
+            ItemCategory.normalized_name == normalize_category_name(draft.category_name)))
+    selected = await session.scalar(select(ItemCategory).where(
+        ItemCategory.id == selected_id, catalog.category_visibility(user_id))) if selected_id else None
     if selected is None or selected.status != "ACTIVE":
         if create:
             raise PreparationError("RESOURCE_CHANGED", "Selected category changed; refresh the proposal")
-        available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE")))
+        available = list(await session.scalars(select(ItemCategory).where(
+            ItemCategory.status == "ACTIVE", catalog.category_visibility(user_id))))
         raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category", {
             "categories": [{"id": str(c.id), "name": c.name} for c in available]})
     # A private same-name definition must be considered before creating a public override.
@@ -153,14 +156,15 @@ async def _creation_values(session, user_id, draft, *, create=False, expected=No
             found = private
     old_id = found.category_id if found else selected.id
     if create:
-        categories = await catalog._lock_categories(session, {old_id, selected.id})
+        categories = await catalog._lock_categories(session, {old_id, selected.id}, user_id)
         if found:
             found = await catalog.get_definition(session, found.id, user_id, lock=True)
             if found.category_id != old_id:
                 raise PreparationError("RESOURCE_CHANGED", "Item category changed; refresh the proposal")
         selected = categories[selected.id]
-    old_category = await session.get(ItemCategory, old_id)
-    if selected.status != "ACTIVE" or old_category.status != "ACTIVE" or (found and found.status != "ACTIVE"):
+    old_category = await session.scalar(select(ItemCategory).where(
+        ItemCategory.id == old_id, catalog.category_visibility(user_id)))
+    if selected.status != "ACTIVE" or old_category is None or old_category.status != "ACTIVE" or (found and found.status != "ACTIVE"):
         raise PreparationError("STATE_CONFLICT", "Creation requires an active definition/category")
     correction = ("PRIVATE" if found.owner_user_id == user_id else "PRIVATE_OVERRIDE") if found and old_id != selected.id else None
     snapshot = {"definition_id": str(found.id) if found else None,
@@ -233,9 +237,9 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
             raise PreparationError("CLARIFICATION_REQUIRED", draft.clarification_question)
         if draft.new_definition and draft.category_name:
             category = await session.scalar(select(ItemCategory).where(ItemCategory.status == "ACTIVE",
-                ItemCategory.normalized_name == normalize_catalog_name(draft.category_name)))
+                catalog.category_visibility(user_id), ItemCategory.normalized_name == normalize_category_name(draft.category_name)))
             if category is None:
-                available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE")))
+                available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE", catalog.category_visibility(user_id))))
                 raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category", {
                     "categories": [{"id": str(c.id), "name": c.name} for c in available]})
             draft = draft.model_copy(update={"new_definition": draft.new_definition.model_copy(update={"category_id": category.id})})
