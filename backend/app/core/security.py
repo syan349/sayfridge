@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import uuid
 
@@ -10,6 +11,16 @@ from pwdlib.hashers.argon2 import Argon2Hasher
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_TYPE = "access"
+JWT_ISSUER = "sayfridge"
+JWT_AUDIENCE = "sayfridge-api"
+
+
+@dataclass(frozen=True)
+class AccessIdentity:
+    user_id: uuid.UUID
+    session_id: uuid.UUID | None
+
+
 password_hash = PasswordHash((Argon2Hasher(),))
 
 
@@ -36,6 +47,8 @@ def create_access_token(
     payload = {
         "sub": str(user_id),
         "type": ACCESS_TOKEN_TYPE,
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
         "iat": issued_at,
         "exp": issued_at + timedelta(minutes=expires_minutes),
     }
@@ -48,14 +61,16 @@ def create_access_token(
     )
 
 
-def decode_access_token(token: str, secret_key: SecretStr) -> uuid.UUID:
+def decode_access_identity(token: str, secret_key: SecretStr) -> AccessIdentity:
     # Fix the algorithm and require key claims; do not trust the token header to determine its algorithm or purpose.
     try:
         payload = jwt.decode(
             token,
             secret_key.get_secret_value(),
             algorithms=[JWT_ALGORITHM],
-            options={"require": ["sub", "type", "iat", "exp"]},
+            # Validate the scope pair below to permit existing unscoped tokens
+            # until their original expiry, without decoding a second time.
+            options={"require": ["sub", "type", "iat", "exp"], "verify_aud": False},
         )
     except (TypeError, ValueError, OverflowError) as exc:
         # Some PyJWT versions leak conversion errors for malformed numeric claims.
@@ -63,7 +78,18 @@ def decode_access_token(token: str, secret_key: SecretStr) -> uuid.UUID:
     if payload["type"] != ACCESS_TOKEN_TYPE:
         raise jwt.InvalidTokenError("unexpected token type")
 
+    if "iss" in payload or "aud" in payload:
+        if payload.get("iss") != JWT_ISSUER or payload.get("aud") != JWT_AUDIENCE:
+            raise jwt.InvalidTokenError("unexpected token issuer or audience")
+
     try:
-        return uuid.UUID(payload["sub"])
+        user_id = uuid.UUID(payload["sub"])
+        session_id = uuid.UUID(payload["sid"]) if "sid" in payload else None
+        return AccessIdentity(user_id=user_id, session_id=session_id)
     except (TypeError, ValueError, AttributeError) as exc:
-        raise jwt.InvalidTokenError("invalid token subject") from exc
+        raise jwt.InvalidTokenError("invalid token identity") from exc
+
+
+def decode_access_token(token: str, secret_key: SecretStr) -> uuid.UUID:
+    """Compatibility wrapper for callers that only need the verified user ID."""
+    return decode_access_identity(token, secret_key).user_id

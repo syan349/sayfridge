@@ -1,0 +1,124 @@
+{
+  "recorded_at_utc": "2026-10-02T10:41:43.523169+00:00",
+  "branch": "syan349_fix_backend_readiness",
+  "branch_identity_source": "User reported creating this branch after updating main; no Git command executed by the verifier",
+  "main_base_commit": "d402b79970e005e4922babba1c48d6f1dda5e36c",
+  "checkout_state": "Fresh main-derived branch with uncommitted Backend hardening; old fix branch and commit were not merged or cherry-picked",
+  "source_sha256": {
+    "backend/app/core/security.py": "66924e04744719cf3d1e4e90f1fdb2503f7baaad2b43e54c6cff10216308f828",
+    "backend/app/core/security_events.py": "8c9c44e0cd0fe271d7685a0d5641a9926ed69f9638a2e0241802e314d4f543d5",
+    "backend/app/api/dependencies.py": "04cef6ca752233dae0795c4380956c9ee412ef408d7dcf2a9cb3043248c645e8",
+    "backend/app/api/routes/auth.py": "bb7b4794ff3612db786ffcb76fac12c6495cda48ae30111076700fc0dff1880f",
+    "backend/app/services/auth_sessions.py": "fed552edf7d35bf296afd97367ab99a5771ddf837acfbe643c342fa96583edfd",
+    "backend/tests/test_security.py": "3f4294c9593a31809e1b9c0ee92b5d929395c4360fd06207b879748f3e091300",
+    "backend/tests/test_persistent_auth.py": "6f931050d713d61882814513a91904f2cb2842007c6b6d59621cacbcb300862e"
+  },
+  "test_results": {
+    "auth-regression-fresh-main-2026-10-02.xml": {
+      "tests": 130,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "duration_seconds": 13.884
+    },
+    "fast-ci-fresh-main-2026-10-02.xml": {
+      "tests": 172,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "duration_seconds": 24.851
+    }
+  },
+  "regression_environment": "Python 3.12; loopback PostgreSQL 18 database sayfridge_test; random per-test schemas; live-model opt-ins disabled",
+  "fast_ci_deselected": 743,
+  "counts_overlap": true,
+  "verification_attempts": [
+    {
+      "outcome": "sandbox_loopback_access_denied",
+      "passed_cases": 71,
+      "setup_errors": 59,
+      "business_result": "Database cases did not execute; rerun with loopback permission passed all 130 cases"
+    },
+    {
+      "outcome": "passed",
+      "evidence": [
+        "auth-regression-fresh-main-2026-10-02.xml",
+        "fast-ci-fresh-main-2026-10-02.xml"
+      ]
+    }
+  ],
+  "production_smoke_artifact": "deployment-2026-10-02.json",
+  "production_smoke_scope": "Earlier same-day deployed main baseline, not the new hardening rollout",
+  "earlier_same_day_verification": {
+    "recorded_at_utc": "2026-10-02T10:07:02.454238+00:00",
+    "main_base_commit": "d402b79970e005e4922babba1c48d6f1dda5e36c",
+    "security_change_commit": "06dcddf",
+    "checkout_state": "Merge contents resolved; user has not yet recorded the merge commit",
+    "source_sha256": {
+      "backend/app/core/security.py": "66924e04744719cf3d1e4e90f1fdb2503f7baaad2b43e54c6cff10216308f828",
+      "backend/app/core/security_events.py": "8c9c44e0cd0fe271d7685a0d5641a9926ed69f9638a2e0241802e314d4f543d5",
+      "backend/app/api/dependencies.py": "04cef6ca752233dae0795c4380956c9ee412ef408d7dcf2a9cb3043248c645e8",
+      "backend/app/api/routes/auth.py": "bb7b4794ff3612db786ffcb76fac12c6495cda48ae30111076700fc0dff1880f",
+      "backend/app/services/auth_sessions.py": "fed552edf7d35bf296afd97367ab99a5771ddf837acfbe643c342fa96583edfd"
+    },
+    "test_results": {
+      "auth-regression-2026-10-02.xml": {
+        "tests": 130,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "fast-ci-2026-10-02.xml": {
+        "tests": 172,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "agent-half-consumption-live-2026-10-02.xml": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "auth_regression_environment": "Python 3.12; dedicated Neon database sayfridge_auth_test; random per-test schemas",
+    "fast_ci_environment": "Python 3.12; loopback PostgreSQL 18 database sayfridge_test; random per-test schemas; live-model opt-ins disabled",
+    "fast_ci_deselected": 743,
+    "counts_overlap": true,
+    "production_smoke_artifact": "deployment-2026-10-02.json",
+    "issue_144_live_recheck": {
+      "outcome": "passed",
+      "attempted_cases": [
+        "test_context_relative_quantity_and_actual_partial_answer[rice-0]",
+        "test_ambiguous_target_new_purchase_query_and_old_task_recovery[0]"
+      ],
+      "passed_cases": 2,
+      "duration_seconds": 55.679,
+      "model": "gpt-6-luna",
+      "provider_host": "api.openai.com",
+      "environment": "Python 3.12; loopback PostgreSQL 18 database sayfridge_test; synthetic inventory in isolated test schemas",
+      "artifact": "agent-half-consumption-live-2026-10-02.xml",
+      "business_result": [
+        "Half of the single 2 kg rice batch is deducted once, leaving 1 kg.",
+        "Two rice batches require a target before deduction; a new purchase and inventory query preserve the pending task; selecting Kitchen resumes it once and leaves the Garage batch unchanged."
+      ],
+      "initial_attempt": {
+        "outcome": "configuration_error_before_model_invocation",
+        "attempted_cases": [
+          "test_context_relative_quantity_and_actual_partial_answer[rice-0]",
+          "test_ambiguous_target_new_purchase_query_and_old_task_recovery[0]"
+        ],
+        "failed_cases": 2,
+        "missing_configuration": [
+          "AGENT_MODEL",
+          "AGENT_API_BASE",
+          "AGENT_API_KEY"
+        ],
+        "business_result": "not evaluated",
+        "offline_quantity_and_question_tests": "passed in auth-regression and fast-ci selections"
+      },
+      "validation_scope": "Backend real-model dialogue and persistence; no assertion of exact user-facing wording or mobile UI behaviour"
+    },
+    "updated_at_utc": "2026-10-02T10:13:57.497131+00:00"
+  }
+}
