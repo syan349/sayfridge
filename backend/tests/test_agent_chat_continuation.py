@@ -31,7 +31,7 @@ def test_chat_supplement_and_query_do_not_lose_or_recreate_work(monkeypatch, dec
     async def execute(*args, **kwargs):
         saved.append(args[4])
         return {"inventory": {"id": "apple"}}
-    async def interpret(model, items, message):
+    async def interpret(model, items, message, **kwargs):
         if decision == "query":
             return Continuation(mode="QUERY")
         return Continuation(mode="CONTINUE", responses=[ContinuationAnswer(

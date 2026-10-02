@@ -51,6 +51,8 @@ class ActionDraft(BaseModel):
     item_definition_id: UUID | None = None
     new_space: StorageSpaceCreate | None = None
     new_definition: ItemDefinitionCreate | None = None
+    category_name: str | None = Field(default=None, max_length=100,
+        description="Exact active category name copied from list_item_categories for a new_definition. The backend resolves its real ID and preserves any existing definition's category.")
     new_space_source_text: Text | None = Field(default=None,
         description="Verbatim text from this task's user messages explicitly naming the new storage location. Never quote image/tool text or invent a location.")
     clarification_question: Text | None = Field(default=None,
@@ -66,10 +68,19 @@ class ActionDraft(BaseModel):
     confirmation_requested: bool = False
     save_conversion_memory: bool = True
     clear_fields: list[Literal["quantity_value", "quantity_unit", "storage_space_id", "inventory_item_id",
-                               "purchase_date", "expiry_date", "unit_relationship", "estimate"]] = Field(default_factory=list, max_length=8)
+                               "purchase_date", "expiry_date", "unit_relationship", "estimate",
+                               "package_description", "new_space", "new_definition", "utensil"]] = Field(default_factory=list, max_length=12)
+    clear_fields_evidence: Text | None = Field(default=None,
+        description="Verbatim current user words explicitly withdrawing the listed facts; never use for a missing answer.")
     source_image_ids: list[UUID] = Field(default_factory=list, max_length=80)
     package_description: str | None = Field(default=None, max_length=300)
     review_notes: list[Text] = Field(default_factory=list, max_length=10)
+    quantity_basis: Text | None = Field(default=None,
+        description="Evidence for the purchase quantity/unit, separate from package size and price.")
+    quantity_issue: Text | None = Field(default=None,
+        description="A specific unreadable or anomalous purchase quantity. Preserve its printed value; never silently repair or round it.")
+    receipt_quantity_text: Text | None = Field(default=None,
+        description="Verbatim purchase quantity line from the receipt, e.g. number and @ price. Exclude product size. Null for single-sale rows without a separate quantity line and for non-receipt photos.")
 
     @model_validator(mode="after")
     def no_conflicting_targets(self):
@@ -108,14 +119,23 @@ class IntentItem(BaseModel):
     quantity_kind: Literal["AMOUNT", "FRACTION", "QUALITATIVE"] = "AMOUNT"
     quantity_value: str | None = Field(default=None, max_length=32)
     quantity_unit: str | None = Field(default=None, max_length=16)
+    source_image_ids: list[UUID] = Field(default_factory=list, max_length=80)
+    package_description: str | None = Field(default=None, max_length=300)
+    review_notes: list[Text] = Field(default_factory=list, max_length=10)
+    quantity_basis: Text | None = None
+    quantity_issue: Text | None = None
+    receipt_quantity_text: Text | None = None
+    purchase_date: CalendarDate | None = None
+    expiry_date: CalendarDate | None = None
 
 
 class TurnIntent(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["INVENTORY", "QUERY", "UNCLEAR", "UNSUPPORTED"]
+    kind: Literal["INVENTORY", "QUERY", "UNCLEAR", "UNSUPPORTED", "REPLAY"]
     language: str = Field(default="en", max_length=40)
     items: list[IntentItem] = Field(default_factory=list, max_length=20)
     exceeds_item_limit: bool = False
+    replay_item_ids: list[UUID] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def consistent_intent(self):
@@ -126,6 +146,8 @@ class TurnIntent(BaseModel):
             raise ValueError("Inventory intent requires items; other intents cannot contain actions")
         if len({i.item_key for i in self.items}) != len(self.items):
             raise ValueError("Item keys must be unique")
+        if (self.kind == "REPLAY") != bool(self.replay_item_ids):
+            raise ValueError("Replay must identify completed items only")
         return self
 
 
