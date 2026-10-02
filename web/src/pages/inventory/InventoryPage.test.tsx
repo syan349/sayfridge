@@ -25,6 +25,27 @@ function answerInventory(items: InventoryItem[]) {
 /** The most recent request made for the table (not for a chip count). */
 const lastListRequest = () => listRequests[listRequests.length - 1]
 
+// More categories than one page holds: 100 on page 1, "Yoghurt" alone on page 2.
+const manyCategories = Array.from({ length: 100 }, (_, index) => ({
+  ...vegetables,
+  id: `category-${index}`,
+  name: `Category ${String(index).padStart(3, '0')}`,
+}))
+const yoghurt = { ...dairy, id: 'category-yoghurt', name: 'Yoghurt' }
+
+/** GET /item-categories over two pages; page 2 can be made to fail. */
+function answerTwoCategoryPages({ secondPageFails = false } = {}) {
+  server.use(
+    http.get('/api/v1/item-categories', ({ request }) => {
+      const pageNumber = Number(new URL(request.url).searchParams.get('page'))
+      if (pageNumber === 2 && secondPageFails) {
+        return HttpResponse.json({ detail: { code: 'SERVER_ERROR', message: 'Database error' } }, { status: 500 })
+      }
+      return HttpResponse.json({ items: pageNumber === 2 ? [yoghurt] : manyCategories, total: 101, page: pageNumber, page_size: 100 })
+    }),
+  )
+}
+
 beforeEach(() => {
   listRequests = []
   signInAs(testUser)
@@ -72,6 +93,32 @@ describe('InventoryPage (W03)', () => {
     // All filters are sent together.
     expect(lastListRequest().get('storage_space_id')).toBe(fridge.id)
     expect(lastListRequest().get('category_id')).toBe(dairy.id)
+  })
+
+  it('offers every category in the filter, including one from the second page', async () => {
+    answerTwoCategoryPages()
+    answerInventory([yogurt, milk])
+    const user = userEvent.setup()
+    renderApp('/inventory')
+    await screen.findByText('Yogurt')
+
+    const categorySelect = screen.getByLabelText('Category')
+    await within(categorySelect).findByRole('option', { name: 'Yoghurt' })
+    expect(within(categorySelect).getAllByRole('option')).toHaveLength(102) // "All categories" + 101
+    await user.selectOptions(categorySelect, 'Yoghurt')
+
+    await waitFor(() => expect(lastListRequest().get('category_id')).toBe(yoghurt.id))
+  })
+
+  it('says so when the category list can’t load, instead of offering half of it', async () => {
+    answerTwoCategoryPages({ secondPageFails: true })
+    answerInventory([yogurt])
+    renderApp('/inventory')
+
+    expect(await screen.findByText(/Categories couldn’t load/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    // Page 1 arrived, but none of it is offered: only "All categories".
+    expect(within(screen.getByLabelText('Category')).getAllByRole('option')).toHaveLength(1)
   })
 
   it('moves every selected item in one batch-move request, with each item’s version', async () => {
