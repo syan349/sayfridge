@@ -1,4 +1,4 @@
-> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前后端设计](../../BACKEND_DESIGN.md)与[接口参考](../../API_REFERENCE.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
+> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前后端设计](../../architecture/BACKEND_DESIGN.md)与[接口参考](../../reference/API_REFERENCE.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
 
 # SayFridge API 与数据库对应实施方案草稿
 
@@ -13,8 +13,8 @@
 | 文件 | 当前实际作用 | 本方案如何使用 |
 | --- | --- | --- |
 | [实施计划](API_IMPLEMENTATION_PLAN.md) | 本轮接口与文件清单，尚未实施 | 作为范围依据，不直接覆盖 |
-| [数据库设计](../../DATABASE_DESIGN.md) | 表、字段和权限关系 | 对照 ORM 和初始迁移 |
-| [数量设计](../../QUANTITY_STATE_DESIGN.md) | 确认量、估算量、盘点与历史目标 | 确定数量更新规则；历史缩减单独标注 |
+| [数据库设计](../../architecture/DATABASE_DESIGN.md) | 表、字段和权限关系 | 对照 ORM 和初始迁移 |
+| [数量设计](../../architecture/QUANTITY_STATE_DESIGN.md) | 确认量、估算量、盘点与历史目标 | 确定数量更新规则；历史缩减单独标注 |
 | [架构](ARCHITECTURE_REALTIME_DRAFT.md) | 前端、后端和 Agent 边界 | 所有业务写入由 FastAPI 执行 |
 | [数据库模型](../../../backend/app/db/models.py) | 八张表的 ORM 字段和约束 | 本地结构事实，不能证明远程库已迁移 |
 | [初始迁移](../../../backend/migrations/versions/create_initial_tables.py) | revision `02ec95582dc7`，建立八表 | 后续 notes 迁移接在此后；实施时再次核对迁移头 |
@@ -85,7 +85,7 @@
 | N07 新增 | `app/services/catalog.py` | 空间和词典写入、状态和名称规则 | storage_space、item_category、item_definition；归档查库存 |
 | N08 新增 | `app/services/inventory.py` | 纯数量计算、库存写入、版本、幂等、批量事务 | inventory_item、inventory_operation；锁定校验相关空间/词典 |
 | N09 新增 | `migrations/versions/<revision>_add_inventory_notes.py` | 仅给 inventory_item 添加可空 TEXT notes | 仅结构变更 |
-| N10 新增 | 根目录 `docs/API_REFERENCE.md` | 实施后的前端契约、示例和验证状态 | 不访问数据库 |
+| N10 新增 | 根目录 `docs/reference/API_REFERENCE.md` | 实施后的前端契约、示例和验证状态 | 不访问数据库 |
 | M01 修改 | `app/main.py` | 注册五组路由、跨域、新业务错误处理 | 无直接业务写入 |
 | M02 修改 | `app/api/dependencies.py` | `require_admin`，复用当前用户查询 | user |
 | M03–M05 修改 | `app/api/routes/auth.py`、`app/schemas/auth.py`、`app/services/auth.py` | change-password 请求、校验、更新 | user.password_hash |

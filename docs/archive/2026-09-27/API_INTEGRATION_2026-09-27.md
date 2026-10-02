@@ -10,7 +10,7 @@
 
 ## 1. 文档与代码核对
 
-核对依据：`docs/API_REFERENCE.md`、`docs/ARCHITECTURE.md`、`docs/QUANTITY_STATE_DESIGN.md`，并参考 `docs/PROJECT_SCOPE_BILINGUAL.md` 的产品边界、`docs/testing/AGENT_V02_TEST_RESULTS.md` 和 `backend/README.md`。请求结构同时核对了 `backend/app/schemas/` 和路由实现。
+核对依据：`docs/reference/API_REFERENCE.md`、`docs/architecture/AGENT_DESIGN.md`、`docs/architecture/QUANTITY_STATE_DESIGN.md`，并参考 `docs/product/README.md` 的产品边界、`docs/testing/reports/AGENT_V02_TEST_RESULTS.md` 和 `backend/README.md`。请求结构同时核对了 `backend/app/schemas/` 和路由实现。
 
 - 产品 scope 包含未来目标，不代表所有接口已经实现。目前 Agent 是文本工作流；语音、图片/OCR、Worker 通知不能因设计图有按钮就宣称已接通。
 - 普通编辑接口只能修改日期、空间、备注。数量必须走 ADD / CONSUME / RECONCILE，不能上传前端自行算出的余额或更改估算标记。

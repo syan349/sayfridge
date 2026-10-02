@@ -1,4 +1,4 @@
-> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前后端设计](../../BACKEND_DESIGN.md)与[接口参考](../../API_REFERENCE.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
+> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前后端设计](../../architecture/BACKEND_DESIGN.md)与[接口参考](../../reference/API_REFERENCE.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
 
 # SayFridge 基础业务 API 实施计划
 
@@ -54,7 +54,7 @@
 | N07 | `app/services/catalog.py` | 空间和词典的必要业务规则，普通用户和管理员共用 |
 | N08 | `app/services/inventory.py` | 数量计算、库存事务、版本校验、数量操作防重及批量处理 |
 | N09 | `migrations/versions/<revision>_add_inventory_notes.py` | 唯一增量迁移，只增加备注字段 |
-| N10 | 项目根目录下 `docs/API_REFERENCE.md` | 完整接口文档、文件职责和验证状态 |
+| N10 | 项目根目录下 `docs/reference/API_REFERENCE.md` | 完整接口文档、文件职责和验证状态 |
 
 ### 修改文件：9 个
 
@@ -275,7 +275,7 @@ async def preview_operation(...):
 
 ### 文档交付
 
-只新增一份 `docs/API_REFERENCE.md`，包含：
+只新增一份 `docs/reference/API_REFERENCE.md`，包含：
 
 - 每个已实现接口的方法、路径、中英文用途和权限。
 - 请求字段、响应字段、默认值、枚举和错误码。
@@ -306,7 +306,7 @@ async def preview_operation(...):
 
 ### 范围保护与完成汇报
 
-- 保留 `docs/PROJECT_SCOPE_BILINGUAL.md` 现有修改。
+- 保留 `docs/product/README.md` 现有修改。
 - 不改前端、真实 `.env`、原始迁移、现有设计文档、图片和根 README。
 - 不新增任何推送依赖或后台进程。
 - 不提交或推送 Git。
@@ -317,7 +317,7 @@ async def preview_operation(...):
 
 ## 附录：从项目范围文档移出的旧实施计划
 
-> 来源：Agent V0.2 基线中 PROJECT_SCOPE_BILINGUAL.md 第 3.2 节标题内误嵌的旧计划。下文仅作历史记录，当前产品范围见[范围文档](../../PROJECT_SCOPE_BILINGUAL.md)。
+> 来源：Agent V0.2 基线中 PROJECT_SCOPE_BILINGUAL.md 第 3.2 节标题内误嵌的旧计划。下文仅作历史记录，当前产品范围见[范围文档](../../product/README.md)。
 
 SayFridge 非 Agent API 实施计划
 
@@ -412,7 +412,7 @@ backend/
 
 ## 4. 前端 API 文档交付
 
-新增 [API_REFERENCE.md](../../API_REFERENCE.md)，提供完整前端接入说明；同步更新后端 README 的启动、迁移及提醒任务运行方法。
+新增 [API_REFERENCE.md](../../reference/API_REFERENCE.md)，提供完整前端接入说明；同步更新后端 README 的启动、迁移及提醒任务运行方法。
 
 文档必须包含：
 
@@ -447,7 +447,7 @@ backend/
 
 ## 附录：原范围文档中的概念工具建议
 
-> 这些是旧规划名称，不是当前工具清单；当前实现见[架构](../../ARCHITECTURE.md)。
+> 这些是旧规划名称，不是当前工具清单；当前实现见[架构](../../architecture/AGENT_DESIGN.md)。
 
 ## 6. Agent and Tool Boundaries / Agent 与工具边界
 

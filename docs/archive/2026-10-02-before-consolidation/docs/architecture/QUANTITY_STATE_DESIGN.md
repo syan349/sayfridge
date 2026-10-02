@@ -1,8 +1,8 @@
 # SayFridge 库存数量与操作规则
 
-> 状态：业务设计。Agent 前向预览、估算提交和记忆能力已加入本地实现，接口见 [API_REFERENCE.md](./API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)；历史重估仍是目标行为。现有远程数据库需独立同步新增执行凭据表。
+> 状态：业务设计。Agent 前向预览、估算提交和记忆能力已加入本地实现，接口见 [API_REFERENCE.md](../reference/API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)；历史重估仍是目标行为。现有远程数据库需独立同步新增执行凭据表。
 >
-> 字段与约束见 [DATABASE_DESIGN.md](./DATABASE_DESIGN.md)，组件协作见 [ARCHITECTURE.md](./ARCHITECTURE.md)。本文维护数量业务语义；表结构由数据库设计维护，历史重估所需的记录结构仍待实施时细化。
+> 字段与约束见 [DATABASE_DESIGN.md](DATABASE_DESIGN.md)，组件协作见 [ARCHITECTURE.md](AGENT_DESIGN.md)。本文维护数量业务语义；表结构由数据库设计维护，历史重估所需的记录结构仍待实施时细化。
 
 ## 1. 数量含义与展示
 

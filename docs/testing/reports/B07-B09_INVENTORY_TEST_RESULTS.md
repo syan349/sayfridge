@@ -65,8 +65,8 @@ backend README provides the one-time structural synchronization SQL if needed.
 No change was made to Neon. Pre-release development does not require incremental
 migration or downgrade workflows; the initial schema is maintained directly.
 
-See the [API contract](../API_REFERENCE.md#6-inventory--b07b09),
-[Postman guide](POSTMAN_GUIDE.md), and [CI selection index](README.md).
+See the [API contract](../../reference/API_REFERENCE.md#6-inventory--b07b09),
+[Postman guide](../POSTMAN_GUIDE.md), and [CI selection index](../README.md).
 
 ## Verification after schema simplification
 

@@ -1,4 +1,4 @@
-// The assistant (docs/API_REFERENCE.md §9, backend/app/schemas/agent_actions.py).
+// The assistant (docs/reference/API_REFERENCE.md §9, backend/app/schemas/agent_actions.py).
 //
 // Chat and resume don't answer with one JSON body: they answer with a STREAM of
 // Server-Sent Events (text/event-stream), so words can appear while the model is

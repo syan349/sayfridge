@@ -1,4 +1,4 @@
-// Administrator endpoints (docs/API_REFERENCE.md §8, backend/app/schemas/admin.py).
+// Administrator endpoints (docs/reference/API_REFERENCE.md §8, backend/app/schemas/admin.py).
 // Only ADMIN accounts may call them; anyone else gets 403 FORBIDDEN.
 import { apiFetch } from './client'
 import type { Page, UserRole, UserStatus } from './types'

@@ -337,7 +337,7 @@ Transactions must guarantee that:
 
 ## 12. Implementation Status
 
-This document maintains business fields and constraints. See [backend design](BACKEND_DESIGN.md) for service/transaction rules, [architecture](ARCHITECTURE.md) for Agent orchestration and [API reference](API_REFERENCE.md) for HTTP/SSE contracts. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
+This document maintains business fields and constraints. See [backend design](BACKEND_DESIGN.md) for service/transaction rules, [architecture](AGENT_DESIGN.md) for Agent orchestration and [API reference](../reference/API_REFERENCE.md) for HTTP/SSE contracts. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
 
 Database structure is acceptance-tested from an empty PostgreSQL schema by running
 `alembic upgrade head` through `test_database_initialization_postgres.py`. The same
@@ -373,7 +373,7 @@ writes credential-free JSON evidence containing the environment and initializati
 date, application commit, current and expected Alembic revisions, category seed
 content version, and schema verification counts. The complete procedure and the
 real-PostgreSQL rollback/idempotency matrix are maintained in
-[`testing/DATABASE_ACCEPTANCE.md`](testing/DATABASE_ACCEPTANCE.md).
+[`testing/DATABASE_ACCEPTANCE.md`](../../../../testing/reports/DATABASE_ACCEPTANCE.md).
 
 ## 13. Agent business receipts: `agent_inventory_action`
 

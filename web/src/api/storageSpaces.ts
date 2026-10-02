@@ -1,4 +1,4 @@
-// Storage-space endpoints (docs/API_REFERENCE.md §3, backend/app/schemas/business.py).
+// Storage-space endpoints (docs/reference/API_REFERENCE.md §3, backend/app/schemas/business.py).
 import { apiFetch } from './client'
 import type { Page } from './types'
 

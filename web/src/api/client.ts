@@ -3,7 +3,7 @@
 // apiFetch() adds the bearer token, sends/reads JSON, and turns every failed
 // response into an ApiError so pages only handle one error type (apiStream()
 // does the same for the assistant's streamed answers). The backend
-// uses three error body shapes (docs/API_REFERENCE.md, "Errors"):
+// uses three error body shapes (docs/reference/API_REFERENCE.md, "Errors"):
 //
 //   business:        {"detail": {"code": "NOT_FOUND", "message": "...", "errors"?: [...]}}
 //   auth:            {"detail": "Invalid email or password"}

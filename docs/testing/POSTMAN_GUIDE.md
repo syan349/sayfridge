@@ -9,7 +9,7 @@ credentials or the JWT signing secret.
 
 1. Set collection variable `base_url` to `http://127.0.0.1:8000` (adjust the port
    if the backend uses another one).
-2. Use paths and JSON fields from the [API reference](../API_REFERENCE.md).
+2. Use paths and JSON fields from the [API reference](../reference/API_REFERENCE.md).
 3. For registration/login, choose **No Auth** and **Body → raw → JSON**.
 4. Register a unique demonstration email, then log in with the same credentials.
    Save the returned token as `access_token`.

@@ -1,10 +1,10 @@
 # SayFridge API Reference
 
 Implemented authentication, storage-space, catalog, inventory, administrator-account and Agent V0.2 contracts.
-For setup, see the [backend README](../backend/README.md). For implementation and
-locking rules, see the [design handbook](BACKEND_DESIGN.md). Test commands, CI
-selection, and acceptance evidence are in the [test index](testing/README.md).
-For manual requests, see the [Postman guide](testing/POSTMAN_GUIDE.md).
+For setup, see the [backend README](../../backend/README.md). For implementation and
+locking rules, see the [design handbook](../architecture/BACKEND_DESIGN.md). Test commands, CI
+selection, and acceptance evidence are in the [test index](../testing/README.md).
+For manual requests, see the [Postman guide](../testing/POSTMAN_GUIDE.md).
 
 ## 1. Common conventions
 
@@ -12,7 +12,9 @@ For manual requests, see the [Postman guide](testing/POSTMAN_GUIDE.md).
 - Interactive schemas: Swagger UI at `/docs`, ReDoc at `/redoc`, and machine-readable
   OpenAPI at `/openapi.json`.
 - Paths below omit the API prefix. JSON requests use `Content-Type: application/json`.
-- Except registration and login, all endpoints require `Authorization: Bearer <token>`.
+- Protected business endpoints require `Authorization: Bearer <token>`. Registration,
+  login, health and system/version metadata are public. Refresh/logout use their
+  refresh credential body rather than bearer authentication.
   Identity, role, and ACTIVE account state are checked against the current database.
   Deleted, SUSPENDED, or DISABLED accounts cannot use an otherwise valid token.
 - IDs are UUIDs. Invalid IDs or request parameters return 422.
@@ -835,8 +837,8 @@ not a second model interpretation of whether approval is needed. Estimated remai
 quantities stay labeled as estimates. Queries still use model-generated plain text.
 
 Start with the [frontend interaction guide](AGENT_FRONTEND_INTEGRATION.md).
-Graph/memory rules: [architecture](ARCHITECTURE.md). Environment and storage:
-[backend README](../backend/README.md#agent-configuration-and-storage).
+Graph/memory rules: [architecture](../architecture/AGENT_DESIGN.md). Environment and storage:
+[backend README](../../backend/README.md#agent-configuration-and-storage).
 
 #### Identifier meanings
 
@@ -1577,7 +1579,7 @@ message. Image-derived stock still requires review; estimates execute directly u
 is not silently reclassified by subsequent chat.
 Changing a saved definition's category affects all inventory batches referring to
 that definition, not just one batch. Public definitions remain subject to existing
-ownership restrictions. See [category rules](DATABASE_DESIGN.md#4-public-category-catalog-table-item_category).
+ownership restrictions. See [category rules](../architecture/DATABASE_DESIGN.md#category-boundaries).
 
 A conflicting selected category produces `CATEGORY_CHANGE` and NEEDS_CONFIRMATION.
 The server explains that correcting a private definition also reclassifies existing
