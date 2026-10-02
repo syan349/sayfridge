@@ -26,6 +26,7 @@ from app.schemas.inventory import (
     InventoryUpdate,
 )
 from app.services import inventory as service
+from app.schemas.inventory import InventoryCreateResult, InventoryBatchCreateResult
 from app.schemas.inventory_operations import (
     IdempotencyKey,
     InventoryOperationCreate,
@@ -73,7 +74,7 @@ async def list_inventory(query: Annotated[InventoryListQuery, Query()],
 
 @router.post(
     "/batch-create",
-    response_model=InventoryBatchResult,
+    response_model=InventoryBatchCreateResult,
     status_code=201,
     summary="Create multiple stock batches atomically",
     responses=WRITE_RESPONSES,
@@ -89,7 +90,7 @@ async def batch_create_inventory(
         user.id,
         [item.model_dump() for item in payload.items],
     )
-    return InventoryBatchResult(items=items, count=len(items))
+    return InventoryBatchCreateResult(items=items, count=len(items), warnings=[w for item in items for w in item.warnings])
 
 
 @router.post(
@@ -172,7 +173,7 @@ async def get_inventory(item_id: UUID, session: AsyncSession = Depends(get_db_se
 
 @router.post(
     "",
-    response_model=InventoryItemRead,
+    response_model=InventoryCreateResult,
     status_code=201,
     summary="Create stock",
     responses=WRITE_RESPONSES,

@@ -706,3 +706,31 @@ calling the model. `agent_context_compacted` logs before/after estimates.
 Acceptance suites: `test_agent_quantity_context.py`, `test_agent_chat_continuation.py`,
 `test_agent_defaults_postgres.py`; optional real-model quantity cases are in
 `test_agent_live_model.py` and require AGENT_LIVE_MODEL=1 and TEST_DATABASE_URL.
+
+### Category correction and automatic stock expiry (issues 158, 145, 161)
+
+Agent stock proposals select a real catalog category. Correcting an existing
+private definition requires confirmation because its older stock shares that
+category. Public definitions remain unchanged; an approved conflict creates a
+private definition. Category correction, stock and receipt are one transaction.
+
+All new-stock entry points preserve explicit expiry dates, calculate stated shelf
+lives with a valid starting date, or reuse the configured Agent model to estimate
+missing dates before taking write locks. Model failure still saves stock and returns
+a creation warning. The Agent speaks the warning; manual clients can consume the
+additive `warnings` response field. Ordinary reads are unchanged. No database
+columns, migration, historical backfill, second model or background job is added.
+
+Before pushing a release, verify the deployment's actual remote database target,
+Alembic revision, required schema and active catalog using read-only checks. Local
+tests or committed code do not prove a remote database is ready or a deployment is
+running. This change requires no schema migration when the existing schema matches.
+
+Focused acceptance (use a separate `TEST_DATABASE_URL` ending in `_test`):
+
+```powershell
+python -m pytest -q tests/test_inventory_expiry.py tests/test_agent_stock_policy_postgres.py tests/test_agent_quantity_context.py
+# Explicit opt-in to real model costs, with writes confined to disposable test schemas:
+$env:AGENT_LIVE_MODEL = '1'
+python -m pytest -q tests/test_agent_stock_policy_live.py
+```

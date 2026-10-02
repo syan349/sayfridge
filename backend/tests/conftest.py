@@ -41,6 +41,7 @@ from app.db.database_target import (
     validate_disposable_database_url,
 )
 from app.db.session import get_db_session
+from app.services.inventory_expiry import estimate_shelf_lives as REAL_EXPIRY_ESTIMATOR
 
 
 @pytest.fixture(scope="session")
@@ -59,6 +60,17 @@ def isolated_login_attempts():
     yield
     with login_rate_limiter._lock:
         login_rate_limiter._attempts.clear()
+
+
+@pytest.fixture(autouse=True)
+def isolated_expiry_model(request, monkeypatch):
+    """Only explicitly opted-in live tests can spend model tokens for enrichment."""
+    if os.getenv("AGENT_LIVE_MODEL") == "1" and "live" in request.node.module.__name__:
+        return
+    from app.services import inventory_expiry
+    async def unavailable(items):
+        return {}
+    monkeypatch.setattr(inventory_expiry, "estimate_shelf_lives", unavailable)
 
 
 @pytest.fixture

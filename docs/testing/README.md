@@ -1,5 +1,37 @@
 # Testing Strategy and Evidence
 
+## Stock category, quantity and expiry acceptance
+
+`test_inventory_expiry.py` covers date precedence, production/opening starting
+dates, model output validation, mixed batch failures and unavailable estimation.
+`test_agent_stock_policy_postgres.py` uses disposable migrated schemas to verify
+private/public classification conflicts, HTTP confirmation/cancellation, atomic
+rollback, concurrent edits, receipt replay, creation warnings, frozen previews and
+persisted apple quantities. These tests are in the Backend `ci` selection.
+
+`test_agent_stock_policy_live.py` requires explicit `AGENT_LIVE_MODEL=1` plus an
+isolated `TEST_DATABASE_URL`; it runs English/Chinese yoghurt, apple weight and
+category-correction scenarios through actual chat/resume with the configured model.
+Normal regression replaces only optional expiry-model calls with an unavailable
+estimator. It never spends model tokens or uses the application database for test
+writes. Full regression and remote/deployed acceptance remain separate evidence.
+
+Local verification on 2026-10-02 used Python 3.11 and a dedicated PostgreSQL 16
+test cluster: the Backend core selection passed **154** tests (714 deselected),
+and the new expiry/stock-policy offline suites passed **24** tests. The final
+real-model suite plus date unit tests passed **18** tests, including all **6**
+live scenarios and production-date shelf-life calculation. The full offline run
+initially reported 797 passed, 63 skipped and one failure: an existing batch-archive
+test compared a timestamp string with UTC while the temporary database returned
+Pacific/Auckland. Setting only that test database to UTC made its focused rerun
+pass; no product-code or remote-database change was used to mask the failure.
+
+The configured remote database passed read-only ORM verification (11 tables,
+96 columns); its revision was `a261001_sessions`, with 25 active categories and
+105 inventory rows. Runtime/direct connection targets matched. This change has
+no ORM or migration edits. These checks do not establish the deployed service's
+environment configuration or confirm a code deployment.
+
 ## Fast CI entry point
 
 Start from the [root README](../../README.md#run-the-tests). The fast selection

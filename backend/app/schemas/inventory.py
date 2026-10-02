@@ -22,6 +22,21 @@ def _calendar_date(value):
 CalendarDate = Annotated[date, BeforeValidator(_calendar_date)]
 
 
+class ShelfLifeInput(BaseModel):
+    """An explicitly stated shelf life, not an AI estimate or a stored column."""
+    model_config = ConfigDict(extra="forbid")
+    days: int = Field(ge=0, le=36500, strict=True)
+    basis: Literal["PURCHASE", "MANUFACTURE", "OPENING", "EXPLICIT"] = "PURCHASE"
+    starts_on: CalendarDate | None = None
+    evidence: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+
+    @model_validator(mode="after")
+    def require_start(self):
+        if self.basis != "PURCHASE" and self.starts_on is None:
+            raise ValueError("A production/opening shelf life requires its actual starting date")
+        return self
+
+
 class InventoryCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     storage_space_id: UUID
@@ -31,6 +46,7 @@ class InventoryCreate(BaseModel):
     purchase_date: CalendarDate | None = None
     expiry_date: CalendarDate | None = None
     notes: Notes | None = None
+    shelf_life: ShelfLifeInput | None = None
 
     @field_validator("amount")
     @classmethod
@@ -180,6 +196,16 @@ class InventoryPage(BaseModel):
     page_size: int
 
 
+class InventoryWarning(BaseModel):
+    code: Literal["EXPIRY_ESTIMATED", "EXPIRY_ESTIMATION_FAILED"]
+    message: str
+    item_id: UUID
+
+
+class InventoryCreateResult(InventoryItemRead):
+    warnings: list[InventoryWarning] = Field(default_factory=list)
+
+
 class ExpiryCounts(BaseModel):
     overdue: int
     today: int
@@ -201,3 +227,7 @@ class ExpirySummary(BaseModel):
 class InventoryBatchResult(BaseModel):
     items: list[InventoryItemRead]
     count: int
+
+
+class InventoryBatchCreateResult(InventoryBatchResult):
+    warnings: list[InventoryWarning] = Field(default_factory=list)
