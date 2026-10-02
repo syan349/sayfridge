@@ -59,6 +59,16 @@ export interface AgentItem {
   error?: { code: string; message: string; details?: { candidates?: InventoryItem[] } } | null
   /** After it was saved: the stock item as it is now. */
   result?: { inventory?: InventoryItem | null } | null
+  /** Words for the screen, prepared by the backend (only the fields the page shows). */
+  display?: {
+    item_name?: string | null
+    space_name?: string | null
+    category_name?: string | null
+    /** The question to show while the item waits for an answer, in the user's language. */
+    question?: string | null
+    /** Why the item needs a closer look, e.g. "the date on the label was hard to read". */
+    review_notes?: string[]
+  } | null
 }
 
 /** AgentConversationState: GET …/state, and the data of the stream's last event. */
