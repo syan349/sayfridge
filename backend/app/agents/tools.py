@@ -271,8 +271,13 @@ async def list_item_definitions(runtime: AgentToolRuntime, query: str = "", page
     async with AsyncSessionFactory() as session:
         rows, total = await catalog.list_definitions(session, runtime.context.user_id,
             status="ACTIVE", scope="ALL", q=query, category_id=None, page=page, page_size=50)
-    return _json({"items": [ItemDefinitionRead(id=r.id, name=r.name, category_id=r.category_id,
-                    status=r.status, scope="PUBLIC" if r.owner_user_id is None else "PRIVATE").model_dump(mode="json") for r in rows],
+        from app.db.models import ItemCategory
+        from sqlalchemy import select
+        categories = {r.id: r.name for r in await session.scalars(select(ItemCategory).where(
+            ItemCategory.id.in_({r.category_id for r in rows})))}
+    return _json({"items": [{**ItemDefinitionRead(id=r.id, name=r.name, category_id=r.category_id,
+                    status=r.status, scope="PUBLIC" if r.owner_user_id is None else "PRIVATE").model_dump(mode="json"),
+                    "category_name": categories[r.category_id]} for r in rows],
                   "total": total, "page": page, "page_size": 50})
 
 

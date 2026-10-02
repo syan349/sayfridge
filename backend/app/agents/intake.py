@@ -70,6 +70,16 @@ def waiting_question(item, language):
     if code in questions:
         return questions[code][0 if zh else 1]
     if item["status"] == "NEEDS_CONFIRMATION":
+        association = item.get("preview", {}).get("association", {})
+        if association.get("correction"):
+            name, old, new = association["name"], association["old_category_name"], association["category_name"]
+            if association["correction"] == "PRIVATE":
+                return (f"将{name}从{old}改为{new}并入库？这也会更正已有同名库存的分类。" if zh else
+                        f"Change {name} from {old} to {new} and add this stock? Existing stock using this private definition will also change category.")
+            return (f"为{name}创建属于{new}的私有定义并入库？公共分类{old}保持不变。" if zh else
+                    f"Create your own {name} definition in {new} and add this stock? The public definition in {old} stays unchanged.")
+        if "OTHER_CATEGORY" in item.get("preview", {}).get("confirmation_reasons", []):
+            return f"没有合适的现有分类，要将{name}归入Other并入库吗？" if zh else f"No maintained category fits {name}. Confirm Other and add this stock?"
         image = "IMAGE_REVIEW" in item.get("preview", {}).get("confirmation_reasons", [])
         quantity = " ".join(str(draft.get(f) or "") for f in ("quantity_value", "quantity_unit")).strip()
         package = draft.get("package_description")
@@ -155,6 +165,11 @@ def outcome_text(items, language):
                 space = saved.get("storage_space_name") or item.get("preview", {}).get("display", {}).get("space_name")
                 lines.append((f"已将{quantity} {name}加入{space}。" if space else f"已添加{quantity} {name}。") if zh
                              else (f"Added {quantity} of {name} to {space}." if space else f"Added {quantity} of {name}."))
+                for warning in saved.get("warnings", []):
+                    if warning["code"] == "EXPIRY_ESTIMATED":
+                        lines.append(f"估算到期日为{saved['expiry_date']}。" if zh else warning["message"])
+                    elif warning["code"] == "EXPIRY_ESTIMATION_FAILED":
+                        lines.append("到期日未能估算，库存已保存，可稍后补充。" if zh else "Stock was saved, but its expiry date could not be estimated. Please add it later.")
             else:
                 estimated = saved.get("is_estimated", saved.get("estimated_current_amount") is not None)
                 relation = item.get("preview", {}).get("unit_relationship")

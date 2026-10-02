@@ -15,6 +15,7 @@ from app.schemas.agent_actions import ActionDraft
 from app.schemas.inventory import InventoryCreate
 from app.schemas.inventory_operations import InventoryOperationCreate
 from app.services import inventory, catalog, storage_spaces
+from app.services.inventory_expiry import ExpiryInput, ExpiryResolution, resolve_expiries
 from app.services.inventory_quantities import (
     calculate_addition, calculate_consumption, calculate_estimated_change, calculate_change,
     prepare_reconciliation, get_addition_base, convert_addition_amount,
@@ -95,34 +96,32 @@ async def resolve_targets(session, user_id, queries, storage_space_id=None, memo
             "truncated": len(candidates) > 100, "preferred_id": preferred, "spaces": space_candidates}
 
 
-async def _creation_values(session, user_id, draft, *, create=False):
-    space_id, definition_id = draft.storage_space_id, draft.item_definition_id
+async def _creation_values(session, user_id, draft, *, create=False, expected=None):
+    """Resolve and optionally write associations in space/category/definition lock order."""
+    space_id = draft.storage_space_id
     if create:
         await storage_spaces.lock_space_owner(session, user_id)
     if not space_id and not draft.new_space:
         space_id = await session.scalar(select(StorageSpace.id).where(
             StorageSpace.user_id == user_id, StorageSpace.status == "ACTIVE", StorageSpace.is_default.is_(True)))
     if draft.new_space:
-        found = await session.scalar(select(StorageSpace).where(StorageSpace.user_id == user_id,
+        found_space = await session.scalar(select(StorageSpace).where(StorageSpace.user_id == user_id,
             func.lower(StorageSpace.name) == draft.new_space.name.lower(), StorageSpace.status == "ACTIVE"))
-        if found and found.type != draft.new_space.type:
+        if found_space and found_space.type != draft.new_space.type:
             raise PreparationError("ASSOCIATION_CONFLICT", "Existing space has a different type")
-        if found:
-            space_id = found.id
+        if found_space:
+            space_id = found_space.id
         elif create:
-            space = await storage_spaces.create_storage_space(session, user_id,
-                **draft.new_space.model_dump(), commit=False)
-            space_id = space.id
-    if space_id:
-        space = await storage_spaces.get_storage_space_by_id(session, space_id, user_id, lock=create)
-        if space.status != "ACTIVE":
-            raise PreparationError("STATE_CONFLICT", "Creation requires an active space")
+            space_id = (await storage_spaces.create_storage_space(session, user_id,
+                **draft.new_space.model_dump(), commit=False)).id
+    space = await storage_spaces.get_storage_space_by_id(session, space_id, user_id, lock=create) if space_id else None
+    if space and space.status != "ACTIVE":
+        raise PreparationError("STATE_CONFLICT", "Creation requires an active space")
+    if not space and not draft.new_space:
+        raise PreparationError("SPACE_REQUIRED", "Select a storage space")
+
+    found = await catalog.get_definition(session, draft.item_definition_id, user_id) if draft.item_definition_id else None
     if draft.new_definition:
-        category = (await catalog._lock_categories(session, {draft.new_definition.category_id}))[draft.new_definition.category_id] if create else await session.get(ItemCategory, draft.new_definition.category_id)
-        if category is None or category.status != "ACTIVE":
-            available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE")))
-            raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category", {
-                "categories": [{"id": str(c.id), "name": c.name} for c in available]})
         matches = list(await session.scalars(select(ItemDefinition).where(
             (ItemDefinition.owner_user_id == user_id) | ItemDefinition.owner_user_id.is_(None),
             ItemDefinition.normalized_name == normalize_catalog_name(draft.new_definition.name))))
@@ -131,24 +130,55 @@ async def _creation_values(session, user_id, draft, *, create=False):
         if len(candidates) > 1:
             raise PreparationError("DEFINITION_REQUIRED", "Which matching item do you mean?")
         found = candidates[0] if candidates else None
-        if found and found.status != "ACTIVE":
-            raise PreparationError("ASSOCIATION_CONFLICT", "Existing item definition is archived")
-        if found:
-            definition_id = found.id
-        elif create:
-            definition = await catalog.create_definition(session, user_id,
-                **draft.new_definition.model_dump(), commit=False)
-            definition_id = definition.id
-    if not space_id and not draft.new_space:
-        raise PreparationError("SPACE_REQUIRED", "Select a storage space")
-    if not definition_id and not draft.new_definition:
+    if not found and not draft.new_definition:
         raise PreparationError("DEFINITION_REQUIRED", "Select an item definition")
-    if definition_id:
-        definition = await catalog.get_definition(session, definition_id, user_id)
-        category = await session.get(ItemCategory, definition.category_id)
-        if definition.status != "ACTIVE" or category.status != "ACTIVE":
-            raise PreparationError("STATE_CONFLICT", "Creation requires an active definition/category")
-    return space_id, definition_id
+    if found and found.status != "ACTIVE":
+        raise PreparationError("ASSOCIATION_CONFLICT", "Existing item definition is archived")
+    selected_id = draft.new_definition.category_id if draft.new_definition else found.category_id
+    if draft.category_name:
+        selected_id = await session.scalar(select(ItemCategory.id).where(ItemCategory.status == "ACTIVE",
+            ItemCategory.normalized_name == normalize_catalog_name(draft.category_name)))
+    selected = await session.get(ItemCategory, selected_id) if selected_id else None
+    if selected is None or selected.status != "ACTIVE":
+        if create:
+            raise PreparationError("RESOURCE_CHANGED", "Selected category changed; refresh the proposal")
+        available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE")))
+        raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category", {
+            "categories": [{"id": str(c.id), "name": c.name} for c in available]})
+    # A private same-name definition must be considered before creating a public override.
+    if found and found.owner_user_id is None and found.category_id != selected.id:
+        private = await session.scalar(select(ItemDefinition).where(ItemDefinition.owner_user_id == user_id,
+            ItemDefinition.normalized_name == found.normalized_name))
+        if private:
+            found = private
+    old_id = found.category_id if found else selected.id
+    if create:
+        categories = await catalog._lock_categories(session, {old_id, selected.id})
+        if found:
+            found = await catalog.get_definition(session, found.id, user_id, lock=True)
+            if found.category_id != old_id:
+                raise PreparationError("RESOURCE_CHANGED", "Item category changed; refresh the proposal")
+        selected = categories[selected.id]
+    old_category = await session.get(ItemCategory, old_id)
+    if selected.status != "ACTIVE" or old_category.status != "ACTIVE" or (found and found.status != "ACTIVE"):
+        raise PreparationError("STATE_CONFLICT", "Creation requires an active definition/category")
+    correction = ("PRIVATE" if found.owner_user_id == user_id else "PRIVATE_OVERRIDE") if found and old_id != selected.id else None
+    snapshot = {"definition_id": str(found.id) if found else None,
+        "definition_updated_at": found.updated_at.isoformat() if found and found.updated_at else None,
+        "name": found.name if found else draft.new_definition.name,
+        "old_category_id": str(old_id), "old_category_name": old_category.name,
+        "category_id": str(selected.id), "category_name": selected.name,
+        "storage_type": space.type if space else draft.new_space.type,
+        "correction": correction}
+    if create and snapshot != expected:
+        raise PreparationError("RESOURCE_CHANGED", "Item classification or storage changed; review the updated proposal")
+    if create:
+        if correction == "PRIVATE":
+            found.category_id = selected.id
+            await session.flush()
+        elif not found or correction == "PRIVATE_OVERRIDE":
+            found = await catalog.create_definition(session, user_id, name=snapshot["name"], category_id=selected.id, commit=False)
+    return space_id, found.id if found else None, snapshot
 
 
 def validate_image_policy(draft, image_policy, *, approved=None):
@@ -209,7 +239,7 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
                 raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category", {
                     "categories": [{"id": str(c.id), "name": c.name} for c in available]})
             draft = draft.model_copy(update={"new_definition": draft.new_definition.model_copy(update={"category_id": category.id})})
-        space_id, definition_id = await _creation_values(session, user_id, draft)
+        space_id, definition_id, association = await _creation_values(session, user_id, draft)
         # Use placeholders only for validating quantities; never submit these IDs.
         placeholder = UUID(int=0)
         values = InventoryCreate(storage_space_id=space_id or placeholder,
@@ -218,20 +248,33 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
         image_review = bool((image_policy or {}).get("requires_review") or draft.source_image_ids)
         definition = await catalog.get_definition(session, definition_id, user_id) if definition_id else None
         space = await storage_spaces.get_storage_space_by_id(session, space_id, user_id) if space_id else None
-        category_id = definition.category_id if definition else draft.new_definition.category_id
+        category_id = UUID(association["category_id"])
         category = await session.get(ItemCategory, category_id)
+        expiry = (await resolve_expiries([ExpiryInput(association["name"], category.name, association["storage_type"],
+            draft.purchase_date, draft.expiry_date, draft.shelf_life, draft.package_description)], as_of))[0]
+        reasons = (["IMAGE_REVIEW"] if image_review else []) + (["CATEGORY_CHANGE"] if association["correction"] else [])
+        notes = [expiry.message] if expiry.code else []
+        if normalize_catalog_name(category.name) == "other":
+            reasons.append("OTHER_CATEGORY")
+            notes.append("Please confirm Other is appropriate because no maintained category fits this item.")
+        if association["correction"]:
+            impact = ("This also changes the category of existing stock using this private definition."
+                      if association["correction"] == "PRIVATE" else "A private definition will be created; the public catalog is unchanged.")
+            notes.append(f"Change {association['name']} from {association['old_category_name']} to {category.name}? {impact}")
         return {"draft": draft.model_dump(mode="json"), "before": None,
             "display": {"item_name": definition.name if definition else draft.new_definition.name,
                         "space_name": space.name if space else draft.new_space.name,
-                        "category_id": str(category.id), "category_name": category.name},
+                        "category_id": str(category.id), "category_name": category.name,
+                        "expiry_date": expiry.expiry_date.isoformat() if expiry.expiry_date else None, "review_notes": notes},
+            "association": association, "expiry_resolution": expiry.model_dump(mode="json"),
             "image_policy": image_policy or {},
             "default_space_id": str(space_id) if not draft.storage_space_id and not draft.new_space and space_id else None,
-            "confirmation_reasons": ["IMAGE_REVIEW"] if image_review else [],
-            "creation_policy": {"version": 1, "new_space_authorized": bool(draft.new_space)},
+            "confirmation_reasons": reasons,
+            "creation_policy": {"version": 2, "new_space_authorized": bool(draft.new_space)},
             "after": {"confirmed_current_amount": values.amount, "confirmed_current_unit": values.unit,
                       "estimated_current_amount": None}, "calculation_method": "EXACT",
             "affects_state": "CONFIRMED", "memory_snapshots": [],
-            "requires_confirmation": bool(image_review or draft.confirmation_requested), "expected_version": None}
+            "requires_confirmation": bool(reasons or draft.confirmation_requested), "expected_version": None}
     if not draft.inventory_item_id:
         if not draft.item_query:
             raise PreparationError("TARGET_REQUIRED", "Identify the inventory item")
@@ -357,6 +400,9 @@ async def execute_action(session, user_id, conversation_id, turn_id, proposal_id
             raise PreparationError("CONFIRMATION_REQUIRED", "Review the image-derived proposal first")
         if preview["requires_confirmation"] and not approved:
             raise PreparationError("CONFIRMATION_REQUIRED", "Confirm the current proposal")
+        if draft.action == "CREATE_STOCK" and (preview.get("creation_policy", {}).get("version") != 2
+                                               or not preview.get("expiry_resolution") or not preview.get("association")):
+            raise PreparationError("RESOURCE_CHANGED", "Reprepare stock creation using current category and expiry rules")
         if draft.new_space and not approved and not preview.get("creation_policy", {}).get("new_space_authorized"):
             raise PreparationError("CONFIRMATION_REQUIRED", "Confirm the current proposal")
         if not await memory.verify_snapshots(preview["memory_snapshots"]):
@@ -374,13 +420,14 @@ async def execute_action(session, user_id, conversation_id, turn_id, proposal_id
             except Exception:
                 raise PreparationError("MEMORY_SAVE_UNAVAILABLE", "Conversion memory could not be saved; inventory has not changed") from None
         if draft.action == "CREATE_STOCK":
-            space_id, definition_id = await _creation_values(session, user_id, draft, create=True)
+            space_id, definition_id, _ = await _creation_values(session, user_id, draft, create=True, expected=preview["association"])
             if preview.get("default_space_id") and str(space_id) != preview["default_space_id"]:
                 raise PreparationError("RESOURCE_CHANGED", "Default space changed; refresh the proposal")
             values = InventoryCreate(storage_space_id=space_id, item_definition_id=definition_id,
                 amount=draft.quantity_value, unit=draft.quantity_unit,
                 purchase_date=draft.purchase_date, expiry_date=draft.expiry_date)
-            result = await inventory.create_inventory(session, user_id, commit=False, **values.model_dump())
+            result = await inventory.create_inventory(session, user_id, commit=False,
+                expiry_resolution=ExpiryResolution.model_validate(preview["expiry_resolution"]), **values.model_dump())
             output = {"inventory": result.model_dump(mode="json"), "operation": None, "replayed": False}
         else:
             delta = preview.get("estimated_change")

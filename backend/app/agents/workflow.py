@@ -78,7 +78,7 @@ def public_item(item):
         "quantity_value": draft.get("quantity_value"), "quantity_unit": draft.get("quantity_unit"),
         "quantity_basis": draft.get("quantity_basis"), "quantity_issue": draft.get("quantity_issue"),
         "receipt_quantity_text": draft.get("receipt_quantity_text"),
-        "review_notes": draft.get("review_notes", []), "missing_fields": missing,
+        "review_notes": list(dict.fromkeys([*draft.get("review_notes", []), *preview.get("display", {}).get("review_notes", [])])), "missing_fields": missing,
         "confirmation_reasons": preview.get("confirmation_reasons", []),
         "question": item.get("question")}
     return result

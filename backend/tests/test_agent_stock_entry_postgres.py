@@ -68,7 +68,8 @@ def test_empty_account_purchase_answer_write_and_replay(inventory_context, monke
         item = events[-1]["data"]["items"][0]
         assert item["status"] == "SUCCEEDED"
         assert item["result"]["inventory"]["confirmed_current_amount"] == "2.000"
-        assert [e["delta"] for e in events if e["type"] == "text_delta"] == ["Added 2 kg of Tomatoes to fridge."]
+        assert [e["delta"] for e in events if e["type"] == "text_delta"] == [
+            "Added 2 kg of Tomatoes to fridge.\nStock was saved, but its expiry date could not be estimated. Please add it later."]
         replay = parse_events(await client.post("/api/v1/agent/resume", json=resume, headers=c[6]))
         assert replay[-1]["data"]["items"][0]["status"] == "SUCCEEDED"
         async with sessions() as session:
