@@ -4,6 +4,9 @@ import '../widgets/page_scroll_fade.dart';
 
 import '../models/inventory_item.dart';
 import '../repositories/workspace_repository.dart';
+import '../repositories/item_artwork_repository.dart';
+import '../widgets/item_icon_picker.dart';
+import '../widgets/storage_space_management.dart';
 import '../services/api_exception.dart';
 import '../widgets/app_background.dart';
 import '../widgets/business_forms.dart';
@@ -12,9 +15,15 @@ import '../widgets/selection_field.dart';
 import '../theme/app_theme.dart';
 
 class StockEditorScreen extends StatefulWidget {
-  const StockEditorScreen({required this.workspace, this.item, super.key});
+  const StockEditorScreen({
+    required this.workspace,
+    this.item,
+    this.artworkRepository = const ItemArtworkRepository(),
+    super.key,
+  });
   final WorkspaceRepository workspace;
   final InventoryItem? item;
+  final ItemArtworkRepository artworkRepository;
   @override
   State<StockEditorScreen> createState() => _StockEditorScreenState();
 }
@@ -27,8 +36,10 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
   final _purchase = TextEditingController(),
       _expiry = TextEditingController(),
       _notes = TextEditingController();
-  List<Map<String, dynamic>> _spaces = [], _definitions = [];
-  String? _space, _definition, _error;
+  List<Map<String, dynamic>> _spaces = [], _definitions = [], _categories = [];
+  String? _space, _definition, _category, _error;
+  String? _selectedArtwork, _originalArtwork;
+  bool _artworkLoaded = false;
   bool _loading = true, _busy = false, _blocked = false;
   bool _loadingDefinitionChoices = false;
 
@@ -44,6 +55,7 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
     }
     _space = item?.storageSpaceId;
     _definition = item?.itemDefinitionId;
+    _category = item?.categoryId;
     _purchase.text = dateInput(item?.purchaseDate);
     _expiry.text = dateInput(item?.expiryDate);
     _notes.text = item?.notes ?? '';
@@ -68,8 +80,23 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
       final definitions = widget.item == null
           ? await widget.workspace.choices('item-definitions')
           : <Map<String, dynamic>>[];
+      final categories = await widget.workspace.choices('item-categories');
+      if (widget.item != null && !_artworkLoaded) {
+        try {
+          _selectedArtwork = await widget.artworkRepository.read(
+            widget.item!.id,
+          );
+        } catch (_) {
+          _selectedArtwork = null;
+        }
+        _originalArtwork = _selectedArtwork;
+        _artworkLoaded = true;
+      }
       if (!mounted) return;
       final item = widget.item;
+      if (item != null && !categories.any((c) => c['id'] == item.categoryId)) {
+        categories.add({'id': item.categoryId, 'name': item.categoryName});
+      }
       if (item != null && !spaces.any((s) => s['id'] == item.storageSpaceId)) {
         spaces.insert(0, {
           'id': item.storageSpaceId,
@@ -79,6 +106,7 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
       setState(() {
         _spaces = spaces;
         _definitions = definitions;
+        _categories = categories;
         if (item == null) {
           if (!spaces.any((s) => s['id'] == _space)) _space = null;
           if (!definitions.any((d) => d['id'] == _definition)) {
@@ -188,6 +216,7 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
         if (_name.text.trim() != item.itemDefinitionName) {
           values['item_name'] = _name.text.trim();
         }
+        if (_category != item.categoryId) values['category_id'] = _category;
         final quantityChanged =
             !_estimated &&
             (double.tryParse(_amount.text.trim()) != item.displayAmount ||
@@ -204,6 +233,25 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
         }
         values.removeWhere((key, value) => before[key] == value);
         if (values.isNotEmpty) await widget.workspace.updateItem(item, values);
+        if (_originalArtwork != _selectedArtwork) {
+          try {
+            if (_selectedArtwork == null) {
+              await widget.artworkRepository.clear(item.id);
+            } else {
+              await widget.artworkRepository.save(item.id, _selectedArtwork!);
+            }
+          } catch (_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Details saved, but the icon could not be saved on this device.',
+                  ),
+                ),
+              );
+            }
+          }
+        }
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -365,7 +413,6 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
     ),
     const SizedBox(height: 8),
     _storageField(),
-    _addSpaceButton(),
     const SizedBox(height: 8),
     _field('Amount', _amount, validateAmount),
     _field(
@@ -382,18 +429,49 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
   ];
 
   List<Widget> _itemFields(InventoryItem item) => [
-    Center(child: InventoryArtwork(item: item, size: 140)),
+    ItemIconPicker(
+      name: _name.text,
+      selectedAsset: _selectedArtwork,
+      enabled: !_busy && !_blocked,
+      onChanged: (value) => setState(() => _selectedArtwork = value),
+    ),
     const SizedBox(height: 24),
     _labelRow(
       'Item name',
       TextFormField(
         key: const Key('item-name-input'),
         controller: _name,
+        onChanged: (_) => setState(() {}),
         enabled: !_busy && !_blocked,
         validator: (v) =>
             requiredValue(v) ??
             (v!.trim().length > 100 ? 'Maximum 100 characters' : null),
         decoration: const InputDecoration(),
+      ),
+    ),
+    const SizedBox(height: 16),
+    _labelRow(
+      'Category',
+      SelectionField(
+        label: 'Category',
+        value: _category,
+        options: {
+          for (final c in _categories) c['id'] as String: c['name'] as String,
+        },
+        decoration: const InputDecoration(),
+        sortAlphabetically: true,
+        onCreateOption: (name) async {
+          final category = await widget.workspace.createCategory(name);
+          if (!mounted) return category['id'] as String;
+          if (!_categories.any((c) => c['id'] == category['id'])) {
+            setState(() => _categories.add(category));
+          }
+          return category['id'] as String;
+        },
+        onChanged: _busy || _blocked
+            ? null
+            : (value) => setState(() => _category = value),
+        validator: requiredValue,
       ),
     ),
     const SizedBox(height: 20),
@@ -481,7 +559,6 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
     _labelRow('Expiry date', _dateField(null, _expiry)),
     const SizedBox(height: 20),
     _labelRow('Storage space', _storageField(compact: true)),
-    _addSpaceButton(),
     const SizedBox(height: 12),
     _notesField(),
   ];
@@ -647,22 +724,6 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
     compact: compact,
   );
 
-  Widget _addSpaceButton() => Align(
-    alignment: Alignment.centerRight,
-    child: TextButton(
-      onPressed: _busy || _blocked
-          ? null
-          : () async {
-              setState(() => _busy = true);
-              await editSpace(context, widget.workspace);
-              if (!mounted) return;
-              setState(() => _busy = false);
-              await _load();
-            },
-      child: const Text('Add storage space'),
-    ),
-  );
-
   Widget _field(
     String label,
     TextEditingController field,
@@ -692,5 +753,11 @@ class _StockEditorScreenState extends State<StockEditorScreen> {
     validator: requiredValue,
     decoration: InputDecoration(labelText: compact ? null : label),
     onChanged: _busy || _blocked ? null : onChange,
+    onManage: label != 'Storage space'
+        ? null
+        : () async {
+            await manageStorageSpaces(context, widget.workspace);
+            if (mounted) await _load();
+          },
   );
 }

@@ -106,6 +106,13 @@ class WorkspaceRepository {
     body: {'name': name.trim(), 'category_id': categoryId},
   );
 
+  Future<Map<String, dynamic>> createCategory(String name) async =>
+      client.postJson(
+        '/item-categories',
+        accessToken: await accessToken(),
+        body: {'name': name.trim()},
+      );
+
   Future<InventoryItem> createStock(Map<String, dynamic> body) async =>
       InventoryItem.fromJson(
         await _saved(

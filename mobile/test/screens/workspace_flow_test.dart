@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:sayfridge/widgets/selection_field.dart';
 import 'package:http/testing.dart';
 import 'package:sayfridge/models/inventory_item.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
@@ -11,6 +13,7 @@ import 'package:sayfridge/widgets/business_forms.dart';
 import '../support/integration_fixtures.dart';
 
 void main() {
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   testWidgets(
     'metadata form submits only changed fields, not a rounded quantity',
     (tester) async {
@@ -65,7 +68,12 @@ void main() {
     (tester) async {
       final api = ApiClient(
         client: MockClient(
-          (_) async => jsonResponse({'items': [], 'total': 0}),
+          (_) async => jsonResponse({
+            'items': [],
+            'total': 0,
+            'page': 1,
+            'page_size': 100,
+          }),
         ),
       );
       addTearDown(api.close);
@@ -76,6 +84,10 @@ void main() {
           ),
         ),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(SelectionField).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage storage spaces'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add storage space'));
       await tester.pumpAndSettle();

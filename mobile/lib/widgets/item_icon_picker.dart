@@ -45,16 +45,20 @@ class ItemIconPicker extends StatelessWidget {
           ),
         ),
       ),
-      TextButton.icon(
-        onPressed: enabled ? () => _openLibrary(context) : null,
-        icon: const Icon(Icons.grid_view_outlined, size: 18),
-        label: const Text('Library'),
-      ),
-      if (selectedAsset != null)
-        TextButton(
+      if (selectedAsset != null) ...[
+        const SizedBox(height: 12),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            side: const BorderSide(color: Color(0xFFA8D589)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(9),
+            ),
+          ),
           onPressed: enabled ? () => onChanged(null) : null,
           child: const Text('Use automatic icon'),
         ),
+      ],
     ],
   );
 

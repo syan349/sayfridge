@@ -74,8 +74,45 @@ class ManualStockInController extends ChangeNotifier {
   bool get isLoadingDefinitions => _isLoadingDefinitions;
   bool get submissionUncertain => _submissionUncertain;
 
-  bool get hasRequiredOptions =>
-      _storageSpaces.isNotEmpty && _categories.isNotEmpty;
+  bool get hasRequiredOptions => _storageSpaces.isNotEmpty;
+
+  Future<String> createCategory(String name) async {
+    final sequence = _sequence;
+    final category = await _catalogRepository.createCategory(name);
+    if (sequence != _sequence) {
+      throw const ApiException(
+        statusCode: 401,
+        message: 'Please sign in again.',
+      );
+    }
+    if (!_categories.any((value) => value.id == category.id)) {
+      _categories = [..._categories, category]
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    }
+    notifyListeners();
+    return category.id;
+  }
+
+  Future<void> reloadStorageSpaces() async {
+    final sequence = _sequence;
+    final spaces = <StorageSpace>[];
+    for (var page = 1; ; page++) {
+      final result = await _storageSpaceRepository.getStorageSpaces(
+        page: page,
+        pageSize: 100,
+      );
+      if (sequence != _sequence) return;
+      spaces.addAll(result.items);
+      if (spaces.length >= result.total || result.items.isEmpty) break;
+    }
+    _storageSpaces = spaces;
+    if (!spaces.any((space) => space.id == _selectedStorageSpaceId)) {
+      _selectedStorageSpaceId =
+          spaces.where((space) => space.isDefault).firstOrNull?.id ??
+          spaces.firstOrNull?.id;
+    }
+    notifyListeners();
+  }
 
   Future<void> loadOptions() async {
     _submissionUncertain = false;
@@ -90,10 +127,19 @@ class ManualStockInController extends ChangeNotifier {
         pageSize: 100,
       );
       if (sequence != _sequence) return;
-      final categories = await _catalogRepository.getCategories(pageSize: 100);
-      if (sequence != _sequence) return;
+      final categories = <ItemCategory>[];
+      for (var page = 1; ; page++) {
+        final result = await _catalogRepository.getCategories(
+          page: page,
+          pageSize: 100,
+        );
+        if (sequence != _sequence) return;
+        categories.addAll(result.items);
+        if (categories.length >= result.total || result.items.isEmpty) break;
+      }
       _storageSpaces = spaces.items;
-      _categories = categories.items;
+      _categories = categories
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       _selectedStorageSpaceId =
           _storageSpaces.where((space) => space.isDefault).firstOrNull?.id ??
           _storageSpaces.firstOrNull?.id;

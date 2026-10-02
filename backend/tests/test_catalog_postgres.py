@@ -54,11 +54,11 @@ def test_category_lock_wait_rechecks_state_and_planned_relationship(catalog_cont
     async def scenario(client, sessions):
         started = asyncio.Event()
         waiter_pid = None
-        async def observe_lock(session, ids):
+        async def observe_lock(session, ids, user_id=None):
             nonlocal waiter_pid
             waiter_pid = await session.scalar(text("SELECT pg_backend_pid()"))
             started.set()
-            return await lock(session, ids)
+            return await lock(session, ids, user_id)
         monkeypatch.setattr(service, "_lock_categories", observe_lock)
         pending = None
         async with sessions() as writer:

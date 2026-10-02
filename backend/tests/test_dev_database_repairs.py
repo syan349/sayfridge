@@ -99,7 +99,8 @@ def test_category_tool_returns_real_ids_with_guidance(database, monkeypatch):
     run_sql(database, "seed_item_categories.sql")
     async def scenario(client, sessions):
         monkeypatch.setattr(tools, "AsyncSessionFactory", sessions)
-        result = json.loads(await tools.list_item_categories.coroutine(SimpleNamespace(), page=1))
+        runtime = SimpleNamespace(context=SimpleNamespace(user_id=uuid4()))
+        result = json.loads(await tools.list_item_categories.coroutine(runtime, page=1))
         assert result['total'] == 25
         async with sessions() as session:
             ids = {str(i) for i in (await session.execute(text("SELECT id FROM item_category"))).scalars()}

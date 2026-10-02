@@ -15,6 +15,7 @@ from app.schemas.inventory_operations import InventoryOperationRead, OperationRe
 from app.services.inventory_quantities import calculate_addition, calculate_consumption, prepare_reconciliation
 from app.core.quantity import QuantityError
 from app.core.catalog import normalize_catalog_name
+from app.services.catalog import category_visibility
 
 
 class InventoryError(Exception):
@@ -30,7 +31,9 @@ def _select_inventory(user_id):
         StorageSpace.name.label("storage_space_name"),
         ItemDefinition.name.label("item_definition_name"),
         ItemCategory.id.label("category_id"), ItemCategory.name.label("category_name"),
-    ).select_from(InventoryItem).join(StorageSpace).join(ItemDefinition).join(ItemCategory).where(
+    ).select_from(InventoryItem).join(StorageSpace).join(ItemDefinition).join(
+        ItemCategory, ItemCategory.id == func.coalesce(InventoryItem.category_override_id, ItemDefinition.category_id)
+    ).where(
         StorageSpace.user_id == user_id)
 
 
@@ -232,8 +235,10 @@ async def create_inventory(session: AsyncSession, user_id: UUID, *, commit: bool
         # Shared lock order: space, category, definition, inventory.
         space = await _space(session, values["storage_space_id"], user_id)
         _active(space, "Storage space")
-        category = (await session.execute(select(ItemCategory).where(ItemCategory.id == category_id)
-                    .with_for_update().execution_options(populate_existing=True))).scalar_one()
+        category = (await session.execute(select(ItemCategory).where(ItemCategory.id == category_id, category_visibility(user_id))
+                    .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+        if category is None:
+            raise InventoryError("NOT_FOUND", "Item category not found")
         definition = (await session.execute(select(ItemDefinition).where(ItemDefinition.id == planned.id)
                       .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
         if definition is None:
@@ -299,7 +304,7 @@ async def create_inventory_batch(
         planned_categories = {
             category.id: category
             for category in (await session.scalars(
-                select(ItemCategory).where(ItemCategory.id.in_(category_ids))
+                select(ItemCategory).where(ItemCategory.id.in_(category_ids), category_visibility(user_id))
             )).all()
         }
 
@@ -353,7 +358,7 @@ async def create_inventory_batch(
         for category_id in sorted(set(planned_category_ids)):
             category = (await session.execute(
                 select(ItemCategory)
-                .where(ItemCategory.id == category_id)
+                .where(ItemCategory.id == category_id, category_visibility(user_id))
                 .with_for_update()
                 .execution_options(populate_existing=True)
             )).scalar_one_or_none()
@@ -720,7 +725,7 @@ async def archive_inventory_batch(
 async def _item_name_definition(session, user_id, category_id, name):
     """Associate this batch with a private name, leaving other batches unchanged."""
     category = (await session.execute(select(ItemCategory).where(
-        ItemCategory.id == category_id).with_for_update())).scalar_one_or_none()
+        ItemCategory.id == category_id, category_visibility(user_id)).with_for_update())).scalar_one_or_none()
     if category is None or category.status != "ACTIVE":
         raise InventoryError("STATE_CONFLICT", "The item category must be active to rename this batch")
     normalized = normalize_catalog_name(name)
@@ -775,12 +780,29 @@ async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
         changes = dict(changes)
         item_name = changes.pop("item_name", None)
         quantity = changes.pop("quantity", None)
+        category_id = changes.pop("category_id", None)
         planned = await get_inventory(session, item_id, user_id)
         source_id = planned.storage_space_id
         target_id = changes.get("storage_space_id", source_id)
         spaces = {}
         for space_id in sorted({source_id, target_id}):
             spaces[space_id] = await _space(session, space_id, user_id)
+        category_changed = category_id is not None and category_id != planned.category_id
+        effective_category_id = category_id or planned.category_id
+        if category_changed or (item_name is not None and item_name != planned.item_definition_name):
+            category_ids = {planned.category_id}
+            if category_changed:
+                category_ids.add(category_id)
+            for target_category in sorted(category_ids):
+                category = await session.scalar(select(ItemCategory).where(
+                    ItemCategory.id == target_category, category_visibility(user_id),
+                ).with_for_update())
+                if category is None:
+                    raise InventoryError("NOT_FOUND", "Item category not found")
+                if target_category == effective_category_id:
+                    _active(category, "Item category")
+            if category_changed:
+                changes["category_override_id"] = category_id
         item = (await session.execute(select(InventoryItem).where(InventoryItem.id == item_id)
                 .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
         if item is None:
@@ -795,7 +817,7 @@ async def update_inventory(session: AsyncSession, item_id: UUID, user_id: UUID,
             _active(spaces[target_id], "Target storage space")
         if item_name is not None and item_name != planned.item_definition_name:
             changes["item_definition_id"] = await _item_name_definition(
-                session, user_id, planned.category_id, item_name)
+                session, user_id, effective_category_id, item_name)
         changed = {key: value for key, value in changes.items() if getattr(item, key) != value}
         quantity_changed = quantity is not None and (
             quantity["mode"] == "EXACT" or item.estimated_current_amount is None)

@@ -236,9 +236,17 @@ keep the original archived. Rename the active namesake before retrying.
 Common pagination/state parameters. **200**, page of category objects:
 `id`, `name`, `status`, `sort_order`.
 
-Read public categories filtered by category status; sort by `sort_order`, name,
-then UUID ascending. No writes. An ACTIVE category must already exist before
-creating a definition; the explicit seed SQL initializes the maintained catalog; there is no category write API.
+Read public and authenticated-user-owned categories filtered by category status;
+sort by normalized name, then UUID ascending. Other users' private categories
+are inaccessible. An ACTIVE visible category must exist before creating a definition.
+
+### POST /item-categories
+
+JSON: `{"name":"Meal Prep"}`. Name is trimmed and contains 1–100 characters.
+**201**, Category response. Reuse a matching visible category after Unicode NFKC,
+case-folding and collapsing whitespace; otherwise create a user-owned category.
+Concurrent requests for the same name reuse one row. An existing archived name
+returns **409 / STATE_CONFLICT**. Public categories are not modified.
 
 ## 5. Item definitions — B06
 
@@ -507,14 +515,19 @@ after a lost response, reload the items before retrying.
 ```
 
 Required expected_version: integer 1–2147483647. Supply at least one of
-storage_space_id, purchase_date, expiry_date, notes, item_name, quantity.
+storage_space_id, category_id, purchase_date, expiry_date, notes, item_name, quantity.
 Null clears dates/notes only. Definition IDs, initial quantities, Added on and
 other timestamps cannot be supplied by the client.
 
 `item_name` is a trimmed 1–100 character name. The batch resolves or creates a
-private definition in its current active category; other batches and public
+private definition in its selected active category; other batches and public
 catalog names are unchanged. Archived or differently categorized private name
 collisions return 409 / NAME_CONFLICT.
+
+`category_id` must identify an ACTIVE public or user-owned category (missing or
+inaccessible: **404 / NOT_FOUND**, archived: **409 / STATE_CONFLICT**). It changes
+only this batch's category, reflected in inventory and expiry filters. The
+shared definition and sibling batches are unchanged. Null is invalid.
 
 The optional quantity edit supports a measured balance or a read-only estimate:
 

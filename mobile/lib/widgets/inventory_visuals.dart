@@ -169,7 +169,7 @@ class _InventoryArtworkState extends State<InventoryArtwork> {
   @override
   void didUpdateWidget(covariant InventoryArtwork oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.item.id != widget.item.id ||
+    if (oldWidget.item != widget.item ||
         oldWidget.artworkRepository != widget.artworkRepository) {
       _loadArtwork();
     }

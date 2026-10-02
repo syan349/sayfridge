@@ -285,7 +285,7 @@ async def list_item_categories(runtime: AgentToolRuntime, page: int = 1) -> str:
     if page < 1:
         raise ValueError("page must be positive")
     async with AsyncSessionFactory() as session:
-        rows, total = await catalog.list_categories(session, status="ACTIVE", page=page, page_size=50)
+        rows, total = await catalog.list_categories(session, runtime.context.user_id, status="ACTIVE", page=page, page_size=50)
     return _json({"items": [{**ItemCategoryRead.model_validate(r).model_dump(mode="json"), **category_guidance(r.name)} for r in rows],
                   "total": total, "page": page, "page_size": 50})
 

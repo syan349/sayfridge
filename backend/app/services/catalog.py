@@ -1,12 +1,13 @@
 """B05/B06 catalog visibility, normalized names, state rules, and transactions."""
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import case, func, or_, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
+from sqlalchemy.dialects.postgresql import insert
 
-from app.core.catalog import normalize_catalog_name
+from app.core.catalog import normalize_catalog_name, normalize_category_name
 from app.db.models import ItemCategory, ItemDefinition
 
 
@@ -40,11 +41,46 @@ async def _read_page(session, statement, model, order_fields, page, page_size):
     return [row for row, _ in rows if row is not None], rows[0].total
 
 
-async def list_categories(session: AsyncSession, *, status: str, page: int, page_size: int):
-    statement = select(ItemCategory)
+def category_visibility(user_id: UUID | None):
+    return or_(ItemCategory.owner_user_id.is_(None), ItemCategory.owner_user_id == user_id)
+
+
+async def list_categories(session: AsyncSession, user_id: UUID | None = None, *, status: str, page: int, page_size: int):
+    statement = select(ItemCategory).where(category_visibility(user_id))
     if status != "ALL":
         statement = statement.where(ItemCategory.status == status)
-    return await _read_page(session, statement, ItemCategory, ("sort_order", "name", "id"), page, page_size)
+    return await _read_page(session, statement, ItemCategory, ("normalized_name", "id"), page, page_size)
+
+
+async def create_category(session: AsyncSession, user_id: UUID, *, name: str):
+    """Reuse a visible normalized name, or atomically create an owned category."""
+    normalized = normalize_category_name(name)
+    if not 1 <= len(normalized) <= 100:
+        raise CatalogNameConflictError("Normalized category name must contain 1 to 100 characters")
+    try:
+        visible = list(await session.scalars(select(ItemCategory).where(category_visibility(user_id))))
+        existing = next((row for row in visible if row.normalized_name == normalized
+                         or normalize_category_name(row.name) == normalized), None)
+        if existing is not None:
+            _require_active(existing)
+            await session.commit()
+            return existing
+        await session.execute(insert(ItemCategory).values(
+            id=uuid4(), owner_user_id=user_id, name=" ".join(name.split()), normalized_name=normalized,
+            status="ACTIVE", sort_order=0,
+        ).on_conflict_do_nothing(
+            index_elements=[ItemCategory.owner_user_id, ItemCategory.normalized_name],
+            index_where=ItemCategory.owner_user_id.is_not(None),
+        ))
+        category = await session.scalar(select(ItemCategory).where(
+            ItemCategory.owner_user_id == user_id, ItemCategory.normalized_name == normalized,
+        ))
+        _require_active(category)
+        await session.commit()
+        return category
+    except Exception:
+        await session.rollback()
+        raise
 
 
 async def list_definitions(
@@ -54,6 +90,7 @@ async def list_definitions(
     scope_column = case((ItemDefinition.owner_user_id.is_(None), "PUBLIC"), else_="PRIVATE").label("scope")
     statement = select(ItemDefinition, scope_column).join(ItemCategory).where(
         or_(ItemDefinition.owner_user_id.is_(None), ItemDefinition.owner_user_id == user_id),
+        category_visibility(user_id),
     )
     if status != "ALL":
         statement = statement.where(ItemDefinition.status == status)
@@ -85,11 +122,11 @@ async def get_definition(
     return definition
 
 
-async def _lock_categories(session: AsyncSession, category_ids: set[UUID]) -> dict[UUID, ItemCategory]:
+async def _lock_categories(session: AsyncSession, category_ids: set[UUID], user_id: UUID | None = None) -> dict[UUID, ItemCategory]:
     categories = {}
     for category_id in sorted(category_ids):
         category = (await session.execute(
-            select(ItemCategory).where(ItemCategory.id == category_id).with_for_update()
+            select(ItemCategory).where(ItemCategory.id == category_id, category_visibility(user_id)).with_for_update()
             .execution_options(populate_existing=True)
         )).scalar_one_or_none()
         if category is None:
@@ -137,7 +174,7 @@ async def _rollback_write(session: AsyncSession, error: Exception) -> None:
 
 async def create_definition(session: AsyncSession, user_id: UUID, *, name: str, category_id: UUID, commit: bool = True) -> ItemDefinition:
     try:
-        categories = await _lock_categories(session, {category_id})
+        categories = await _lock_categories(session, {category_id}, user_id)
         _require_active(categories[category_id])
         normalized = await _check_name(session, user_id, name)
         definition = ItemDefinition(name=name, normalized_name=normalized, category_id=category_id,
@@ -154,7 +191,7 @@ async def update_definition(session: AsyncSession, definition_id: UUID, user_id:
         planned = await get_definition(session, definition_id, user_id, own_only=True)
         original_category = planned.category_id
         target_category = changes.get("category_id", original_category)
-        categories = await _lock_categories(session, {original_category, target_category})
+        categories = await _lock_categories(session, {original_category, target_category}, user_id)
         definition = await get_definition(session, definition_id, user_id, own_only=True, lock=True)
         if definition.category_id != original_category:
             raise CatalogResourceChangedError("Item category changed; refresh and retry")
@@ -182,7 +219,7 @@ async def set_definition_status(
     try:
         planned = await get_definition(session, definition_id, user_id, own_only=True)
         original_category = planned.category_id
-        categories = await _lock_categories(session, {original_category})
+        categories = await _lock_categories(session, {original_category}, user_id)
         definition = await get_definition(session, definition_id, user_id, own_only=True, lock=True)
         if definition.category_id != original_category:
             raise CatalogResourceChangedError("Item category changed; refresh and retry")

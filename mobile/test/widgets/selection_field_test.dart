@@ -4,6 +4,86 @@ import 'package:sayfridge/widgets/selection_field.dart';
 
 void main() {
   testWidgets(
+    'typed categories reuse existing IDs and choices are alphabetical',
+    (tester) async {
+      String? selected;
+      var creates = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SelectionField(
+              label: 'Category',
+              options: {'z': 'Vegetables', 'f': 'Fruit', 'd': 'Dairy'},
+              sortAlphabetically: true,
+              onCreateOption: (name) async {
+                creates++;
+                return 'new-category';
+              },
+              onChanged: (value) => selected = value,
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byType(SelectionField));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(find.text('Dairy')).dy,
+        lessThan(tester.getTopLeft(find.text('Fruit')).dy),
+      );
+      expect(
+        tester.getTopLeft(find.text('Fruit')).dy,
+        lessThan(tester.getTopLeft(find.text('Vegetables')).dy),
+      );
+      await tester.enterText(
+        find.byKey(const Key('category-name-input')),
+        '  FRUIT  ',
+      );
+      await tester.tap(find.byTooltip('Use category'));
+      await tester.pumpAndSettle();
+      expect(selected, 'f');
+      expect(creates, 0);
+      await tester.tap(find.byType(SelectionField));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('category-name-input')),
+        'Baking',
+      );
+      await tester.tap(find.byTooltip('Use category'));
+      await tester.pumpAndSettle();
+      expect(selected, 'new-category');
+      expect(creates, 1);
+    },
+  );
+
+  testWidgets('space management opens without replacing the chosen space', (
+    tester,
+  ) async {
+    var manages = 0;
+    String? changed;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SelectionField(
+            label: 'Storage space',
+            value: 'fridge',
+            options: {'fridge': 'Fridge'},
+            onChanged: (value) => changed = value,
+            onManage: () async => manages++,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(SelectionField));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage storage spaces'));
+    await tester.pumpAndSettle();
+    expect(manages, 1);
+    expect(changed, isNull);
+    expect(find.text('Choose storage space'), findsNothing);
+    expect(find.text('Fridge'), findsOneWidget);
+  });
+
+  testWidgets(
     'selection sheet preserves cancellation, validates and follows dependent choices',
     (tester) async {
       final form = GlobalKey<FormState>();
@@ -87,6 +167,8 @@ void main() {
     await tester.tap(find.byType(SelectionField));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Custom item 39'), 250);
+    await tester.drag(find.byType(ListView), const Offset(0, -150));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Custom item 39'));
     await tester.pumpAndSettle();
     expect(selected, '39');

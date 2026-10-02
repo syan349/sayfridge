@@ -18,4 +18,7 @@ class ItemArtworkRepository {
     if (!ItemIcon.isValidAsset(asset)) throw ArgumentError('Unknown item icon');
     return _storage.write(key: 'item_artwork_$itemId', value: asset);
   }
+
+  Future<void> clear(String itemId) =>
+      _storage.delete(key: 'item_artwork_$itemId');
 }

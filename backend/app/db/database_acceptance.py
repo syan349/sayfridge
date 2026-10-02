@@ -22,7 +22,7 @@ def _category_rows(connection: Connection, schema: str) -> list[dict[str, Any]]:
         text(
             f"SELECT name, normalized_name, sort_order "
             f"FROM {quoted}.item_category "
-            "WHERE normalized_name IN :names AND status = 'ACTIVE' "
+            "WHERE normalized_name IN :names AND status = 'ACTIVE' AND owner_user_id IS NULL "
             "ORDER BY sort_order, normalized_name"
         ).bindparams(bindparam("names", expanding=True)),
         {"names": expected},

@@ -80,6 +80,7 @@ def test_openapi_is_complete_enough_for_interactive_acceptance() -> None:
         ("/api/v1/auth/logout", "post"),
         ("/api/v1/storage-spaces", "post"),
         ("/api/v1/storage-spaces/{space_id}", "patch"),
+        ("/api/v1/item-categories", "post"),
         ("/api/v1/item-definitions", "post"),
         ("/api/v1/item-definitions/{definition_id}", "patch"),
         ("/api/v1/inventory-items", "post"),

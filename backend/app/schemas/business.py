@@ -94,6 +94,11 @@ class ItemDefinitionListQuery(CatalogListQuery):
 CatalogName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 
+class ItemCategoryCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: CatalogName
+
+
 class ItemDefinitionCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

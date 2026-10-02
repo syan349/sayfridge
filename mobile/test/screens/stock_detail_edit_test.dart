@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/testing.dart';
 import 'package:sayfridge/models/inventory_item.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
@@ -26,6 +27,7 @@ Future<void> save(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   for (final estimated in [false, true]) {
     testWidgets(
       'name and measured free-text units save together, original estimate: $estimated',

@@ -228,8 +228,10 @@ class _SayFridgeAppState extends State<SayFridgeApp> {
   Future<void> _openManualStockIn(BuildContext context) async {
     final createdItem = await Navigator.of(context).push<InventoryItem>(
       MaterialPageRoute<InventoryItem>(
-        builder: (_) =>
-            ManualStockInScreen(controller: _manualStockInController),
+        builder: (_) => ManualStockInScreen(
+          controller: _manualStockInController,
+          workspace: _workspace,
+        ),
       ),
     );
     if (createdItem == null) return;

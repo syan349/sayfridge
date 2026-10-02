@@ -51,7 +51,7 @@ Once the server starts, the following endpoints are available:
 - Storage spaces: `GET/POST http://127.0.0.1:8000/api/v1/storage-spaces`
 - Space detail/edit: `GET/PATCH http://127.0.0.1:8000/api/v1/storage-spaces/{id}`
 - Space archive/restore: `POST http://127.0.0.1:8000/api/v1/storage-spaces/{id}/archive` or `/restore`
-- Categories: `GET http://127.0.0.1:8000/api/v1/item-categories`
+- Categories: `GET/POST http://127.0.0.1:8000/api/v1/item-categories`
 - Item definitions: `GET/POST http://127.0.0.1:8000/api/v1/item-definitions`; detail/PATCH and archive/restore under `/{id}`
 - Inventory: `GET/POST http://127.0.0.1:8000/api/v1/inventory-items`; detail/PATCH under `/{id}`
 - Add to existing inventory: `POST http://127.0.0.1:8000/api/v1/inventory-items/{id}/operations` (ADD/AMOUNT; Idempotency-Key required)
@@ -489,6 +489,16 @@ applied.
 The inventory routes use `app/schemas/inventory.py` and `app/services/inventory.py`.
 An owned active space and visible active definition/category must exist before
 stock entry. No shared seed data is inserted automatically.
+
+`POST /api/v1/item-categories` accepts a typed name and reuses a matching public
+or user-owned category after Unicode, case and whitespace normalization. New
+categories belong to the authenticated user. Category lists include public and
+owned categories in alphabetical order. `PATCH /api/v1/inventory-items/{id}`
+accepts `category_id` for a batch-specific change; other batches retain their
+categories. These changes require migration `a261002_categories`; run
+`python -m alembic upgrade head` against the intended database before releasing
+the updated backend and mobile app. Local disposable test migrations do not
+establish shared or production deployment status.
 
 Run inventory tests alone with:
 

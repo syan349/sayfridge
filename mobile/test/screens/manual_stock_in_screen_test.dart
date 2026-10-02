@@ -14,6 +14,9 @@ import 'package:sayfridge/repositories/catalog_repository.dart';
 import 'package:sayfridge/repositories/inventory_repository.dart';
 import 'package:sayfridge/repositories/item_artwork_repository.dart';
 import 'package:sayfridge/repositories/storage_space_repository.dart';
+import 'package:sayfridge/repositories/workspace_repository.dart';
+import 'package:sayfridge/screens/stock_editor_screen.dart';
+import 'package:sayfridge/widgets/selection_field.dart';
 import 'package:sayfridge/screens/manual_stock_in_screen.dart';
 import 'package:sayfridge/services/api_client.dart';
 import 'package:sayfridge/services/catalog_api_service.dart';
@@ -48,9 +51,23 @@ class _Harness {
     api = ApiClient(
       client: MockClient((request) async {
         final path = request.url.path;
-        if (request.method == 'POST') {
+        if (request.method == 'POST' || request.method == 'PATCH') {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           writes.add((path, body));
+          if (request.method == 'PATCH') {
+            return jsonResponse({
+              ...stockJson(version: 2),
+              'category_id': body['category_id'] ?? 'category-1',
+            });
+          }
+          if (path.endsWith('/item-categories')) {
+            return jsonResponse({
+              'id': 'custom-category',
+              'name': body['name'],
+              'status': 'ACTIVE',
+              'sort_order': 0,
+            });
+          }
           if (path.endsWith('/item-definitions')) {
             return jsonResponse({
               'id': 'new-definition',
@@ -146,10 +163,13 @@ class _Harness {
     await tester.pumpWidget(
       RepaintBoundary(
         key: _captureKey,
-          child: MaterialApp(
-            debugShowCheckedModeBanner: false,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
-          home: ManualStockInScreen(controller: controller),
+          home: ManualStockInScreen(
+            controller: controller,
+            workspace: WorkspaceRepository(api, MemoryTokens()),
+          ),
         ),
       ),
     );
@@ -224,8 +244,8 @@ void main() {
       expect(_previewAsset(tester), ItemIcon.defaultAsset);
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Library'));
-      await tester.tap(find.text('Library'));
+      await tester.ensureVisible(find.byKey(const Key('item-icon-preview')));
+      await tester.tap(find.byKey(const Key('item-icon-preview')));
       await tester.pumpAndSettle();
       await _capture(tester, 'add-item-library');
       final search = find.widgetWithText(TextField, 'Search icons');
@@ -255,8 +275,8 @@ void main() {
       await tester.enterText(find.byKey(const Key('add-item-name')), 'Apple');
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Library'));
-      await tester.tap(find.text('Library'));
+      await tester.ensureVisible(find.byKey(const Key('item-icon-preview')));
+      await tester.tap(find.byKey(const Key('item-icon-preview')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Banana'));
       await tester.pumpAndSettle();
@@ -265,6 +285,11 @@ void main() {
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
       final button = find.widgetWithText(FilledButton, 'Add to inventory');
+      await tester.dragUntilVisible(
+        button,
+        find.byType(ListView).last,
+        const Offset(0, -200),
+      );
       await tester.ensureVisible(button);
       await tester.pumpAndSettle();
       await _capture(tester, 'add-item-form-bottom');
@@ -335,7 +360,7 @@ void main() {
     tester,
   ) async {
     await _Harness().open(tester, size: const Size(320, 568));
-    await tester.tap(find.text('Library'));
+    await tester.tap(find.byKey(const Key('item-icon-preview')));
     await tester.pumpAndSettle();
     tester.view.viewInsets = const FakeViewPadding(bottom: 250);
     addTearDown(tester.view.resetViewInsets);
@@ -348,4 +373,125 @@ void main() {
     expect(find.text('No matching icons'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'manual category is saved and selected; forms open the existing space manager',
+    (tester) async {
+      final harness = _Harness();
+      await harness.open(tester);
+      await tester.enterText(find.byKey(const Key('add-item-name')), 'Apple');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final categoryField = find.byType(SelectionField).first;
+      await tester.tap(categoryField);
+      await tester.pumpAndSettle();
+      await _capture(tester, 'choose-category');
+      await tester.enterText(
+        find.byKey(const Key('category-name-input')),
+        'Baking',
+      );
+      await tester.tap(find.byTooltip('Use category'));
+      await tester.pumpAndSettle();
+      expect(harness.writes.single.$2, {'name': 'Baking'});
+      expect(harness.controller.selectedCategoryId, 'custom-category');
+      expect(find.text('Baking'), findsOneWidget);
+      final storageField = find.byType(SelectionField).last;
+      await tester.ensureVisible(storageField);
+      await tester.pumpAndSettle();
+      await tester.tap(storageField);
+      await tester.pumpAndSettle();
+      await _capture(tester, 'choose-storage-space');
+      await tester.tap(find.text('Manage storage spaces'));
+      await tester.pumpAndSettle();
+      expect(find.text('Manage where you store items.'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(harness.controller.selectedCategoryId, 'custom-category');
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('add-item-name')))
+            .controller
+            ?.text,
+        'Apple',
+      );
+    },
+  );
+
+  testWidgets(
+    'detail edits save category and icon; restoring automatic removes the saved override',
+    (tester) async {
+      final harness = _Harness();
+      await harness.open(tester);
+      final item = InventoryItem.fromJson({
+        ...stockJson(),
+        'category_id': 'original-category',
+        'category_name': 'Dairy',
+      });
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: _captureKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            home: StockEditorScreen(
+              workspace: WorkspaceRepository(harness.api, MemoryTokens()),
+              item: item,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _capture(tester, 'item-details-edit');
+      await tester.tap(find.byKey(const Key('item-icon-preview')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Banana'));
+      await tester.pumpAndSettle();
+      await _capture(tester, 'item-details-manual-icon');
+      final categoryField = find.byType(SelectionField).first;
+      await tester.ensureVisible(categoryField);
+      await tester.pumpAndSettle();
+      await tester.tap(categoryField);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fruit'));
+      await tester.pumpAndSettle();
+      final save = find.widgetWithText(FilledButton, 'Save changes');
+      await tester.dragUntilVisible(
+        save,
+        find.byType(ListView).last,
+        const Offset(0, -200),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(harness.writes.last.$2['category_id'], 'category-1');
+      expect(harness.writes.last.$2['expected_version'], 1);
+      expect(
+        await const ItemArtworkRepository().read(item.id),
+        endsWith('/banana.png'),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: StockEditorScreen(
+            key: const Key('second-edit'),
+            workspace: WorkspaceRepository(harness.api, MemoryTokens()),
+            item: item,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Use automatic icon'));
+      await tester.pumpAndSettle();
+      await tester.dragUntilVisible(
+        find.widgetWithText(FilledButton, 'Save changes'),
+        find.byType(ListView).last,
+        const Offset(0, -200),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await tester.pumpAndSettle();
+      expect(await const ItemArtworkRepository().read(item.id), isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

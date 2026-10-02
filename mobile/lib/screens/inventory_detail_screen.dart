@@ -184,6 +184,7 @@ class _DetailPanel extends StatelessWidget {
           ),
           SizedBox(height: compact ? 8 : 14),
           _row(label: 'Item name', value: item.itemDefinitionName),
+          _row(label: 'Category', value: item.categoryName),
           _row(
             label: 'Quantity',
             value: quantityLabel(item),

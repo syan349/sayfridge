@@ -5,6 +5,8 @@ import '../widgets/page_scroll_fade.dart';
 import '../models/inventory_item.dart';
 import '../models/item_definition.dart';
 import '../repositories/item_artwork_repository.dart';
+import '../repositories/workspace_repository.dart';
+import '../widgets/storage_space_management.dart';
 import '../state/manual_stock_in_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
@@ -16,11 +18,13 @@ class ManualStockInScreen extends StatefulWidget {
   const ManualStockInScreen({
     required this.controller,
     this.artworkRepository = const ItemArtworkRepository(),
+    this.workspace,
     super.key,
   });
 
   final ManualStockInController controller;
   final ItemArtworkRepository artworkRepository;
+  final WorkspaceRepository? workspace;
 
   @override
   State<ManualStockInScreen> createState() => _ManualStockInScreenState();
@@ -159,6 +163,8 @@ class _ManualStockInScreenState extends State<ManualStockInScreen> {
                             category.id: category.name,
                         },
                         onChanged: enabled ? controller.selectCategory : null,
+                        sortAlphabetically: true,
+                        onCreateOption: controller.createCategory,
                         validator: (value) =>
                             value == null ? 'Choose a category.' : null,
                       ),
@@ -249,6 +255,26 @@ class _ManualStockInScreenState extends State<ManualStockInScreen> {
                         onChanged: enabled
                             ? controller.selectStorageSpace
                             : null,
+                        onManage: widget.workspace == null
+                            ? null
+                            : () async {
+                                await manageStorageSpaces(
+                                  context,
+                                  widget.workspace!,
+                                );
+                                if (!mounted) return;
+                                try {
+                                  await controller.reloadStorageSpaces();
+                                } catch (error) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(businessError(error)),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
                         validator: (value) =>
                             value == null ? 'Choose a storage space.' : null,
                       ),

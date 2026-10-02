@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import select, func, text
 
 from app.agents.memory import fingerprint, MemoryService
-from app.core.catalog import normalize_catalog_name
+from app.core.catalog import normalize_catalog_name, normalize_category_name
 from app.core.quantity import validate_quantity_amount
 from app.db.models import AgentInventoryAction, StorageSpace, ItemDefinition, ItemCategory
 from app.schemas.agent_actions import ActionDraft
@@ -118,9 +118,9 @@ async def _creation_values(session, user_id, draft, *, create=False):
         if space.status != "ACTIVE":
             raise PreparationError("STATE_CONFLICT", "Creation requires an active space")
     if draft.new_definition:
-        category = (await catalog._lock_categories(session, {draft.new_definition.category_id}))[draft.new_definition.category_id] if create else await session.get(ItemCategory, draft.new_definition.category_id)
+        category = (await catalog._lock_categories(session, {draft.new_definition.category_id}, user_id))[draft.new_definition.category_id] if create else await session.scalar(select(ItemCategory).where(ItemCategory.id == draft.new_definition.category_id, catalog.category_visibility(user_id)))
         if category is None or category.status != "ACTIVE":
-            available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE")))
+            available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE", catalog.category_visibility(user_id))))
             raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category", {
                 "categories": [{"id": str(c.id), "name": c.name} for c in available]})
         matches = list(await session.scalars(select(ItemDefinition).where(
@@ -145,8 +145,8 @@ async def _creation_values(session, user_id, draft, *, create=False):
         raise PreparationError("DEFINITION_REQUIRED", "Select an item definition")
     if definition_id:
         definition = await catalog.get_definition(session, definition_id, user_id)
-        category = await session.get(ItemCategory, definition.category_id)
-        if definition.status != "ACTIVE" or category.status != "ACTIVE":
+        category = await session.scalar(select(ItemCategory).where(ItemCategory.id == definition.category_id, catalog.category_visibility(user_id)))
+        if definition.status != "ACTIVE" or category is None or category.status != "ACTIVE":
             raise PreparationError("STATE_CONFLICT", "Creation requires an active definition/category")
     return space_id, definition_id
 
@@ -203,9 +203,9 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
             raise PreparationError("CLARIFICATION_REQUIRED", draft.clarification_question)
         if draft.new_definition and draft.category_name:
             category = await session.scalar(select(ItemCategory).where(ItemCategory.status == "ACTIVE",
-                ItemCategory.normalized_name == normalize_catalog_name(draft.category_name)))
+                catalog.category_visibility(user_id), ItemCategory.normalized_name == normalize_category_name(draft.category_name)))
             if category is None:
-                available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE")))
+                available = list(await session.scalars(select(ItemCategory).where(ItemCategory.status == "ACTIVE", catalog.category_visibility(user_id))))
                 raise PreparationError("CATEGORY_REQUIRED", "Choose an active existing category", {
                     "categories": [{"id": str(c.id), "name": c.name} for c in available]})
             draft = draft.model_copy(update={"new_definition": draft.new_definition.model_copy(update={"category_id": category.id})})
