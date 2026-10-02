@@ -29,6 +29,7 @@ class AgentModelSettings(BaseSettings):
     context_limit: int = Field(default=160000, alias="AGENT_CONTEXT_LIMIT")
     model_context_limit: int = Field(default=160000, alias="AGENT_MODEL_CONTEXT_LIMIT")
     output_tokens: int = Field(default=8000, alias="AGENT_OUTPUT_TOKENS")
+    summary_timeout_seconds: float = Field(default=45, alias="AGENT_SUMMARY_TIMEOUT_SECONDS", gt=0, le=120)
 
     @field_validator("model_name", "api_base")
     @classmethod
@@ -56,7 +57,7 @@ def create_agent_model() -> BudgetModel:
     budget = Budget(trigger=settings.context_trigger, target=settings.context_target,
                     limit=settings.context_limit, model_limit=settings.model_context_limit,
                     output=settings.output_tokens)
-    return BudgetModel(ChatOpenAI(
+    model = BudgetModel(ChatOpenAI(
         model=settings.model_name,
         base_url=settings.api_base,
         api_key=settings.api_key,
@@ -65,3 +66,5 @@ def create_agent_model() -> BudgetModel:
         streaming=True,
         max_tokens=settings.output_tokens,
     ), budget)
+    model.summary_timeout_seconds = settings.summary_timeout_seconds
+    return model

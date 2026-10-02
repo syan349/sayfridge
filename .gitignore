@@ -28,6 +28,7 @@ Thumbs.db
 /mobile/test-results.jsonl
 
 /backend/test-results.xml
+/backend/agent-client-traces.jsonl
 
 # Disposable browser E2E builds and evidence
 /web/.e2e-dist/

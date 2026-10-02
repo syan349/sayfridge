@@ -2,6 +2,9 @@
 import asyncio
 from datetime import datetime, timezone
 import uuid
+import os
+import json
+from pathlib import Path
 
 import httpx
 from sqlalchemy import select
@@ -65,7 +68,22 @@ async def exercise(database, scenario):
     previous = app.dependency_overrides.get(get_db_session)
     app.dependency_overrides[get_db_session] = override
     try:
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        async def capture(response):
+            target = os.getenv("AGENT_CLIENT_CAPTURE_FILE")
+            path = response.request.url.path
+            capture_path = path.startswith("/api/v1/agent/") or (
+                path.startswith("/api/v1/inventory-items/") and path.endswith("/discard"))
+            if not target or not capture_path:
+                return
+            await response.aread()
+            payload = json.loads(response.request.content) if response.request.content else None
+            row = {"path": response.request.url.path, "method": response.request.method,
+                   "request": payload, "status": response.status_code,
+                   "content_type": response.headers.get("content-type", ""), "body": response.text}
+            with Path(target).open("a", encoding="utf-8") as output:
+                output.write(json.dumps(row, ensure_ascii=False) + "\n")
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test",
+                event_hooks={"response": [capture]}) as client:
             return await scenario(client, sessions)
     finally:
         if previous is None:

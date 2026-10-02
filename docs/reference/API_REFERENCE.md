@@ -839,6 +839,7 @@ responses are SSE (`text/event-stream`); state responses are ordinary JSON.
 
 | User action | Interface | Frontend behavior |
 | --- | --- | --- |
+| Open the persistent main chat and read older public messages | `GET /api/v1/agent/chat` | Use the returned ID for existing POST chat/resume calls; render public history |
 | Send a new message/photo | `POST /api/v1/agent/chat` | Show the reply or proposed stock entries |
 | Answer, edit, supplement, confirm or cancel a pending item | `POST /api/v1/agent/resume` | Update the existing item using the new response |
 | Refresh or recover after losing a response | `GET /api/v1/agent/conversations/{conversation_id}/state` | Restore current progress before retrying |
@@ -1013,6 +1014,59 @@ An item marked EXECUTION_UNCERTAIN may already have committed. Confirmation retr
 its unchanged receipt first; editing or cancelling it is rejected with
 VERIFY_OUTCOME_FIRST. After a stream error/disconnection query state before retrying.
 
+### GET /api/v1/agent/chat
+
+Authenticated JSON entry for the user's persistent main chat. First use binds the
+most recently used owned legacy thread, or creates a stable primary ID if no older
+thread exists. Concurrent opens return the same ID. The partial primary-user index
+allows all other legacy IDs to remain valid.
+
+Query parameters are optional: `page_size` defaults to 50 and accepts 1–100;
+`before` is the `next_before` UUID from the previous page. Each page contains the
+most recent eligible public messages in ascending `(created_at, id)` order. A
+missing/foreign cursor returns **422 / INVALID_HISTORY_CURSOR**. The cursor is for
+interface history only and has no effect on model context.
+
+```json
+{
+  "conversation_id": "00000000-0000-4000-8000-000000000001",
+  "state": {"status": "COMPLETED", "items": []},
+  "messages": [
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "conversation_id": "00000000-0000-4000-8000-000000000001",
+      "role": "USER",
+      "content": "I bought 2 kg rice today",
+      "created_at": "2026-10-02T00:00:00Z"
+    }
+  ],
+  "history_complete": false
+}
+```
+
+`next_before` is present when an older page exists. `state` uses the existing
+sanitized recovery schema and describes only the primary thread. Public messages
+include available history from the user's older threads; their per-message
+`conversation_id` identifies the original source. Older pending business operations
+continue using their original state/resume IDs. Execution states are not merged.
+
+Public records contain actual user text, explicit confirm/answer/edit/cancel
+actions, final public replies and questions. Images appear as attachment notes;
+raw bytes, internal tool/model messages, prompts, summaries and checkpoints are
+excluded. Stable message IDs prevent request replay from duplicating history.
+History-write failure retains a durable retry record without repeating committed
+inventory actions. Old recovery remains conservative: `history_complete=false`
+means messages or exact send timestamps may be missing; missing text is never
+generated from summaries. The recovery script in the backend README defaults to
+read-only preview and requires an explicit apply step for backfill.
+
+This is an incremental frontend entry. Existing POST chat/resume and
+`GET /agent/conversations/{id}/state` contracts remain compatible. Existing POST
+requests keep supplied IDs; omitted IDs keep the previous generation rule. The
+backend never redirects them silently to the primary thread. Existing Web/Mobile
+pages need a later minimal integration to display the complete server transcript
+and adopt the single-window product flow.
+
 ### GET /api/v1/agent/conversations/{conversation_id}/state
 
 **Purpose:** restore business progress after refresh, lost response or interruption.
@@ -1032,7 +1086,7 @@ Authorization: Bearer <token>
 
 | Field | Meaning |
 | --- | --- |
-| request_id | Original chat turn UUID, not the latest resume UUID |
+| request_id | Current chat/resume turn UUID |
 | status | COMPLETED, WAITING_INPUT or RECOVERABLE |
 | items | All work items in this turn, including completed and pending items |
 | interrupt_id | Present while interrupted; use the current value for resume |
@@ -1646,6 +1700,15 @@ committed receipts are replayed without new stock or model calls.
   disconnected request with the same `request_id`; never manufacture replacement
   operation IDs after an uncertain save. `CONTEXT_BUDGET_EXCEEDED` preserves recovery
   state and indicates no oversized model request was sent.
+- Working context uses a cumulative model summary plus recent full messages,
+  existing relevant user memories and authoritative task data. The summary is
+  persisted before older working messages are removed. It neither deletes public
+  history nor authorizes inventory writes. Tool call/result groups and pending
+  evidence remain intact. A failed summary retains the old state; safe requests
+  continue, while oversized requests receive a retryable error.
+- The `start` event precedes model summarization. During idle execution the server
+  sends SSE comment heartbeats every 15 seconds (`: keep-alive`), requiring no new
+  client event type. Summary output never appears in `text_delta`.
 - Current balances use the operation's requested unit; a relative fraction retains
   the existing unit. Weight can switch back to an estimated integer count. Original
   entry and operation expressions remain unchanged. Estimates execute directly unless

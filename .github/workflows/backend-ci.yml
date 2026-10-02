@@ -45,6 +45,7 @@ jobs:
     env:
       AGENT_LIVE_MODEL: '0'
       TEST_DATABASE_URL: postgresql+psycopg://test_user:ci-only-password@localhost:5432/sayfridge_auth_test
+      AGENT_CLIENT_CAPTURE_FILE: agent-client-traces.jsonl
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,3 +69,47 @@ jobs:
           name: backend-test-results
           path: backend/test-results.xml
           retention-days: 7
+      - name: Actual backend responses for unchanged clients
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-client-traces
+          path: backend/agent-client-traces.jsonl
+          retention-days: 7
+
+  legacy-agent-clients:
+    name: Unchanged Agent clients consume backend responses
+    needs: test-job
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AGENT_CLIENT_CAPTURE_FILE: ../backend/agent-client-traces.jsonl
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.test_ref || github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: agent-client-traces
+          path: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Locked Web dependencies
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+      - name: Existing Web parser and chat state
+        working-directory: web
+        run: npm test -- --config ../backend/tests/vitest.agent-clients.config.mts
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+      - name: Locked Mobile dependencies
+        working-directory: mobile
+        run: flutter pub get --enforce-lockfile
+      - name: Existing Mobile parser and retry controller
+        working-directory: mobile
+        run: flutter test --no-pub ../backend/tests/agent_client_compat_test.dart

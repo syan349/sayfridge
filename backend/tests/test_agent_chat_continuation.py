@@ -43,7 +43,7 @@ def test_chat_supplement_and_query_do_not_lose_or_recreate_work(monkeypatch, dec
         model = ScriptModel([call([proposed]), AIMessage(content="Inventory answer") if decision == "query" else call([revised])],
                             intents=[intake([proposed]), intake(kind="QUERY")])
         from app.agents.context_budget import Budget
-        model.budget = Budget(trigger=7000, target=4000, limit=16000, model_limit=16000, output=1000)
+        model.budget = Budget(output=1000)
         graph = workflow.build_agent_graph(model, checkpointer=InMemorySaver(), store=InMemoryStore(),
                                            session_factory=fake_session, tools=[])
         config = {"configurable": {"thread_id": str(uuid4())}, "recursion_limit": 128}
@@ -51,7 +51,7 @@ def test_chat_supplement_and_query_do_not_lose_or_recreate_work(monkeypatch, dec
         start = initial()
         history = []
         for n in range(20):
-            history.extend([HumanMessage(content=f"old topic {n}: " + "x" * 350), AIMessage(content="old answer")])
+            history.extend([HumanMessage(content=f"old topic {n}: " + "x" * 3500), AIMessage(content="old answer")])
         start["messages"] = [*history, *start["messages"]]
         await graph.ainvoke(start, config, context=context)
         before = await graph.aget_state(config)
