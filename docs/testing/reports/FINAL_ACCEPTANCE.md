@@ -36,6 +36,42 @@ The [delivery runbook](../../delivery/README.md) owns commands, configuration an
 deployment order. Run results identify the selected release rather than reusing
 older results as if they tested the final commit.
 
+## Backend release-readiness verification — 2026-10-02
+
+The three authentication controls were rebuilt on the fresh main-derived branch
+`syan349_fix_backend_readiness`, based on main `d402b79970e005e4922babba1c48d6f1dda5e36c`.
+The old fix branch was deleted; its commit was not merged or cherry-picked.
+These results test the uncommitted working tree. The
+[verification manifest](../evidence/backend-release-readiness/verification-2026-10-02.json)
+records the code/test SHA-256 values and preserves earlier same-day verification.
+
+| Check | Actual result | Evidence |
+| --- | --- | --- |
+| Authentication, permissions, persistent sessions, JWT scope, safe logging, smoke-runner and Agent quantity/dialogue selection | 130 passed in 13.88 seconds; Python 3.12 and isolated local PostgreSQL 18 schemas | [Fresh-branch JUnit](../evidence/backend-release-readiness/auth-regression-fresh-main-2026-10-02.xml) |
+| Backend fast CI selection | 172 passed, 743 deselected in 24.85 seconds; same local test environment | [Fresh-branch JUnit](../evidence/backend-release-readiness/fast-ci-fresh-main-2026-10-02.xml) |
+| Earlier same-day real-model check for issue #144 | 2 passed in 55.68 seconds; `gpt-6-luna` and isolated local inventory, before recreating the branch | [Live-model JUnit](../evidence/backend-release-readiness/agent-half-consumption-live-2026-10-02.xml) |
+| Earlier same-day deployed Backend baseline | Health/version, unauthenticated rejection, ordinary/admin login, categories, stock/expiry reads, administrator denial, refresh rotation, logout revocation and browser CORS passed | [Sanitized smoke result](../evidence/backend-release-readiness/deployment-2026-10-02.json) |
+| Existing Neon baseline | Revision `a261002_categories`; 25 active public categories | Included in the sanitized smoke result |
+
+The regression selections overlap; their counts are reported separately. The first
+fresh-branch attempt could not connect to local PostgreSQL from the sandbox. After
+loopback permission was granted, all 130 cases passed; the manifest records both
+attempts. No shared Neon inventory or schema was changed by these fresh runs.
+
+The earlier real-model check verifies that a single 2 kg rice batch becomes 1 kg
+after consuming half. With two batches, target clarification is required before
+deduction; a new purchase and inventory query preserve the pending task; selecting
+the Kitchen batch resumes the deduction once and leaves the Garage batch unchanged.
+It verifies Backend dialogue and persistence, with Mobile UI acceptance recorded
+separately below. The initial missing-model-configuration attempt and successful
+rerun are preserved in the manifest.
+
+The hosted smoke verifies deployed main `d402b799`, before this hardening rollout.
+It creates and revokes authentication sessions and performs read-only business and
+database queries. After the new changes are committed and merged into main, deploy
+that main version, repeat hosted checks and record its production SHA. Final release
+identity and cross-client acceptance are recorded in the sections above and below.
+
 ## Manual cross-client and Android validation
 
 Use a dedicated ordinary account and an existing administrator account. Store their

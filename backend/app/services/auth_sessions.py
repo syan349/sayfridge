@@ -4,12 +4,12 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
-import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
-from app.core.security import create_access_token
+from app.core.security import AccessIdentity, create_access_token
+from app.core.security_events import security_event
 from app.db.models import AuthSession, RefreshCredential, User
 from app.schemas.auth import LoginResponse, UserPublic
 
@@ -79,7 +79,9 @@ async def locked_session(
     return session, credential
 
 
-async def rotate_session(db: AsyncSession, refresh: str, settings: Settings) -> LoginResponse:
+async def rotate_session(
+    db: AsyncSession, refresh: str, settings: Settings, *, request_id: uuid.UUID | None = None,
+) -> LoginResponse:
     session, credential = await locked_session(db, refresh)
     now = datetime.now(timezone.utc)
     user = await db.get(User, session.user_id)
@@ -88,8 +90,13 @@ async def rotate_session(db: AsyncSession, refresh: str, settings: Settings) -> 
         or session.expires_at <= now or session.absolute_expires_at <= now
         or user is None or user.status != "ACTIVE"
     ):
+        newly_revoked = session.revoked_at is None
         session.revoked_at = session.revoked_at or now
         await db.commit()
+        if credential.used_at is not None:
+            security_event("refresh_replay_detected", request_id=request_id, user_id=session.user_id, session_id=session.id)
+        if newly_revoked:
+            security_event("session_revoked", request_id=request_id, user_id=session.user_id, session_id=session.id)
         raise InvalidSession()
     credential.used_at = now
     session.expires_at = min(
@@ -102,30 +109,30 @@ async def rotate_session(db: AsyncSession, refresh: str, settings: Settings) -> 
     return result
 
 
-async def revoke_session(db: AsyncSession, refresh: str) -> None:
+async def revoke_session(
+    db: AsyncSession, refresh: str, *, request_id: uuid.UUID | None = None,
+) -> None:
     try:
         session, _ = await locked_session(db, refresh)
     except InvalidSession:
         return
+    newly_revoked = session.revoked_at is None
     session.revoked_at = session.revoked_at or datetime.now(timezone.utc)
     await db.commit()
+    if newly_revoked:
+        security_event("session_revoked", request_id=request_id, user_id=session.user_id, session_id=session.id)
 
 
 async def validate_access_session(
-    db: AsyncSession, token: str, settings: Settings, user_id: uuid.UUID,
+    db: AsyncSession, identity: AccessIdentity,
 ) -> None:
-    claims = jwt.decode(token, settings.jwt_secret_key.get_secret_value(), algorithms=["HS256"])
-    if "sid" not in claims:
+    if identity.session_id is None:
         # Pre-migration access tokens keep their original short expiry.
         return
-    try:
-        sid = uuid.UUID(claims["sid"])
-    except (ValueError, TypeError, AttributeError) as exc:
-        raise InvalidSession() from exc
-    session = await db.get(AuthSession, sid)
+    session = await db.get(AuthSession, identity.session_id)
     now = datetime.now(timezone.utc)
     if (
-        session is None or session.user_id != user_id or session.revoked_at is not None
+        session is None or session.user_id != identity.user_id or session.revoked_at is not None
         or session.expires_at <= now or session.absolute_expires_at <= now
     ):
         raise InvalidSession()

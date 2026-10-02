@@ -43,7 +43,7 @@ recorded selections, not a full regression run or a count of OWASP requirements.
 
 | Area | Implemented control and verified behaviour |
 | --- | --- |
-| Authentication | Argon2 password hashing; fixed HS256 JWT verification; required `sub`, `type`, `iat` and `exp` claims. Identity and session dependencies decode separately; issuer/audience claims are not explicitly issued or validated in this branch. Invalid claims, disallowed algorithms and invalid/expired tokens are rejected. Account status is checked on authenticated requests. |
+| Authentication | Argon2 password hashing; one fixed HS256 JWT verification per protected request; required `sub`, `type`, `iat` and `exp` claims. New login/refresh tokens carry issuer `sayfridge` and audience `sayfridge-api`; incorrect or partial scope claims are rejected. Legacy signed tokens with neither scope claim retain their original expiry and session checks. Account status is checked on authenticated requests. |
 | Authorization and IDOR | Resource reads/writes are scoped to the authenticated user. Tests cover foreign inventory, spaces, private definitions, history and batch operations. Ordinary users receive 403 from administrator endpoints; missing authentication receives 401. |
 | Role escalation | Registration creates a USER. Registration/status-update payload validation rejects unsupported role fields. Tests verify that input cannot create an administrator. |
 | Terminal states | Discard/archive and quantity/batch tests reject illegal operations on terminal resources; failed operations do not partially write or restore resources. |
@@ -139,6 +139,37 @@ No automatic cleanup date is promised. Removal requests are handled through the 
 procedure above, with backup and provider limitations explained to the requester.
 
 ## Logging and secret management
+
+### Authentication boundary and security events
+
+Protected requests verify the JWT signature and claims once, then pass immutable user/session
+UUIDs to the database session check. Current account status, role, session expiry and revocation
+remain enforced on every request. Login and refresh issue tokens scoped to issuer `sayfridge`
+and audience `sayfridge-api`. Wrong, partial or malformed scope claims are rejected.
+Existing signed tokens with neither scope claim remain accepted until their original expiry;
+existing session-bearing tokens still undergo the database revocation check. Refresh replaces
+these tokens with scoped tokens. This rollout requires no migration or client payload change.
+
+The `app.security.audit` logger records login success/failure, login throttling, authentication
+rejection, denied administrator access, refresh rejection/replay and device-session revocation.
+Each HTTP event has a server-generated request UUID; replay and revocation events from the same
+request share it. Records include only the fixed event name and applicable internal user/session
+UUIDs. They exclude email addresses, IP addresses, passwords, access/refresh tokens, token hashes,
+request bodies and exception text. Revocation events are emitted after the database commit.
+
+Regression evidence: `backend/tests/test_security.py` checks token scope and malformed session
+claims. `backend/tests/test_persistent_auth.py` checks one JWT decode per protected request,
+legacy-token compatibility, refresh/logout behavior and correlated credential-free audit records.
+
+Verification on 2 October 2026 on the fresh main-derived Backend readiness branch:
+130 selected regression cases and 172 fast CI cases passed against isolated local
+PostgreSQL schemas. The selections overlap. They verify issuer/audience scope,
+one JWT decode, legacy-token compatibility, refresh/logout, administrator boundaries
+and credential-free audit events. The
+[Backend readiness record](../testing/reports/FINAL_ACCEPTANCE.md#backend-release-readiness-verification--2026-10-02)
+links the fresh-branch JUnit reports and code fingerprints. The earlier hosted smoke
+checks deployed main `d402b799`; rollout verification follows the new PR's merge and
+deployment from main.
 
 ### Logging rules — 8.5
 
