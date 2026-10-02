@@ -42,7 +42,7 @@ features.
 
 ## Core features
 
-- Email/password registration and sign-in with short-lived bearer tokens.
+- Email/password registration and sign-in with automatic renewal and revocable device sessions.
 - User-owned storage spaces and private item definitions with shared categories.
 - Inventory listing, detail, search, pagination, metadata editing, and movement.
 - Atomic batch creation, movement, and archival.
@@ -69,7 +69,7 @@ in [the project scope](docs/product/README.md).
 | Agent | LangGraph and an OpenAI-compatible model API | Interprets user requests and proposes or executes allowlisted inventory actions. |
 | Database | PostgreSQL hosted on Neon | Persistent users, storage spaces, catalogue, inventory, operation, and Agent state. |
 | Hosting | Render and Vercel | Static Web/Flutter Web hosting and the deployed FastAPI service. |
-| CI | GitHub Actions with disposable PostgreSQL | Automated Backend core regression without using shared Neon data. |
+| CI | GitHub Actions with disposable PostgreSQL | Backend/Web/Flutter fast checks, conditional browser E2E and manual full regression. |
 
 ```mermaid
 flowchart LR
@@ -88,11 +88,12 @@ pooled connection; Alembic and setup operations use a direct connection.
 
 More detailed design documentation is available in:
 
-- [Architecture](docs/architecture/AGENT_DESIGN.md)
+- [System architecture](docs/architecture/README.md)
 - [Backend design](docs/architecture/BACKEND_DESIGN.md)
 - [Database design](docs/architecture/DATABASE_DESIGN.md)
 - [Quantity-state design](docs/architecture/QUANTITY_STATE_DESIGN.md)
 - [Testing evidence](docs/testing/README.md)
+- [Original design blueprints and project history](docs/archive/README.md)
 
 ## Assessment entry points
 
@@ -185,7 +186,7 @@ Start the Backend first, then open a second terminal:
 
 ```bash
 cd web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -225,12 +226,11 @@ Web, preview, and deployment details.
 
 See the [testing guide and CI policy](docs/testing/README.md) for automated
 checks, test scope, and result artifacts. Every PR runs Backend core checks
- and the Web/Flutter fast checks.
+and the Web/Flutter fast checks.
 
 GitHub Actions is the automated entry point: [Core E2E](.github/workflows/core-e2e.yml)
 coordinates reusable Backend and Frontend fast checks on every PR. For local verification, use
-the per-module commands below and the testing guide. Backend **Run workflow**
-executes full regression; its automatic PR/main runs execute the fast selection.
+the per-module commands below and the testing guide. Use **Full Regression → Run workflow** for a coordinated test of all modules.
 
 
 For one complete automated regression of the same commit, use **Actions →
@@ -270,7 +270,7 @@ AGENT_LIVE_MODEL=1 python -m pytest -q tests/test_agent_live_model.py
 
 ```bash
 cd web
-npm install
+npm ci
 npm run lint
 npm test
 npm run build
@@ -302,18 +302,10 @@ python backend/scripts/run_e2e.py
 
 The automated suite covers authentication, spaces, stock entry, editing/moving,
 consumption/history, reconciliation, archival and ownership/admin boundaries.
-Continue to validate the broader deployed-system path manually and
-record the tested commit and result:
-
-1. Register and sign in.
-2. Create a storage space.
-3. Add an inventory item.
-4. Record consumption and a physical reconciliation.
-5. Confirm that the React Web application shows the updated inventory and
-   operation history.
-6. Open the expiry view and verify overdue/upcoming grouping.
-7. Confirm that an ordinary user receives `403` for administrator APIs, then
-   repeat the account-management check with an administrator account.
+Deployment order, main revision checks, Neon migration/seed, Android APK build and
+installation, and deployed acceptance commands are maintained in
+[Build and Deployment](docs/delivery/README.md). Publish APKs as release assets;
+keep generated binaries out of source control.
 
 ## Team
 
@@ -325,9 +317,9 @@ record the tested commit and result:
 
 ## Privacy and security
 
-- [Security and Privacy](docs/security/README.md): controls, data handling, findings and fixes, test/audit evidence, and remaining risks.
+- [Security and Privacy](docs/security/README.md): controls, data handling, findings and fixes, test/audit evidence, and recorded verification scope.
 
 
 Persistent login uses short-lived access tokens and revocable refresh sessions.
-See the [authentication lifecycle and migration instructions](backend/README.md#persistent-login)
+See the [authentication lifecycle](backend/README.md#persistent-login)
 and [API reference](docs/reference/API_REFERENCE.md#post-authrefresh).

@@ -1,102 +1,338 @@
-# SayFridge Database Design
+# Database Design
 
-> Status: Current local business schema, including Agent V0.2 receipts; deployment synchronization is verified separately
->
-> Database: Neon PostgreSQL
->
-> Scope: Individual users, public and private item catalogs, inventory state, operation history, and conversation history
+This document owns the current persistence structure. Field contracts are maintained
+in the [API reference](../reference/API_REFERENCE.md); quantity semantics are in
+[quantity rules](QUANTITY_STATE_DESIGN.md). The [delivery runbook](../delivery/README.md)
+owns migration, seed, reset and restore commands.
 
-## 1. Overall Structure
+## Structure and ownership
 
-The current business schema consists of nine tables. The original eight are retained,
-and `agent_inventory_action` records committed Agent actions:
+The SQLAlchemy business metadata defines 11 tables. Inventory ownership follows
+inventory_item → storage_space → user. Public categories are shared;
+item_definition.owner_user_id NULL denotes a public definition, otherwise it
+belongs to one user. Foreign keys protect relationships; services also enforce
+ownership and active-state rules.
 
-~~~text
-item_category
-└── item_definition
-    ├── owner_user_id = NULL       Public item definition
-    └── owner_user_id = user.id    User-owned private item definition
+```mermaid
+erDiagram
+    user ||--o{ storage_space : owns
+    user ||--o{ item_definition : owns_private
+    storage_space ||--o{ inventory_item : contains
+    item_category ||--o{ item_definition : categorizes
+    item_definition ||--o{ inventory_item : describes
+    inventory_item ||--o{ inventory_operation : records
+    user ||--o{ auth_session : opens
+    auth_session ||--o{ auth_refresh_credential : rotates
+    user ||--o{ agent_inventory_action : owns_receipts
+    user ||--o{ conversation : legacy_mapping
+    conversation ||--o{ conversation_message : legacy_mapping
+```
 
-user
-├── storage_space
-│   └── inventory_item
-│       ├── item_definition_id → item_definition
-│       └── inventory_operation
-│
-├── agent_inventory_action       Agent receipts; logical conversation/turn IDs
-└── conversation
-    └── conversation_message
-~~~
+## Table reference
 
-- A user may own multiple independent storage spaces. Nested spaces and households are not modeled.
-- `item_category` is the public category catalog, with entries such as vegetables, dairy products, meat, and household supplies.
-- `item_definition` is the item catalog, with entries such as tomatoes, cucumbers, and bananas. An item definition does not represent a barcode, SKU, or specific inventory batch.
-- An `item_definition` is public when `owner_user_id` is NULL. When a user ID is present, only that user may view and maintain the private definition.
-- `inventory_item` represents a specific inventory batch in a user's storage space. Its name and category are obtained through `item_definition` rather than duplicated in the inventory table.
-- `inventory_operation` represents an operation on a single inventory item, initiated through AI or a manual action. It is not a general accounting ledger, and there is no parent operation table organized by receipt.
-- Agent V0.2 handles text requests. Photo/receipt recognition is a future capability; it must not be inferred from this schema.
-- Conversation history and inventory operation history are not linked by foreign keys.
-- The `conversation` / `conversation_message` tables remain in the business schema, but the current Agent uses LangGraph checkpoints and does not create rows in those tables.
-- LangGraph owns six separate persistence tables in the configured `agent` schema: checkpoints, checkpoint_blobs, checkpoint_writes, checkpoint_migrations, store and store_migrations. They are not included in the nine business tables. Namespace-based user memory lives in Store, not a table per user or item.
+The following field/constraint reference matches `backend/app/db/models.py`.
+Defaults generated in Python and database defaults remain defined by that model
+and the migrations. UUIDs are generated in Python; timestamps are timezone-aware.
 
-## 2. User Table: `user`
+### `item_category`
 
-| Field | Description |
-| --- | --- |
-| id | User primary key |
-| email | Unique email address used for login |
-| password_hash | Password hash for local authentication; plaintext passwords must never be stored |
-| auth_provider | Authentication provider, such as LOCAL or a third-party identity provider |
-| role | User role, such as USER or ADMIN |
-| status | Account status, such as ACTIVE, SUSPENDED, or DISABLED |
-| voice_limit_seconds | Voice usage allowance, in seconds, for the current quota period |
-| voice_used_seconds | Voice usage consumed, in seconds, during the current quota period |
-| voice_quota_reset_at | Next scheduled reset time for the voice quota |
-| created_at | User creation timestamp |
-| updated_at | Last user update timestamp |
+The 25 seeded public categories with normalized names and ordering.
 
-## 3. Storage Space Table: `storage_space`
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `name` | `VARCHAR(100)` | No |
+| `normalized_name` | `VARCHAR(100)` | No |
+| `status` | `VARCHAR(16)` | No |
+| `sort_order` | `INTEGER` | No |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `updated_at` | `TIMESTAMP WITH TIME ZONE` | No |
 
-`is_default BOOLEAN NOT NULL DEFAULT false` marks the default. A partial unique
-index on user_id WHERE is_default enforces at most one per user; a check requires
-default spaces to be ACTIVE. Login and default-space mutations ensure a replacement
-when needed, serialized by a user row lock before space locks. Existing defaults
-are preserved; absent defaults use the earliest active (created_at, id) or a new
-OTHER space named “默认空间”. Incremental revision: `a260929_defaults`.
+Constraints and indexes:
 
+- `ck_item_category_sort_order_nonnegative`: sort_order >= 0.
+- `ck_item_category_status_allowed`: status IN ('ACTIVE', 'ARCHIVED').
+- `pk_item_category`: PrimaryKeyConstraint: id.
+- `uq_item_category_normalized_name`: UniqueConstraint: normalized_name.
+- `ix_item_category_status_sort`: item_category.status, item_category.sort_order.
 
-| Field | Description |
-| --- | --- |
-| id | Storage space primary key |
-| user_id | Owning user; foreign key referencing user.id |
-| name | User-defined name, such as Kitchen Fridge or Garage Freezer |
-| type | Space type, such as FRIDGE, FREEZER, PANTRY, WAREHOUSE, or OTHER |
-| status | Space status, such as ACTIVE or ARCHIVED |
-| created_at | Space creation timestamp |
-| updated_at | Last space update timestamp |
+### `user`
 
-Key constraints and indexes:
+Accounts, Argon2 password hashes, role/status and internal voice counters.
 
-- All inventory queries and writes verify ownership against the authenticated user through `storage_space.user_id`.
-- Create an index on `(user_id, status)`. Active space names should be unique within each user's spaces.
-- Archiving a space must not leave in-stock items without an owning space.
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `email` | `VARCHAR(320)` | No |
+| `password_hash` | `VARCHAR(255)` | Yes |
+| `auth_provider` | `VARCHAR(32)` | No |
+| `role` | `VARCHAR(16)` | No |
+| `status` | `VARCHAR(16)` | No |
+| `voice_limit_seconds` | `INTEGER` | No |
+| `voice_used_seconds` | `INTEGER` | No |
+| `voice_quota_reset_at` | `TIMESTAMP WITH TIME ZONE` | Yes |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `updated_at` | `TIMESTAMP WITH TIME ZONE` | No |
 
-## 4. Public Category Catalog Table: `item_category`
+Constraints and indexes:
 
-Each row represents a public category available for filtering. The maintained 25-category catalog and boundaries are defined in `backend/app/core/category_catalog.py` and summarized below. Categories describe product identity, independently of storage location or packaging.
+- `ck_user_role_allowed`: role IN ('USER', 'ADMIN').
+- `ck_user_status_allowed`: status IN ('ACTIVE', 'SUSPENDED', 'DISABLED').
+- `ck_user_voice_limit_nonnegative`: voice_limit_seconds >= 0.
+- `ck_user_voice_used_nonnegative`: voice_used_seconds >= 0.
+- `pk_user`: PrimaryKeyConstraint: id.
+- `uq_user_email`: UniqueConstraint: email.
 
-| Field | Description |
-| --- | --- |
-| id | Category primary key |
-| name | Display name, such as Vegetables |
-| normalized_name | Normalized name used for searching and deduplication |
-| status | ACTIVE or ARCHIVED |
-| sort_order | Display order in the frontend |
-| created_at | Creation timestamp |
-| updated_at | Last update timestamp |
+### `agent_inventory_action`
 
-- Categories are not privately owned by ordinary users. Public categories are initialized by the system or maintained by administrators.
-- Categories referenced by item definitions must not be physically deleted; set their status to ARCHIVED instead.
+Committed per-item Agent receipts, result snapshots and calculation evidence.
+
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `user_id` | `UUID` | No |
+| `conversation_id` | `UUID` | No |
+| `turn_id` | `UUID` | No |
+| `action` | `VARCHAR(24)` | No |
+| `request_fingerprint` | `VARCHAR(64)` | No |
+| `request_snapshot` | `JSONB` | No |
+| `result_snapshot` | `JSONB` | No |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+
+Constraints and indexes:
+
+- `fk_agent_inventory_action_user_id_user`: user_id → user.id.
+- `pk_agent_inventory_action`: PrimaryKeyConstraint: id.
+- `ix_agent_inventory_action_user_id`: agent_inventory_action.user_id.
+
+### `auth_session`
+
+Per-device session deadlines, revocation and current refresh state.
+
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `user_id` | `UUID` | No |
+| `expires_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `absolute_expires_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `revoked_at` | `TIMESTAMP WITH TIME ZONE` | Yes |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+
+Constraints and indexes:
+
+- `fk_auth_session_user_id_user`: user_id → user.id.
+- `pk_auth_session`: PrimaryKeyConstraint: id.
+- `ix_auth_session_user_id`: auth_session.user_id.
+
+### `conversation`
+
+Legacy conversation mapping; current Agent messages use LangGraph checkpoints.
+
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `user_id` | `UUID` | No |
+| `title` | `VARCHAR(200)` | Yes |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `updated_at` | `TIMESTAMP WITH TIME ZONE` | No |
+
+Constraints and indexes:
+
+- `fk_conversation_user_id_user`: user_id → user.id.
+- `pk_conversation`: PrimaryKeyConstraint: id.
+- `ix_conversation_user_updated_desc`: conversation.user_id, updated_at DESC.
+
+### `item_definition`
+
+Public/private product definitions, not stock quantities.
+
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `name` | `VARCHAR(100)` | No |
+| `normalized_name` | `VARCHAR(100)` | No |
+| `category_id` | `UUID` | No |
+| `owner_user_id` | `UUID` | Yes |
+| `status` | `VARCHAR(16)` | No |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `updated_at` | `TIMESTAMP WITH TIME ZONE` | No |
+
+Constraints and indexes:
+
+- `ck_item_definition_status_allowed`: status IN ('ACTIVE', 'ARCHIVED').
+- `fk_item_definition_category_id_item_category`: category_id → item_category.id.
+- `fk_item_definition_owner_user_id_user`: owner_user_id → user.id.
+- `pk_item_definition`: PrimaryKeyConstraint: id.
+- `ix_item_definition_category_status`: item_definition.category_id, item_definition.status.
+- `ix_item_definition_owner_status`: item_definition.owner_user_id, item_definition.status.
+- `uq_item_definition_private_owner_name`: unique item_definition.owner_user_id, item_definition.normalized_name; predicate owner_user_id IS NOT NULL.
+- `uq_item_definition_public_name`: unique item_definition.normalized_name; predicate owner_user_id IS NULL.
+
+### `storage_space`
+
+User-owned spaces, active/archived status and default-space flag.
+
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `user_id` | `UUID` | No |
+| `name` | `VARCHAR(100)` | No |
+| `is_default` | `BOOLEAN` | No |
+| `type` | `VARCHAR(16)` | No |
+| `status` | `VARCHAR(16)` | No |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `updated_at` | `TIMESTAMP WITH TIME ZONE` | No |
+
+Constraints and indexes:
+
+- `ck_storage_space_default_space_active`: NOT is_default OR status = 'ACTIVE'.
+- `ck_storage_space_status_allowed`: status IN ('ACTIVE', 'ARCHIVED').
+- `ck_storage_space_type_allowed`: type IN ('FRIDGE', 'FREEZER', 'PANTRY', 'WAREHOUSE', 'OTHER').
+- `fk_storage_space_user_id_user`: user_id → user.id.
+- `pk_storage_space`: PrimaryKeyConstraint: id.
+- `ix_storage_space_user_status`: storage_space.user_id, storage_space.status.
+- `uq_storage_space_active_user_name`: unique storage_space.user_id, lower(name); predicate status = 'ACTIVE'.
+- `uq_storage_space_user_default`: unique storage_space.user_id; predicate is_default.
+
+### `auth_refresh_credential`
+
+SHA-256 refresh hashes, consumption/rotation and session association.
+
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `token_hash` | `VARCHAR(64)` | No |
+| `session_id` | `UUID` | No |
+| `used_at` | `TIMESTAMP WITH TIME ZONE` | Yes |
+
+Constraints and indexes:
+
+- `fk_auth_refresh_credential_session_id_auth_session`: session_id → auth_session.id.
+- `pk_auth_refresh_credential`: PrimaryKeyConstraint: token_hash.
+- `ix_auth_refresh_credential_session_id`: auth_refresh_credential.session_id.
+
+### `conversation_message`
+
+Legacy message mapping; current Agent does not write chat content here.
+
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `conversation_id` | `UUID` | No |
+| `role` | `VARCHAR(16)` | No |
+| `content` | `TEXT` | No |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+
+Constraints and indexes:
+
+- `ck_conversation_message_role_allowed`: role IN ('USER', 'ASSISTANT').
+- `fk_conversation_message_conversation_id_conversation`: conversation_id → conversation.id.
+- `pk_conversation_message`: PrimaryKeyConstraint: id.
+- `ix_conversation_message_order`: conversation_message.conversation_id, conversation_message.created_at, conversation_message.id.
+
+### `inventory_item`
+
+One stock batch, initial/confirmed/estimated quantities, dates, nullable notes and version.
+
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `storage_space_id` | `UUID` | No |
+| `item_definition_id` | `UUID` | No |
+| `notes` | `TEXT` | Yes |
+| `purchase_date` | `DATE` | Yes |
+| `expiry_date` | `DATE` | Yes |
+| `status` | `VARCHAR(16)` | No |
+| `initial_amount` | `NUMERIC(12, 3)` | No |
+| `initial_unit` | `VARCHAR(16)` | No |
+| `confirmed_current_amount` | `NUMERIC(12, 3)` | No |
+| `confirmed_current_unit` | `VARCHAR(16)` | No |
+| `confirmed_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `estimated_current_amount` | `NUMERIC(12, 3)` | Yes |
+| `estimated_current_unit` | `VARCHAR(16)` | Yes |
+| `estimated_at` | `TIMESTAMP WITH TIME ZONE` | Yes |
+| `version` | `INTEGER` | No |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `updated_at` | `TIMESTAMP WITH TIME ZONE` | No |
+
+Constraints and indexes:
+
+- `ck_inventory_item_estimate_trio`: (estimated_current_amount IS NULL AND estimated_current_unit IS NULL AND estimated_at IS NULL) OR (estimated_current_amount IS NOT NULL AND estimated_current_unit IS NOT NULL AND estimated_at IS NOT NULL).
+- `ck_inventory_item_nonnegative_amounts`: initial_amount >= 0 AND confirmed_current_amount >= 0 AND (estimated_current_amount IS NULL OR estimated_current_amount >= 0).
+- `ck_inventory_item_status_allowed`: status IN ('IN_STOCK', 'EMPTY', 'DISCARDED', 'ARCHIVED').
+- `ck_inventory_item_version_positive`: version >= 1.
+- `fk_inventory_item_item_definition_id_item_definition`: item_definition_id → item_definition.id.
+- `fk_inventory_item_storage_space_id_storage_space`: storage_space_id → storage_space.id.
+- `pk_inventory_item`: PrimaryKeyConstraint: id.
+- `ix_inventory_item_definition`: inventory_item.item_definition_id.
+- `ix_inventory_item_storage_status`: inventory_item.storage_space_id, inventory_item.status.
+- `ix_inventory_item_storage_status_expiry`: inventory_item.storage_space_id, inventory_item.status, inventory_item.expiry_date.
+
+### `inventory_operation`
+
+Successful ADD/CONSUME/RECONCILE history, input/calculation basis and idempotency key.
+
+| Column | PostgreSQL type | Nullable |
+| --- | --- | --- |
+| `id` | `UUID` | No |
+| `inventory_item_id` | `UUID` | No |
+| `operation_type` | `VARCHAR(24)` | No |
+| `affects_state` | `VARCHAR(24)` | No |
+| `input_method` | `VARCHAR(16)` | No |
+| `quantity_kind` | `VARCHAR(24)` | No |
+| `quantity_value` | `VARCHAR(32)` | No |
+| `quantity_unit` | `VARCHAR(16)` | Yes |
+| `calculation_method` | `VARCHAR(24)` | No |
+| `applied_change_amount` | `NUMERIC(12, 3)` | Yes |
+| `applied_change_unit` | `VARCHAR(16)` | Yes |
+| `status` | `VARCHAR(24)` | No |
+| `idempotency_key` | `VARCHAR(128)` | No |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `updated_at` | `TIMESTAMP WITH TIME ZONE` | No |
+| `undone_at` | `TIMESTAMP WITH TIME ZONE` | Yes |
+
+Constraints and indexes:
+
+- `ck_inventory_operation_affects_state_allowed`: affects_state IN ('CONFIRMED', 'ESTIMATED').
+- `ck_inventory_operation_applied_change_nonnegative`: applied_change_amount IS NULL OR applied_change_amount >= 0.
+- `ck_inventory_operation_applied_change_pair`: (applied_change_amount IS NULL AND applied_change_unit IS NULL) OR (applied_change_amount IS NOT NULL AND applied_change_unit IS NOT NULL).
+- `ck_inventory_operation_calculation_method_allowed`: calculation_method IN ('EXACT', 'CONVERTED', 'AI_ESTIMATED').
+- `ck_inventory_operation_input_method_allowed`: input_method IN ('TEXT', 'VOICE', 'PHOTO', 'RECEIPT', 'MANUAL').
+- `ck_inventory_operation_operation_type_allowed`: operation_type IN ('ADD', 'CONSUME', 'RECONCILE').
+- `ck_inventory_operation_quantity_kind_allowed`: quantity_kind IN ('AMOUNT', 'FRACTION', 'QUALITATIVE').
+- `ck_inventory_operation_status_allowed`: status IN ('PENDING_CONFIRMATION', 'SUCCESS', 'FAILED', 'UNDONE').
+- `ck_inventory_operation_undone_timestamp_matches_status`: (status = 'UNDONE' AND undone_at IS NOT NULL) OR (status <> 'UNDONE' AND undone_at IS NULL).
+- `fk_inventory_operation_inventory_item_id_inventory_item`: inventory_item_id → inventory_item.id.
+- `pk_inventory_operation`: PrimaryKeyConstraint: id.
+- `uq_inventory_operation_idempotency_key`: UniqueConstraint: idempotency_key.
+- `ix_inventory_operation_item_created`: inventory_operation.inventory_item_id, inventory_operation.created_at.
+- `ix_inventory_operation_item_status`: inventory_operation.inventory_item_id, inventory_operation.status.
+
+## Agent persistence and consistency
+
+LangGraph checkpoint/store tables use a separate configured Agent schema on the
+same PostgreSQL service by default. They are initialized explicitly, not by API
+startup. Checkpoints retain messages/images and pending tasks; the Store retains
+user-scoped memory. Business receipts are separate from checkpoint progress.
+Their conversation identifier is a logical reference rather than a foreign key
+to the legacy conversation table.
+
+Quantity-operation idempotency is user-scoped in the stored key. Constraints,
+ordered row locks, version checks and transaction ownership jointly protect stock;
+see [backend consistency](BACKEND_DESIGN.md). Default-space selection is protected
+by its active/default constraint and partial unique index. Refresh-session hashes
+support rotation and revocation without storing plaintext credentials.
+
+## Categories and initialization
+
+Required category seed is repeatable. Definitions and demo accounts are separate
+from categories: a category groups products, a definition names a product, and an
+inventory item records its physical batch. Optional demo seed and target guards
+are described in [delivery](../delivery/README.md#optional-demo-data).
+
+### Category boundaries
+
+Category guidance is maintained in `backend/app/core/category_catalog.py`.
+Categories describe product identity rather than packaging or storage location.
 
 | Category | Includes / examples | Excludes / boundary |
 | --- | --- | --- |
@@ -149,255 +385,12 @@ Sources inform boundaries and retail vocabulary; no standards-compliance claim i
 - [GS1 GPC](https://www.gs1.org/standards/gpc/get-started): common product group definitions.
 - [New World fridge categories](https://www.newworld.co.nz/shop/category/fridge-deli-and-eggs) and [pantry categories](https://www.newworld.co.nz/shop/category/pantry): local retail vocabulary, not household usability evidence.
 
-## 5. Item Definition Catalog Table: `item_definition`
+## Verification evidence
 
-Each row represents an item name and its associated category.
-
-| Field | Description |
-| --- | --- |
-| id | Item definition primary key |
-| name | Display name, such as Tomatoes, Cucumbers, or Bananas |
-| normalized_name | Normalized name used for searching and deduplication |
-| category_id | Associated category; foreign key referencing item_category.id |
-| owner_user_id | Nullable; NULL indicates a public definition, while a user ID indicates that user's private definition |
-| status | ACTIVE or ARCHIVED |
-| created_at | Creation timestamp |
-| updated_at | Last update timestamp |
-
-Visibility rule:
-
-~~~text
-owner_user_id IS NULL
-OR owner_user_id = authenticated_user_id
-~~~
-
-Two partial unique indexes are recommended:
-
-- Public definitions: `normalized_name` is unique where `owner_user_id IS NULL`.
-- Private definitions: `(owner_user_id, normalized_name)` is unique where `owner_user_id IS NOT NULL`.
-
-## 6. Inventory Item Table: `inventory_item`
-
-Each row represents a specific inventory item or batch. The same item may have multiple rows when purchase dates, expiry dates, or storage spaces differ.
-
-| Field | Description |
-| --- | --- |
-| id | Inventory item primary key |
-| storage_space_id | Owning storage space; foreign key referencing storage_space.id |
-| item_definition_id | Item definition; foreign key referencing item_definition.id |
-| notes | Optional inventory-batch notes; nullable TEXT; API accepts up to 1,000 characters; does not affect quantities |
-| purchase_date | Purchase date; nullable |
-| expiry_date | Expiry date; nullable. The AI model must not infer an unverified date on its own |
-| status | IN_STOCK, EMPTY, DISCARDED, or ARCHIVED |
-| initial_amount | Quantity initially added to inventory; ordinary operations do not change it after creation |
-| initial_unit | Unit of the initial quantity |
-| confirmed_current_amount | Current reliable quantity, including deterministic changes while no estimate exists |
-| confirmed_current_unit | Unit of the confirmed current quantity |
-| confirmed_at | Last update timestamp for the confirmed current quantity |
-| estimated_current_amount | Current valid estimated inventory quantity; NULL when no valid estimate exists |
-| estimated_current_unit | Unit of the current valid estimate; NULL when no valid estimate exists |
-| estimated_at | Timestamp when the current estimate was last generated or updated; NULL when no valid estimate exists |
-| version | Optimistic locking version; incremented for each committed update |
-| created_at | Inventory record creation timestamp |
-| updated_at | Last inventory record update timestamp |
-
-Quantity state rules:
-
-~~~text
-initial_*
-= Immutable historical facts about the initial stock entry
-
-confirmed_current_*
-= The current reliable balance; deterministic changes update it while no estimate exists
-
-estimated_current_*
-= The current result after the confirmed baseline, incorporating uncertain conversions or AI estimates
-~~~
-
-- On inventory creation, `confirmed_current_*` equals `initial_*`; `estimated_current_*` and `estimated_at` are all NULL.
-- `estimated_current_amount` and `estimated_current_unit` must either both be NULL or both have values. `estimated_at` must be NULL or populated together with them.
-- All quantities retain `NUMERIC(12,3)`, never floating point. Current amount/unit fields hold the effective balance; no auxiliary quantity state or residual column is added.
-- Display `estimated_current_*` when it is non-NULL, labeled "Approximately / AI estimate". Otherwise, display `confirmed_current_*`.
-- Automatically change `status` to EMPTY only when the inventory quantity is confirmed to be zero. An estimate of zero may produce a "Possibly used up" indication but must not automatically hide the inventory item.
-
-Ownership relationship:
-
-~~~text
-inventory_item.storage_space_id
-→ storage_space.user_id
-→ Authenticated user
-~~~
-
-## 7. Inventory Operation Table: `inventory_operation`
-
-Each row represents a committed addition, consumption, estimate, or reconfirmation for one `inventory_item`. Neither the Agent nor the frontend may bypass this record and modify inventory directly.
-
-| Field | Description |
-| --- | --- |
-| id | Operation primary key |
-| inventory_item_id | Target inventory item; foreign key referencing inventory_item.id |
-| operation_type | ADD, CONSUME, or RECONCILE |
-| affects_state | CONFIRMED or ESTIMATED; identifies which current quantity state the operation changes |
-| input_method | TEXT, VOICE, PHOTO, RECEIPT, or MANUAL |
-| quantity_kind | Type of quantity expression provided by the user: AMOUNT, FRACTION, or QUALITATIVE |
-| quantity_value | Original user-provided value, such as 2, 1/2, some, or 18.5 after a stock count |
-| quantity_unit | Original user-provided unit, such as kg, g, each, cup, or remaining; nullable for qualitative expressions |
-| calculation_method | EXACT, CONVERTED, or AI_ESTIMATED |
-| applied_change_amount | Quantity change applied by ADD or CONSUME; nullable for RECONCILE |
-| applied_change_unit | Unit of applied_change_amount; nullable for RECONCILE |
-| status | PENDING_CONFIRMATION, SUCCESS, FAILED, or UNDONE |
-| idempotency_key | Idempotency key that prevents retries from creating duplicate operations |
-| created_at | Operation creation timestamp |
-| updated_at | Last operation update timestamp |
-| undone_at | Undo timestamp; NULL if the operation has not been undone |
-
-Semantic rules:
-
-- `quantity_value` and `quantity_unit` preserve the user's original expression and must not be overwritten with standardized units.
-- EXACT and CONVERTED indicate calculations that the backend can determine without AI. AI_ESTIMATED requires an AI-proposed value and user confirmation.
-- When no valid estimate exists, a deterministic ADD or CONSUME operation updates the CONFIRMED state.
-- When a valid estimate exists, subsequent additions and consumption use that estimate as their baseline and update the ESTIMATED state. A deterministic change in the current operation must not discard uncertainty inherited from earlier estimates.
-- RECONCILE represents the user reweighing, counting stock, or explicitly stating "X remains now". It updates `confirmed_current_*` and clears `estimated_current_*` and `estimated_at` in the same transaction.
-- Only SUCCESS operations affect inventory. PENDING_CONFIRMATION, FAILED, and UNDONE operations do not affect the current state.
-- Undo remains a future capability. An incorrect RECONCILE entry can be corrected with a new RECONCILE operation; this does not restore the previous chain of estimates. Historical undo/recalculation requirements are not current API guarantees.
-
-## 8. Conversation Table: `conversation`
-
-| Field | Description |
-| --- | --- |
-| id | Conversation primary key |
-| user_id | Owning user; foreign key referencing user.id |
-| title | Conversation title |
-| created_at | Creation timestamp |
-| updated_at | Timestamp of the latest message or conversation metadata update |
-
-Create an index on `(user_id, updated_at DESC)` to list recent conversations.
-
-## 9. Conversation Message Table: `conversation_message`
-
-| Field | Description |
-| --- | --- |
-| id | Message primary key |
-| conversation_id | Owning conversation; foreign key referencing conversation.id |
-| role | USER or ASSISTANT |
-| content | User message, transcription, or response intended for the user; must not store the model's hidden reasoning |
-| created_at | Message creation timestamp |
-
-- Order messages deterministically by `(conversation_id, created_at, id)`.
-- Do not store system prompts, hidden reasoning, API keys, or access tokens.
-- Conversation records are not a source of inventory facts or inventory audit evidence.
-
-## 10. Quantity State and Display Example
-
-~~~text
-Purchase 20 kg of tomatoes
-→ confirmed = 20 kg
-→ estimated = NULL
-→ Display: 20 kg (confirmed)
-
-The user says, "I used half"
-→ Deterministic consumption of 10 kg
-→ confirmed = 10 kg
-→ estimated = NULL
-→ Display: 10 kg (confirmed)
-
-The user says, "I used two more"
-→ Two individual items cannot be directly converted to kg
-→ Estimated consumption of approximately 0.3 kg, confirmed by the user
-→ confirmed = 10 kg
-→ estimated = 9.7 kg
-→ Display: Approximately 9.7 kg (AI estimate)
-
-The user reweighs the stock: "There is 9.5 kg left now"
-→ confirmed = 9.5 kg
-→ estimated = NULL
-→ Display: 9.5 kg (confirmed)
-~~~
-
-## 11. Validated Write Workflow
-
-~~~text
-User input
-→ The Agent extracts the original quantity expression and proposes an operation
-→ The backend calculates using the confirmed quantity or valid estimate as the appropriate baseline
-→ For an AI_ESTIMATED proposal, show the user the original expression and proposed result
-→ User confirmation
-→ FastAPI validates identity, visibility, units, quantities, state, version, and the idempotency key
-→ A PostgreSQL transaction updates inventory_item and inserts inventory_operation
-~~~
-
-Transactions must guarantee that:
-
-- Users can operate only on inventory in their own `storage_space` and can select only public or personally owned `item_definition` entries.
-- Without an estimate, deterministic operations update the confirmed state. With an estimate, subsequent additions and consumption update the estimated state.
-- RECONCILE atomically updates the confirmed state and clears the estimated state.
-- CONSUME cannot reduce the quantity in the affected state below zero.
-- The inventory update and SUCCESS operation record are committed together or rolled back together.
-- The `idempotency_key` prevents the same validated request from being executed twice.
-
-## 12. Implementation Status
-
-This document maintains business fields and constraints. See [backend design](BACKEND_DESIGN.md) for service/transaction rules, [architecture](AGENT_DESIGN.md) for Agent orchestration and [API reference](../reference/API_REFERENCE.md) for HTTP/SSE contracts. Local ORM and initial-schema changes do not prove that an existing deployment has been synchronized. Flutter, Web, and the Agent must not bypass backend business services to write inventory.
-
-Database structure is acceptance-tested from an empty PostgreSQL schema by running
-`alembic upgrade head` through `test_database_initialization_postgres.py`. The same
-test verifies all ORM-required tables, columns, primary/foreign/unique/check
-constraints, and indexes. Existing Neon environments can be checked without
-mutation using `python scripts/verify_database_schema.py`; the separate LangGraph
-schema is checked with `python scripts/setup_agent_storage.py --check`.
-
-### Required and demonstration seed data
-
-`scripts/initialize_database.py` owns structural migration and the required,
-idempotent 25-category seed. `scripts/manage_demo_data.py` is a separate,
-non-production acceptance-data tool: it creates deterministic users, shared item
-definitions, spaces, inventory states, and operation history only after an
-explicit target and confirmation are supplied. Real passwords are injected by
-the operator and are never stored in the repository.
-
-Demo reset deletes known deterministic rows in dependency order and never drops
-the schema or category seed. Database restore is separate again: use a Neon branch
-restore/recreation or an approved backup, then run structural and seed checks.
-Application startup performs none of these operations automatically.
-
-### Environment isolation and acceptance evidence
-
-Local development, GitHub/PostgreSQL tests, future E2E tests, and Neon predeploy
-use different database targets. Test databases must end in `_test`, E2E databases
-must end in `_e2e`, and both use direct connections. The code-level target guard
-rejects ambiguous names, pooled endpoints, and an E2E target that is also the
-runtime/predeploy target.
-
-`scripts/record_database_acceptance.py` performs a read-only release check and
-writes credential-free JSON evidence containing the environment and initialization
-date, application commit, current and expected Alembic revisions, category seed
-content version, and schema verification counts. The complete procedure and the
-real-PostgreSQL rollback/idempotency matrix are maintained in
-[`testing/DATABASE_ACCEPTANCE.md`](../testing/reports/DATABASE_ACCEPTANCE.md).
-
-## 13. Agent business receipts: `agent_inventory_action`
-
-The Agent extension adds a ninth business table. Each row is a committed, independently
-replayable action, saved in the same transaction as its inventory changes and any
-new private item definition or storage space. Failures and unconfirmed proposals
-remain in the LangGraph checkpoint, not successful business history.
-
-| Field | Meaning |
-| --- | --- |
-| id | Server-generated proposal/action UUID; primary key and retry identity |
-| user_id | Owning user foreign key |
-| conversation_id / turn_id | Logical LangGraph conversation and original request UUIDs; no conversation-table foreign key |
-| action | CREATE_STOCK, ADD, CONSUME or RECONCILE |
-| request_fingerprint | SHA-256 of the immutable prepared request |
-| request_snapshot | JSONB original expression, resolved target, preview, estimate source and memory snapshots |
-| result_snapshot | JSONB actual committed outcome and created inventory/operation identifiers |
-| created_at | Committed action creation timestamp |
-
-Existing quantity fields retain their semantics. Agent quantity operations use
-input_method=TEXT and retain original expressions in inventory_operation. Initial
-stock entry still does not fabricate an ADD operation. This receipt provides
-creation provenance and crash recovery without depending on chat history.
-
-For existing databases, `backend/scripts/setup_agent_actions.py --check` checks
-the table; `--initialize` explicitly adds it after confirmation. The updated initial
-schema includes it for fresh databases. Application startup does not run DDL.
+`verify_database_schema.py` compares database objects with the ORM read-only;
+`record_database_acceptance.py` records a selected environment's revision, category
+seed and structural checks. Empty-database initialization, ownership, constraints,
+rollback and concurrent writes are tested in isolated PostgreSQL schemas.
+See [database acceptance](../testing/reports/DATABASE_ACCEPTANCE.md) and the
+[testing guide](../testing/README.md). Recorded environment results identify a run;
+the schema reference above describes the current source definition.

@@ -1,8 +1,9 @@
 # Security and Privacy
 
-Review date: **2026-09-29**. Scope: SayFridge course demonstration, work items **8.1–8.6**.
+Initial review date: **2026-09-29**; subsequent verification notes retain their dates. Scope: SayFridge course demonstration, work items **8.1–8.6**.
 Review baseline: `1ac5a5df581b66d659448c109a84a2a9aa04dc12`, plus the security changes
-reviewed locally on `syan349_fix_backend_db_issues`.
+reviewed locally on `syan349_fix_backend_db_issues`. This baseline identifies the
+initial audit; current authentication behavior and later results are recorded below.
 
 This document is the single entry point for security controls, privacy disclosures, operational
 procedures and verification evidence. It presents completed achievements supporting course assessment
@@ -42,7 +43,7 @@ recorded selections, not a full regression run or a count of OWASP requirements.
 
 | Area | Implemented control and verified behaviour |
 | --- | --- |
-| Authentication | Argon2 password hashing; fixed HS256 JWT verification; required `sub`, `type`, `iat` and `exp` claims. Invalid claims, disallowed algorithms and invalid/expired tokens are rejected. Account status is checked on authenticated requests. |
+| Authentication | Argon2 password hashing; fixed HS256 JWT verification; required `sub`, `type`, `iat` and `exp` claims; issuer/audience verification with bounded legacy-token compatibility; one verified decode passed to session validation. Invalid claims, disallowed algorithms and invalid/expired tokens are rejected. Account status is checked on authenticated requests. |
 | Authorization and IDOR | Resource reads/writes are scoped to the authenticated user. Tests cover foreign inventory, spaces, private definitions, history and batch operations. Ordinary users receive 403 from administrator endpoints; missing authentication receives 401. |
 | Role escalation | Registration creates a USER. Registration/status-update payload validation rejects unsupported role fields. Tests verify that input cannot create an administrator. |
 | Terminal states | Discard/archive and quantity/batch tests reject illegal operations on terminal resources; failed operations do not partially write or restore resources. |
@@ -313,3 +314,11 @@ See [Backend tests](../../backend/tests/test_persistent_auth.py),
 These results validate local isolated environments; cloud migration and deployment
 are separate release steps. Browser refresh credentials remain accessible to same-origin
 JavaScript, so this feature does not remove the need for XSS protections.
+
+
+## Related maintained guides
+
+Current testing strategy and CI execution belong to the [testing guide](../testing/README.md).
+Migration, hosting secrets and deployed acceptance commands belong to the
+[delivery runbook](../delivery/README.md). This document owns security conclusions,
+privacy behavior, findings/fixes and their dated evidence.

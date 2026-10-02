@@ -1,120 +1,69 @@
 # Testing Strategy and Evidence
 
-## Stock category, quantity and expiry acceptance
+This is the project's testing entry point for assessment criterion 8. Tests are
+maintained alongside feature development: historical feature reports and commits
+record the unit, API, database, UI and Agent checks added during implementation.
 
-`test_inventory_expiry.py` covers date precedence, production/opening starting
-dates, model output validation, mixed batch failures and unavailable estimation.
-`test_agent_stock_policy_postgres.py` uses disposable migrated schemas to verify
-private/public classification conflicts, HTTP confirmation/cancellation, atomic
-rollback, concurrent edits, receipt replay, creation warnings, frozen previews and
-persisted apple quantities. These tests are in the Backend `ci` selection.
+## Strategy and execution
 
-`test_agent_stock_policy_live.py` requires explicit `AGENT_LIVE_MODEL=1` plus an
-isolated `TEST_DATABASE_URL`; it runs English/Chinese yoghurt, apple weight and
-category-correction scenarios through actual chat/resume with the configured model.
-Normal regression replaces only optional expiry-model calls with an unavailable
-estimator. It never spends model tokens or uses the application database for test
-writes. Full regression and remote/deployed acceptance remain separate evidence.
+| Layer | Trigger | Coverage and environment |
+| --- | --- | --- |
+| Fast CI | Every PR creation/update; Backend also runs on main push | Marked Backend core tests; all selected Web and Flutter unit/component/widget tests; Web typecheck/build; disposable PostgreSQL |
+| Core E2E | Relevant PR file changes after fast checks pass; manual dispatch | Eight real Chromium → Web → Backend → database workflows in isolated schemas |
+| Full regression | Manual before release or after substantial cross-module changes | Same immutable commit for full offline Backend, Web/Flutter selections and E2E; aggregate pass/fail |
+| Live-model checks | Explicit local opt-in | Actual configured model with synthetic stock in disposable test schemas |
+| Native/manual acceptance | Selected Android build and deployed system | Permissions, camera/speech, notifications, network interruption and cross-client business flows |
+| Performance | Dedicated measured run | Record environment, load, data volume, warm/cold latency and errors against architecture targets |
 
-Local verification on 2026-10-02 used Python 3.11 and a dedicated PostgreSQL 16
-test cluster: the Backend core selection passed **154** tests (714 deselected),
-and the new expiry/stock-policy offline suites passed **24** tests. The final
-real-model suite plus date unit tests passed **18** tests, including all **6**
-live scenarios and production-date shelf-life calculation. The full offline run
-initially reported 797 passed, 63 skipped and one failure: an existing batch-archive
-test compared a timestamp string with UTC while the temporary database returned
-Pacific/Auckland. Setting only that test database to UTC made its focused rerun
-pass; no product-code or remote-database change was used to mask the failure.
-
-The configured remote database passed read-only ORM verification (11 tables,
-96 columns); its revision was `a261001_sessions`, with 25 active categories and
-105 inventory rows. Runtime/direct connection targets matched. This change has
-no ORM or migration edits. These checks do not establish the deployed service's
-environment configuration or confirm a code deployment.
+Fast CI favors core business boundaries and bounded runtime. Full regression adds
+Backend cases without repeating real-model calls in routine PRs. Unit/UI mocks
+exercise deterministic client behavior; E2E verifies actual persistence and CORS.
+Native Android and model behavior require their own evidence. Performance targets
+in [architecture](../architecture/README.md#capacity-assumptions-and-scaling) are
+engineering assumptions, not measured results.
 
 ## Fast CI entry point
 
-Start from the [root README](../../README.md#run-the-tests). The fast selection
-runs the Backend core selection and all Web and Flutter automated tests, excluding the manual screenshot exporter. All PRs run the fast checks through Core E2E orchestration; Backend also runs
-after pushes to `main`. Fast CI has no path filter. Integration changes run
-Core E2E after both reusable fast workflows succeed. Manual dispatch runs
-the same gates and E2E. Backend manual dispatch retains its full suite.
+[Core E2E](../../.github/workflows/core-e2e.yml) orchestrates reusable Backend and
+Frontend jobs on PRs. [Backend CI](../../.github/workflows/backend-ci.yml) and
+[Frontend CI](../../.github/workflows/frontend-ci.yml) provide additional entry points: Backend runs on main push/dispatch; Frontend supports dispatch. Required-check settings control merge permission;
+workflow YAML controls execution. A historical check name must not be retained
+as a required check after its job is renamed.
 
-The execution entry point is **GitHub Actions**:
+<a id="ci-selection-policy"></a>
 
-| Workflow | Automatic execution | Manual `Run workflow` |
-| --- | --- | --- |
-| [Backend CI](../../.github/workflows/backend-ci.yml) | Reused by PR orchestration; core selection on pushes to `main` | Full Backend regression |
-| [Frontend CI](../../.github/workflows/frontend-ci.yml) | Reused by PR orchestration on every PR | The same frontend fast checks |
-| [Core E2E](../../.github/workflows/core-e2e.yml) | Every PR runs fast checks; relevant changes then run Chromium E2E | Fast checks followed by Chromium E2E |
-| [Full Regression](../../.github/workflows/full-regression.yml) | None | Same-commit full offline Backend, Web, Flutter and browser E2E |
+The `ci` marker selects Backend fast checks. Web/Flutter keep their complete
+selected offline tests; browser E2E runs after successful fast jobs when the path
+selector matches. The commands below are the current CI selection policy.
 
-For local verification, use the per-module commands in this guide: frontend
-commands below and Backend commands under **Run tests**. Use Python 3.12,
-Node.js 22 and Flutter 3.44.8. Configure an isolated test database via
-`TEST_DATABASE_URL` or `backend/.env.test` before running Backend database tests.
-GitHub provides its own disposable PostgreSQL service. Local timings exclude
-runner/SDK provisioning and artifact upload; GitHub jobs can run concurrently.
-Generated reports are ignored by Git and uploaded as Actions artifacts.
-
-The developer reported approximately 3 minutes 30 seconds for the combined fast
-checks on 2026-09-30 and accepted this budget. This is a user-reported local
-measurement, not a GitHub runtime guarantee. Both workflows cancel superseded
-runs and retain reports for seven days. Backend manual full regression keeps a
-separate concurrency group from PR/push runs.
-
-## Frontend fast CI
-
-[Frontend CI](../../.github/workflows/frontend-ci.yml) is called by Core E2E on every
-pull request (open, update, or reopen), without path filters, and can also be started manually.
-It adds two independent checks alongside the existing Backend CI:
-
-| Check | Runtime | Verification | Evidence artifact |
-| --- | --- | --- | --- |
-| Web tests | Node.js 22, dependencies from `package-lock.json` | Typecheck, all Vitest unit/component/page tests with MSW-controlled APIs, production build | `web-test-results` (JUnit), `web-dist` (successful build only) |
-| Flutter tests | Flutter 3.44.8, dependencies from `pubspec.lock` | Unit and widget tests under `mobile/test` except the `manual_preview` screenshot exporter, including models, services, controllers, authentication, inventory, Agent and UI interactions | `flutter-test-results` (Flutter machine JSON lines) |
-
-These jobs use Linux runners, cached dependencies/SDK, a ten-minute timeout per
-job, and seven-day artifact retention. A newer update cancels the previous run
-for the same PR. There is no additional frontend push trigger, avoiding duplicate
-runs for the same PR update. Test failures fail the job, including failures in the
-Flutter command piped through `tee` (GitHub's explicit Bash shell uses pipefail).
-
-Frontend tests use fake/mock dependencies: they need no Neon, deployed Backend,
-OpenAI credentials, emulator, or device. Camera/voice widget and service tests
-verify simulated interactions, not native hardware. The Windows-specific `voice_overlay_preview_test.dart` screenshot exporter is
-tagged `manual_preview` and excluded; optional profile screenshot export is not
-enabled. These checks do not build Android/iOS, deploy, or replace
-real-system E2E or device acceptance.
-
-Reproduce locally with the stated runtime versions:
+Local equivalents:
 
 ```bash
-# From web/
-npm ci --no-audit --no-fund
-npx tsc -b
-npm test -- --reporter=default --reporter=junit --outputFile=test-results.xml
-npm run build
+# From backend/, with ignored .env.test / TEST_DATABASE_URL for a database ending _test
+python -m pytest -v -m ci --strict-markers --durations=15 --junitxml=test-results.xml
+python -m pytest --collect-only -q -m ci --strict-markers
 
-# From mobile/, using Flutter 3.44.8 (also used by the Render build script)
+# From web/, Node.js 22
+npm ci
+npm test
+npm run build
+npm run lint
+
+# From mobile/, Flutter 3.44.8
 flutter pub get --enforce-lockfile
-flutter test --no-pub --exclude-tags manual_preview
+flutter test --exclude-tags manual_preview
+flutter analyze
 ```
 
-Local verification on 2026-09-30 (macOS, this CI integration working tree):
-Node.js 22.23.3 passed typechecking, all 103 Web tests in 21 files, and the
-production build; Flutter 3.44.8 / Dart 3.12.2 passed all 151 selected tests with
-`manual_preview` excluded. Locked dependency installation succeeded for both
-clients without changing either lockfile. Test execution took approximately
-5 seconds for Web and 11 seconds for Flutter; these exclude installation and
-are not GitHub runner timings. Existing Web fixture warnings (duplicate keys and
-unhandled mocked admin requests) did not fail the suite. The developer subsequently confirmed that the merged fast-CI PR passed on GitHub.
-This confirmation does not cover the new Core E2E workflow.
+Pytest markers define the current fast selection; inspect it with `--collect-only`
+rather than maintaining a duplicated count. Web lint and Flutter analyze are local
+checks; the current frontend workflow executes tests and Web typecheck/build.
+Backend does not currently define a unified lint job.
 
-The workflow reports checks automatically; requiring `Web tests` and
-`Flutter tests` before merging is a separate GitHub branch-protection setting.
-No repository setting is changed by adding this workflow. Historical Backend
-reports below retain their original scope and results.
+Backend database fixtures use a direct TEST_DATABASE_URL ending `_test` and
+random schemas. CI supplies disposable PostgreSQL 18 without shared Neon secrets.
+Web unit/UI tests use MSW and reject unhandled requests. Flutter tests exclude
+`manual_preview` screenshot exporters. E2E files are excluded from Vitest.
 
 ## Core E2E
 
@@ -218,8 +167,8 @@ npx playwright show-report .e2e-artifacts/html
 ```
 
 Vitest explicitly excludes `e2e/**`, keeping Web unit/component tests separate from browser E2E.
-The seven database-target guard cases belong to Backend full regression; the fast
-Backend selection remains 60. Core E2E results must be reported separately from
+Database-target guard cases belong to Backend regression. Use pytest collection
+to inspect the current fast selection. Core E2E results must be reported separately from
 unit/component counts.
 
 ### PR gates and verification
@@ -241,7 +190,7 @@ that names the former checks after confirming the first remote PR run.
 Local verification on 2026-09-30: eight real-browser scenarios passed in 11.7
 seconds with Node.js 22, Python 3.12 and Docker PostgreSQL 18. Six path-selection
 checks cover docs, business code, migrations, client code, locks/workflows and
-Flutter-only changes. The next PR run provides GitHub execution evidence.
+Flutter-only changes. GitHub run summaries identify the tested commit and artifact outcomes.
 
 ## Unified full regression
 
@@ -273,13 +222,12 @@ Live OpenAI acceptance needs a separate explicit opt-in and credentials; native
 Android validation and manual screenshot exporters remain separate activities.
 Their exclusion is recorded in the summary. Web and Flutter currently use the
 same complete offline unit/UI selections in both fast CI and full regression;
-Backend expands from its 60-case fast selection to the full offline suite.
+Backend expands from its marked fast selection to the full offline suite.
 
-Local verification: orchestration tests exercise successful aggregation and
+Orchestration tests exercise successful aggregation and
 failure/cancellation/skipped/missing outcomes; YAML and reusable workflow targets
-are checked locally. The complete multi-module run is performed through the
-manual GitHub workflow after this configuration is pushed and available on the
-default branch. Record that run's result and SHA as final full-regression evidence.
+are checked locally. Run the complete multi-module suite through the manual GitHub workflow and
+retain its result and SHA as release evidence.
 
 ## Reports
 
@@ -305,150 +253,22 @@ default branch. Record that run's result and SHA as final full-regression eviden
 Manual requests: [Postman guide](POSTMAN_GUIDE.md).
 Setup and database configuration: [backend README](../../backend/README.md).
 
-## Run tests
+## Evidence maintenance
 
-Run commands from `backend`. Uvicorn does not need to be running.
+[Recorded testing notes](reports/TESTING_IMPLEMENTATION_NOTES.md) retain dated
+category/schema, frontend and session verification results formerly embedded here.
+Reports are snapshots, not current-suite totals; overlapping selections are not added.
+Security conclusions remain in [Security and Privacy](../security/README.md), which
+links the original redacted audit/JUnit files under `evidence/security/`.
 
-| Execution | Selection | Command |
-| --- | --- | --- |
-| Local full regression | Current suite; live-model tests require explicit opt-in | `python -m pytest -v` |
-| Local core check | 60 scenarios | `python -m pytest -v -m ci` |
-| Automatic PR/main CI | Same core set | `python -m pytest -v -m ci --strict-markers` |
-| Manual workflow dispatch | Full suite | `python -m pytest -v --strict-markers` |
-| Database-free check | Current database-free selection | `python -m pytest -v -m "not postgres"` |
+For each release retain commit SHA, environment/tool versions, exact command,
+result and report/artifact location. Actions artifacts expire after seven days;
+keep the selected submission evidence before expiry. Label manual/device/model
+results separately from offline regression. Record failures, fixes and rerun results
+rather than replacing an old result with a newer total.
 
-Database tests use real PostgreSQL. Locally, supply `TEST_DATABASE_URL` through the
-process environment or ignored `.env.test`; never use the application database.
-CI uses a disposable PostgreSQL 18 service, not Neon. Fixtures initialize an
-isolated schema and clean it up after each test.
+Database evidence is produced by `backend/scripts/record_database_acceptance.py`;
+[delivery](../delivery/README.md) owns operator commands and deployed smoke checks.
 
-Use `python -m pytest --collect-only -q` to inspect the current suite. Historical
-reports retain the counts and outcomes of their recorded runs; do not sum overlapping
-test groups. The Agent V0.2 report includes the opt-in model checks and environment
-limitations of that run.
-
-## CI selection policy
-
-Use one test implementation for local and CI runs. The fast selection contains
-**60 scenarios: 28 PostgreSQL-backed and 32 database-free** (collected on
-2026-09-30). It was reduced from 169 (80 PostgreSQL-backed) after slow local runs.
-No test bodies or assertions were removed. The original 727 scenarios remain in full regression; this E2E foundation adds
-seven runner-safety cases (734 total; 674 excluded by `-m ci`). Live-model cases still require opt-in.
-
-| Fast coverage | Scenarios |
-| --- | ---: |
-| Registration/login lifecycle and registration role protection | 2 |
-| Administrator authorization and account status | 2 |
-| Storage creation and non-empty archive guard | 2 |
-| Catalog visibility | 1 |
-| Inventory creation/listing/ownership and concurrent version conflict | 5 |
-| Addition/replay and transaction rollback | 2 |
-| Consumption/replay, reconciliation/replay, discard and archive | 4 |
-| Batch create/move/archive: success and atomic rollback for each | 6 |
-| Expiry summary and item/global operation history | 3 |
-| Agent stock entry/replay and deterministic workflow validation | 3 |
-| Architecture boundaries, database target guards, OpenAPI/version, migration logging | 14 |
-| Token protection, login throttling, upload/CORS, private logs/settings and image metadata | 16 |
-| **Total** | **60** |
-
-Full regression retains exhaustive route/authentication matrices, malformed-input
-variants, extra filters/states, additional lock-wait/concurrency permutations,
-and complete database initialization/acceptance checks. Run it before release and
-for changes to authentication, transactions, migrations, or shared API contracts;
-a fast pass is not a full-suite or E2E pass. Do not skip it merely because the fast
-selection is green.
-
-Use `--durations=15` to identify slow setup, call, and teardown phases. A local
-remote-database run is not comparable to GitHub's colocated disposable PostgreSQL
-service. Reducing the database-backed selection cuts repeated migration/connection
-work, but does not guarantee a particular runtime on a remote database. Each
-selected database test still migrates its own schema; isolation is unchanged.
-
-Local verification on 2026-09-30: **60 passed, 667 deselected in 12.67 seconds**
-using Python 3.12 and a disposable PostgreSQL 18 instance on localhost (UTC).
-This is a local measurement, not a remote Neon or GitHub runtime guarantee.
-At that verification point, full collection contained 727 parameterized
-scenarios, and test function bodies and assertions were unchanged. Web (103) and Flutter (151) fast
-selections were not reduced.
-
-Use `@pytest.mark.ci` for a whole test or `pytest.param(..., marks=pytest.mark.ci)`
-for selected parameters. The marker is registered in `backend/pytest.ini`;
-there is no default filter. Check the actual selection with:
-
-```bash
-python -m pytest --collect-only -q -m ci --strict-markers
-```
-
-The Backend job name remains `test-job`. Automatic/manual runs upload their
-respective JUnit results. Whether a check blocks merging depends on repository
-branch protection, which is not changed here. Run full regression for the
-critical changes described above and before release.
-
-## Maintain reports
-
-Name reports `Bxx[-Byy]_FEATURE_TEST_RESULTS.md`. Record the date, tested commit or
-working tree, environment, commands, outcomes, and outstanding acceptance checks.
-Keep detailed scenarios and historical timings in the feature reports, not this
-index. Distinguish local results from remote CI. Update current counts here when
-selection changes; test collection is the source of truth.
-
-
-## Category and schema verification — 2026-09-26
-
-The targeted repair/category/receipt tests passed: **8 passed**. The full 598-test
-collection initially reported **588 passed, 8 skipped, 1 failed and 2 errors**
-(one error occurred during teardown of an already counted test). All three
-exceptions were database connection failures; their targeted reruns passed.
-Across these runs all 590 non-skipped cases passed, but the initial run was not
-clean. Original interrupted/failed teardown cleanup was not verified.
-
-Development database writes and authenticated development HTTP acceptance were
-not performed. Live-model classification evaluation was not performed; deterministic
-tests validate database checks and confirmation, not semantic classification accuracy.
-
-### Fixed model-evaluation cases
-
-These are manual/live-model evaluation expectations, not a rule-based classifier or a measured
-accuracy claim. Run with a seeded isolated test database and explicit live-model opt-in; record
-model/version, date, category result, clarification, and confirmation behavior.
-
-| Input | Expected result |
-| --- | --- |
-| 鸡胸肉 / chicken breast / frozen chicken | Meat & Poultry |
-| canned tomatoes / 罐装番茄 | Vegetables & Mushrooms |
-| tomato sauce / 番茄酱 / 老干妈 | Sauces, Condiments & Spreads |
-| frozen pizza / 冷冻披萨 | Prepared Meals & Leftovers |
-| oat milk / 燕麦奶 | Milk & Plant-Based Milk |
-| coconut milk / 椰奶 (no use indicated) | Clarify drinking versus cooking |
-| cooking coconut milk | Sauces, Condiments & Spreads |
-| Anchor (brand only) | Ask for product identity |
-| CHK BRST 500G, user says chicken breast | Meat & Poultry; do not derive stock count from weight |
-| XYZ 2.99 (unexplained receipt text) | Ask; do not silently choose Other |
-| Greek yoghurt / 希腊酸奶 | Yoghurt |
-| tofu / 豆腐 | Tofu & Meat Alternatives |
-| dish soap / 洗洁精 | Household Supplies |
-| clearly identified item outside catalog | Propose Other and require confirmation |
-| existing private definition with user-selected category | Reuse category; do not reclassify |
-
-
-## Persistent-login validation — 2026-10-01
-
-Local verification used Python 3.12, Node.js 22 and Flutter 3.44.8. PostgreSQL
-sessions and browser E2E used isolated local schemas; these checks did not modify
-Neon or deploy to hosted platforms.
-
-- Backend fast CI: 90 passed, 679 deselected.
-- Ten [Backend session tests](../../backend/tests/test_persistent_auth.py) passed:
-  rotation, hashed storage, replay revocation, logout, independent devices,
-  concurrent rotation, inactive accounts, expired access renewal and session deadlines.
-- Web: 108 Vitest cases passed; production build passed. Existing lint warning:
-  the triple-slash type reference in `vite.config.ts`.
-- Flutter: 165 cases passed with `manual_preview` excluded; analyzer reported no issues.
-  Tests cover concurrent renewal, offline behavior, server logout, stream authentication
-  and offline preview storage isolation.
-- Eight Chromium E2E flows passed, including real session renewal and immediate
-  access revocation after logout. The first browser run timed out before executing
-  business requests; subsequent complete runs passed.
-
-Deploy migration `a261001_sessions` before the new Backend, then update both
-frontends. Existing access-only sessions require login again to use persistent login.
+Original blueprints, design alternatives and pre-consolidation records remain
+available through the [project archive](../archive/README.md).

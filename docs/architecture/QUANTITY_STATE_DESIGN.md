@@ -1,96 +1,78 @@
-# SayFridge 库存数量与操作规则
+# Inventory Quantity Rules
 
-> 状态：业务设计。Agent 前向预览、估算提交和记忆能力已加入本地实现，接口见 [API_REFERENCE.md](../reference/API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)；历史重估仍是目标行为。现有远程数据库需独立同步新增执行凭据表。
->
-> 字段与约束见 [DATABASE_DESIGN.md](DATABASE_DESIGN.md)，组件协作见 [ARCHITECTURE.md](AGENT_DESIGN.md)。本文维护数量业务语义；表结构由数据库设计维护，历史重估所需的记录结构仍待实施时细化。
+This document owns quantity semantics. [Database design](DATABASE_DESIGN.md)
+owns persisted fields; the [API reference](../reference/API_REFERENCE.md) owns requests.
 
-## 1. 数量含义与展示
+## Balances and display
 
-| 数量 | 含义 | 普通加减是否修改 |
+| Field group | Meaning | Update rule |
 | --- | --- | --- |
-| initial_* | 首次入库数量与单位，保留历史事实 | 否 |
-| confirmed_current_* | 当前可确定的库存数量与单位 | 无估算且本次变化可确定时修改 |
-| estimated_current_* | 包含不确定换算的当前余额；没有有效估算时为空 | 有估算时在此基础上继续加减 |
+| `initial_*` | Original stock-entry amount and unit | Preserved by subsequent operations |
+| `confirmed_current_*` | Last certain balance and unit | Updated by certain operations when there is no estimated balance, or by reconciliation |
+| `estimated_current_*` | Balance containing an uncertain conversion | Updated while uncertainty remains; amount/unit/time are set or cleared together |
 
-新建库存时，已确认数量等于初始数量，估算数量为空。界面优先显示估算数量与单位，标注“约”及估算时间；没有估算时，显示已确认数量与单位及确认时间。初始数量仅在详情中保留，不作为当前显示值的兜底。
+New stock starts with confirmed quantity equal to its initial quantity and no
+estimate. Display uses the estimate when present, including zero; otherwise it
+uses the confirmed balance. Initial quantity is a historical fact, not a display fallback.
+An estimated zero means possibly exhausted and remains visible. Confirmed zero
+can set the item to EMPTY.
 
-估算为零只能提示“可能用完”；只有确定归零时才可标记 EMPTY 并从在库列表隐藏。
+## Additions and consumption
 
-## 2. 手动加减与 Agent 操作
+ADD/CONSUME enter a change amount, not a remaining total. Operations use the
+current effective balance rather than recalculating from the initial quantity.
+An exact deduction from an estimated starting balance remains estimated.
 
-以下手动弹窗描述是交互建议，不代表前端页面或独立手动预览端点已交付。当前 Agent 已通过准备节点计算预览；实际可调用接口以 API 参考为准。
+| Calculation method | Basis |
+| --- | --- |
+| EXACT | Same-unit amounts or a valid fraction of the current balance |
+| CONVERTED | Deterministic mass/volume conversions, such as g/kg or ml/l |
+| AI_ESTIMATED | Context-dependent relationships, such as cups/weight or pieces/weight |
 
-两种入口共用同一套后端规则。手动点击增加或减少后，弹窗默认采用当前显示单位，允许输入小数，展示本次变化量和操作后余额，再由用户确认。例如“当前约 9.7 kg，本次减少 0.5 kg，操作后约 9.2 kg”。输入的是变化量，不是剩余总量。
+The backend calculates the final balance. User memory can supply an applicable
+relationship but does not turn an empirical relationship into an exact conversion.
+Estimates execute with an estimated label unless the user requests approval;
+photo stock and category review have their own confirmation rules.
 
-存在估算值时，后续加减始终以估算值为基数，保留确认基线；没有估算值时，可确定的变化更新已确认值，不确定换算则建立估算值。精确输入一次变化量不能消除之前余额的不确定性。快捷“加一/减一”也必须明确单位。
+The effective balance is converted to the requested operation unit before the
+change and saved in that unit. A fraction without a new unit retains the current
+unit. Ordinary cross-unit whole-item estimates round to an integer consistently
+in the preview, persisted result and feedback. An explicit half-item deduction
+can retain a fractional result. An ambiguous half of three whole apples requires
+clarification of the actual count.
 
-| 计算方式 | 适用情况 | 执行方式 |
-| --- | --- | --- |
-| EXACT | 同单位加减，或基数明确的分数 | 后端计算 |
-| CONVERTED | g/kg、ml/l 等确定性换算 | 后端规则换算 |
-| AI_ESTIMATED | 个与重量、杯与重量等依赖具体条件的换算 | Agent 提出换算关系，后端计算、标注估算并直接执行；用户明确要求核对时才确认 |
+Decimal arithmetic stores at most three decimal places in NUMERIC(12,3).
+Unrepresentable changes and rounding that would erase a positive balance return
+a specific validation problem. Physical reconciliation establishes a fresh baseline.
 
-用户记忆可提供适用的换算依据，但不能将经验换算自动视为精确事实。Agent 提取原始表达并提出候选操作，正式数量计算、校验与写入由 FastAPI 完成。
+A new conversion relationship is saved during execution before the stock write.
+Memory failure leaves stock unchanged. If stock fails after memory succeeds, the
+relationship can remain; the stock result still reports failure. Receipts and retry
+identities prevent a duplicate inventory write.
 
-### 本次单位与合理数量
+## Reconciliation
 
-当前有效余额先换成本次操作单位，再执行增减并保存；“一半”等没有指定新单位时
-沿用当前单位。初始数量和单位不变，不重新从初始数量开始扣减。
+RECONCILE records an actual remaining total, not agreement to an estimated change.
+For example, a batch initially recorded as 20 kg can be reconciled to 8 pieces:
+initial facts stay unchanged, confirmed becomes 8 pieces, and the estimate is cleared.
+Subsequent operations use pieces. An incorrect stocktake is corrected by another
+RECONCILE. Reconciliation records a new confirmation even when the total is unchanged.
 
-普通跨单位整件估算在后端按四舍五入取整数，预览、保存和 Agent 反馈一致。
-例如约 17.89 个保存为约 18 个。明确消耗半个时，先将换算基数估算为整数，
-再减去 0.5；同单位已有的真实部分数量正常保留。3 个苹果消耗一半仍追问实际个数。
+## Batches and history
 
-重量和体积采用 Decimal 计算，中间不反复取整，最终最多保存三位小数。
-保留原有 NUMERIC(12,3) 字段，不扩容、不增加数量状态字段或隐藏余量。
-小到无法保存的变化、会抹掉正余额的取整返回具体问题；整件估算为零仍是估算。
-有限精度和反复切换单位可能产生误差，复用换算记忆并减少中间取整可以控制误差，
-不承诺数学上零误差。实际盘点建立新的确认基准。
+Use ADD to supplement the same stock batch; create a new batch for a purchase with
+its own dates. Automatic merging and historical recalculation are outside the
+current implementation. Displaying quantities together requires compatible units.
 
-新换算依据在实际执行阶段、必要确认完成后、库存写入前保存到现有用户记忆。
-写记忆失败则不改库存并保留待办；库存提交失败可以保留已保存的关系，但不得报告
-库存成功。重试采用原有执行编号防重复。不新增记忆同步数据库状态。
+Successful ADD/CONSUME/RECONCILE writes create quantity-operation records. Agent
+receipts additionally retain execution identity and the calculation basis snapshot.
+Creation does not manufacture an ADD record. Metadata edits, movement, discard and
+archive are not a complete event ledger. Memory changes affect future interpretation,
+not old operations or current stock.
 
-## 3. 确认剩余
+## Consistency
 
-“确认剩余”对应 RECONCILE，是用户重新盘点当前总量的独立操作。弹窗允许填写数量和选择单位，优先推荐当前显示单位、最近确认单位与初始单位，去重后展示，也允许手填。手填单位不自动建立与其他单位的换算关系。
-
-例如，首次买入 20 kg 西红柿，经过多次估算消耗后，用户明确确认“现在还剩 8 个”：保留 initial = 20 kg，将 confirmed_current 更新为 8 个，并清空估算数量、单位与时间。后续默认按“个”操作，无需先将 8 个换算成 kg。
-
-普通弹窗中的“确认操作”只表示同意本次变化；“确认剩余”才建立新的实际库存基线并结束此前的估算链。盘点录入错误时，用新的 RECONCILE 更正。
-
-## 4. 补充库存、新购批次与合并
-
-补记漏录数量或补充同一份库存，可以使用普通增加流程；新购一批具有独立购买日期或到期日的物品，建议新建库存批次。判断依据是实际库存关系，不是手动或拍照的输入方式。
-
-目前建议底层分批保存，界面按物品聚合，例如“牛奶共 7 盒，2 批”。只有单位能够可靠统一时才合计，否则分开显示数量。这是待确认的展示方案。
-
-真正将新旧库存合并的规则仍待确定。若后续实现，必须同时处理来源余额、来源状态、单位和日期归属，并保留来源关系；不能只复制旧余额到新条目，造成重复计算。
-
-## 5. 操作历史与用户记忆
-
-当前实现：手动接口记录成功的 ADD / CONSUME / RECONCILE；Agent 额外保存逐项执行凭据和当时的估算依据。手动首次入库、资料修改、移动及丢弃/归档并没有完整事件历史。下段的完整审计能力是目标，不能当作现有所有接口的保证。
-
-所有正式变更都需要业务操作记录，包括手动和 Agent 操作。历史应能解释用户原始表达、实际变化量、操作前后数量与单位、确认或估算状态、操作来源、当时采用的换算依据以及后续更正关系。上述为记录能力要求，具体字段与更正操作类型另行设计。
-
-Agent 只按用户维护统一记忆，不为每个 item 建立独立记忆。记忆可以保存“我量这种大米的杯子，一杯约 0.1 kg”等说明，并限定适用物品、量具和时间范围。同一用户的新批次可在条件一致时复用该说明；不同用户之间不得复用私有记忆。
-
-操作历史保存当时实际发生的业务事实；用户记忆保存可用于后续理解和估算的知识。记忆更新本身不会直接改写库存。
-
-## 6. 历史估算修正（未来目标，尚未实现）
-
-支持根据用户新补充的换算信息，追溯修正此前估算。系统先明确适用范围：“之前每杯都是 0.1 kg”可用于相关历史操作；“以后换这个杯子”只影响后续。范围不明确时先追问，不擅自追溯。
-
-重算从最近一次“确认剩余”的基线开始；没有盘点记录时从首次入库开始。后端按顺序处理该区间内有效操作，仅替换适用的换算依据，同时重新计算依赖余额的后续操作，例如“用掉剩余的一半”。不得从已经包含这些扣减的当前余额再扣一次，也不得重复应用此前更正。重建起点应来自对应历史基线，不能将已经历精确加减的当前 confirmed_current 误当作区间起点。
-
-例如首次入库 1 kg，之后仅记录两次“用了 2 杯”。原来按 0.15 kg/杯计算，余额约 0.4 kg；用户说明这两次都应按 0.1 kg/杯计算，候选余额变为约 0.6 kg。
-
-系统展示原余额、新估算余额、适用操作和修正依据，用户确认后更新估算值并新增更正记录，保留原始操作历史。结果仍属于估算，不等同于 RECONCILE，不修改确认基线或初始数量。早于最近盘点的历史修正不得改变盘点后的当前余额。
-
-历史或换算依据不足、单位不能可靠衔接时，不强行产生余额，应请求补充信息或重新确认剩余。候选生成后库存发生变化时，重新计算并再次展示，不提交过期结果。
-
-## 7. 提交与一致性
-
-预览和重算候选不改变库存。按上述自动执行或确认规则提交后，FastAPI 校验身份、库存归属、单位、非负数量、版本与幂等性，按服务端当前状态计算，在同一事务中更新库存并记录正式操作。手动操作与 Agent 操作采用相同边界。
-
-只有有效的成功操作影响当前状态。撤回或更正必须考虑后续操作、盘点及历史重估，不能在基线已经变化后机械地反向加减旧数量；跨这些边界的具体撤回策略留待实施时细化。日常列表直接读取当前状态，只有历史重估等明确需求才读取并重算相关历史区间。
+Preparation changes no stock. Submission checks identity, ownership, state, units,
+quantity, expected version and retry identity against current server data. Quantity
+updates and their operation records commit together. Agent items commit independently;
+manual batch endpoints commit all members together. See [backend consistency rules](BACKEND_DESIGN.md).
