@@ -30,6 +30,7 @@ class AgentInputPanel extends StatefulWidget {
     this.maxLength = 8000,
     this.inputKey = const Key('assistant-message-field'),
     this.onMessage,
+    this.textTopPadding = 6,
     super.key,
   });
 
@@ -42,6 +43,7 @@ class AgentInputPanel extends StatefulWidget {
   final int reset, maxLength;
   final Key inputKey;
   final ValueChanged<String>? onMessage;
+  final double textTopPadding;
 
   @override
   State<AgentInputPanel> createState() => _AgentInputPanelState();
@@ -342,6 +344,7 @@ class _AgentInputPanelState extends State<AgentInputPanel> {
         voiceActive: _recordingVoice,
         maxLength: widget.maxLength,
         inputKey: widget.inputKey,
+        textTopPadding: widget.textTopPadding,
         onPhotoPressed: _enabled && _images.length < AgentImage.maxImages
             ? _pickImages
             : null,

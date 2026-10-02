@@ -12,7 +12,7 @@ import '../widgets/assistant_widgets.dart';
 import '../widgets/assistant_welcome.dart';
 import '../widgets/assistant_scroll_layout.dart';
 import '../widgets/inventory_visuals.dart';
-import '../widgets/business_forms.dart';
+import '../widgets/agent_proposal_options.dart';
 import 'camera_input_screen.dart';
 import 'conversation_history_screen.dart';
 
@@ -111,8 +111,9 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                           agent.error == null;
                       return AssistantScrollLayout(
                         bottomInset: bottomInset,
+                        headerFadeExtent: 16,
                         header: Padding(
-                          padding: const EdgeInsets.fromLTRB(25, 27, 25, 15),
+                          padding: const EdgeInsets.fromLTRB(25, 8, 25, 8),
                           child: AssistantHeader(
                             onNewConversation: () async {
                               if (agent.canSend) {
@@ -265,9 +266,10 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                           children: [
                             Padding(
                               key: _footerKey,
-                              padding: const EdgeInsets.fromLTRB(25, 8, 25, 28),
+                              padding: const EdgeInsets.fromLTRB(25, 8, 25, 8),
                               child: AgentInputPanel(
                                 controller: _message,
+                                textTopPadding: 14,
                                 enabled: agent.canSend,
                                 waiting: agent.waiting,
                                 reset: _inputReset,
@@ -310,44 +312,23 @@ class _AgentItemCard extends StatefulWidget {
 }
 
 class _AgentItemCardState extends State<_AgentItemCard> {
-  final _response = TextEditingController();
-  String? _selectedId;
+  String? _selectedId, _answerText;
+  bool _editing = false;
   AgentController get controller => widget.controller;
   Map<String, dynamic> get item => widget.item;
   Future<List<XFile>> Function()? get pickImages => widget.pickImages;
 
-  @override
-  void dispose() {
-    _response.dispose();
-    super.dispose();
-  }
-
   Future<void> _confirm() async {
-    if (item['status'] == 'NEEDS_CONFIRMATION') {
+    if (item['status'] == 'NEEDS_CONFIRMATION' && !_editing) {
       await controller.respond(item, 'confirm');
     } else {
       await controller.respond(
         item,
-        'answer',
+        _editing ? 'edit' : 'answer',
         selectedId: _selectedId,
-        message: _response.text,
+        message: _answerText,
       );
     }
-  }
-
-  Future<void> _answer(BuildContext context, String decision) async {
-    await businessForm(
-      context,
-      title: decision == 'edit'
-          ? 'Change this proposal'
-          : 'Provide information',
-      explanation: item['original_text'] as String?,
-      fields: [
-        BusinessField('message', 'Your response', validator: requiredValue),
-      ],
-      submit: (values) =>
-          controller.respond(item, decision, message: values['message']),
-    );
   }
 
   Future<void> _supportPhoto(BuildContext context) async {
@@ -400,7 +381,6 @@ class _AgentItemCardState extends State<_AgentItemCard> {
         : <String, dynamic>{...?previewDisplay, ...?itemDisplay};
     final error = item['error'] as Map<String, dynamic>?;
     final details = error?['details'] as Map<String, dynamic>?;
-    final candidates = details?['candidates'] as List? ?? [];
     final uncertain = error?['code'] == 'EXECUTION_UNCERTAIN';
     final waiting = status == 'NEEDS_INPUT' || status == 'NEEDS_CONFIRMATION';
     final canRespond = controller.canRespond && waiting;
@@ -408,255 +388,205 @@ class _AgentItemCardState extends State<_AgentItemCard> {
     final heading = _text(display?['item_name']) ?? 'Inventory action';
     final recognized =
         _readableRequest(_text(display?['recognized_text'])) ?? original;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: const Color(0x70FFFFFF),
-        border: Border.all(color: const Color(0xFFA8D589)),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0879AF43),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE9F7DF),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Image.asset(
-                      itemArtworkForName(heading),
-                      fit: BoxFit.contain,
-                    ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: AssistantActionBubble(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE9F7DF),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          heading,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            height: 1.3,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Chip(
-                          avatar: Icon(_statusIcon(status), size: 18),
-                          label: Text(_statusLabel(status)),
-                          labelStyle: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          backgroundColor: _statusColor(status),
-                          side: BorderSide.none,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const Divider(color: Color(0xFFA8D589), height: 24),
-              if (recognized != null) _RecognisedText(text: recognized),
-              if (_text(display?['category_name']) case final category?)
-                _DetailRow(label: 'Category', value: category),
-              if (_text(display?['space_name']) case final space?)
-                _DetailRow(label: 'Location', value: space),
-              if (_text(display?['package_description']) case final package?)
-                _DetailRow(label: 'Package', value: package),
-              if (_quantity(after, draft) case final quantity?)
-                _DetailRow(label: 'Quantity', value: quantity),
-              if (_text(draft?['purchase_date']) case final purchaseDate?)
-                _DetailRow(label: 'Purchase date', value: purchaseDate),
-              if (_text(draft?['expiry_date']) case final expiryDate?)
-                _DetailRow(label: 'Expiry date', value: expiryDate),
-              if (_stringList(display?['missing_fields']).isNotEmpty)
-                _NoticeBox(
-                  icon: Icons.help_outline,
-                  title: 'Still needed',
-                  values: _stringList(display?['missing_fields']),
-                ),
-              if (_stringList(display?['review_notes']).isNotEmpty)
-                _NoticeBox(
-                  icon: Icons.fact_check_outlined,
-                  title: 'Review notes',
-                  values: _stringList(display?['review_notes']),
-                ),
-              if (preview != null) ...[
-                _DetailRow(
-                  label: 'Calculation',
-                  value: '${preview['calculation_method']}',
-                ),
-                if (preview['before'] is Map)
-                  _DetailRow(
-                    label: 'Before',
-                    value: _balance(preview['before'] as Map),
-                  ),
-                if (preview['after'] is Map &&
-                    _quantity(after, draft) !=
-                        _balance(preview['after'] as Map))
-                  _DetailRow(
-                    label: 'After',
-                    value: _balance(preview['after'] as Map),
-                  ),
-              ],
-              if (error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Text(
-                    '${error['message'] ?? error['code']}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.45,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  child: Image.asset(
+                    itemArtworkForName(heading),
+                    fit: BoxFit.contain,
                   ),
                 ),
-              if (waiting && !uncertain && status == 'NEEDS_INPUT') ...[
-                const SizedBox(height: 12),
-                for (final candidate in candidates)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                        backgroundColor: _selectedId == candidate['id']
-                            ? const Color(0xFFE2F2D0)
-                            : null,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: canRespond
-                          ? () => setState(
-                              () => _selectedId = candidate['id'] as String,
-                            )
-                          : null,
-                      child: Row(
-                        children: [
-                          Icon(
-                            _selectedId == candidate['id']
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_unchecked,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              '${candidate['item_definition_name'] ?? candidate['name'] ?? 'Batch'} · ${candidate['storage_space_name'] ?? ''} · ${candidate['confirmed_current_amount'] ?? candidate['display_amount'] ?? ''} ${candidate['confirmed_current_unit'] ?? candidate['display_unit'] ?? ''}',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (candidates.isEmpty)
-                  TextField(
-                    controller: _response,
-                    enabled: canRespond,
-                    maxLines: 2,
-                    maxLength: 1000,
-                    decoration: const InputDecoration(
-                      hintText: 'Enter the missing details',
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-              ],
-              if (waiting) ...[
-                const SizedBox(height: 16),
-                if (uncertain)
-                  FilledButton(
-                    onPressed: canRespond ? _confirm : null,
-                    child: const Text('Verify original action'),
-                  )
-                else ...[
-                  Row(
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 44),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed:
-                              canRespond &&
-                                  (status == 'NEEDS_CONFIRMATION' ||
-                                      _selectedId != null ||
-                                      _response.text.trim().isNotEmpty)
-                              ? _confirm
-                              : null,
-                          child: const Text('Confirm'),
+                      Text(
+                        heading,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(0, 44),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: canRespond
-                              ? () => controller.respond(item, 'cancel')
-                              : null,
-                          child: const Text('Cancel'),
+                      const SizedBox(height: 5),
+                      Chip(
+                        avatar: Icon(_statusIcon(status), size: 18),
+                        label: Text(_statusLabel(status)),
+                        labelStyle: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
                         ),
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        backgroundColor: _statusColor(status),
+                        side: BorderSide.none,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      if (status == 'NEEDS_CONFIRMATION')
-                        TextButton.icon(
-                          onPressed: canRespond
-                              ? () => _answer(context, 'edit')
-                              : null,
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          label: const Text('Edit details'),
+                ),
+              ],
+            ),
+            const Divider(color: Color(0xFFA8D589), height: 24),
+            if (recognized != null) _RecognisedText(text: recognized),
+            if (_text(display?['category_name']) case final category?)
+              _DetailRow(label: 'Category', value: category),
+            if (_text(display?['space_name']) case final space?)
+              _DetailRow(label: 'Location', value: space),
+            if (_text(display?['package_description']) case final package?)
+              _DetailRow(label: 'Package', value: package),
+            if (_quantity(after, draft) case final quantity?)
+              _DetailRow(label: 'Quantity', value: quantity),
+            if (_text(draft?['purchase_date']) case final purchaseDate?)
+              _DetailRow(label: 'Purchase date', value: purchaseDate),
+            if (_text(draft?['expiry_date']) case final expiryDate?)
+              _DetailRow(label: 'Expiry date', value: expiryDate),
+            if (_stringList(display?['missing_fields']).isNotEmpty)
+              _NoticeBox(
+                icon: Icons.help_outline,
+                title: 'Still needed',
+                values: _stringList(display?['missing_fields']),
+              ),
+            if (_stringList(display?['review_notes']).isNotEmpty)
+              _NoticeBox(
+                icon: Icons.fact_check_outlined,
+                title: 'Review notes',
+                values: _stringList(display?['review_notes']),
+              ),
+            if (preview != null) ...[
+              _DetailRow(
+                label: 'Calculation',
+                value: '${preview['calculation_method']}',
+              ),
+              if (preview['before'] is Map)
+                _DetailRow(
+                  label: 'Before',
+                  value: _balance(preview['before'] as Map),
+                ),
+              if (preview['after'] is Map &&
+                  _quantity(after, draft) != _balance(preview['after'] as Map))
+                _DetailRow(
+                  label: 'After',
+                  value: _balance(preview['after'] as Map),
+                ),
+            ],
+            if (error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  '${error['message'] ?? error['code']}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            if (waiting &&
+                !uncertain &&
+                (status == 'NEEDS_INPUT' || _editing)) ...[
+              const SizedBox(height: 12),
+              AgentProposalOptions(
+                workspace: controller.workspace,
+                details: details ?? const {},
+                errorCode: error?['code'] as String?,
+                editing: _editing,
+                enabled: canRespond,
+                onChanged: (answer) => setState(() {
+                  _selectedId = answer.inventoryId;
+                  _answerText = answer.message;
+                }),
+              ),
+            ],
+            if (waiting) ...[
+              const SizedBox(height: 16),
+              if (uncertain)
+                FilledButton(
+                  onPressed: canRespond ? _confirm : null,
+                  child: const Text('Verify original action'),
+                )
+              else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
+                        onPressed:
+                            canRespond &&
+                                (status == 'NEEDS_CONFIRMATION' && !_editing ||
+                                    _selectedId != null ||
+                                    _answerText != null)
+                            ? _confirm
+                            : null,
+                        child: Text(_editing ? 'Update proposal' : 'Confirm'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: canRespond
+                            ? () => controller.respond(item, 'cancel')
+                            : null,
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (status == 'NEEDS_CONFIRMATION')
                       TextButton.icon(
                         onPressed: canRespond
-                            ? () => _supportPhoto(context)
+                            ? () => setState(() {
+                                _editing = !_editing;
+                                _selectedId = null;
+                                _answerText = null;
+                              })
                             : null,
-                        icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                        label: const Text('Add supporting photo'),
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: Text(
+                          _editing ? 'Close editing' : 'Edit details',
+                        ),
                       ),
-                    ],
-                  ),
-                ],
+                    TextButton.icon(
+                      onPressed: canRespond
+                          ? () => _supportPhoto(context)
+                          : null,
+                      icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                      label: const Text('Add supporting photo'),
+                    ),
+                  ],
+                ),
               ],
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -835,35 +765,32 @@ class _BatchConfirmation extends StatelessWidget {
   const _BatchConfirmation({required this.controller});
   final AgentController controller;
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: const Color(0xFFE2F2D0),
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '${controller.confirmableItems.length} items ready for review',
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        FilledButton.icon(
-          key: const Key('confirm-all-items'),
-          style: FilledButton.styleFrom(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: AssistantActionBubble(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '${controller.confirmableItems.length} items ready for review',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
-          onPressed: controller.canRespond
-              ? () => controller.confirmItems(controller.confirmableItems)
-              : null,
-          icon: const Icon(Icons.done_all, size: 20),
-          label: Text('Confirm all (${controller.confirmableItems.length})'),
-        ),
-      ],
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            key: const Key('confirm-all-items'),
+            style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: controller.canRespond
+                ? () => controller.confirmItems(controller.confirmableItems)
+                : null,
+            icon: const Icon(Icons.done_all, size: 20),
+            label: Text('Confirm all (${controller.confirmableItems.length})'),
+          ),
+        ],
+      ),
     ),
   );
 }

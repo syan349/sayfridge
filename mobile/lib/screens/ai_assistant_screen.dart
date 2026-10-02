@@ -147,8 +147,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               constraints: const BoxConstraints(maxWidth: 480),
               child: AssistantScrollLayout(
                 bottomInset: bottomInset,
+                headerFadeExtent: 16,
                 header: Padding(
-                  padding: const EdgeInsets.fromLTRB(25, 27, 25, 15),
+                  padding: const EdgeInsets.fromLTRB(25, 8, 25, 8),
                   child: AssistantHeader(
                     onNewConversation: _startNewConversation,
                     onHistory: _openHistory,
@@ -158,7 +159,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                     _buildScrollableContent(bottomPadding),
                 footer: widget.isGuest
                     ? Padding(
-                        padding: const EdgeInsets.fromLTRB(25, 14, 25, 28),
+                        padding: const EdgeInsets.fromLTRB(25, 14, 25, 8),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -185,7 +186,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(25, 8, 25, 28),
+                            padding: const EdgeInsets.fromLTRB(25, 8, 25, 8),
                             child: AssistantComposer(
                               key: const Key('assistant-bottom-action'),
                               controller: _messageController,

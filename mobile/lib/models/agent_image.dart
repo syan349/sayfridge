@@ -30,6 +30,8 @@ class AgentImage {
   final int sizeBytes;
   final Uint8List bytes;
 
+  (int, int) get dimensions => _dimensions(bytes, mimeType);
+
   /// Persist a compact chat preview; requests keep the original image payload.
   Future<AgentImage> thumbnail() async {
     ui.Codec? codec;

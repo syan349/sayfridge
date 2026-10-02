@@ -11,6 +11,7 @@ class AssistantScrollLayout extends StatelessWidget {
     required this.footer,
     this.header,
     this.bottomInset = 0,
+    this.headerFadeExtent = 32,
     super.key,
   });
 
@@ -20,6 +21,7 @@ class AssistantScrollLayout extends StatelessWidget {
   final Widget? header;
   // Supplied from outside SafeArea, which removes this inset from MediaQuery.
   final double bottomInset;
+  final double headerFadeExtent;
 
   static const double _fadeAboveFooter = 24;
 
@@ -53,7 +55,7 @@ class AssistantScrollLayout extends StatelessWidget {
                   minHeight: viewportHeight,
                   maxHeight: viewportHeight,
                   child: ScrollEdgeFade(
-                    topExtent: header == null ? 56 : 32,
+                    topExtent: header == null ? 56 : headerFadeExtent,
                     bottomExtent: 0,
                     child: contentBuilder(
                       context,

@@ -16,6 +16,7 @@ class AgentComposer extends StatefulWidget {
     this.voiceActive = false,
     this.maxLength = 8000,
     this.inputKey = const Key('assistant-message-field'),
+    this.textTopPadding = 6,
     super.key,
   });
 
@@ -24,6 +25,7 @@ class AgentComposer extends StatefulWidget {
   final int voiceModeReset;
   final int maxLength;
   final Key inputKey;
+  final double textTopPadding;
   final VoidCallback? onPhotoPressed, onSendPressed;
   final Widget voiceButton;
 
@@ -108,7 +110,12 @@ class _AgentComposerState extends State<AgentComposer> {
     children: [
       Padding(
         // Selection handles extend below the field; keep them clear of actions.
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 18),
+        padding: EdgeInsets.fromLTRB(
+          8,
+          widget.textTopPadding,
+          8,
+          24 - widget.textTopPadding,
+        ),
         child: TextField(
           key: widget.inputKey,
           controller: widget.controller,
