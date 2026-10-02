@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import styles from './DataTable.module.css'
+import { tableMinWidth } from './tableMinWidth'
 
 export interface Column<Row> {
   key: string
@@ -57,7 +58,7 @@ export function DataTable<Row>({
 
   return (
     <div className={styles.frame}>
-      <table className={styles.table} aria-busy={busy}>
+      <table className={styles.table} aria-busy={busy} style={{ minWidth: tableMinWidth(columns, Boolean(selection)) }}>
         <caption className="visually-hidden">{caption}</caption>
         <colgroup>
           {selection && <col style={{ width: '44px' }} />}

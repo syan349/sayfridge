@@ -14,6 +14,22 @@
   gap: 9px;
 }
 
+.problem {
+  font-size: var(--sf-text-sm);
+  color: var(--sf-overdue);
+}
+
+/* Looks like a link, but it is a button: it does something on this page. */
+.retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sf-green-700);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .divider {
   width: 1px;
   height: 24px;

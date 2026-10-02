@@ -8,7 +8,7 @@ import { ItemCell } from '../ItemCell/ItemCell'
 import { formatAmount } from '../QuantityCell/formatAmount'
 import { StatusPill } from '../StatusPill/StatusPill'
 import { TextField } from '../TextField/TextField'
-import { describeAgentItem } from './describeAgentItem'
+import { describeAgentItem, isUncertain, itemQuestion } from './describeAgentItem'
 import styles from './ProposalCard.module.css'
 
 const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five']
@@ -32,6 +32,9 @@ export function ProposalCard({ items, busy, onAnswer }: ProposalCardProps) {
 
   const toConfirm = items.filter((item) => item.status === 'NEEDS_CONFIRMATION')
   const onlyQuestions = toConfirm.length === 0
+  // A "maybe saved" item may only be confirmed (the backend answers 409 to edit or cancel),
+  // so don't offer buttons that are certain to fail. Corrections can still go in the chat box.
+  const confirmOnly = items.some(isUncertain)
   const all = items.length > 1 ? ' all' : ''
   const count = NUMBER_WORDS[items.length] ?? String(items.length)
   const title = `${count} proposed ${items.length === 1 ? 'change' : 'changes'}`
@@ -101,12 +104,20 @@ export function ProposalCard({ items, busy, onAnswer }: ProposalCardProps) {
               Confirm{toConfirm.length > 1 ? ' all' : ''}
             </Button>
           )}
-          <Button variant="secondary" disabled={busy} onClick={() => setEditing(true)}>
-            {onlyQuestions ? 'Answer' : 'Edit'}
-          </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => onAnswer(items.map((item) => answer(item, 'cancel')))}>
-            Cancel{all}
-          </Button>
+          {!confirmOnly && (
+            <>
+              <Button variant="secondary" disabled={busy} onClick={() => setEditing(true)}>
+                {onlyQuestions ? 'Answer' : 'Edit'}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => onAnswer(items.map((item) => answer(item, 'cancel')))}
+              >
+                Cancel{all}
+              </Button>
+            </>
+          )}
         </div>
       )}
     </section>
@@ -123,6 +134,8 @@ function ProposalRow({ item, busy, onChoose }: ProposalRowProps) {
   const summary = describeAgentItem(item)
   const detail = [summary.where, summary.change].filter(Boolean).join(' · ')
   const candidates = item.error?.details?.candidates ?? []
+  const question = itemQuestion(item)
+  const notes = item.display?.review_notes ?? []
 
   return (
     <li className={styles.row}>
@@ -141,7 +154,9 @@ function ProposalRow({ item, busy, onChoose }: ProposalRowProps) {
       </div>
 
       {/* The assistant's question, or why it can't go ahead yet. */}
-      {item.error && <p className={styles.question}>{item.error.message}</p>}
+      {question && <p className={styles.question}>{question}</p>}
+      {/* Why it wants a closer look, e.g. "the date on the label was hard to read". */}
+      {notes.length > 0 && <p className={styles.notes}>{notes.join(' ')}</p>}
 
       {candidates.length > 0 && (
         <div role="group" aria-label="Which one?" className={styles.candidates}>

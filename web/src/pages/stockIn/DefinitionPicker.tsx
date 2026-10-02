@@ -37,8 +37,8 @@ export function DefinitionPicker({ value, onChange, error }: DefinitionPickerPro
     queryFn: ({ signal }) => searchDefinitions(search, signal),
     enabled: value === null && search.length > 0,
   })
-  const categories = useQuery(categoriesQuery)
-  const categoryList = categories.data?.items ?? []
+  const categories = useQuery(categoriesQuery) // every page of public + the user's own categories
+  const categoryList = categories.data ?? []
 
   function choose(definition: ItemDefinition) {
     setCreateError(null)
@@ -129,7 +129,15 @@ export function DefinitionPicker({ value, onChange, error }: DefinitionPickerPro
               <p className={styles.matchesNote}>
                 Not in the list? Create “{search}” as <strong>your own</strong> item (only you will see it).
               </p>
-              {categories.data && categoryList.length === 0 ? (
+              {categories.isError ? (
+                // Never offer a half-loaded list: say so and let the user retry.
+                <p role="alert" className={styles.matchesNote}>
+                  The category list couldn’t load, so new items can’t be created right now.{' '}
+                  <Button variant="secondary" size="sm" onClick={() => void categories.refetch()}>
+                    Try again
+                  </Button>
+                </p>
+              ) : categories.data && categoryList.length === 0 ? (
                 <p className={styles.matchesNote}>No categories exist yet, so new items can’t be created.</p>
               ) : (
                 <div className={styles.createRow}>
