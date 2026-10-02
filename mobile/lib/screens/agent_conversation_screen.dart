@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:image_picker/image_picker.dart';
 
 import '../models/agent_input_draft.dart';
@@ -42,6 +43,7 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
   bool _followLatest = true;
   bool _scrollScheduled = false;
   bool _positioningLatest = false;
+  bool _userScrolling = false;
   String? _conversationId;
   String? _lastUserMessage;
   int _inputReset = 0;
@@ -81,7 +83,9 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     _scrollScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollScheduled = false;
-      if (!mounted || !_followLatest || !_scroll.hasClients) return;
+      if (!mounted || !_followLatest || _userScrolling || !_scroll.hasClients) {
+        return;
+      }
       final agent = widget.controller;
       final welcome =
           agent.messages.isEmpty &&
@@ -97,17 +101,30 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
 
   Widget _scrollNotifications(Widget child) =>
       NotificationListener<ScrollMetricsNotification>(
-        onNotification: (_) {
-          if (_followLatest) _scheduleLatest();
+        onNotification: (notification) {
+          if (notification.depth == 0 && _followLatest && !_userScrolling) {
+            _scheduleLatest();
+          }
           return false;
         },
         child: NotificationListener<ScrollNotification>(
           onNotification: (notification) {
-            if (!_positioningLatest &&
-                notification.depth == 0 &&
-                (notification is UserScrollNotification ||
-                    notification is ScrollUpdateNotification)) {
-              _followLatest = notification.metrics.extentAfter <= 80;
+            if (_positioningLatest || notification.depth != 0) return false;
+            // Even a slow, short drag must cancel queued automatic positioning.
+            if (notification is ScrollStartNotification &&
+                    notification.dragDetails != null ||
+                notification is UserScrollNotification &&
+                    notification.direction != ScrollDirection.idle) {
+              _userScrolling = true;
+              _followLatest = false;
+            } else if (notification is ScrollEndNotification ||
+                notification is UserScrollNotification &&
+                    notification.direction == ScrollDirection.idle) {
+              _userScrolling = false;
+              _followLatest = notification.metrics.extentAfter <= 1;
+            } else if (notification is ScrollUpdateNotification &&
+                !_userScrolling) {
+              _followLatest = notification.metrics.extentAfter <= 1;
             }
             return false;
           },
