@@ -6,12 +6,12 @@ The FastAPI backend for SayFridge. The current version provides health checks, l
 
 | Question | Maintained reference |
 | --- | --- |
-| Product scope and future goals | [Project scope](../docs/PROJECT_SCOPE_BILINGUAL.md) |
-| Current components, Agent graph, tools, memory and user intervention | [Architecture](../docs/ARCHITECTURE.md) |
-| Initial, confirmed, estimated and reconciled quantities | [Quantity rules](../docs/QUANTITY_STATE_DESIGN.md) |
-| Tables, fields and constraints | [Database design](../docs/DATABASE_DESIGN.md) |
-| HTTP request flow, layer ownership, services, permissions and transactions | [Backend design](../docs/BACKEND_DESIGN.md#21-http-request-lifecycle-and-layer-ownership) |
-| HTTP/SSE contracts for frontend integration | [API reference](../docs/API_REFERENCE.md) |
+| Product scope and future goals | [Project scope](../docs/product/README.md) |
+| Current components, Agent graph, tools, memory and user intervention | [Architecture](../docs/architecture/AGENT_DESIGN.md) |
+| Initial, confirmed, estimated and reconciled quantities | [Quantity rules](../docs/architecture/QUANTITY_STATE_DESIGN.md) |
+| Tables, fields and constraints | [Database design](../docs/architecture/DATABASE_DESIGN.md) |
+| HTTP request flow, layer ownership, services, permissions and transactions | [Backend design](../docs/architecture/BACKEND_DESIGN.md#21-http-request-lifecycle-and-layer-ownership) |
+| HTTP/SSE contracts for frontend integration | [API reference](../docs/reference/API_REFERENCE.md) |
 | Validation evidence and test commands | [Test index](../docs/testing/README.md) |
 
 Startup, environment and database initialization instructions are maintained in this
@@ -22,11 +22,11 @@ references, not parallel implementation instructions.
 
 The multimodal Agent has a six-node workflow, structured memory, independently
 committed inventory actions, confirmation/resume, and SSE recovery interfaces.
-See [Agent interfaces](../docs/API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)
+See [Agent interfaces](../docs/reference/API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)
 and [Agent configuration and storage](#agent-configuration-and-storage). Existing
 databases require the explicit receipt-table setup before enabling Agent writes.
 The same configured model reads text and inline images; no OCR service or second
-model is used. See [frontend handoff](../docs/AGENT_FRONTEND_INTEGRATION.md).
+model is used. See [frontend handoff](../docs/reference/AGENT_FRONTEND_INTEGRATION.md).
 
 - Python 3.12
 
@@ -209,7 +209,7 @@ Local isolated-database and browser tests have passed. No online Neon migration
 or hosted deployment has been performed for this change. Cookie login, password
 recovery and MFA are separate from these endpoints.
 
-The [Security and Privacy review (8.1–8.6)](../docs/SECURITY_AND_PRIVACY.md) records focused
+The [Security and Privacy review (8.1–8.6)](../docs/security/README.md) records focused
 verification and remaining risks. Runtime SQLAlchemy exceptions hide bound SQL
 parameters; this does not replace sanitizing driver messages or application logs.
 
@@ -383,10 +383,10 @@ python3.12 -m venv .venv
 
 If you use an existing Conda environment, activate it and use `python` instead of `.venv/bin/python`. Each team member should use their own `.env` and must not commit real credentials.
 
-- [Authentication, storage-space, and catalog API manual](../docs/API_REFERENCE.md)
+- [Authentication, storage-space, and catalog API manual](../docs/reference/API_REFERENCE.md)
 - Optional local Postman collection: `docs/postman/SayFridge_Auth.postman_collection.json` (not included in the planned documentation commit; see the API manual for manual requests)
-- [B01–B03 authentication test results](../docs/testing/B01-B03_AUTH_TEST_RESULTS.md)
-- [B04 storage-space test results](../docs/testing/B04_STORAGE_SPACES_TEST_RESULTS.md)
+- [B01–B03 authentication test results](../docs/testing/reports/B01-B03_AUTH_TEST_RESULTS.md)
+- [B04 storage-space test results](../docs/testing/reports/B04_STORAGE_SPACES_TEST_RESULTS.md)
 - [Backend test results index](../docs/testing/README.md)
 
 ## One test suite for local development and CI
@@ -450,7 +450,7 @@ branch. Disposable test or E2E jobs must never reset the predeploy database.
 
 The reusable target guards, read-only evidence command, and transaction/rollback
 acceptance matrix are documented in
-[Database isolation and acceptance evidence](../docs/testing/DATABASE_ACCEPTANCE.md).
+[Database isolation and acceptance evidence](../docs/testing/reports/DATABASE_ACCEPTANCE.md).
 The transaction matrix can be run independently with:
 
 ```bash
@@ -506,7 +506,7 @@ B10–B12 use the existing inventory_item and inventory_operation tables. No sch
 change or incremental migration is introduced. Request/response schemas are in
 `app/schemas/inventory_operations.py`; the transaction is in `app/services/inventory.py`,
 and pure calculation helpers remain in `app/services/inventory_quantities.py`.
-See [API reference](../docs/API_REFERENCE.md#7-inventory-quantity-operations-and-history--b10b12-and-b14) for requests
+See [API reference](../docs/reference/API_REFERENCE.md#7-inventory-quantity-operations-and-history--b10b12-and-b14) for requests
 and retry behavior. Run the complete addition tests from backend:
 
 ```bash

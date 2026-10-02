@@ -2,7 +2,7 @@
 
 Validation date: 2026-09-11. Work packages: B01 registration, B02 login, B03 current user. These results describe the local working-tree implementation at the time of testing, not a claim of completed remote CI or team review. No tested commit SHA was recorded because the changes had not yet been committed.
 
-Design: [Backend design handbook](../BACKEND_DESIGN.md). Usage: [API reference](../API_REFERENCE.md).
+Design: [Backend design handbook](../../architecture/BACKEND_DESIGN.md). Usage: [API reference](../../reference/API_REFERENCE.md).
 
 ## 1. Current test suite and results
 
@@ -24,7 +24,7 @@ python -m pytest -v
 python -m pytest -v -m "not postgres"
 ```
 
-Local tests load the isolated Neon direct URL from the ignored .env.test file. CI provides TEST_DATABASE_URL for its disposable PostgreSQL 18 service and needs no Neon credentials. Both use the shared database fixture in [conftest.py](../../backend/tests/conftest.py), which migrates and drops a new random schema per test. The [.env.test.example](../../backend/.env.test.example) template contains placeholders only. The application .env is not a test-connection fallback.
+Local tests load the isolated Neon direct URL from the ignored .env.test file. CI provides TEST_DATABASE_URL for its disposable PostgreSQL 18 service and needs no Neon credentials. Both use the shared database fixture in [conftest.py](../../../backend/tests/conftest.py), which migrates and drops a new random schema per test. The [.env.test.example](../../../backend/.env.test.example) template contains placeholders only. The application .env is not a test-connection fallback.
 
 The Docker verification ran on the developer's Mac, not a GitHub-hosted runner. Actual GitHub Actions execution remains pending a push, PR, or manual dispatch. No commit or push was performed as part of that verification. The user separately confirmed successful Postman-to-Neon authentication integration testing.
 

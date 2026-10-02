@@ -41,7 +41,7 @@ flutter build web --release -t lib/main.dart --no-web-resources-cdn --dart-defin
 
 替换示例域名后运行。网页未配置 `API_BASE_URL` 时使用同源 `/api/v1`；在只托管静态文件的 Render 上，这只能用于先查看游客界面，登录、库存和 AI 需接通后端后再验收。Android 模拟器的默认地址保持不变。
 
-Render 正式站跟踪 `main`；另建测试站跟踪 `mobile-render`，每次向测试分支提交并推送即可更新测试站，稳定后再通过 PR 合入 `main`。两个站点都使用 **Static Site**，Root Directory 填 `mobile`，Build Command 填 `bash scripts/render-build.sh`，Publish Directory 填 `build/web`，Auto-Deploy 选 `On Commit`。脚本准备 Flutter 3.44.8，并把各站点的 `API_BASE_URL` 变量传给 Dart 编译器；不使用 React 的 `VITE_API_BASE_URL`。详细步骤和上线检查见 [手机端 Render 部署](RENDER_DEPLOY.md)。
+Render 正式站跟踪 `main`；另建测试站跟踪 `mobile-render`，每次向测试分支提交并推送即可更新测试站，稳定后再通过 PR 合入 `main`。两个站点都使用 **Static Site**，Root Directory 填 `mobile`，Build Command 填 `bash scripts/render-build.sh`，Publish Directory 填 `build/web`，Auto-Deploy 选 `On Commit`。脚本准备 Flutter 3.44.8，并把各站点的 `API_BASE_URL` 变量传给 Dart 编译器；不使用 React 的 `VITE_API_BASE_URL`。详细步骤和上线检查见 [手机端 Render 部署](../docs/archive/deployment/RENDER_DEPLOY.md)。
 
 ## 真实 API 入口与联调
 
@@ -63,7 +63,7 @@ flutter run -t lib/main.dart --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
 - 退出/换账号会重置业务列表与会话状态。没有自动刷新令牌；过期后重新登录。
 - **代码接线不等于云端已通**：共享数据库此前发现缺字段/回执表，模型 Key 及联调环境仍需后端准备。本轮没有对共享 Neon 写入、创建真实演示账号或部署。
 
-详细范围、文档差异、验证记录与端到端步骤见 [API 接入更新](../docs/API_INTEGRATION_2026-09-27.md)。
+详细范围、文档差异、验证记录与端到端步骤见 [API 接入更新](../docs/archive/2026-09-27/API_INTEGRATION_2026-09-27.md)。
 
 ## 离线登录后 UI 预览（仅 Debug）
 

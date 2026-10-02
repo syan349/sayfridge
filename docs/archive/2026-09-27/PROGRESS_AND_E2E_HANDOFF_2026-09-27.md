@@ -235,4 +235,4 @@ Set-Location 'E:\Projects\project-implementation-appix\mobile'
 
 只交接源码、测试和本记录。不要交接 `.env`、虚拟环境、缓存、构建产物或包含令牌的日志。
 
-本记录是 2026-09-27 的状态快照，不替代后续维护的接口契约。接口细节以 `docs/API_REFERENCE.md`、环境与数据库流程以 `backend/README.md`、移动端使用说明以 `mobile/README.md` 为准。
+本记录是 2026-09-27 的状态快照，不替代后续维护的接口契约。接口细节以 `docs/reference/API_REFERENCE.md`、环境与数据库流程以 `backend/README.md`、移动端使用说明以 `mobile/README.md` 为准。

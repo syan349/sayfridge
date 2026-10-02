@@ -9,12 +9,12 @@ This document defines product scope, not a release checklist. The feature journe
 
 | Capability / 能力 | Current boundary / 当前边界 |
 | --- | --- |
-| Authentication, spaces, catalog and inventory APIs / 认证、空间、词典和库存接口 | Implemented endpoints are listed in [API reference](API_REFERENCE.md). / 已实现接口以 API 参考为准。 |
+| Authentication, spaces, catalog and inventory APIs / 认证、空间、词典和库存接口 | Implemented endpoints are listed in [API reference](../reference/API_REFERENCE.md). / 已实现接口以 API 参考为准。 |
 | Text Agent V0.2 / 文本 Agent | Local six-node implementation, memory, estimates and per-item resume/recovery; deployment requires storage checks. / 六节点、记忆、估算和逐项恢复已有本地实现，部署前仍需检查数据库。 |
 | Web/mobile experiences / Web 与移动端交互 | Product requirements; component code/readmes determine actual page coverage. / 属于产品要求，页面完成度以对应组件为准。 |
 | Voice, images, proactive notifications and historical recalculation / 语音、图片、主动提醒与历史重算 | Future goals, not current Agent V0.2 capabilities. / 未来目标，不属于当前 Agent V0.2 能力。 |
 
-Current implementation structure: [Architecture](ARCHITECTURE.md). Historical voice/dual-Agent design: [archived draft](archive/2026-09-25/ARCHITECTURE_REALTIME_DRAFT.md). / 当前实现结构与历史方案分开维护。
+Current implementation structure: [Architecture](../architecture/AGENT_DESIGN.md). Historical voice/dual-Agent design: [archived draft](../archive/2026-09-25/ARCHITECTURE_REALTIME_DRAFT.md). / 当前实现结构与历史方案分开维护。
 
 ## 1. Project Overview / 项目概述
 
@@ -121,7 +121,7 @@ flowchart LR
 1. The user says or enters, “Used three eggs.” / 用户说或输入“用了三个鸡蛋”。
 2. The Agent calls a query tool to locate plausible inventory batches. / Agent 调用查询工具定位可能的库存批次。
 3. If there are multiple batches, use an applicable user preference or ask the user to choose. / 多批次时使用适用的用户偏好；仍有歧义则让用户选择，不默认取第一批。
-4. After required clarification/confirmation, the backend reduces stock. Only confirmed zero becomes EMPTY; estimated zero remains visible as possibly used up. / 完成必要的补充或确认后，由后端扣减；只有确认归零才标记 EMPTY，估算为零仍保留为可能用完。数量语义见 [数量设计](QUANTITY_STATE_DESIGN.md)。
+4. After required clarification/confirmation, the backend reduces stock. Only confirmed zero becomes EMPTY; estimated zero remains visible as possibly used up. / 完成必要的补充或确认后，由后端扣减；只有确认归零才标记 EMPTY，估算为零仍保留为可能用完。数量语义见 [数量设计](../architecture/QUANTITY_STATE_DESIGN.md)。
 
 ### 5.3 Scheduled reminders / 每日提醒流程
 
@@ -134,7 +134,7 @@ flowchart LR
 The Agent interprets requests and proposes controlled actions. The backend validates
 identity, ownership and quantity rules, computes final balances and owns transactions.
 Current node/tool names and memory behavior are maintained only in
-[Architecture](ARCHITECTURE.md); public contracts are in [API reference](API_REFERENCE.md).
+[Architecture](../architecture/AGENT_DESIGN.md); public contracts are in [API reference](../reference/API_REFERENCE.md).
 The old conceptual tool list is preserved with the archived implementation plan.
 
 Agent 负责理解请求、选择目标和提出候选；后端负责身份、归属、数量校验、余额计算和正式事务。
@@ -144,7 +144,7 @@ Agent 负责理解请求、选择目标和提出候选；后端负责身份、�
 
 ## 7. Current Basic Data Model / 当前数据库基础模型
 
-The current business schema contains nine tables: the original user, storage_space, item_category, item_definition, inventory_item, inventory_operation, conversation and conversation_message, plus agent_inventory_action. LangGraph checkpoint/Store tables are maintained separately in the Agent schema. See [database design](DATABASE_DESIGN.md). / 当前业务结构为原八表加 agent_inventory_action，共九表；LangGraph 检查点和 Store 表在 Agent schema 中单独维护，不计入业务九表。字段与约束见数据库设计。
+The current business schema contains nine tables: the original user, storage_space, item_category, item_definition, inventory_item, inventory_operation, conversation and conversation_message, plus agent_inventory_action. LangGraph checkpoint/Store tables are maintained separately in the Agent schema. See [database design](../architecture/DATABASE_DESIGN.md). / 当前业务结构为原八表加 agent_inventory_action，共九表；LangGraph 检查点和 Store 表在 Agent schema 中单独维护，不计入业务九表。字段与约束见数据库设计。
 
 | Entity / 实体 | Key fields / 关键字段 | Description / 说明 |
 | --- | --- | --- |

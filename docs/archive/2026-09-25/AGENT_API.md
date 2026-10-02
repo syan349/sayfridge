@@ -1,4 +1,4 @@
-> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前架构](../../ARCHITECTURE.md)、[接口参考](../../API_REFERENCE.md)与[启动说明](../../../backend/README.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
+> 已归档 / Archived — 2026-09-25。以下内容保留历史决策和当时状态，不是当前实施指令。当前入口：[当前架构](../../architecture/AGENT_DESIGN.md)、[接口参考](../../reference/API_REFERENCE.md)与[启动说明](../../../backend/README.md)。旧文中的阶段限制、能力和部署说明仅代表当时方案。
 
 # SayFridge Agent v0.2: workflow and client contract
 

@@ -56,8 +56,8 @@ features.
   Android and Web.
 
 The maintained API contracts and exact endpoint behaviour are documented in
-[the API reference](docs/API_REFERENCE.md). Current product scope is documented
-in [the project scope](docs/PROJECT_SCOPE_BILINGUAL.md).
+[the API reference](docs/reference/API_REFERENCE.md). Current product scope is documented
+in [the project scope](docs/product/README.md).
 
 ## Technology stack and architecture
 
@@ -88,10 +88,10 @@ pooled connection; Alembic and setup operations use a direct connection.
 
 More detailed design documentation is available in:
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Backend design](docs/BACKEND_DESIGN.md)
-- [Database design](docs/DATABASE_DESIGN.md)
-- [Quantity-state design](docs/QUANTITY_STATE_DESIGN.md)
+- [Architecture](docs/architecture/AGENT_DESIGN.md)
+- [Backend design](docs/architecture/BACKEND_DESIGN.md)
+- [Database design](docs/architecture/DATABASE_DESIGN.md)
+- [Quantity-state design](docs/architecture/QUANTITY_STATE_DESIGN.md)
 - [Testing evidence](docs/testing/README.md)
 
 ## Assessment entry points
@@ -325,9 +325,9 @@ record the tested commit and result:
 
 ## Privacy and security
 
-- [Security and Privacy](docs/SECURITY_AND_PRIVACY.md): controls, data handling, findings and fixes, test/audit evidence, and remaining risks.
+- [Security and Privacy](docs/security/README.md): controls, data handling, findings and fixes, test/audit evidence, and remaining risks.
 
 
 Persistent login uses short-lived access tokens and revocable refresh sessions.
 See the [authentication lifecycle and migration instructions](backend/README.md#persistent-login)
-and [API reference](docs/API_REFERENCE.md#post-authrefresh).
+and [API reference](docs/reference/API_REFERENCE.md#post-authrefresh).

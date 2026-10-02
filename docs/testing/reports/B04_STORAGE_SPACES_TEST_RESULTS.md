@@ -3,8 +3,8 @@
 Validation date: 2026-09-13. Tested working tree: `syan349_feat_backend_apis`,
 based on `1efc65e58409` (PR #61 merge). B04 changes are not committed or pushed.
 
-Design: [Backend design handbook](../BACKEND_DESIGN.md), sections 3, 4.2, and 7.
-Manual usage: [B04 API reference](../API_REFERENCE.md#3-storage-spaces--b04).
+Design: [Backend design handbook](../../architecture/BACKEND_DESIGN.md), sections 3, 4.2, and 7.
+Manual usage: [B04 API reference](../../reference/API_REFERENCE.md#3-storage-spaces--b04).
 
 ## 1. Delivered scope
 
@@ -63,7 +63,7 @@ query-observation wrappers do not replace the database or return fabricated data
 The `test-job` workflow uses the same test definitions. After the CI selection
 update, automatic PR/main runs select 22 marked core cases (6 B01–B03 and 16 B04);
 manual workflow dispatch and default local pytest run all 115. Its job name and
-PostgreSQL service configuration were not changed. See the [CI selection policy](README.md#ci-selection-policy). This local run is not a GitHub Actions result; remote B04 CI awaits a PR
+PostgreSQL service configuration were not changed. See the [CI selection policy](../README.md#ci-selection-policy). This local run is not a GitHub Actions result; remote B04 CI awaits a PR
 or another configured trigger. Manual B04 Postman/Neon and Web/Flutter acceptance
 are pending. No remote deployment, performance baseline, commit, push, or Issue
 closure is claimed.

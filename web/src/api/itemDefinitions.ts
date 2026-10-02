@@ -1,4 +1,4 @@
-// Item-definition endpoints (docs/API_REFERENCE.md §5, backend/app/schemas/business.py).
+// Item-definition endpoints (docs/reference/API_REFERENCE.md §5, backend/app/schemas/business.py).
 // A definition is a kind of food ("Milk"); inventory items are batches of it.
 import { apiFetch } from './client'
 import type { Page } from './types'

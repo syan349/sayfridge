@@ -74,10 +74,10 @@ Results are local review evidence; see the verification scope below.
 
 | ID | Finding and risk | Fix or response | Verification evidence | Status at review |
 | --- | --- | --- | --- | --- |
-| SEC-01 | SQLAlchemy exceptions could include bound email/inventory parameters in logs. | Enable `hide_parameters=True` in [database session setup](../backend/app/db/session.py). | `test_sql_exception_representation_hides_bound_private_data` in [security probes](../backend/tests/test_security_review.py): failed before the fix and passed afterward. | Locally verified; deployed behaviour not verified. |
-| SEC-02 | Unhandled request exceptions could reach server traceback logs containing sensitive exception text. | Add [SafeErrorsMiddleware](../backend/app/middleware/safe_errors.py): record only random error ID and exception class; return a generic 500 before response start, or end an already-started stream without exposing the exception. CORS wraps this boundary. | `test_exception_details_never_reach_logs_or_response`, two cases in [safe-error tests](../backend/tests/test_safe_errors.py), checks logs, response and CORS. Both passed; no saved pre-fix failing run. | Locally verified; provider/startup logs remain outside this boundary. |
-| SEC-03 | Printed settings-validation errors could include sensitive input values. | Set `hide_input_in_errors=True` in [application settings](../backend/app/core/config.py) and [Agent settings](../backend/app/agents/model.py). | `test_settings_validation_does_not_print_input`, two cases in [safe-error tests](../backend/tests/test_safe_errors.py), passed; no saved pre-fix failing run. | Locally verified; structured error exports are not covered by this setting. |
-| SEC-04 | Uploaded image metadata could expose private photo information to the model/checkpoint. | Re-encode decoded pixels before constructing model messages; preserve orientation and original-byte request identity. | Four tests in [image privacy tests](../backend/tests/test_image_privacy.py) cover JPEG/PNG/WebP metadata and trailing data, orientation, retries and transparency; passed. | Local verification only; does not erase old checkpoints or client copies. |
+| SEC-01 | SQLAlchemy exceptions could include bound email/inventory parameters in logs. | Enable `hide_parameters=True` in [database session setup](../../backend/app/db/session.py). | `test_sql_exception_representation_hides_bound_private_data` in [security probes](../../backend/tests/test_security_review.py): failed before the fix and passed afterward. | Locally verified; deployed behaviour not verified. |
+| SEC-02 | Unhandled request exceptions could reach server traceback logs containing sensitive exception text. | Add [SafeErrorsMiddleware](../../backend/app/middleware/safe_errors.py): record only random error ID and exception class; return a generic 500 before response start, or end an already-started stream without exposing the exception. CORS wraps this boundary. | `test_exception_details_never_reach_logs_or_response`, two cases in [safe-error tests](../../backend/tests/test_safe_errors.py), checks logs, response and CORS. Both passed; no saved pre-fix failing run. | Locally verified; provider/startup logs remain outside this boundary. |
+| SEC-03 | Printed settings-validation errors could include sensitive input values. | Set `hide_input_in_errors=True` in [application settings](../../backend/app/core/config.py) and [Agent settings](../../backend/app/agents/model.py). | `test_settings_validation_does_not_print_input`, two cases in [safe-error tests](../../backend/tests/test_safe_errors.py), passed; no saved pre-fix failing run. | Locally verified; structured error exports are not covered by this setting. |
+| SEC-04 | Uploaded image metadata could expose private photo information to the model/checkpoint. | Re-encode decoded pixels before constructing model messages; preserve orientation and original-byte request identity. | Four tests in [image privacy tests](../../backend/tests/test_image_privacy.py) cover JPEG/PNG/WebP metadata and trailing data, orientation, retries and transparency; passed. | Local verification only; does not erase old checkpoints or client copies. |
 | PRIV-02 | Web recovery notice incorrectly claimed the server only retained operations. | Correct the Assistant notice to disclose retained conversation history and images. | Assistant page tests passed, including recovery and literal rendering of hostile model HTML. | Locally verified; not deployed. |
 | PRIV-01 | Data destinations, retention and deletion limitations were not consolidated for reviewers/users. | Document data flows, third parties, access and deletion limitations below. | Reviewed against Agent state/persistence/tools, client session storage and voice-input implementation. | Disclosure prepared; not implementation of automatic deletion or a frontend consent screen. |
 
@@ -184,18 +184,18 @@ No live Neon changes, live model calls, Android/iOS builds or full regression we
 
 | Run | Result | Interpretation |
 | --- | --- | --- |
-| Authentication/security/Agent/image selection | 159 passed | [Backend JUnit](testing/security/backend-security-junit.xml). |
-| Inventory/space/catalog boundary selection | 314 passed, 183 deselected | [Boundary JUnit](testing/security/inventory-boundaries-junit.xml); disjoint from the 159-case selection, giving 473 Backend cases. |
-| Web Assistant selection | 7 passed | [Web JUnit](testing/security/web-assistant-junit.xml); includes hostile-text rendering and retention-notice verification. |
+| Authentication/security/Agent/image selection | 159 passed | [Backend JUnit](../testing/evidence/security/backend-security-junit.xml). |
+| Inventory/space/catalog boundary selection | 314 passed, 183 deselected | [Boundary JUnit](../testing/evidence/security/inventory-boundaries-junit.xml); disjoint from the 159-case selection, giving 473 Backend cases. |
+| Web Assistant selection | 7 passed | [Web JUnit](../testing/evidence/security/web-assistant-junit.xml); includes hostile-text rendering and retention-notice verification. |
 | Web production build | Passed | TypeScript checks and Vite build completed locally. |
 | Backend CI collection | 168 selected out of 726 collected | Collection snapshot only, not a CI execution result. |
 
-[Security probes](../backend/tests/test_security_review.py) contain 60 new cases;
-[safe-error tests](../backend/tests/test_safe_errors.py) and
-[image privacy tests](../backend/tests/test_image_privacy.py) contain four each. All are marked `ci`.
-Existing evidence includes [auth tests](../backend/tests/test_auth_api.py),
-[admin tests](../backend/tests/test_admin_users.py),
-[Agent API tests](../backend/tests/test_agent_api_postgres.py) and inventory/space/catalog suites.
+[Security probes](../../backend/tests/test_security_review.py) contain 60 new cases;
+[safe-error tests](../../backend/tests/test_safe_errors.py) and
+[image privacy tests](../../backend/tests/test_image_privacy.py) contain four each. All are marked `ci`.
+Existing evidence includes [auth tests](../../backend/tests/test_auth_api.py),
+[admin tests](../../backend/tests/test_admin_users.py),
+[Agent API tests](../../backend/tests/test_agent_api_postgres.py) and inventory/space/catalog suites.
 Counts are dated snapshots. Earlier overlapping runs are not added to these totals.
 
 
@@ -226,15 +226,15 @@ with the tested commit, environment and date. Keep sensitive data out of failure
 
 | Scope | Result on review date | Evidence and limits |
 | --- | --- | --- |
-| 75 recorded local Python dependency versions | No known vulnerabilities reported by pip-audit 2.10.1. | [JSON](testing/security/python-audit.json), [audited versions](testing/security/python-audited-versions.txt). Not the actual Vercel installation or a project install lockfile. |
-| Web package-lock | npm audit reports zero vulnerabilities at all severity levels. | [JSON](testing/security/web-audit.json). Does not test browser behaviour. |
-| 84 hosted packages in Flutter/Dart pubspec.lock | OSV Pub ecosystem query by exact package/version returned no matches. | [Queries/results](testing/security/dart-audit.json). Excludes Flutter/Dart SDKs, SDK packages and native Gradle dependencies. |
+| 75 recorded local Python dependency versions | No known vulnerabilities reported by pip-audit 2.10.1. | [JSON](../testing/evidence/security/python-audit.json), [audited versions](../testing/evidence/security/python-audited-versions.txt). Not the actual Vercel installation or a project install lockfile. |
+| Web package-lock | npm audit reports zero vulnerabilities at all severity levels. | [JSON](../testing/evidence/security/web-audit.json). Does not test browser behaviour. |
+| 84 hosted packages in Flutter/Dart pubspec.lock | OSV Pub ecosystem query by exact package/version returned no matches. | [Queries/results](../testing/evidence/security/dart-audit.json). Excludes Flutter/Dart SDKs, SDK packages and native Gradle dependencies. |
 
 No dependency upgrades or lockfile changes were made for these audits. Outdated does not automatically
 mean vulnerable; no known advisory is not a guarantee of safety.
 
 Reproduce Python using the recorded version list with
-`pip-audit -r docs/testing/security/python-audited-versions.txt --no-deps --disable-pip --format json`
+`pip-audit -r docs/testing/evidence/security/python-audited-versions.txt --no-deps --disable-pip --format json`
 from the repository root; regenerate the list when installed versions change. For npm, run
 `npm audit --package-lock-only --json` from `web`.
 For Dart, derive hosted packages and exact versions from the current `mobile/pubspec.lock` and POST
@@ -247,7 +247,7 @@ Network errors are not passing results. Regenerate queries after lockfile change
 An initial scan of 526 tracked text files found no common private-key/API-key pattern matches.
 A follow-up limited scan of current source/config/documentation and locally available Git refs also
 found no private-key/API-key matches. Its 15 current and 18 historical database-URL matches were
-localhost, example or template hosts. See [redacted counts](testing/security/secret-scan.json).
+localhost, example or template hosts. See [redacted counts](../testing/evidence/security/secret-scan.json).
 Actual local environment files are ignored; tracked example secrets use placeholders.
 
 This is a heuristic check, not a comprehensive secret scanner. It excludes unavailable/deleted remote
@@ -283,13 +283,13 @@ abuse cases; they are not a claim of distributed denial-of-service protection.
   exists transiently in request memory; frontend copies and existing database history are unchanged.
 - Web model output is tested as literal text: hostile HTML does not create script/image/event-handler
   elements. This is a jsdom component test, not a complete browser penetration test.
-- [Backend JUnit](testing/security/backend-security-junit.xml): 159 passed (authentication, security,
+- [Backend JUnit](../testing/evidence/security/backend-security-junit.xml): 159 passed (authentication, security,
   configuration, Agent, image and multimodal selections). This overlaps earlier results.
-- [Inventory boundary JUnit](testing/security/inventory-boundaries-junit.xml): 314 passed, 183 deselected. Together with the 159-case selection, 473 distinct Backend cases passed. An initial sandboxed run could not connect to local PostgreSQL; this rerun used the required local access and passed.
-- [Web JUnit](testing/security/web-assistant-junit.xml): 7 passed. TypeScript and production Web build passed.
+- [Inventory boundary JUnit](../testing/evidence/security/inventory-boundaries-junit.xml): 314 passed, 183 deselected. Together with the 159-case selection, 473 distinct Backend cases passed. An initial sandboxed run could not connect to local PostgreSQL; this rerun used the required local access and passed.
+- [Web JUnit](../testing/evidence/security/web-assistant-junit.xml): 7 passed. TypeScript and production Web build passed.
 - Official Gitleaks 8.30.1 was checksum-verified and run against all locally available Git history and a
-  tracked-file snapshot. [History results](testing/security/gitleaks-history.json) and
-  [snapshot results](testing/security/gitleaks-tracked.json) each contain two findings, reviewed as a
+  tracked-file snapshot. [History results](../testing/evidence/security/gitleaks-history.json) and
+  [snapshot results](../testing/evidence/security/gitleaks-tracked.json) each contain two findings, reviewed as a
   synthetic conversation identifier and an unsubmitted widget-test password. Scanner exit was 1 because
   findings exist; this is a triaged outcome, not an unqualified zero-finding scan. No blanket allowlist was added.
 - A broader local directory scan also detected a JWT key in ignored `backend/.env`; this is expected local
@@ -307,9 +307,9 @@ The persistent-login change adds database-backed device sessions and single-use
 refresh rotation. Tests cover expired access renewal, replay revocation, immediate
 logout, inactive accounts, idle/absolute expiry, and the absolute cap. Web and Flutter
 client tests cover concurrent renewal, credential replacement, and network failures.
-See [Backend tests](../backend/tests/test_persistent_auth.py),
-[Web client tests](../web/src/api/client.test.ts), and
-[Flutter repository tests](../mobile/test/repositories/auth_repository_test.dart).
+See [Backend tests](../../backend/tests/test_persistent_auth.py),
+[Web client tests](../../web/src/api/client.test.ts), and
+[Flutter repository tests](../../mobile/test/repositories/auth_repository_test.dart).
 These results validate local isolated environments; cloud migration and deployment
 are separate release steps. Browser refresh credentials remain accessible to same-origin
 JavaScript, so this feature does not remove the need for XSS protections.
