@@ -43,7 +43,7 @@ recorded selections, not a full regression run or a count of OWASP requirements.
 
 | Area | Implemented control and verified behaviour |
 | --- | --- |
-| Authentication | Argon2 password hashing; fixed HS256 JWT verification; required `sub`, `type`, `iat` and `exp` claims; issuer/audience verification with bounded legacy-token compatibility; one verified decode passed to session validation. Invalid claims, disallowed algorithms and invalid/expired tokens are rejected. Account status is checked on authenticated requests. |
+| Authentication | Argon2 password hashing; fixed HS256 JWT verification; required `sub`, `type`, `iat` and `exp` claims. Identity and session dependencies decode separately; issuer/audience claims are not explicitly issued or validated in this branch. Invalid claims, disallowed algorithms and invalid/expired tokens are rejected. Account status is checked on authenticated requests. |
 | Authorization and IDOR | Resource reads/writes are scoped to the authenticated user. Tests cover foreign inventory, spaces, private definitions, history and batch operations. Ordinary users receive 403 from administrator endpoints; missing authentication receives 401. |
 | Role escalation | Registration creates a USER. Registration/status-update payload validation rejects unsupported role fields. Tests verify that input cannot create an administrator. |
 | Terminal states | Discard/archive and quantity/batch tests reject illegal operations on terminal resources; failed operations do not partially write or restore resources. |

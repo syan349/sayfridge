@@ -233,6 +233,7 @@ retain its result and SHA as release evidence.
 
 | Work packages | Report | Scope |
 | --- | --- | --- |
+| Documentation consolidation | [Documentation review — 2026-10-02](reports/DOCUMENTATION_REVIEW.md) | Navigation, links, command syntax, source consistency and evidence preservation |
 | Security 8.1–8.6 | [Security and Privacy](../security/README.md) | Authorization, hostile inputs, uploads, tokens, logging and dependency audit |
 | Agent multimodal | [Image input and stock review](reports/AGENT_MULTIMODAL_TEST_RESULTS.md) | Inline images, cross-turn context, supplements, mandatory review, checkpoint recovery and live-model acceptance |
 | Agent V0.2 | [Agent workflow verification](reports/AGENT_V02_TEST_RESULTS.md) | Memory, estimates, per-item transactions, resume, recovery, and live-model acceptance |
@@ -272,3 +273,10 @@ Database evidence is produced by `backend/scripts/record_database_acceptance.py`
 
 Original blueprints, design alternatives and pre-consolidation records remain
 available through the [project archive](../archive/README.md).
+
+## Final release evidence
+
+Use the [Final Acceptance Record](reports/FINAL_ACCEPTANCE.md) to record one
+selected main release's automated, deployed and Android results. It is currently
+a prepared record, not a passing test report. Keep existing feature reports and
+raw attachments alongside the final record.

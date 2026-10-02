@@ -157,7 +157,7 @@ complete table structure and [delivery](../delivery/README.md) for existing-data
 
 Registration creates ordinary accounts. Protected dependencies verify identity,
 active account state and session state; administrator dependencies additionally
-check the role. JWT signature and claims are decoded once and passed as trusted
-identity to session validation. No feature service accepts a user ID from model
+check the role. The identity dependency verifies JWT signature and required
+claims; session validation decodes the token again to check its session ID. No feature service accepts a user ID from model
 output as authentication. The [security guide](../security/README.md) records
 controls and their test evidence.

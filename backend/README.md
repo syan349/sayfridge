@@ -54,10 +54,11 @@ public version endpoint; these metadata values are not credentials.
 
 ### Persistent login
 
-Access JWTs are verified once for signature, type, identity, time and configured
-issuer/audience (`sayfridge` / `sayfridge-api`). Existing tokens lacking both
-issuer and audience retain their original expiry during compatibility transition;
-partially specified or wrong claims are rejected.
+Access JWTs use fixed HS256 signature verification and required `sub`, `type`,
+`iat` and `exp` claims. The authentication dependency decodes identity; session
+validation decodes again to obtain `sid`. Tokens without `sid` retain their
+original expiry as the legacy compatibility path. The current branch does not
+issue or explicitly validate issuer/audience claims.
 
 Refresh credentials rotate once per use. PostgreSQL stores their SHA-256 hashes.
 Default idle/absolute session lifetimes are `REFRESH_TOKEN_IDLE_DAYS=30` and

@@ -86,14 +86,28 @@ FastAPI derives the user identity from the bearer token and applies ownership
 and role checks before database access. Runtime database traffic uses the Neon
 pooled connection; Alembic and setup operations use a direct connection.
 
-More detailed design documentation is available in:
+## Documentation and assessment evidence
 
-- [System architecture](docs/architecture/README.md)
-- [Backend design](docs/architecture/BACKEND_DESIGN.md)
-- [Database design](docs/architecture/DATABASE_DESIGN.md)
-- [Quantity-state design](docs/architecture/QUANTITY_STATE_DESIGN.md)
-- [Testing evidence](docs/testing/README.md)
-- [Original design blueprints and project history](docs/archive/README.md)
+This README is the project entry point. Each subject guide owns its detailed
+content; module READMEs retain local setup and checks.
+
+| Subject | Maintained entry | Assessment evidence |
+| --- | --- | --- |
+| Product and user needs | [Product Scope](docs/product/README.md) | Target users, core stories and delivered workflows; criteria 1 and 4 |
+| Architecture and engineering | [System Architecture](docs/architecture/README.md) | Diagram, decisions, protocol choices and capacity assumptions; criteria 6 and 7 |
+| API and client integration | [API Reference](docs/reference/API_REFERENCE.md), [Agent Client Integration](docs/reference/AGENT_FRONTEND_INTEGRATION.md) | Shared contracts and recovery/UI behavior |
+| Testing | [Testing Strategy and Evidence](docs/testing/README.md) | CI/E2E/regression strategy, feature reports and raw evidence; criterion 8 |
+| Security and privacy | [Security and Privacy](docs/security/README.md) | Risks, mitigations, findings/fixes and verification; criterion 9 |
+| Build and delivery | [Build and Deployment](docs/delivery/README.md) | main revision, migration, hosting, APK build/install and acceptance; criterion 11 |
+| Additional technical learning | [Learning and Design Evolution](docs/learning/README.md) | Adopted techniques, engineering lessons and project benefits; criteria 3 and 12 |
+| Final release validation | [Final Acceptance Record](docs/testing/reports/FINAL_ACCEPTANCE.md) | Prepared record; results are entered after the selected release is tested |
+| Original designs and project history | [Project Archive](docs/archive/README.md) | Preserved blueprints, drafts and dated implementation records |
+| Team process | [Wiki](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/wiki), [Issues](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/issues), [Project boards](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/projects), [PRs](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/pulls) | Weekly records, responsibilities, task progress and reviews; criteria 10 and 12 |
+
+Flutter implementation and native capability evidence are linked from the
+[Mobile README](mobile/README.md), testing guide and release record for criteria
+2 and 5. Historical reports retain their tested date/version; the final record
+identifies the submission release.
 
 ## Assessment entry points
 
@@ -123,7 +137,7 @@ docs/      Architecture, API, database, design, and test documentation
 
 - Git
 - Python 3.12
-- Node.js 22 or newer and npm
+- Node.js 22 and npm
 - Flutter 3.44.8 with Dart 3.12.2
 - Android Studio / Android SDK for Android development
 - PostgreSQL, or a Neon PostgreSQL project with pooled and direct connection

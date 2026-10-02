@@ -210,3 +210,10 @@ Then test Android stock entry/consumption → React view of the same account/dat
 network interruption and selected device permissions. Record exact environment,
 commit, APK and outcome; link that release evidence from the testing guide. Submit
 private acceptance credentials through the course-designated application.
+
+## Release record
+
+Enter the selected commit, hosted deployment versions, database revision, APK
+checksum, device/emulator and actual check results in the
+[Final Acceptance Record](../testing/reports/FINAL_ACCEPTANCE.md). Its prepared
+status changes only after release validation is performed.
