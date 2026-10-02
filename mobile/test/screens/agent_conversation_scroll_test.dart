@@ -117,4 +117,40 @@ void main() {
     expect(position(tester).extentAfter, closeTo(0, 1));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('small touch drags are not pulled back during layout changes', (
+    tester,
+  ) async {
+    await open(tester);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ListView).first),
+    );
+    await gesture.moveBy(const Offset(0, 40));
+    await tester.pump();
+    final readingOffset = position(tester).pixels;
+    expect(position(tester).extentAfter, greaterThan(0));
+    // A reply or keyboard/layout update can arrive before a slow drag has
+    // moved more than the old 80px follow threshold.
+    agent.messages['assistant:29'] = 'Updated reply while reading';
+    agent.update();
+    await tester.pump();
+    await tester.pump();
+    expect(position(tester).pixels, closeTo(readingOffset, 1));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    final stoppedOffset = position(tester).pixels;
+    agent.update();
+    await tester.pumpAndSettle();
+    expect(position(tester).pixels, closeTo(stoppedOffset, 1));
+    await tester.drag(find.byType(ListView).first, const Offset(0, -150));
+    await tester.pumpAndSettle();
+    expect(position(tester).extentAfter, closeTo(0, 1));
+    agent.messages['assistant:29'] = List.filled(
+      10,
+      'More reply text',
+    ).join('\n');
+    agent.update();
+    await tester.pumpAndSettle();
+    expect(position(tester).extentAfter, closeTo(0, 1));
+  });
 }
