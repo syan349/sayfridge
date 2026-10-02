@@ -164,7 +164,7 @@ class _Harness {
 }
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
-  await tester.ensureVisible(finder);
+  await Scrollable.ensureVisible(tester.element(finder), alignment: .5);
   await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.runAsync(() => pumpEventQueue());
@@ -345,6 +345,12 @@ void main() {
       }
       final harness = _Harness(_proposal());
       await harness.open(tester, photo: portrait);
+      // Existing conversations now open at the end; reveal the earlier photo.
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(0);
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.byType(UserMessageBubble));
       await tester.pumpAndSettle();
       await _capture(tester, 'photo-chat');

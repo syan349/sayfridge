@@ -282,6 +282,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(posts, hasLength(1));
       expect(posts.single['message'], contains('Wait for my confirmation'));
+      // Photo messages precede the review cards, which now open at the end.
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(0);
+      await tester.pumpAndSettle();
       expect(find.text('Photo attached'), findsOneWidget);
       expect(
         find.byKey(ValueKey('uploaded-photo-${image.imageId}')),
