@@ -362,6 +362,8 @@ class AgentInventoryAction(Base):
 class Conversation(Base):
     __tablename__ = "conversation"
     __table_args__ = (
+        Index("uq_conversation_primary_user", "user_id", unique=True,
+              postgresql_where=text("is_primary")),
         Index(
             "ix_conversation_user_updated_desc",
             "user_id",
@@ -374,6 +376,8 @@ class Conversation(Base):
         UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     title: Mapped[str | None] = mapped_column(String(200))
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    history_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
 

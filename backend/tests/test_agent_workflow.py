@@ -24,6 +24,8 @@ class ScriptModel:
     def bind_tools(self, tools, **kwargs):
         return self
     async def ainvoke(self, messages, **kwargs):
+        if "agent_summary" in kwargs.get("config", {}).get("tags", []):
+            return AIMessage(content="Historical conversation facts retained.")
         if "agent_intake" in kwargs.get("config", {}).get("tags", []):
             return next(self.intents)
         if "agent_questions" in kwargs.get("config", {}).get("tags", []):

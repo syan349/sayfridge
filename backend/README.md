@@ -115,6 +115,62 @@ The reload development command selects a compatible loop. Linux uses normal asyn
 Image request limits and formats are owned by the [API reference](../docs/reference/API_REFERENCE.md#multimodal-messages-and-frontend-contract);
 [security and privacy](../docs/security/README.md) explains storage and third parties.
 
+## Persistent chat upgrade
+
+Migration `a261002_chat` adds only `conversation.is_primary`,
+`conversation.history_complete`, and the partial unique primary-user index.
+Apply the reviewed migration before deploying this backend. It retains legacy
+conversation IDs, messages and Agent checkpoints. Deployment and shared-database
+changes require separate authorization.
+
+```bash
+python -m alembic upgrade a261002_categories:a261002_chat --sql
+python scripts/recover_chat_history.py --dry-run
+python scripts/recover_chat_history.py --dry-run --user-id <uuid> --source-thread <uuid>
+```
+
+The first command prints the migration preview. Recovery defaults to read-only;
+`--apply` requires the migrated target and an explicit `BACKFILL` confirmation.
+It recovers observed user text and saved public replies across checkpoints using
+stable message IDs. It never reconstructs original text from summaries. Where a
+send time is missing, it uses the first observed checkpoint time. Repeated runs
+retain existing public rows. Recovered legacy history stays marked incomplete.
+Primary binding uses the most recently active owned thread; other legacy pending
+operations continue through their original IDs without combining execution state.
+
+The [Agent API contract](../docs/reference/API_REFERENCE.md#9-agent-v02--chat-resume-and-recovery)
+defines the incremental `GET /agent/chat` entry and its public-history cursor.
+Existing clients continue using their current POST and state APIs; reopening the
+complete public transcript requires their later adoption of the GET entry.
+
+`AGENT_CONTEXT_TRIGGER=80000`, `AGENT_CONTEXT_TARGET=40000`,
+`AGENT_CONTEXT_LIMIT=160000`, `AGENT_MODEL_CONTEXT_LIMIT=160000`, and
+`AGENT_OUTPUT_TOKENS=8000` are the initial configurable defaults. Accounting
+includes rules, tool schemas, relevant memory/task data, image input and output
+reserves. `AGENT_SUMMARY_TIMEOUT_SECONDS=45` bounds the entire summarization step.
+The current model merges the previous summary with older full text, checkpoints
+that result, then removes eligible working messages in a separate node. Recent
+text, pending evidence and complete tool call/result groups remain available.
+Public messages are retained separately. Failed summarization retains the prior
+state; requests that cannot fit safely return `CONTEXT_BUDGET_EXCEEDED` for retry.
+This implementation adds neither LangMem nor retrieval of old public messages.
+
+The backend CI subset includes durable history/recovery regressions. CI also feeds
+captured responses from FastAPI and isolated PostgreSQL to unchanged Web and Mobile
+parsers/controllers. To run the same compatibility checks locally, set
+`AGENT_CLIENT_CAPTURE_FILE` to an ignored JSONL path, run the relevant PostgreSQL
+Agent API tests, then run:
+
+```bash
+# From web/
+npm test -- --config ../backend/tests/vitest.agent-clients.config.mts
+# From mobile/, after locked dependencies are available
+flutter test --no-pub ../backend/tests/agent_client_compat_test.dart
+```
+
+Original half-consumption and real summary fidelity checks remain opt-in:
+`AGENT_LIVE_MODEL=1 python -m pytest -q tests/test_agent_chat_acceptance_live.py`.
+
 ## Checks
 
 Copy `.env.test.example` to ignored `.env.test`; configure a direct

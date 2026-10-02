@@ -17,7 +17,7 @@ from inventory_test_support import inventory_context, seed_inventory
 from auth_test_support import exercise
 from test_agent_workflow import ScriptModel, call, intake
 
-pytestmark = pytest.mark.postgres
+pytestmark = [pytest.mark.postgres, pytest.mark.ci]
 
 
 def parse_events(response):

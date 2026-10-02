@@ -11,7 +11,7 @@ from app.db.models import InventoryItem
 from app.core.quantity import QuantityError
 from app.services.inventory_quantities import calculate_change
 from app.agents.memory import MemoryService
-from app.agents.context_budget import Budget, BudgetModel, ContextBudgetError, compact
+from app.agents.context_budget import Budget, BudgetModel, ContextBudgetError, rolling_summary
 
 pytestmark = pytest.mark.ci
 
@@ -96,10 +96,8 @@ def test_budget_preserves_complete_recent_groups_and_refuses_oversize():
     budget = Budget(trigger=7000, target=4000, limit=16000, output=1000, margin=1024, model_limit=16000)
     history = []
     for n in range(20):
-        history.extend([HumanMessage(content=f"Question {n} " + "x" * 300), AIMessage(content="reply " * 40)])
+        history.extend([HumanMessage(content=f"Question {n} " + "x" * 300, id=f"question-{n}"), AIMessage(content="reply " * 40, id=f"reply-{n}")])
     history.append(HumanMessage(content="放冷藏室"))
-    trimmed, info = compact(history, budget)
-    assert info and trimmed[-1].content == "放冷藏室"
     class Recorder:
         calls = 0
         async def ainvoke(self, messages, **kwargs):
@@ -108,10 +106,17 @@ def test_budget_preserves_complete_recent_groups_and_refuses_oversize():
     async def scenario():
         model = Recorder()
         guarded = BudgetModel(model, budget)
+        info = await rolling_summary(guarded, history)
+        assert info and info["after"] < info["before"]
+        assert history[-1].content == "放冷藏室"  # planning cannot mutate the working messages
+        model.calls = 0
         with pytest.raises(ContextBudgetError):
             await guarded.ainvoke([HumanMessage(content="x" * 20000)])
         assert model.calls == 0
-        await guarded.ainvoke(history)
+        with pytest.raises(ContextBudgetError):
+            await guarded.ainvoke(history)
+        assert model.calls == 0
+        await guarded.ainvoke([m for m in history if m.id not in info["remove_ids"]])
         assert model.calls == 1
     asyncio.run(scenario())
 
