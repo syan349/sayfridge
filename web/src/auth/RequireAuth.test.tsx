@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
@@ -39,6 +39,33 @@ describe('RequireAuth (route guard)', () => {
     renderApp('/admin/accounts')
 
     expect(await screen.findByRole('heading', { name: 'Accounts' })).toBeInTheDocument()
+  })
+
+  it('says the session has ended when it can no longer be renewed', async () => {
+    setToken('old-token', 900, 'refresh-old')
+    server.use(
+      http.get('/api/v1/auth/me', () => HttpResponse.json({ detail: 'Invalid or expired access token' }, { status: 401 })),
+      http.post('/api/v1/auth/refresh', () =>
+        HttpResponse.json({ detail: 'Invalid or expired refresh token' }, { status: 401 }),
+      ),
+    )
+    const { router } = renderApp('/inventory')
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByText('Your session has ended. Please sign in again to continue.')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/login')
+  })
+
+  it('doesn’t show that message after the user presses Log out', async () => {
+    signInAs(testUser)
+    const user = userEvent.setup()
+    renderApp('/settings')
+
+    const signOut = await screen.findByRole('region', { name: 'Sign out' })
+    await user.click(within(signOut).getByRole('button', { name: 'Log out' }))
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByText(/Your session has ended/)).not.toBeInTheDocument()
   })
 
   it('shows an error with "Try again" when the account cannot be loaded', async () => {
