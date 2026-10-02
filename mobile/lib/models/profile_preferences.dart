@@ -7,6 +7,7 @@ class ProfilePreferences {
     this.fullName = '',
     this.avatarAsset = defaultAvatar,
     this.avatarBase64,
+    this.deviceNotifications = true,
     this.expiryReminders = true,
     this.daysBeforeExpiry = 3,
     this.dailyCheckIn = true,
@@ -18,6 +19,7 @@ class ProfilePreferences {
   final String fullName;
   final String avatarAsset;
   final String? avatarBase64;
+  final bool deviceNotifications;
   final bool expiryReminders;
   final int daysBeforeExpiry;
   final bool dailyCheckIn;
@@ -35,6 +37,7 @@ class ProfilePreferences {
     fullName: fullName,
     avatarAsset: avatarAsset,
     avatarBase64: avatarBytes == null ? null : base64Encode(avatarBytes),
+    deviceNotifications: deviceNotifications,
     expiryReminders: expiryReminders,
     daysBeforeExpiry: daysBeforeExpiry,
     dailyCheckIn: dailyCheckIn,
@@ -43,6 +46,7 @@ class ProfilePreferences {
   );
 
   ProfilePreferences withReminders({
+    bool? deviceNotifications,
     bool? expiryReminders,
     int? daysBeforeExpiry,
     bool? dailyCheckIn,
@@ -52,6 +56,7 @@ class ProfilePreferences {
     fullName: fullName,
     avatarAsset: avatarAsset,
     avatarBase64: avatarBase64,
+    deviceNotifications: deviceNotifications ?? this.deviceNotifications,
     expiryReminders: expiryReminders ?? this.expiryReminders,
     daysBeforeExpiry: daysBeforeExpiry ?? this.daysBeforeExpiry,
     dailyCheckIn: dailyCheckIn ?? this.dailyCheckIn,
@@ -66,6 +71,7 @@ class ProfilePreferences {
       fullName: json['full_name'] as String? ?? '',
       avatarAsset: json['avatar_asset'] as String? ?? defaultAvatar,
       avatarBase64: avatar,
+      deviceNotifications: json['device_notifications'] as bool? ?? true,
       expiryReminders: json['expiry_reminders'] as bool? ?? true,
       daysBeforeExpiry: (json['days_before_expiry'] as int? ?? 3).clamp(1, 7),
       dailyCheckIn: json['daily_check_in'] as bool? ?? true,
@@ -81,6 +87,7 @@ class ProfilePreferences {
     'full_name': fullName,
     'avatar_asset': avatarAsset,
     'avatar_base64': avatarBase64,
+    'device_notifications': deviceNotifications,
     'expiry_reminders': expiryReminders,
     'days_before_expiry': daysBeforeExpiry,
     'daily_check_in': dailyCheckIn,

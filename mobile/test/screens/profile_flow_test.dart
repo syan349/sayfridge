@@ -19,6 +19,7 @@ import 'package:sayfridge/screens/profile_screen.dart';
 import 'package:sayfridge/screens/reminder_settings_screen.dart';
 import 'package:sayfridge/screens/sign_in_screen.dart';
 import 'package:sayfridge/screens/voice_usage_screen.dart';
+import 'package:sayfridge/services/notification_service.dart';
 import 'package:sayfridge/state/auth_controller.dart';
 import 'package:sayfridge/state/profile_controller.dart';
 import 'package:sayfridge/theme/app_theme.dart';
@@ -102,9 +103,9 @@ void main() {
     await tester.tap(find.text('choose one'));
     await tester.pumpAndSettle();
     expect(find.text('Avatar library'), findsOneWidget);
-    final tomato = find.byKey(const Key('avatar-tomato'));
-    await tester.ensureVisible(tomato);
-    await tester.tap(tomato);
+    final rose = find.byKey(const Key('avatar-fridge spirit rose'));
+    await tester.ensureVisible(rose);
+    await tester.tap(rose);
     final useAvatar = find.byKey(const Key('use-avatar-button'));
     await tester.ensureVisible(useAvatar);
     await tester.tap(useAvatar);
@@ -113,10 +114,13 @@ void main() {
     await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
     expect(find.text('Alex Chen'), findsOneWidget);
-    expect(session.$2.preferences.avatarAsset, contains('tomato_avatar'));
+    expect(
+      session.$2.preferences.avatarAsset,
+      contains('fridge_spirit_rose_avatar'),
+    );
     final stored = await const ProfilePreferencesRepository().read(_user.id);
     expect(stored.fullName, 'Alex Chen');
-    expect(stored.avatarAsset, contains('tomato_avatar'));
+    expect(stored.avatarAsset, contains('fridge_spirit_rose_avatar'));
 
     await tester.tap(find.text('Edit Personal Information'));
     await tester.pumpAndSettle();
@@ -248,6 +252,116 @@ void main() {
     },
   );
 
+  testWidgets(
+    'device notification switch disables reminder edits and restores saved choices',
+    (tester) async {
+      _phoneSize(tester);
+      final session = await _session();
+      await tester.runAsync(() async {
+        await pumpEventQueue();
+        await session.$2.saveReminders(
+          daysBeforeExpiry: 5,
+          dailyCheckIn: false,
+          notificationHour: 10,
+          notificationMinute: 30,
+        );
+      });
+      final savedChoices = session.$2.preferences.toJson();
+      await tester.pumpWidget(
+        _app(ReminderSettingsScreen(controller: session.$2)),
+      );
+      await tester.pumpAndSettle();
+      final master = find.byKey(const Key('device-notifications-switch'));
+      expect(tester.widget<CupertinoSwitch>(master).value, isTrue);
+
+      await tester.tap(master);
+      await tester.pumpAndSettle();
+      expect(tester.widget<CupertinoSwitch>(master).value, isFalse);
+      for (final toggle
+          in tester
+              .widgetList<CupertinoSwitch>(find.byType(CupertinoSwitch))
+              .skip(1)) {
+        expect(toggle.onChanged, isNull);
+        expect(toggle.value, isFalse);
+      }
+      expect(
+        tester
+            .widget<DropdownButton<int>>(find.byKey(const Key('reminder-days')))
+            .onChanged,
+        isNull,
+      );
+      await tester.tap(find.byType(CupertinoSwitch).at(1));
+      await tester.tap(find.byKey(const Key('reminder-days')));
+      await tester.ensureVisible(find.byKey(const Key('reminder-time')));
+      await tester.tap(find.byKey(const Key('reminder-time')));
+      await tester.pumpAndSettle();
+      expect(find.byType(CupertinoPicker), findsNothing);
+      expect(session.$2.preferences.toJson(), {
+        ...savedChoices,
+        'device_notifications': false,
+      });
+      final stored = await const ProfilePreferencesRepository().read(_user.id);
+      expect(stored.toJson(), session.$2.preferences.toJson());
+
+      await tester.ensureVisible(master);
+      await tester.tap(master);
+      await tester.pumpAndSettle();
+      expect(session.$2.preferences.toJson(), savedChoices);
+      final toggles = tester
+          .widgetList<CupertinoSwitch>(find.byType(CupertinoSwitch))
+          .toList();
+      expect(toggles[1].value, isTrue);
+      expect(toggles[2].value, isFalse);
+      expect(toggles[1].onChanged, isNotNull);
+      expect(toggles[2].onChanged, isNotNull);
+      await tester.tap(find.byKey(const Key('reminder-days')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('2 days before').last);
+      await tester.pumpAndSettle();
+      expect(session.$2.preferences.daysBeforeExpiry, 2);
+      await tester.ensureVisible(find.byKey(const Key('reminder-time')));
+      await tester.tap(find.byKey(const Key('reminder-time')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('save-notification-time')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('denied device permission keeps reminder controls disabled', (
+    tester,
+  ) async {
+    _phoneSize(tester);
+    final session = await _session(
+      permission: NotificationPermissionState.denied,
+    );
+    await tester.pumpWidget(
+      _app(ReminderSettingsScreen(controller: session.$2)),
+    );
+    await tester.pumpAndSettle();
+    final master = find.byKey(const Key('device-notifications-switch'));
+    expect(tester.widget<CupertinoSwitch>(master).value, isFalse);
+    await tester.tap(master);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('permission was not granted'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<CupertinoSwitch>(master).value, isFalse);
+    for (final toggle
+        in tester
+            .widgetList<CupertinoSwitch>(find.byType(CupertinoSwitch))
+            .skip(1)) {
+      expect(toggle.onChanged, isNull);
+      expect(toggle.value, isFalse);
+    }
+    await tester.ensureVisible(find.byKey(const Key('reminder-time')));
+    await tester.tap(find.byKey(const Key('reminder-time')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CupertinoPicker), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('reminders persist toggles, lead time and notification time', (
     tester,
   ) async {
@@ -256,7 +370,7 @@ void main() {
     await _showProfile(tester, session.$1, session.$2);
     await tester.tap(find.text('Reminders Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(CupertinoSwitch).first);
+    await tester.tap(find.byType(CupertinoSwitch).at(1));
     await tester.pumpAndSettle();
     expect(session.$2.preferences.expiryReminders, isFalse);
     expect(
@@ -265,7 +379,7 @@ void main() {
           .onChanged,
       isNull,
     );
-    await tester.tap(find.byType(CupertinoSwitch).first);
+    await tester.tap(find.byType(CupertinoSwitch).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('reminder-days')));
     await tester.pumpAndSettle();
@@ -278,15 +392,16 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('reminder-time')));
     await tester.tap(find.byKey(const Key('reminder-time')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Switch to text input mode'));
-    await tester.pumpAndSettle();
-    final fields = find.descendant(
-      of: find.byType(TimePickerDialog),
-      matching: find.byType(TextField),
+    final hour = tester.widget<CupertinoPicker>(
+      find.byKey(const ValueKey('notification-hour')),
     );
-    await tester.enterText(fields.first, '10');
-    await tester.enterText(fields.last, '30');
-    await tester.tap(find.text('OK'));
+    final minute = tester.widget<CupertinoPicker>(
+      find.byKey(const ValueKey('notification-minute')),
+    );
+    hour.scrollController!.jumpToItem(9);
+    minute.scrollController!.jumpToItem(30);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('save-notification-time')));
     await tester.pumpAndSettle();
     expect(session.$2.preferences.notificationHour, 10);
     expect(session.$2.preferences.notificationMinute, 30);
@@ -440,7 +555,9 @@ Widget _app(Widget home, {double textScale = 1}) => MaterialApp(
   home: home,
 );
 
-Future<(AuthController, ProfileController)> _session() async {
+Future<(AuthController, ProfileController)> _session({
+  NotificationPermissionState permission = NotificationPermissionState.enabled,
+}) async {
   const repository = ProfilePreferencesRepository();
   await repository.save(
     _user.id,
@@ -448,7 +565,9 @@ Future<(AuthController, ProfileController)> _session() async {
   );
   final auth = AuthController(_FakeAuthRepository(_user));
   await auth.initialize();
-  final profile = ProfileController(auth);
+  final notifications = _Notifications(permission);
+  final profile = ProfileController(auth, repository, notifications);
+  addTearDown(notifications.dispose);
   addTearDown(profile.dispose);
   addTearDown(auth.dispose);
   return (auth, profile);
@@ -500,6 +619,23 @@ Future<void> _capture(WidgetTester tester, String name) async {
     ).writeAsBytes(bytes!.buffer.asUint8List());
     image.dispose();
   });
+}
+
+class _Notifications extends NotificationService {
+  _Notifications(this.permission);
+  final NotificationPermissionState permission;
+
+  @override
+  Future<NotificationPermissionState> permissionState() async => permission;
+
+  @override
+  Future<NotificationPermissionState> requestPermission() async => permission;
+
+  @override
+  Future<void> synchronizeDailyReminder(ProfilePreferences preferences) async {}
+
+  @override
+  Future<void> cancel(int id) async {}
 }
 
 class _FakeAuthRepository implements AuthRepository {

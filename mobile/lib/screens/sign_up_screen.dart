@@ -1,7 +1,4 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../state/auth_controller.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
@@ -25,10 +22,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
   bool _isSubmitting = false;
-  bool _isPickingAvatar = false;
   AvatarChoice _avatar = avatarChoices.first;
-  Uint8List? _uploadedAvatarBytes;
-  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void dispose() {
@@ -48,36 +42,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (selected != null && mounted) {
       setState(() {
         _avatar = selected;
-        _uploadedAvatarBytes = null;
       });
-    }
-  }
-
-  Future<void> _uploadAvatar() async {
-    if (_isPickingAvatar) return;
-    setState(() => _isPickingAvatar = true);
-    try {
-      final image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 90,
-        requestFullMetadata: false,
-      );
-      if (image == null) return;
-
-      final bytes = await image.readAsBytes();
-      if (!mounted) return;
-      setState(() => _uploadedAvatarBytes = bytes);
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to open the photo library. Please try again.'),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isPickingAvatar = false);
     }
   }
 
@@ -132,17 +97,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 20),
                 Center(
                   child: AvatarBubble(
-                    key: Key(
-                      _uploadedAvatarBytes == null
-                          ? 'selected-avatar-${_avatar.name.toLowerCase()}'
-                          : 'selected-avatar-uploaded',
-                    ),
+                    key: Key('selected-avatar-${_avatar.name.toLowerCase()}'),
                     choice: _avatar,
-                    imageBytes: _uploadedAvatarBytes,
                     size: 122,
-                    onUploadTap: _uploadAvatar,
-                    isUploading: _isPickingAvatar,
-                    showUploadBadge: true,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -151,7 +108,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     alignment: WrapAlignment.center,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      const Text('or ', style: TextStyle(fontSize: 16)),
                       UnderlinedAction(
                         label: 'choose one',
                         onPressed: _chooseAvatar,

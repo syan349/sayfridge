@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/selection_sheet.dart';
 
 import '../widgets/page_scroll_fade.dart';
 
@@ -209,47 +210,17 @@ class ExpiringItemsScreen extends StatelessWidget {
   }
 
   void _showBucketFilter(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Filter expiry group',
-                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 10),
-              for (final choice in const <(String, String?)>[
-                ('All', null),
-                ('Expired', 'overdue'),
-                ('Today', 'today'),
-                ('Upcoming', 'upcoming'),
-              ])
-                ListTile(
-                  title: Text(choice.$1),
-                  trailing: Icon(
-                    controller.bucket == choice.$2
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    controller.selectBucket(choice.$2);
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
+    showSelectionSheet<String?>(
+      context,
+      title: 'Filter expiry group',
+      selected: controller.bucket,
+      options: const [
+        ('All', null),
+        ('Expired', 'overdue'),
+        ('Today', 'today'),
+        ('Upcoming', 'upcoming'),
+      ],
+      onSelected: controller.selectBucket,
     );
   }
 

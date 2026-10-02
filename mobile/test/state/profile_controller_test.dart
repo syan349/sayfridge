@@ -7,8 +7,85 @@ import 'package:sayfridge/repositories/auth_repository.dart';
 import 'package:sayfridge/repositories/profile_preferences_repository.dart';
 import 'package:sayfridge/state/auth_controller.dart';
 import 'package:sayfridge/state/profile_controller.dart';
+import 'package:sayfridge/services/notification_service.dart';
 
 void main() {
+  test(
+    'device notifications request permission, persist, and cancel without changing reminder choices',
+    () async {
+      final auth = AuthController(_Accounts());
+      await auth.initialize();
+      final storage = _Preferences();
+      final service = _Notifications();
+      final profile = ProfileController(auth, storage, service);
+      addTearDown(profile.dispose);
+      addTearDown(auth.dispose);
+      addTearDown(service.dispose);
+      await pumpEventQueue();
+      expect(await profile.setDeviceNotificationsEnabled(false), isTrue);
+      expect(profile.preferences.deviceNotifications, isFalse);
+      expect(profile.preferences.expiryReminders, isTrue);
+      expect(profile.preferences.dailyCheckIn, isTrue);
+      expect(service.scheduled, isFalse);
+      expect(
+        service.cancelled,
+        containsAll([
+          NotificationService.expiredItemsId,
+          NotificationService.expiringSoonId,
+          NotificationService.dailyCheckInId,
+        ]),
+      );
+      expect(await profile.setDeviceNotificationsEnabled(true), isFalse);
+      expect(profile.preferences.deviceNotifications, isFalse);
+      expect(
+        profile.notificationPermission,
+        NotificationPermissionState.denied,
+      );
+      service.permission = NotificationPermissionState.enabled;
+      expect(await profile.setDeviceNotificationsEnabled(true), isTrue);
+      expect(service.scheduled, isTrue);
+      expect(storage.values['first']!.deviceNotifications, isTrue);
+      await profile.saveReminders(notificationHour: 23);
+      await profile.saveIdentity(
+        fullName: 'Name',
+        avatarAsset: ProfilePreferences.defaultAvatar,
+      );
+      expect(profile.preferences.deviceNotifications, isTrue);
+      await profile.setDeviceNotificationsEnabled(false);
+      final restored = ProfilePreferences.fromJson(
+        storage.values['first']!.toJson(),
+      );
+      expect(restored.deviceNotifications, isFalse);
+      expect(restored.notificationHour, 23);
+      expect(restored.expiryReminders, isTrue);
+    },
+  );
+
+  test(
+    'permission completion after account change does not enable notifications for the next account',
+    () async {
+      final accounts = _Accounts();
+      final auth = AuthController(accounts);
+      await auth.initialize();
+      final storage = _Preferences();
+      final service = _Notifications()
+        ..pending = Completer<NotificationPermissionState>();
+      final profile = ProfileController(auth, storage, service);
+      addTearDown(profile.dispose);
+      addTearDown(auth.dispose);
+      addTearDown(service.dispose);
+      await pumpEventQueue();
+      final enabling = profile.setDeviceNotificationsEnabled(true);
+      await auth.logout();
+      accounts.user = _user('second');
+      await auth.login(email: 'second@example.com', password: 'password');
+      await pumpEventQueue();
+      service.pending!.complete(NotificationPermissionState.enabled);
+      expect(await enabling, isFalse);
+      expect(storage.values, isEmpty);
+    },
+  );
+
   test(
     'late load after logout cannot restore the previous user profile',
     () async {
@@ -144,4 +221,26 @@ class _Preferences implements ProfilePreferencesRepository {
     if (pendingSave != null) await pendingSave!.future;
     values[userId] = preferences;
   }
+}
+
+class _Notifications extends NotificationService {
+  NotificationPermissionState permission = NotificationPermissionState.denied;
+  Completer<NotificationPermissionState>? pending;
+  bool scheduled = false;
+  final cancelled = <int>[];
+  @override
+  Future<NotificationPermissionState> permissionState() async =>
+      NotificationPermissionState.unknown;
+  @override
+  Future<NotificationPermissionState> requestPermission() async =>
+      pending == null ? permission : await pending!.future;
+  @override
+  Future<void> synchronizeDailyReminder(ProfilePreferences preferences) async {
+    scheduled =
+        preferences.deviceNotifications &&
+        (preferences.expiryReminders || preferences.dailyCheckIn);
+  }
+
+  @override
+  Future<void> cancel(int id) async => cancelled.add(id);
 }

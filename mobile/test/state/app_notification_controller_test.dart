@@ -24,6 +24,54 @@ import 'package:sayfridge/theme/app_theme.dart';
 import '../support/integration_fixtures.dart';
 
 void main() {
+  test(
+    'device notifications off suppresses delivery while preserving the in-app inbox',
+    () async {
+      final auth = AuthController(_Accounts());
+      await auth.initialize();
+      final service = _NotificationService();
+      final profile = ProfileController(auth, _Preferences(), service);
+      await pumpEventQueue();
+      await profile.setDeviceNotificationsEnabled(false);
+      final api = ApiClient(
+        client: MockClient(
+          (request) async => jsonResponse({
+            'counts': {'overdue': 1, 'today': 0, 'upcoming': 0},
+            'items': <Object>[],
+            'total': 1,
+            'page': 1,
+            'page_size': 20,
+          }),
+        ),
+      );
+      final expiry = ExpirySummaryController(
+        InventoryRepository(InventoryApiService(api), MemoryTokens()),
+      );
+      final notifications = AppNotificationController(
+        authController: auth,
+        profileController: profile,
+        expiryController: expiry,
+        service: service,
+        repository: _NotificationState(),
+      );
+      addTearDown(() {
+        notifications.dispose();
+        expiry.dispose();
+        profile.dispose();
+        auth.dispose();
+        api.close();
+        service.dispose();
+      });
+      await expiry.loadSummary(asOf: DateUtils.dateOnly(DateTime.now()));
+      await pumpEventQueue();
+      expect(notifications.notifications, isNotEmpty);
+      expect(service.shown, isEmpty);
+      await profile.setDeviceNotificationsEnabled(true);
+      await pumpEventQueue();
+      expect(service.shown, contains(NotificationService.expiredItemsId));
+    },
+  );
+
   testWidgets(
     'home opens notifications separately and updates the bell after reading',
     (tester) async {
@@ -331,6 +379,7 @@ class _NotificationState extends NotificationStateRepository {
 
 class _NotificationService extends NotificationService {
   final cancelled = <int>[];
+  final shown = <int>[];
   final _selected = StreamController<String>.broadcast();
 
   @override
@@ -340,6 +389,22 @@ class _NotificationService extends NotificationService {
 
   @override
   Future<void> cancel(int id) async => cancelled.add(id);
+
+  @override
+  Future<NotificationPermissionState> permissionState() async =>
+      NotificationPermissionState.enabled;
+
+  @override
+  Future<void> synchronizeDailyReminder(ProfilePreferences preferences) async {}
+
+  @override
+  Future<void> showNow({
+    required int id,
+    required String title,
+    required String body,
+    required String payload,
+    bool processAction = false,
+  }) async => shown.add(id);
 
   @override
   void dispose() {

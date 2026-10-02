@@ -71,7 +71,7 @@ void main() {
   );
 
   testWidgets(
-    'short and reversed swipes cancel; long drags stay bounded and ask once on release',
+    'short and reversed swipes cancel; long drags stay bounded and reveal a delete action without writing',
     (tester) async {
       final fixture = _InventoryFixture();
       addTearDown(fixture.dispose);
@@ -98,12 +98,16 @@ void main() {
       await tester.pump();
       final travel = initial.dx - tester.getTopLeft(content).dx;
       expect(travel, greaterThan(30));
-      expect(travel, lessThanOrEqualTo(60));
+      expect(travel, lessThanOrEqualTo(72));
       expect(find.byType(AlertDialog), findsNothing);
       await drag.moveBy(const Offset(-200, 0));
       await tester.pump();
       expect(initial.dx - tester.getTopLeft(content).dx, closeTo(travel, 0.1));
       await drag.up();
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(fixture.writes, isEmpty);
+      await tester.tap(find.byKey(const Key('swipe-delete-action')).first);
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(fixture.writes, isEmpty);
@@ -115,13 +119,17 @@ void main() {
     },
   );
   testWidgets(
-    'left swipe opens confirmation, cancel restores the card, and pending writes preserve it',
+    'left swipe reveals delete, tapping confirms, and pending writes preserve the card',
     (tester) async {
       final fixture = _InventoryFixture();
       addTearDown(fixture.dispose);
       await fixture.open(tester);
       final card = find.byType(SwipeDeleteCard).first;
       await tester.drag(card, const Offset(-180, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(fixture.writes, isEmpty);
+      await tester.tap(find.byKey(const Key('swipe-delete-action')).first);
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(fixture.writes, isEmpty);
@@ -131,6 +139,10 @@ void main() {
       expect(fixture.writes, isEmpty);
       fixture.pending = Completer<void>();
       await tester.drag(card, const Offset(-180, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(fixture.writes, isEmpty);
+      await tester.tap(find.byKey(const Key('swipe-delete-action')).first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirm delete'));
       await tester.pump(const Duration(milliseconds: 300));

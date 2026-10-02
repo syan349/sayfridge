@@ -124,7 +124,10 @@ class NotificationService {
     if (!isSupported || kIsWeb) return;
     await initialize();
     await _plugin.cancel(id: dailyReminderId);
-    if (!preferences.expiryReminders && !preferences.dailyCheckIn) return;
+    if (!preferences.deviceNotifications ||
+        (!preferences.expiryReminders && !preferences.dailyCheckIn)) {
+      return;
+    }
     if (await permissionState() != NotificationPermissionState.enabled) return;
 
     await _initializeTimeZone();

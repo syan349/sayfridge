@@ -72,7 +72,7 @@ void main() {
     expect(find.text('Meat'), findsOneWidget);
     expect(find.text('Vegetables'), findsOneWidget);
     expect(find.text('Others'), findsOneWidget);
-    expect(find.text('View all expiring items'), findsOneWidget);
+    expect(find.text('Expiry overview'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(const ValueKey('inventory-group-vegetables')));
@@ -118,8 +118,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('View all expiring items'));
-    await tester.tap(find.text('View all expiring items'));
+    await tester.ensureVisible(find.text('Expiry overview'));
+    await tester.tap(find.text('Expiry overview'));
     await tester.pumpAndSettle();
     expect(find.text('Expiry Overview'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -170,7 +170,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No items expiring soon'), findsOneWidget);
-    expect(find.text('View all expiring items'), findsNothing);
+    expect(find.text('Expiry overview'), findsNothing);
     expect(find.text('3 items'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

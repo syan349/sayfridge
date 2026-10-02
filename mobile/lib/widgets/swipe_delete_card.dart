@@ -1,9 +1,8 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'app_action_icon.dart';
 
-/// A bounded left swipe asks for confirmation; it never removes the card itself.
+/// A left swipe reveals an action; only tapping it asks to delete the item.
 class SwipeDeleteCard extends StatefulWidget {
   const SwipeDeleteCard({
     required this.child,
@@ -14,27 +13,29 @@ class SwipeDeleteCard extends StatefulWidget {
   final Widget child;
   final Future<void> Function()? onDelete;
   final String itemName;
-
   @override
   State<SwipeDeleteCard> createState() => _SwipeDeleteCardState();
 }
 
 class _SwipeDeleteCardState extends State<SwipeDeleteCard> {
+  static const _travel = 72.0;
   double _offset = 0;
   bool _dragging = false, _confirming = false;
-  static const _maxTravel = 56.0;
-  static const _triggerDistance = 36.0;
-  late final _deleteAction = CustomSemanticsAction(
-    label: 'Delete ${widget.itemName}',
-  );
+  bool get _enabled => widget.onDelete != null && !_confirming;
 
-  bool get _canSwipe => widget.onDelete != null && !_confirming;
-
-  Future<void> _confirmDeletion() async {
-    if (!_canSwipe) return;
-    setState(() {
+  @override
+  void didUpdateWidget(covariant SwipeDeleteCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.onDelete == null || oldWidget.itemName != widget.itemName) {
       _offset = 0;
       _dragging = false;
+    }
+  }
+
+  Future<void> _delete() async {
+    if (!_enabled) return;
+    setState(() {
+      _offset = 0;
       _confirming = true;
     });
     try {
@@ -44,75 +45,88 @@ class _SwipeDeleteCardState extends State<SwipeDeleteCard> {
     }
   }
 
-  void _reset() => setState(() {
-    _dragging = false;
+  void _close() => setState(() {
     _offset = 0;
+    _dragging = false;
   });
 
   @override
   Widget build(BuildContext context) => Semantics(
-    customSemanticsActions: !_canSwipe
+    customSemanticsActions: !_enabled
         ? null
-        : {_deleteAction: _confirmDeletion},
+        : {CustomSemanticsAction(label: 'Delete ${widget.itemName}'): _delete},
     child: GestureDetector(
-      onHorizontalDragStart: !_canSwipe
+      onHorizontalDragStart: !_enabled
           ? null
           : (_) => setState(() => _dragging = true),
-      onHorizontalDragUpdate: !_canSwipe
+      onHorizontalDragUpdate: !_enabled
           ? null
-          : (details) => setState(
-              () =>
-                  _offset = (_offset + details.delta.dx).clamp(-_maxTravel, 0),
-            ),
-      onHorizontalDragEnd: !_canSwipe
+          : (details) => setState(() {
+              _offset = (_offset + details.delta.dx).clamp(-_travel, 0);
+            }),
+      onHorizontalDragEnd: !_enabled
           ? null
-          : (_) {
-              if (_offset <= -_triggerDistance) {
-                _confirmDeletion();
-              } else {
-                _reset();
-              }
-            },
-      onHorizontalDragCancel: _reset,
+          : (_) => setState(() {
+              _offset = _offset <= -32 ? -_travel : 0;
+              _dragging = false;
+            }),
+      onHorizontalDragCancel: _close,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(13),
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: _offset),
-          duration: _dragging
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
-          builder: (context, offset, child) {
-            final travel = _dragging ? _offset : offset;
-            final strength = (-travel / _triggerDistance).clamp(0.0, 1.0);
-            return ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (bounds) {
-                // Use the Assistant's alpha fade horizontally, restricted to
-                // the clipped edge rather than painting a strip over the card.
-                final width = math.max(bounds.width, 1.0);
-                final extent = math.min(44.0, width * 0.2);
-                return LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.white.withValues(alpha: 1 - strength),
-                    Colors.white,
-                    Colors.white,
-                  ],
-                  stops: [0, extent / width, 1],
-                ).createShader(bounds);
-              },
-              child: Transform.translate(
-                offset: Offset(travel, 0),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 64,
+                  height: double.infinity,
+                  child: AnimatedOpacity(
+                    opacity: _offset == 0 ? 0 : 1,
+                    duration: const Duration(milliseconds: 180),
+                    child: ExcludeSemantics(
+                      excluding: _offset == 0,
+                      child: Material(
+                        color: const Color(0xFFF8DADB),
+                        borderRadius: BorderRadius.circular(13),
+                        child: InkWell(
+                          key: const Key('swipe-delete-action'),
+                          borderRadius: BorderRadius.circular(13),
+                          onTap: _offset == 0 || !_enabled ? null : _delete,
+                          child: Tooltip(
+                            message: 'Delete ${widget.itemName}',
+                            child: const Center(
+                              child: AppActionIcon(ActionAssets.deleteRed),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: _offset),
+              duration: _dragging
+                  ? Duration.zero
+                  : const Duration(milliseconds: 180),
+              builder: (context, offset, child) => Transform.translate(
+                offset: Offset(_dragging ? _offset : offset, 0),
                 child: child,
               ),
-            );
-          },
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(13),
-            child: widget.child,
-          ),
+              child: GestureDetector(
+                onTap: _offset < 0 ? _close : null,
+                child: AbsorbPointer(
+                  absorbing: _offset < 0,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: widget.child,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     ),

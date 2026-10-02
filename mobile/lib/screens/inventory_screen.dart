@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../widgets/app_action_icon.dart';
 
 import '../widgets/page_scroll_fade.dart';
 
@@ -14,6 +15,7 @@ import '../widgets/inventory_toolbar.dart';
 import '../widgets/storage_space_picker.dart';
 import '../widgets/inventory_visuals.dart';
 import '../widgets/swipe_delete_card.dart';
+import '../widgets/selection_sheet.dart';
 import 'inventory_detail_screen.dart';
 
 enum InventoryCategoryGroup { meat, vegetables, others }
@@ -206,7 +208,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     _deleteMode
                 ? null
                 : () => setState(() => _deleteMode = true),
-            icon: const Icon(Icons.delete_outline, size: 26),
+            icon: const AppActionIcon(ActionAssets.deleteBlack, size: 26),
           ),
         ),
       ],
@@ -539,53 +541,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
     for (final item in items) {
       categories[item.categoryId] = item.categoryName;
     }
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Filter by category',
-                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                title: const Text('All categories'),
-                trailing: Icon(
-                  _selectedCategoryId == null
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
-                ),
-                onTap: () => _applyCategory(sheetContext, null),
-              ),
-              for (final category in categories.entries)
-                ListTile(
-                  title: Text(category.value),
-                  trailing: Icon(
-                    _selectedCategoryId == category.key
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  onTap: () => _applyCategory(sheetContext, category.key),
-                ),
-            ],
-          ),
-        ),
-      ),
+    showSelectionSheet<String?>(
+      context,
+      title: 'Filter by category',
+      selected: _selectedCategoryId,
+      options: [
+        ('All categories', null),
+        for (final category in categories.entries)
+          (category.value, category.key),
+      ],
+      onSelected: (id) => _applyCategory(id),
     );
   }
 
-  void _applyCategory(BuildContext sheetContext, String? categoryId) {
-    Navigator.pop(sheetContext);
+  void _applyCategory(String? categoryId) {
     setState(() {
       _selectedCategoryId = categoryId;
       _selectedGroup = null;

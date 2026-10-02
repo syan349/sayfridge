@@ -135,11 +135,17 @@ class AppNotificationController extends ChangeNotifier {
       if (readDate != today) unread.add(notification);
     }
     _setNotifications(unread);
+    if (!profileController.preferences.deviceNotifications) return;
     if (profileController.notificationPermission !=
         NotificationPermissionState.enabled) {
       return;
     }
     for (final notification in unread) {
+      if (run != _evaluation ||
+          _disposed ||
+          !profileController.preferences.deviceNotifications) {
+        return;
+      }
       if (!_shownThisSession.add(notification.type)) continue;
       await service.showNow(
         id: switch (notification.type) {

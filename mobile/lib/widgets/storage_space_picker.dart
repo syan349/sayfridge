@@ -5,6 +5,7 @@ import '../state/inventory_controller.dart';
 import '../state/storage_space_controller.dart';
 import '../theme/app_theme.dart';
 import 'inventory_visuals.dart';
+import 'selection_sheet.dart';
 
 Future<void> showStorageSpacePicker(
   BuildContext context, {
@@ -59,57 +60,16 @@ Future<void> showStorageSpacePicker(
               }
             }
             Widget option(String? id, String name, int? count) {
-              final selected = id == selectedId;
-              return Material(
-                color: selected ? const Color(0xFFE0F2CE) : Colors.transparent,
-                borderRadius: BorderRadius.circular(13),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(13),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    onSelected(id);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              if (count != null)
-                                Text(
-                                  '$count ${count == 1 ? 'item' : 'items'}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.muted,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(
-                          selected
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
-                          size: 23,
-                          color: Colors.black,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              return SelectionSheetOption(
+                label: name,
+                subtitle: count == null
+                    ? null
+                    : '$count ${count == 1 ? 'item' : 'items'}',
+                selected: id == selectedId,
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  onSelected(id);
+                },
               );
             }
 

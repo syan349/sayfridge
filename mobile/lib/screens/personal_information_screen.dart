@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../state/profile_controller.dart';
 import '../theme/app_theme.dart';
@@ -28,7 +27,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   );
   late String _avatarAsset = widget.controller.preferences.avatarAsset;
   late Uint8List? _avatarBytes = widget.controller.preferences.avatarBytes;
-  bool _pickingImage = false;
 
   @override
   void dispose() {
@@ -42,7 +40,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       MaterialPageRoute<AvatarChoice>(
         builder: (_) => AvatarPickerScreen(
           title: 'Avatar library',
-          showUploadOption: false,
           initialAvatar: avatarChoices.firstWhere(
             (choice) => choice.assetPath == _avatarAsset,
             orElse: () => avatarChoices.first,
@@ -55,33 +52,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       _avatarAsset = selected.assetPath;
       _avatarBytes = null;
     });
-  }
-
-  Future<void> _uploadAvatar() async {
-    if (_pickingImage) return;
-    setState(() => _pickingImage = true);
-    try {
-      final image = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 85,
-        requestFullMetadata: false,
-      );
-      if (image == null) return;
-      if (await image.length() > 2 * 1024 * 1024) {
-        if (mounted) _message('Please choose an image smaller than 2 MB.');
-        return;
-      }
-      final bytes = await image.readAsBytes();
-      if (mounted) setState(() => _avatarBytes = bytes);
-    } catch (_) {
-      if (mounted) {
-        _message('Unable to open that photo. Please try another image.');
-      }
-    } finally {
-      if (mounted) setState(() => _pickingImage = false);
-    }
   }
 
   void _message(String text) =>
@@ -118,12 +88,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       ),
       children: [
         Center(
-          child: ProfileAvatar(
-            asset: _avatarAsset,
-            bytes: _avatarBytes,
-            onUpload: _uploadAvatar,
-            uploading: _pickingImage,
-          ),
+          child: ProfileAvatar(asset: _avatarAsset, bytes: _avatarBytes),
         ),
         const SizedBox(height: 10),
         Center(
@@ -131,7 +96,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Text('or ', style: TextStyle(fontSize: 16)),
               TextButton(
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,

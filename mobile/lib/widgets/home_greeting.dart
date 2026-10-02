@@ -74,7 +74,7 @@ class _HomeGreetingState extends State<HomeGreeting>
   Widget build(BuildContext context) {
     final style = DefaultTextStyle.of(
       context,
-    ).style.copyWith(fontSize: 29, fontWeight: FontWeight.w500, height: 1.1);
+    ).style.copyWith(fontSize: 29, fontWeight: FontWeight.w600, height: 1.1);
     final painter = TextPainter(
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),

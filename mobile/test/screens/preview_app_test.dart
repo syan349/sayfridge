@@ -90,7 +90,7 @@ void main() {
       await tester.tap(find.text('Home'));
       await tester.pumpAndSettle();
       expect(find.text('8 items'), findsOneWidget);
-      expect(find.text('View all expiring items'), findsOneWidget);
+      expect(find.text('Expiry overview'), findsOneWidget);
       await tester.tap(find.text('Chicken Thigh'));
       await tester.pumpAndSettle();
       expect(find.text('Item details'), findsOneWidget);
@@ -112,7 +112,7 @@ void main() {
       expect(find.text('All Spaces'), findsOneWidget);
       expect(find.text('0 items'), findsOneWidget);
       expect(find.text('Your inventory is empty'), findsOneWidget);
-      expect(find.text('View all expiring items'), findsNothing);
+      expect(find.text('Expiry overview'), findsNothing);
       // Keep the empty-state message centered and the action at the section edge.
       expect(
         tester.getCenter(find.text('No items expiring soon')).dx,
