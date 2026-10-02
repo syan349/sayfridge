@@ -88,7 +88,7 @@ def test_disabled_account_cannot_refresh(database):
 
 def test_expired_access_can_be_renewed(database):
     data = login(database)
-    claims = jwt.decode(data["access_token"], "s" * 40, algorithms=["HS256"])
+    claims = jwt.decode(data["access_token"], "s" * 40, algorithms=["HS256"], audience="sayfridge-api", issuer="sayfridge")
     claims["exp"] = int(datetime.now(timezone.utc).timestamp()) - 1
     data["access_token"] = jwt.encode(claims, "s" * 40, algorithm="HS256")
     assert me(database, data).status_code == 401
@@ -124,3 +124,73 @@ def test_simultaneous_refresh_detects_reuse(database):
         result = await client.get("/api/v1/auth/me", headers={"Authorization": "Bearer " + winner["access_token"]})
         assert result.status_code == 401
     asyncio.run(exercise(database, scenario))
+
+
+@pytest.mark.ci
+def test_protected_request_verifies_jwt_once(database, monkeypatch):
+    from app.core import security
+    data = login(database)
+    calls = []
+    original = security.jwt.decode
+    def counted(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(security.jwt, "decode", counted)
+    assert me(database, data).status_code == 200
+    assert len(calls) == 1
+
+
+@pytest.mark.ci
+@pytest.mark.parametrize("keep_session", [False, True])
+def test_existing_unscoped_access_token_keeps_original_behavior(database, keep_session):
+    data = login(database)
+    claims = jwt.decode(data["access_token"], "s" * 40, algorithms=["HS256"],
+                        audience="sayfridge-api", issuer="sayfridge")
+    del claims["iss"], claims["aud"]
+    if not keep_session:
+        del claims["sid"]
+    data["access_token"] = jwt.encode(claims, "s" * 40, algorithm="HS256")
+    assert me(database, data).status_code == 200
+    if keep_session:
+        request(database, "POST", "/api/v1/auth/logout", json={"refresh_token": data["refresh_token"]})
+        assert me(database, data).status_code == 401
+    claims["exp"] = int(datetime.now(timezone.utc).timestamp()) - 1
+    data["access_token"] = jwt.encode(claims, "s" * 40, algorithm="HS256")
+    assert me(database, data).status_code == 401
+
+
+@pytest.mark.ci
+def test_security_events_are_correlated_and_exclude_credentials(database, caplog):
+    import json
+    import logging
+    import uuid
+    caplog.set_level(logging.INFO, logger="app.security.audit")
+    bad_password = "NeverLogThisPassword@123"
+    assert request(database, "POST", "/api/v1/auth/login", json={
+        "email": "unknown@example.com", "password": bad_password}).status_code == 401
+    data = login(database)
+    assert request(database, "GET", "/api/v1/admin/users", headers={
+        "Authorization": "Bearer " + data["access_token"]}).status_code == 403
+    assert request(database, "GET", "/api/v1/auth/me", headers={
+        "Authorization": "Bearer NeverLogThisToken"}).status_code == 401
+    renewed = refresh(database, data).json()
+    assert refresh(database, data).status_code == 401
+    another = request(database, "POST", "/api/v1/auth/login", json={
+        "email": "user@example.com", "password": VALID_PASSWORD}).json()
+    request(database, "POST", "/api/v1/auth/logout", json={"refresh_token": another["refresh_token"]})
+    records = [json.loads(record.message) for record in caplog.records
+               if record.name == "app.security.audit"]
+    events = {record["event"] for record in records}
+    assert {"login_denied", "login_succeeded", "authentication_denied", "admin_access_denied",
+            "refresh_replay_detected", "refresh_denied", "session_revoked"} <= events
+    replay = next(record for record in records if record["event"] == "refresh_replay_detected")
+    assert any(record["event"] == "session_revoked" and record["request_id"] == replay["request_id"]
+               for record in records)
+    for record in records:
+        assert set(record) <= {"event", "request_id", "user_id", "session_id"}
+        uuid.UUID(record["request_id"])
+    output = json.dumps(records)
+    for sensitive in [bad_password, VALID_PASSWORD, "unknown@example.com", "user@example.com",
+                      "NeverLogThisToken", data["access_token"], data["refresh_token"],
+                      renewed["refresh_token"], another["refresh_token"], "s" * 40]:
+        assert sensitive not in output

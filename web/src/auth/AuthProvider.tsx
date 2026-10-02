@@ -12,6 +12,7 @@ const ME_QUERY_KEY = ['auth', 'me'] as const
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const [hasToken, setHasToken] = useState(() => getToken() !== null || getRefreshToken() !== null)
+  const [sessionEnded, setSessionEnded] = useState(false)
 
   const me = useQuery({
     queryKey: ME_QUERY_KEY,
@@ -28,11 +29,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     clearToken()
     setHasToken(false)
+    setSessionEnded(false)
     queryClient.clear() // forget every response cached for this user
   }, [queryClient])
 
-  // A 401 on any request means the token expired or the account was disabled.
-  useEffect(() => onUnauthorized(logout), [logout])
+  // A 401 that renewal couldn't fix: the session is over (refresh expired, revoked,
+  // or the account was disabled). Sign out like Log out, but remember why.
+  useEffect(
+    () =>
+      onUnauthorized(() => {
+        logout()
+        setSessionEnded(true)
+      }),
+    [logout],
+  )
 
   const login = useCallback(
     async (credentials: Credentials) => {
@@ -41,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The login response already contains the user, so skip a /auth/me round trip.
       queryClient.setQueryData(ME_QUERY_KEY, response.user)
       setHasToken(true)
+      setSessionEnded(false)
       return response.user
     },
     [queryClient],
@@ -60,9 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error: status === 'error' ? error : null,
       login,
       logout,
+      sessionEnded,
       retry: () => void refetch(),
     }),
-    [status, data, error, login, logout, refetch],
+    [status, data, error, login, logout, sessionEnded, refetch],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

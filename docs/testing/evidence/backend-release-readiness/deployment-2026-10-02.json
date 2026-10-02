@@ -1,0 +1,22 @@
+{
+  "recorded_at_utc": "2026-10-02T09:54:00.480106+00:00",
+  "environment": "Vercel Production / shared Neon",
+  "base_url": "https://sayfridge-backend-preview.vercel.app",
+  "expected_deployed_commit": "d402b79970e005e4922babba1c48d6f1dda5e36c",
+  "procedure": "Existing-account API smoke with read-only business queries and read-only Neon checks",
+  "effects": "Creates and revokes authentication sessions; does not change accounts, inventory, roles or schema",
+  "checks": [
+    "PASS health: HTTP 200, status ok",
+    "PASS unauthenticated identity, inventory and admin requests: HTTP 401",
+    "PASS Neon revision=a261002_categories; active public categories=25",
+    "PASS production commit matches latest main",
+    "PASS new category creation and inventory category editing contracts",
+    "PASS user login, categories (25), inventory (7), expiry and admin access denial",
+    "PASS refresh token rotation and refreshed access",
+    "PASS logout invalidates access session",
+    "PASS administrator login and account list",
+    "PASS logout invalidates access session",
+    "PASS CORS for React Web and both Flutter Web origins"
+  ],
+  "passed": true
+}

@@ -16,6 +16,11 @@ export interface AuthContextValue {
   error: Error | null
   login: (credentials: Credentials) => Promise<User>
   logout: () => void
+  /**
+   * True when the backend ended the session (it could not be renewed, or the account
+   * was suspended) rather than the user pressing Log out. The sign-in page then says so.
+   */
+  sessionEnded: boolean
   /** Load the user again after an error. */
   retry: () => void
 }

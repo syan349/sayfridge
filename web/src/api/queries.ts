@@ -41,9 +41,11 @@ export const storageSpacesQuery = {
   queryFn: ({ signal }: { signal: AbortSignal }) => listStorageSpaces(signal),
 }
 
-// Categories never change while the app is open (there is no API to change them).
+// All visible categories (every page). Used by the inventory filter and by "create
+// your own item". Users can add their own categories (e.g. from the phone or the
+// assistant), so the list is refreshed after 5 minutes instead of never.
 export const categoriesQuery = {
   queryKey: ['item-categories'],
   queryFn: ({ signal }: { signal: AbortSignal }) => listCategories(signal),
-  staleTime: Infinity,
+  staleTime: 5 * 60 * 1000,
 }

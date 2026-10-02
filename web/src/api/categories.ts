@@ -2,7 +2,7 @@
 import { apiFetch } from './client'
 import type { Page } from './types'
 
-/** ItemCategoryRead — public categories shared by everyone (Dairy, Meat, …). */
+/** ItemCategoryRead — a public category (Dairy, Meat, …) or one the user created. */
 export interface ItemCategory {
   id: string
   name: string
@@ -10,7 +10,36 @@ export interface ItemCategory {
   sort_order: number
 }
 
-/** GET /item-categories — ACTIVE categories in display order. */
-export function listCategories(signal?: AbortSignal): Promise<Page<ItemCategory>> {
-  return apiFetch<Page<ItemCategory>>('/item-categories', { query: { page_size: 100 }, signal })
+/** The most the backend sends in one page. */
+const PAGE_SIZE = 100
+/** Safety stop, in case a backend bug kept reporting more pages forever. */
+const MAX_PAGES = 50
+
+/**
+ * GET /item-categories — EVERY visible ACTIVE category, in the backend's order.
+ *
+ * Users can create their own categories, so there can be more than one page
+ * (e.g. 25 public + 76 private = 101 → "Yoghurt" sorts onto page 2). This asks
+ * for page after page until it has `total` of them. If any page fails, the
+ * whole call fails: a selector must never quietly show half the list.
+ */
+export async function listCategories(signal?: AbortSignal): Promise<ItemCategory[]> {
+  const categories: ItemCategory[] = []
+  const seen = new Set<string>()
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const result = await apiFetch<Page<ItemCategory>>('/item-categories', {
+      query: { page, page_size: PAGE_SIZE },
+      signal,
+    })
+    for (const category of result.items) {
+      // A category added while we were paging can push one onto the next page twice.
+      if (!seen.has(category.id)) {
+        seen.add(category.id)
+        categories.push(category)
+      }
+    }
+    if (result.items.length === 0 || page * PAGE_SIZE >= result.total) break
+  }
+  return categories
 }

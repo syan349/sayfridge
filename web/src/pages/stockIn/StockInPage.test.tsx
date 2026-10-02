@@ -137,4 +137,64 @@ describe('StockInPage (W06)', () => {
     expect(within(form).getByText('Brown rice')).toBeInTheDocument()
     expect(body).toEqual({ name: 'Brown rice', category_id: dairy.id })
   })
+
+  describe('with more than 100 categories', () => {
+    const manyCategories = Array.from({ length: 100 }, (_, index) => ({
+      ...dairy,
+      id: `category-${index}`,
+      name: `Category ${String(index).padStart(3, '0')}`,
+    }))
+    const yoghurt = { ...dairy, id: 'category-yoghurt', name: 'Yoghurt' }
+
+    function answerCategories({ secondPageFails = false } = {}) {
+      server.use(
+        http.get('/api/v1/item-categories', ({ request }) => {
+          const pageNumber = Number(new URL(request.url).searchParams.get('page'))
+          if (pageNumber === 2 && secondPageFails) {
+            return HttpResponse.json({ detail: { code: 'SERVER_ERROR', message: 'Database error' } }, { status: 500 })
+          }
+          return HttpResponse.json({ items: pageNumber === 2 ? [yoghurt] : manyCategories, total: 101, page: pageNumber, page_size: 100 })
+        }),
+      )
+    }
+
+    it('can put your own item in a category from the second page', async () => {
+      let body: unknown
+      answerCategories()
+      server.use(
+        http.post('/api/v1/item-definitions', async ({ request }) => {
+          body = await request.json()
+          return HttpResponse.json(
+            { id: 'def-skyr', name: 'Skyr', category_id: yoghurt.id, status: 'ACTIVE', scope: 'PRIVATE' },
+            { status: 201 },
+          )
+        }),
+      )
+      const user = userEvent.setup()
+      renderApp('/inventory/new')
+
+      const form = await screen.findByRole('region', { name: 'New item' })
+      await user.type(within(form).getByLabelText('Item'), 'Skyr')
+      const select = await within(form).findByLabelText('Category for Skyr')
+      await within(select).findByRole('option', { name: 'Yoghurt' })
+      await user.selectOptions(select, 'Yoghurt')
+      await user.click(within(form).getByRole('button', { name: 'Create “Skyr”' }))
+
+      expect(await within(form).findByText('Yours')).toBeInTheDocument()
+      expect(body).toEqual({ name: 'Skyr', category_id: yoghurt.id })
+    })
+
+    it('says so when the category list can’t load, instead of offering half of it', async () => {
+      answerCategories({ secondPageFails: true })
+      const user = userEvent.setup()
+      renderApp('/inventory/new')
+
+      const form = await screen.findByRole('region', { name: 'New item' })
+      await user.type(within(form).getByLabelText('Item'), 'Skyr')
+
+      expect(await within(form).findByText(/The category list couldn’t load/)).toBeInTheDocument()
+      expect(within(form).queryByLabelText('Category for Skyr')).not.toBeInTheDocument()
+      expect(within(form).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    })
+  })
 })
