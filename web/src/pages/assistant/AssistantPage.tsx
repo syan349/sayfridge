@@ -9,7 +9,7 @@ import { ChatBubble } from '../../components/ChatBubble/ChatBubble'
 import { Composer } from '../../components/Composer/Composer'
 import { PageHeader } from '../../components/PageHeader/PageHeader'
 import { ProposalCard } from '../../components/ProposalCard/ProposalCard'
-import { describeAgentItem, isWaiting } from '../../components/ProposalCard/describeAgentItem'
+import { describeAgentItem, isWaiting, itemQuestion } from '../../components/ProposalCard/describeAgentItem'
 import { StatusPill } from '../../components/StatusPill/StatusPill'
 import { useAssistant } from './useAssistant'
 import styles from './AssistantPage.module.css'
@@ -130,11 +130,13 @@ export function AssistantPage() {
           </p>
 
           <div className={styles.composer}>
+            {/* While a proposal waits, a message here answers it (e.g. "it was three tomatoes"):
+                the backend passes it to the waiting item instead of refusing it. */}
             <Composer
               onSend={sendMessage}
               sending={state.busy}
-              disabled={waiting.length > 0 || state.restoring}
-              placeholder={waiting.length > 0 ? 'Answer the proposal above first…' : undefined}
+              disabled={state.restoring}
+              placeholder={waiting.length > 0 ? 'Reply to the assistant, or use the buttons above…' : undefined}
             />
           </div>
         </div>
@@ -174,7 +176,9 @@ function RailItem({ item }: { item: AgentItem }) {
     <li className={isWaiting(item) ? `${styles.railItem} ${styles.railPending}` : styles.railItem}>
       <StatusPill status={item.status} />
       <p className={styles.railItemTitle}>{saved ? <Link to={`/inventory/${saved.id}`}>{title}</Link> : title}</p>
-      <p className={styles.railItemText}>{item.error?.message ?? `From “${item.original_text}”`}</p>
+      <p className={styles.railItemText}>
+        {(isWaiting(item) ? itemQuestion(item) : item.error?.message) ?? `From “${item.original_text}”`}
+      </p>
     </li>
   )
 }

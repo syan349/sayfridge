@@ -44,6 +44,7 @@ type Action =
   | { type: 'failed'; message: string; canRetry: boolean }
   | { type: 'restoring' }
   | { type: 'restored'; conversationId: string | null; state: AgentState | null }
+  | { type: 'refreshed'; state: AgentState }
   | { type: 'reset' }
 
 const initialState: AssistantState = {
@@ -93,6 +94,14 @@ function reducer(state: AssistantState, action: Action): AssistantState {
             : null,
       }
     }
+    case 'refreshed':
+      // Only the items change: the error message that explains why stays on screen,
+      // and the chat isn't treated as "reloaded" (its messages are still there).
+      return {
+        ...state,
+        items: action.state.items,
+        interruptId: action.state.status === 'WAITING_INPUT' ? (action.state.interrupt_id ?? null) : null,
+      }
     case 'reset':
       return initialState
   }
@@ -199,7 +208,7 @@ export function useAssistant(userId: string) {
   const retryRef = useRef<(() => void) | null>(null)
   const storageKey = `sayfridge.assistant.${userId}`
 
-  /** Loads what the backend kept about a conversation (after a reload, or when a proposal changed). */
+  /** Loads what the backend kept about a conversation after a page reload. */
   const restore = useCallback(
     function restore(conversationId: string, signal?: AbortSignal) {
       dispatch({ type: 'restoring' })
@@ -230,6 +239,18 @@ export function useAssistant(userId: string) {
     return () => controller.abort()
   }, [storageKey, restore])
 
+  /**
+   * After "that proposal changed": fetch the latest items so the card shows the current
+   * version, while the message explaining why stays visible (unlike restore()).
+   */
+  function refresh(conversationId: string) {
+    getConversationState(conversationId)
+      .then((saved) => dispatch({ type: 'refreshed', state: saved }))
+      .catch(() => {
+        // The error is already on screen; "New conversation" still works.
+      })
+  }
+
   /** Sends one request and applies its streamed events as they arrive. */
   async function stream(send: (onEvent: (event: AgentEvent) => void) => Promise<void>) {
     let finished = false
@@ -241,6 +262,7 @@ export function useAssistant(userId: string) {
         void queryClient.invalidateQueries({ queryKey: ['inventory'] })
         void queryClient.invalidateQueries({ queryKey: ['storage-spaces'] })
         void queryClient.invalidateQueries({ queryKey: ['item-definitions'] })
+        void queryClient.invalidateQueries({ queryKey: ['item-categories'] }) // it may have added one
       }
       dispatch({ type: 'event', event })
     }
@@ -251,7 +273,7 @@ export function useAssistant(userId: string) {
     } catch (error) {
       const problem = describeError(error)
       dispatch({ type: 'failed', message: problem.message, canRetry: problem.canRetry })
-      if (problem.reload && state.conversationId) restore(state.conversationId)
+      if (problem.reload && state.conversationId) refresh(state.conversationId)
     }
   }
 

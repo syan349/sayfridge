@@ -34,6 +34,8 @@ interface FilterBarProps {
   /** How many items each chip would show; undefined while still loading. */
   counts: FilterCounts
   onChange: (change: Partial<InventoryFilters>) => void
+  /** Set when the category list couldn't be loaded: says so, with a retry button. */
+  onRetryCategories?: () => void
 }
 
 /** "Label · 12", or just "Label" while the number is loading. */
@@ -42,7 +44,7 @@ function withCount(label: string, count: number | undefined) {
 }
 
 /** The row of filters under the page header. */
-export function FilterBar({ filters, spaces, categories, counts, onChange }: FilterBarProps) {
+export function FilterBar({ filters, spaces, categories, counts, onChange, onRetryCategories }: FilterBarProps) {
   return (
     <div className={styles.bar}>
       <div role="group" aria-label="Storage space" className={styles.group}>
@@ -64,6 +66,14 @@ export function FilterBar({ filters, spaces, categories, counts, onChange }: Fil
         onChange={(event) => onChange({ categoryId: event.target.value || null })}
         options={[{ value: '', label: 'All categories' }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
       />
+      {onRetryCategories && (
+        <span role="alert" className={styles.problem}>
+          Categories couldn’t load.{' '}
+          <button type="button" className={styles.retry} onClick={onRetryCategories}>
+            Try again
+          </button>
+        </span>
+      )}
       <ChipSelect
         label="Status"
         value={filters.status}

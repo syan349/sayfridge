@@ -17,7 +17,7 @@ interface RequireAuthProps {
  * Hiding pages is only for convenience — the backend checks every request.
  */
 export function RequireAuth({ role }: RequireAuthProps) {
-  const { status, user, error, retry, logout } = useAuth()
+  const { status, user, error, retry, logout, sessionEnded } = useAuth()
   const location = useLocation()
 
   if (status === 'loading') {
@@ -44,7 +44,11 @@ export function RequireAuth({ role }: RequireAuthProps) {
   }
 
   if (!user) {
-    const state: LoginLocationState = { from: location.pathname + location.search }
+    const state: LoginLocationState = {
+      from: location.pathname + location.search,
+      // Without this, being sent to sign-in mid-task looks like the app broke.
+      notice: sessionEnded ? 'Your session has ended. Please sign in again to continue.' : undefined,
+    }
     return <Navigate to="/login" replace state={state} />
   }
 

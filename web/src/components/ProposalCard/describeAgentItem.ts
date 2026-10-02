@@ -18,15 +18,40 @@ export function isWaiting(item: AgentItem): boolean {
 }
 
 /**
+ * The save may or may not have happened (the connection broke at the wrong moment).
+ * Such an item can only be confirmed again, which checks first and never saves twice.
+ */
+export function isUncertain(item: AgentItem): boolean {
+  return item.error?.code === 'EXECUTION_UNCERTAIN'
+}
+
+/**
+ * What to ask the user about a waiting item. The backend's `display.question` is
+ * written for people ("Where would you like to store the milk?"); `error.message`
+ * is only the fallback, because it is often internal ("Select a storage space").
+ */
+export function itemQuestion(item: AgentItem): string | null {
+  if (isUncertain(item)) return 'It isn’t certain this was saved. Confirm to check — it won’t be saved twice.'
+  return item.display?.question || item.error?.message || null
+}
+
+/**
  * Turns an assistant item into words for the page. The backend's `preview` says what
  * would happen; once saved, `result.inventory` is the real stock item, so that wins.
  */
 export function describeAgentItem(item: AgentItem): AgentItemSummary {
   const draft = item.preview?.draft
   const stock = item.result?.inventory ?? item.preview?.before ?? null
+  const display = item.display
 
-  const name = stock?.item_definition_name ?? draft?.new_definition?.name ?? (draft?.item_query || item.original_text)
-  const where = [stock?.category_name, stock?.storage_space_name ?? draft?.new_space?.name].filter(Boolean).join(' · ')
+  const name =
+    stock?.item_definition_name ??
+    draft?.new_definition?.name ??
+    (display?.item_name || draft?.item_query || item.original_text)
+  // A new item has no stock row yet; the backend's display still knows its category and space.
+  const category = stock?.category_name ?? display?.category_name
+  const space = stock?.storage_space_name ?? draft?.new_space?.name ?? display?.space_name
+  const where = [category, space].filter(Boolean).join(' · ')
 
   let change = ''
   if (draft) {
