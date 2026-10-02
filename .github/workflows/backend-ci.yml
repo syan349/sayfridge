@@ -45,7 +45,7 @@ jobs:
     env:
       AGENT_LIVE_MODEL: '0'
       TEST_DATABASE_URL: postgresql+psycopg://test_user:ci-only-password@localhost:5432/sayfridge_auth_test
-      AGENT_CLIENT_CAPTURE_FILE: ${{ runner.temp }}/agent-client-traces.jsonl
+      AGENT_CLIENT_CAPTURE_FILE: agent-client-traces.jsonl
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: agent-client-traces
-          path: ${{ runner.temp }}/agent-client-traces.jsonl
+          path: backend/agent-client-traces.jsonl
           retention-days: 7
 
   legacy-agent-clients:
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      AGENT_CLIENT_CAPTURE_FILE: ${{ runner.temp }}/agent-client-traces.jsonl
+      AGENT_CLIENT_CAPTURE_FILE: ../backend/agent-client-traces.jsonl
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: agent-client-traces
-          path: ${{ runner.temp }}
+          path: backend
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
