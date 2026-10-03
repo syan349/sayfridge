@@ -14,6 +14,8 @@ class SavedConversation {
     required this.updatedAt,
     this.messageImages = const {},
     this.inventoryQueries = const {},
+    this.pendingRequest,
+    this.status = 'COMPLETED',
   });
 
   final String id;
@@ -21,6 +23,12 @@ class SavedConversation {
   final DateTime updatedAt;
   final Map<String, List<AgentImage>> messageImages;
   final Map<String, AgentInventoryQuery> inventoryQueries;
+  final Map<String, dynamic>? pendingRequest;
+  final String status;
+  bool get needsAttention =>
+      pendingRequest != null ||
+      status == 'WAITING_INPUT' ||
+      status == 'RECOVERABLE';
 
   String get title {
     for (final entry in messages.entries) {
@@ -35,6 +43,8 @@ class SavedConversation {
     'id': id,
     'messages': messages,
     'updated_at': updatedAt.toUtc().toIso8601String(),
+    'status': status,
+    if (pendingRequest != null) 'pending': pendingRequest,
     if (messageImages.isNotEmpty) 'message_images': _saveImages(messageImages),
     if (inventoryQueries.isNotEmpty)
       'inventory_queries': _saveQueries(inventoryQueries),
@@ -47,6 +57,10 @@ class SavedConversation {
       messages: _readMessages(value['messages']),
       messageImages: _readImages(value['message_images']),
       inventoryQueries: _readQueries(value['inventory_queries']),
+      pendingRequest: value['pending'] is Map
+          ? Map<String, dynamic>.from(value['pending'] as Map)
+          : null,
+      status: value['status'] as String? ?? 'COMPLETED',
       updatedAt:
           DateTime.tryParse(value['updated_at']?.toString() ?? '') ??
           DateTime.now(),
@@ -162,6 +176,8 @@ class AgentController extends ChangeNotifier {
       messages.addAll(_readMessages(saved?['messages']));
       messageImages.addAll(_readImages(saved?['message_images']));
       inventoryQueries.addAll(_readQueries(saved?['inventory_queries']));
+      // Older sessions lack a cached status; verify them when explicitly opened.
+      status = saved?['status'] as String? ?? 'UNKNOWN';
       final savedHistory = saved?['history'];
       if (savedHistory is List) {
         for (final record in savedHistory) {
@@ -172,9 +188,13 @@ class AgentController extends ChangeNotifier {
         }
       }
       if (conversationId != null) {
-        status = 'RECOVERABLE';
-        await _readState(generation);
+        _archiveCurrent();
       }
+      // Login and process startup always enter the welcome screen. Keep the
+      // previous transcript and exact pending payload in history, without a POST
+      // or a state fetch until the user chooses that conversation.
+      _resetCurrent();
+      if (saved != null) await _persist();
     } catch (e) {
       if (_current(generation)) error = businessError(e);
     } finally {
@@ -212,6 +232,7 @@ class AgentController extends ChangeNotifier {
       }
       await store.write(user, {
         'conversation_id': conversationId,
+        'status': status,
         'pending': _pending,
         'messages': messages,
         if (messageImages.isNotEmpty)
@@ -242,7 +263,7 @@ class AgentController extends ChangeNotifier {
 
   void _archiveCurrent() {
     final id = conversationId;
-    if (id == null || messages.isEmpty) return;
+    if (id == null) return;
     _history.removeWhere((entry) => entry.id == id);
     _history.insert(
       0,
@@ -251,12 +272,20 @@ class AgentController extends ChangeNotifier {
         messages: Map.of(messages),
         messageImages: Map.of(messageImages),
         inventoryQueries: Map.of(inventoryQueries),
+        pendingRequest: _pending == null ? null : Map.of(_pending!),
+        status: status,
         updatedAt: DateTime.now(),
       ),
     );
-    // The device keeps a bounded list; the server remains the source of truth
-    // for inventory actions and pending requests.
-    if (_history.length > 20) _history.removeRange(20, _history.length);
+    // Keep 20 recent chats, but retain unfinished requests and legacy sessions
+    // whose server status has not been checked yet.
+    while (_history.length > 20) {
+      final oldestCompleted = _history.lastIndexWhere(
+        (entry) => !entry.needsAttention && entry.status != 'UNKNOWN',
+      );
+      if (oldestCompleted < 0) break;
+      _history.removeAt(oldestCompleted);
+    }
   }
 
   void _resetCurrent() {
@@ -281,12 +310,18 @@ class AgentController extends ChangeNotifier {
     messages.addAll(selected.messages);
     messageImages.addAll(selected.messageImages);
     inventoryQueries.addAll(selected.inventoryQueries);
+    _pending = selected.pendingRequest == null
+        ? null
+        : Map.of(selected.pendingRequest!);
+    // A cached transcript does not prove that its server request has finished.
+    status = 'RECOVERABLE';
     busy = true;
     _notify();
     final generation = _generation;
     try {
       await _persist();
       await _readState(generation);
+      if (_current(generation)) await _persist();
     } catch (e) {
       if (_current(generation)) error = businessError(e);
     } finally {

@@ -1,6 +1,7 @@
 import asyncio
 
 import httpx
+import pytest
 
 from app.main import app
 
@@ -51,6 +52,44 @@ def test_preflight_allows_configured_method_and_headers() -> None:
     allowed_headers = response.headers["access-control-allow-headers"].lower()
     for header in ("authorization", "content-type", "idempotency-key"):
         assert header in allowed_headers
+
+
+@pytest.mark.ci
+@pytest.mark.parametrize("path", ["/api/v1/agent/chat", "/api/v1/agent/resume"])
+def test_preflight_allows_inventory_card_requests(path: str) -> None:
+    response = _request(
+        "OPTIONS",
+        path,
+        headers={
+            "Origin": WEB_ORIGIN,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": (
+                "authorization,content-type,x-sayfridge-inventory-cards"
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == WEB_ORIGIN
+    assert "x-sayfridge-inventory-cards" in response.headers[
+        "access-control-allow-headers"
+    ].lower()
+
+
+@pytest.mark.ci
+def test_agent_preflight_still_rejects_unconfigured_headers() -> None:
+    response = _request(
+        "OPTIONS",
+        "/api/v1/agent/resume",
+        headers={
+            "Origin": WEB_ORIGIN,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,x-unapproved-header",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Disallowed CORS headers" in response.text
 
 
 def test_unconfigured_origin_is_not_allowed() -> None:

@@ -110,8 +110,13 @@ void main() {
       final restored = AgentController(workspace, store: store);
       addTearDown(restored.dispose);
       await restored.bindUser('alice');
-      expect(restored.messages.values, contains('Second question'));
-      expect(restored.history.single.title, 'First question');
+      expect(restored.conversationId, isNull);
+      expect(restored.messages, isEmpty);
+      expect(restored.canSend, isTrue);
+      expect(restored.history.map((entry) => entry.title), [
+        'Second question',
+        'First question',
+      ]);
       await restored.openConversation(firstId);
       expect(restored.conversationId, firstId);
       expect(
@@ -387,6 +392,7 @@ void main() {
       );
       addTearDown(agent.dispose);
       await agent.bindUser('alice');
+      await agent.openConversation('conversation');
       await agent.respond(agent.items.single, 'confirm');
       expect(reads, 2);
       expect(agent.items.single['proposal_id'], 'new');
@@ -596,24 +602,50 @@ void main() {
   );
 
   test(
-    'a recreated controller restores pending identity and does not automatically replay a write',
+    'restart opens a fresh session and keeps the exact pending request for explicit history recovery',
     () async {
       final store = MemoryAgentStore();
+      const pending = {
+        'path': '/agent/resume',
+        'body': {
+          'conversation_id': 'conversation',
+          'interrupt_id': 'interrupt-original',
+          'request_id': 'original',
+          'responses': [
+            {
+              'item_id': 'milk',
+              'proposal_id': 'proposal-original',
+              'decision': 'cancel',
+            },
+          ],
+        },
+      };
       await store.write('alice', {
         'conversation_id': 'conversation',
-        'pending': {
-          'path': '/agent/chat',
-          'body': {
-            'conversation_id': 'conversation',
-            'request_id': 'original',
-            'message': 'add',
-          },
-        },
+        'pending': pending,
       });
+      var reads = 0;
+      final posts = <String>[];
       final api = ApiClient(
         client: MockClient((request) async {
-          expect(request.method, 'GET');
-          return jsonResponse({'status': 'RECOVERABLE', 'items': []});
+          if (request.method == 'GET') {
+            reads++;
+            expect(
+              request.url.path,
+              endsWith('/conversations/conversation/state'),
+            );
+            return jsonResponse({'status': 'RECOVERABLE', 'items': []});
+          }
+          expect(request.url.path, endsWith('/agent/resume'));
+          posts.add(request.body);
+          expect(jsonDecode(request.body), pending['body']);
+          return eventResponse([
+            {
+              'type': 'done',
+              'status': 'COMPLETED',
+              'data': {'status': 'COMPLETED', 'items': []},
+            },
+          ]);
         }),
       );
       addTearDown(api.close);
@@ -623,9 +655,176 @@ void main() {
       );
       addTearDown(agent.dispose);
       await agent.bindUser('alice');
+      expect(agent.conversationId, isNull);
+      expect(agent.canSend, isTrue);
+      expect(agent.history.single.pendingRequest, pending);
+      expect(reads, 0);
+      expect(posts, isEmpty);
+      expect((await store.read('alice'))!['history'][0]['pending'], pending);
+      // A second restart still keeps the archived request without replaying it.
+      await agent.bindUser('alice', reload: true);
+      expect(agent.history.single.pendingRequest, pending);
+      expect(reads, 0);
+      await agent.openConversation('conversation');
       expect(agent.conversationId, 'conversation');
+      expect(reads, 1);
+      expect(posts, isEmpty);
       expect(agent.canRetry, isTrue);
       expect(agent.canSend, isFalse);
+      await agent.retry();
+      expect(posts, hasLength(1));
+      expect(agent.canSend, isTrue);
+      expect((await store.read('alice'))!['pending'], isNull);
+    },
+  );
+
+  test(
+    'signing in again shows welcome and restores waiting proposals only from history',
+    () async {
+      final store = MemoryAgentStore();
+      await store.write('alice', {
+        'conversation_id': 'waiting-conversation',
+        'status': 'WAITING_INPUT',
+        'messages': {'user:original': 'I consumed 3 cups of milk'},
+      });
+      var reads = 0;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          expect(request.method, 'GET');
+          reads++;
+          return jsonResponse({
+            'status': 'WAITING_INPUT',
+            'interrupt_id': 'milk-interrupt',
+            'items': [
+              {
+                'item_id': 'milk',
+                'proposal_id': 'milk-proposal',
+                'status': 'NEEDS_INPUT',
+                'original_text': 'I consumed 3 cups of milk',
+              },
+            ],
+          });
+        }),
+      );
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: store,
+      );
+      addTearDown(agent.dispose);
+      await agent.bindUser('alice');
+      expect(agent.messages, isEmpty);
+      expect(agent.canSend, isTrue);
+      expect(reads, 0);
+      await agent.openConversation('waiting-conversation');
+      expect(agent.canRespond, isTrue);
+      expect(agent.items.single['proposal_id'], 'milk-proposal');
+      await agent.bindUser('alice');
+      expect(agent.conversationId, 'waiting-conversation');
+      await agent.bindUser(null);
+      await agent.bindUser('bob');
+      expect(agent.history, isEmpty);
+      await agent.bindUser('alice');
+      expect(agent.conversationId, isNull);
+      expect(agent.messages, isEmpty);
+      expect(agent.canSend, isTrue);
+      expect(agent.history.single.status, 'WAITING_INPUT');
+      expect(reads, 1);
+    },
+  );
+
+  test(
+    'history retention never evicts an unfinished request identity',
+    () async {
+      final store = MemoryAgentStore();
+      const pending = {
+        'path': '/agent/chat',
+        'body': {
+          'conversation_id': 'unfinished',
+          'request_id': 'original',
+          'message': 'Add milk',
+        },
+      };
+      await store.write('alice', {
+        'conversation_id': 'latest',
+        'status': 'COMPLETED',
+        'messages': {'user:latest': 'Latest question'},
+        'history': [
+          for (var i = 0; i < 19; i++)
+            {
+              'id': 'completed-$i',
+              'messages': {'user:$i': 'Question $i'},
+              'status': 'COMPLETED',
+            },
+          {
+            'id': 'unfinished',
+            'messages': {},
+            'pending': pending,
+            'status': 'RECOVERABLE',
+          },
+        ],
+      });
+      final api = ApiClient(
+        client: MockClient((request) async {
+          fail('Startup must not call the Agent API');
+        }),
+      );
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: store,
+      );
+      addTearDown(agent.dispose);
+      await agent.bindUser('alice');
+      expect(agent.history, hasLength(20));
+      expect(agent.history.first.id, 'latest');
+      expect(agent.history.last.id, 'unfinished');
+      expect(agent.history.last.pendingRequest, pending);
+      expect(agent.canSend, isTrue);
+      await agent.bindUser('alice', reload: true);
+      expect(agent.history.last.pendingRequest, pending);
+    },
+  );
+
+  test(
+    'opening history waits for server state before permitting a new write',
+    () async {
+      final store = MemoryAgentStore();
+      await store.write('alice', {
+        'history': [
+          {
+            'id': 'saved',
+            'messages': {'user:old': 'Add milk'},
+            'status': 'COMPLETED',
+          },
+        ],
+      });
+      var reads = 0;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          expect(request.method, 'GET');
+          return ++reads == 1
+              ? jsonResponse({'detail': 'Unavailable'}, 503)
+              : jsonResponse({'status': 'COMPLETED', 'items': []});
+        }),
+      );
+      addTearDown(api.close);
+      final agent = AgentController(
+        WorkspaceRepository(api, MemoryTokens()),
+        store: store,
+      );
+      addTearDown(agent.dispose);
+      await agent.bindUser('alice');
+      expect(reads, 0);
+      await agent.openConversation('saved');
+      expect(agent.messages.values, contains('Add milk'));
+      expect(agent.canSend, isFalse);
+      expect(agent.canRetry, isFalse);
+      await agent.send('Duplicate milk');
+      expect(reads, 1);
+      await agent.recover();
+      expect(reads, 2);
+      expect(agent.canSend, isTrue);
     },
   );
 
