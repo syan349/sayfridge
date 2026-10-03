@@ -80,6 +80,10 @@ Generated documents start with a brief introduction followed by a `##` title.
 document in a full-width rounded card below it. Untitled legacy inventory reports
 with storage-space bullets also use a card. Short replies and action reviews keep
 their normal conversation layout.
+Legacy reports beginning with "You have" or "There are" also receive an inventory
+report title and numbered items within each storage space, including bold labels
+whose colon is inside the bold markup. This changes presentation only, preserving
+the saved quantities, dates and original transcript.
 
 Production confirmation dialogs share `AppDialog`: pale-green rounded cards, green
 filled primary actions with dark text, and unfilled green-outline cancel actions.
@@ -111,6 +115,12 @@ Credentials use FlutterSecureStorage. Access renews automatically; concurrent
 requests share renewal. Logout waits for server revocation before clearing credentials,
 so offline logout can be retried. Business lists and local conversation state reset
 on account changes. Full history listing is not provided by the backend.
+Login and app startup show a fresh Assistant welcome page. The previous conversation
+is saved in device history and opened only when selected. Unfinished conversations
+retain the exact pending request payload and fetch server state on explicit opening;
+startup never replays an inventory write. They are kept even beyond the usual
+20-chat limit so recovery identities cannot be lost. Returning to the Assistant
+within the same signed-in app session keeps its current conversation.
 
 ## Profile and reminders
 

@@ -64,8 +64,8 @@ class ConversationHistoryScreen extends StatelessWidget {
           ),
           const SizedBox(height: 30),
           const Text(
-            'The latest 20 conversations on this device appear here. '
-            'Chats from before this update cannot be restored.',
+            'Open a saved conversation to continue it. Recent chats and '
+            'unfinished requests are kept on this device.',
             style: TextStyle(color: AppColors.muted, fontSize: 15, height: 1.4),
           ),
           const SizedBox(height: 32),
@@ -185,11 +185,29 @@ class ConversationHistoryScreen extends StatelessWidget {
                         const Icon(Icons.chat_bubble_outline_rounded, size: 30),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: Text(
-                            conversation.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 16.5),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                conversation.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 16.5),
+                              ),
+                              if (conversation.needsAttention) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  conversation.status == 'WAITING_INPUT' &&
+                                          conversation.pendingRequest == null
+                                      ? 'Waiting for your input'
+                                      : 'Needs recovery',
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                    fontSize: 14.5,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         const Icon(Icons.chevron_right_rounded, size: 30),

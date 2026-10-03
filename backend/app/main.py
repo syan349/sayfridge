@@ -85,7 +85,12 @@ app.add_middleware(
     allow_origins=settings.cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-SayFridge-Inventory-Cards",
+    ],
 )
 app.include_router(auth_router)
 app.include_router(storage_spaces_router)

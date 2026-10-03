@@ -24,6 +24,7 @@ import 'package:sayfridge/widgets/assistant_widgets.dart';
 import 'package:sayfridge/widgets/inventory_visuals.dart';
 
 import '../support/integration_fixtures.dart';
+import '../support/legacy_inventory_report_fixture.dart';
 
 const _captureKey = Key('assistant-capture');
 
@@ -85,11 +86,16 @@ class _Harness {
     Map<String, dynamic> proposal, {
     String? reply,
     Map<String, dynamic>? query,
+    MemoryAgentStore? store,
   }) {
     item = proposal;
     api = ApiClient(
       client: MockClient((request) async {
         if (request.method == 'GET') {
+          if (request.url.path.contains('/agent/conversations/')) {
+            stateReads++;
+            return jsonResponse({'status': 'COMPLETED', 'items': []});
+          }
           if (request.url.path.contains('/inventory-items/')) {
             detailReads.add(request.url.path);
             expect(request.headers['authorization'], 'Bearer test-token');
@@ -149,7 +155,7 @@ class _Harness {
     );
     agent = AgentController(
       WorkspaceRepository(api, MemoryTokens()),
-      store: MemoryAgentStore(),
+      store: store ?? MemoryAgentStore(),
     );
   }
 
@@ -158,6 +164,7 @@ class _Harness {
   late final AgentController agent;
   final posts = <Map<String, dynamic>>[];
   final detailReads = <String>[];
+  int stateReads = 0;
 
   Future<void> open(
     WidgetTester tester, {
@@ -166,6 +173,7 @@ class _Harness {
     String command = 'Review the receipt',
     Size size = const Size(390, 844),
     double textScale = 1,
+    bool sendCommand = true,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -174,12 +182,14 @@ class _Harness {
     addTearDown(api.close);
     addTearDown(agent.dispose);
     await agent.bindUser('alice');
-    await tester.runAsync(
-      () => agent.send(
-        photo == null ? command : '',
-        images: photo == null ? const [] : [photo],
-      ),
-    );
+    if (sendCommand) {
+      await tester.runAsync(
+        () => agent.send(
+          photo == null ? command : '',
+          images: photo == null ? const [] : [photo],
+        ),
+      );
+    }
     await tester.pumpWidget(
       RepaintBoundary(
         key: _captureKey,
@@ -347,6 +357,59 @@ void main() {
       await report.open(tester, command: 'Generate an inventory report');
       expect(find.byKey(const Key('assistant-document-card')), findsOneWidget);
       expect(find.byType(InventoryItemTile), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'saved inventory report text uses the introduction and wide document layout',
+    (tester) async {
+      final store = MemoryAgentStore();
+      await store.write('alice', {
+        'conversation_id': 'saved-report',
+        'messages': {
+          'user:original': 'Show me an inventory report',
+          'assistant:original': legacyInventoryReport,
+        },
+      });
+      final harness = _Harness({}, store: store);
+      await harness.open(tester, sendCommand: false);
+      expect(harness.agent.messages, isEmpty);
+      expect(harness.agent.canSend, isTrue);
+      expect(harness.stateReads, 0);
+      expect(find.byKey(const Key('assistant-document-card')), findsNothing);
+      expect(find.text('I want to update my inventory'), findsOneWidget);
+      await _capture(tester, 'assistant-welcome-after-restart');
+      await tester.tap(find.byTooltip('Conversation history'));
+      await tester.pumpAndSettle();
+      expect(find.text('Show me an inventory report'), findsOneWidget);
+      expect(find.text('Needs recovery'), findsNothing);
+      await _capture(tester, 'assistant-saved-history');
+      await tester.tap(find.text('Show me an inventory report'));
+      await tester.runAsync(() async {
+        while (harness.agent.busy) {
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+        }
+      });
+      await tester.pumpAndSettle();
+      expect(harness.stateReads, 1);
+      final position = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      position.jumpTo(0);
+      await tester.pumpAndSettle();
+      final card = find.byKey(const Key('assistant-document-card'));
+      expect(card, findsOneWidget);
+      expect(tester.getSize(card).width, 390 - 2 * 25);
+      expect(find.byType(InventoryItemTile), findsNothing);
+      expect(find.text('Inventory report', findRichText: true), findsOneWidget);
+      expect(find.text('Arctic Box', findRichText: true), findsOneWidget);
+      expect(harness.agent.messages.values, contains(legacyInventoryReport));
+      await _capture(tester, 'legacy-report-top');
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      await _capture(tester, 'legacy-report-bottom');
+      expect(harness.posts, isEmpty);
       expect(tester.takeException(), isNull);
     },
   );

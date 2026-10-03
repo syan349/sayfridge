@@ -28,15 +28,26 @@ class AssistantDocument {
     }
 
     // Older inventory reports were saved as plain text with storage-space bullets.
+    final opening = text.split('\n').first.replaceAll('**', '').trim();
     final legacyReport = RegExp(
-      r'^(?:Inventory report[:：]?|库存报告[:：]?|There are \d+ in[- ]stock batches[:.]?)',
+      r'^(?:Inventory report[:：]?|库存报告[:：]?|(?:There are|You have)\s+\d+\s+in[- ]stock\s+batch(?:es)?\b)',
       caseSensitive: false,
-    ).hasMatch(text);
-    final bullets = RegExp(r'^\s*[-•]\s+', multiLine: true).allMatches(text);
+    ).hasMatch(opening);
+    final bullets = RegExp(r'^\s*[-*•]\s+', multiLine: true).allMatches(text);
     if (legacyReport && bullets.isNotEmpty) {
+      var content = _reportLayout(text);
+      if (RegExp(
+        r'^(?:Inventory report|库存报告)[:：]?$',
+        caseSensitive: false,
+      ).hasMatch(opening)) {
+        content = content.substring(content.indexOf('\n') + 1).trimLeft();
+      }
+      final reportTitle = opening.startsWith('库存报告')
+          ? '## 库存报告'
+          : '## Inventory report';
       return AssistantDocument(
         introduction: _leadIn(text),
-        content: _reportLayout(text),
+        content: '$reportTitle\n\n$content',
       );
     }
     return null;
@@ -44,7 +55,7 @@ class AssistantDocument {
 
   static String _reportLayout(String text) {
     if (!RegExp(
-      r'inventory report|in[- ]stock batches|库存报告',
+      r'inventory report|in[- ]stock batch(?:es)?|库存报告',
       caseSensitive: false,
     ).hasMatch(text)) {
       return text;
@@ -54,7 +65,7 @@ class AssistantDocument {
     var number = 0;
     for (final line in text.split('\n')) {
       final group = RegExp(
-        r'^\s*[-•]\s+(?:\*\*)?([^:：]+?)(?:\*\*)?[:：]\s*(.+)$',
+        r'^\s*[-*•]\s+(?:\*\*)?([^:：]+?)(?:\*\*)?[:：](?:\*\*)?\s*(.+)$',
       ).firstMatch(line);
       if (legacyGroups && group != null) {
         output.add('\n### ${group[1]!.replaceAll('**', '').trim()}\n');
@@ -115,7 +126,7 @@ class AssistantDocument {
       return content.contains('报告') ? '以下是为你整理的报告。' : '以下是为你整理的内容。';
     }
     return RegExp(
-          r'\breport\b|in[- ]stock batches',
+          r'\breport\b|in[- ]stock batch(?:es)?',
           caseSensitive: false,
         ).hasMatch(content)
         ? 'Here’s your report.'

@@ -4,6 +4,8 @@ import 'package:sayfridge/models/assistant_document.dart';
 import 'package:sayfridge/theme/app_theme.dart';
 import 'package:sayfridge/widgets/assistant_widgets.dart';
 
+import '../support/legacy_inventory_report_fixture.dart';
+
 void main() {
   test('generation splits introduction without changing document facts', () {
     const content = '## Inventory report\n\n- **Milk** — estimated 2 L';
@@ -79,6 +81,55 @@ void main() {
       );
       final recipe = '## Dinner recipe\n\n### Prepare\n3. Chop\n4. Cook';
       expect(AssistantDocument.fromMessage(recipe)!.content, recipe);
+    },
+  );
+
+  test(
+    'saved You have reports become documents while retaining every stock fact',
+    () {
+      for (final summary in [
+        'You have 12 in-stock batches:',
+        '**You have 12 in-stock batches:**',
+      ]) {
+        final text = legacyInventoryReport.replaceFirst(
+          '**You have 12 in-stock batches:**',
+          summary,
+        );
+        final report = AssistantDocument.fromMessage(text);
+        expect(report, isNotNull, reason: summary);
+        expect(report!.content, startsWith('## Inventory report\n\n'));
+        expect(report.content, contains(summary));
+        expect(
+          report.content,
+          contains(
+            '### Arctic Box\n\n1. **Chicken breast** — 0.8 kg (expiry Sep 27, overdue)\n2. **apple** — 5 pics (expiry Oct 8).',
+          ),
+        );
+        expect(
+          report.content,
+          contains(
+            '### BoschFridge\n\n1. **Whole milk** — 2 L (expiry Oct 1, overdue)\n2. **apples** — 4 each (estimated; expiry Oct 5)\n3. **chicken eggs** — 3 each and 5 pieces\n4. **tomatoes** — 2 each and 2 pieces.',
+          ),
+        );
+        expect(
+          report.content,
+          contains(
+            '### Pantry Potter\n\n1. **Carrots** — 1.6 kg\n2. **rice** — 1 kg and 1.5 kg\n3. **apples** — 2.3 kg.',
+          ),
+        );
+        expect(
+          RegExp(r'^\d+\. ', multiLine: true).allMatches(report.content),
+          hasLength(9),
+        );
+      }
+      final alternateLabels = legacyInventoryReport
+          .replaceAll('Box:**', 'Box**:')
+          .replaceAll('BoschFridge:**', 'BoschFridge**:')
+          .replaceAll('Potter:**', 'Potter**:');
+      expect(
+        AssistantDocument.fromMessage(alternateLabels)!.content,
+        AssistantDocument.fromMessage(legacyInventoryReport)!.content,
+      );
     },
   );
 
