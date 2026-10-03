@@ -17,10 +17,10 @@ import styles from './AssistantPage.module.css'
 // Starting points for an empty conversation. Clicking one sends it.
 const SUGGESTIONS = ['I used 2 eggs', 'What expires in the next 3 days?', 'I bought 2 L of milk for the fridge']
 
-/** W07 — the text assistant: chat on the left, what it proposed and saved on the right. */
+/** W07 — the assistant: chat (text and photos) on the left, what it proposed and saved on the right. */
 export function AssistantPage() {
   const { user } = useAuth()
-  const { state, sendMessage, answer, retry, startNewConversation } = useAssistant(user?.id ?? '')
+  const { state, sendMessage, answer, retry, startNewConversation, backToMainChat } = useAssistant(user?.id ?? '')
   const messagesRef = useRef<HTMLDivElement>(null)
   const railTitleId = useId()
 
@@ -28,7 +28,7 @@ export function AssistantPage() {
   const waiting = state.interruptId ? state.items.filter(isWaiting) : []
   const thinking = state.busy && !state.replying
   const lastReply = state.messages.findLast((message) => message.from === 'assistant')
-  const isEmpty = state.messages.length === 0 && state.items.length === 0 && !state.restoring
+  const isEmpty = state.messages.length === 0 && state.items.length === 0 && !state.opening
 
   // Keep the newest message in view while the answer streams in.
   useEffect(() => {
@@ -41,9 +41,14 @@ export function AssistantPage() {
       <PageHeader
         title="AI assistant"
         leading={<img src="/assets/icons/assistant/ai_assistant.png" alt="" width={44} height={44} className={styles.avatar} />}
-        subtitle="Tell it what you bought or used, or ask about your food. Text only — voice is on the phone."
+        subtitle="Tell it what you bought or used, send a photo of a receipt or shelf, or ask about your food. Voice is on the phone."
         actions={
           <>
+            {state.side && (
+              <Button variant="secondary" disabled={state.busy} onClick={backToMainChat}>
+                Back to main chat
+              </Button>
+            )}
             <Button
               variant="secondary"
               icon="/assets/icons/assistant/add.png"
@@ -62,14 +67,20 @@ export function AssistantPage() {
       <div className={styles.layout}>
         <div className={styles.chat}>
           <div ref={messagesRef} className={styles.messages}>
-            {state.restoring ? (
+            {state.opening && (
               <p role="status" className={styles.note}>
                 Loading your conversation…
               </p>
-            ) : (
+            )}
+            {state.hasEarlier && (
+              <p className={styles.note}>
+                Earlier messages are in <Link to="/conversations">Conversation history</Link>.
+              </p>
+            )}
+            {!state.opening && state.messages.length === 0 && (
               <ChatBubble from="assistant">
-                Hi {user?.email.split('@')[0]}! Tell me what you bought or used, or ask what’s about to expire. I’ll
-                check with you before I change anything I’m not sure about.
+                Hi {user?.email.split('@')[0]}! Tell me what you bought or used, send a photo of a receipt, or ask
+                what’s about to expire. I’ll check with you before I change anything I’m not sure about.
               </ChatBubble>
             )}
 
@@ -83,16 +94,16 @@ export function AssistantPage() {
               </div>
             )}
 
-            {state.restored && (
-              <p className={styles.note}>
-                Earlier messages aren’t shown here after a reload. The server may retain conversation history and
-                submitted images to resume your session; proposed and saved operations are listed on the right.
-              </p>
-            )}
-
             {state.messages.map((message) => (
               <ChatBubble key={message.id} from={message.from}>
                 {message.text}
+                {message.photos && (
+                  <span className={styles.photos}>
+                    {message.photos.map((photo, index) => (
+                      <img key={index} src={photo.url} alt={`Photo you sent: ${photo.name}`} />
+                    ))}
+                  </span>
+                )}
               </ChatBubble>
             ))}
 
@@ -126,7 +137,7 @@ export function AssistantPage() {
 
           {/* Screen readers hear "thinking", then the whole answer once it has arrived (not every word). */}
           <p role="status" className="visually-hidden">
-            {thinking ? 'The assistant is thinking…' : !state.busy && lastReply ? `Assistant: ${lastReply.text}` : ''}
+            {thinking ? 'The assistant is thinking…' : !state.busy && state.replying && lastReply ? `Assistant: ${lastReply.text}` : ''}
           </p>
 
           <div className={styles.composer}>
@@ -135,7 +146,7 @@ export function AssistantPage() {
             <Composer
               onSend={sendMessage}
               sending={state.busy}
-              disabled={state.restoring}
+              disabled={state.opening}
               placeholder={waiting.length > 0 ? 'Reply to the assistant, or use the buttons above…' : undefined}
             />
           </div>

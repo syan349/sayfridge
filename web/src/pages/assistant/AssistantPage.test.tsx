@@ -1,13 +1,24 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { AgentEvent, AgentItem } from '../../api/agent'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AgentEvent, AgentItem, ChatHistory, SavedMessage } from '../../api/agent'
 import { todayLocal } from '../../lib/dates'
 import { signInAs, testUser } from '../../test/fixtures'
 import { page, tomatoes } from '../../test/inventoryFixtures'
 import { renderApp } from '../../test/renderApp'
 import { server } from '../../test/server'
+
+// Shrinking a photo needs a real browser (a canvas). Here it is replaced by a stand-in
+// that returns a tiny fixed photo, so these tests check what is SENT, not the pixels.
+vi.mock('../../lib/photos', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/photos')>()),
+  preparePhoto: async (file: File) => ({
+    image: { image_id: `photo-${file.name}`, mime_type: 'image/jpeg', data_base64: 'QUJD' },
+    previewUrl: 'data:image/jpeg;base64,QUJD',
+    name: file.name,
+  }),
+}))
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const STORAGE_KEY = `sayfridge.assistant.${testUser.id}`
@@ -46,6 +57,36 @@ const askToConfirm = () =>
     { type: 'done', status: 'WAITING_INPUT', data: { status: 'WAITING_INPUT', items: [proposal], interrupt_id: 'interrupt-1' } },
   )
 
+/** The message box, once the saved chat has loaded (it is disabled until then). */
+async function messageBox() {
+  const box = await screen.findByLabelText('Message the assistant')
+  await waitFor(() => expect(box).toBeEnabled())
+  return box
+}
+
+/** GET /agent/chat: the user's main chat, with these saved messages and this state. */
+function answerHistory(history: Partial<ChatHistory>) {
+  server.use(
+    http.get('/api/v1/agent/chat', () =>
+      HttpResponse.json({
+        conversation_id: 'conversation-1',
+        state: { status: 'COMPLETED', items: [] },
+        messages: [],
+        history_complete: true,
+        ...history,
+      }),
+    ),
+  )
+}
+
+const said = (id: string, role: SavedMessage['role'], content: string, conversationId = 'conversation-1'): SavedMessage => ({
+  id,
+  conversation_id: conversationId,
+  role,
+  content,
+  created_at: '2026-10-02T07:28:00Z',
+})
+
 beforeEach(() => {
   sessionStorage.clear()
   signInAs(testUser)
@@ -63,7 +104,7 @@ describe('AssistantPage (W07)', () => {
     )))
     const user = userEvent.setup()
     renderApp('/assistant')
-    await user.type(await screen.findByLabelText('Message the assistant'), 'hello')
+    await user.type(await messageBox(),'hello')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     expect(await screen.findByText(payload)).toBeInTheDocument()
     expect(document.body.querySelector('script, img[src="x"], [onerror]')).toBeNull()
@@ -85,14 +126,20 @@ describe('AssistantPage (W07)', () => {
     const user = userEvent.setup()
     renderApp('/assistant')
 
-    await user.type(await screen.findByLabelText('Message the assistant'), 'What expires soon?')
+    await user.type(await messageBox(),'What expires soon?')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
     // The pieces of text are joined into one reply bubble.
     expect(await screen.findByText('Spinach and yogurt expire tomorrow.')).toBeInTheDocument()
     expect(screen.getByText('What expires soon?')).toBeInTheDocument()
-    expect(body).toEqual({ message: 'What expires soon?', as_of: todayLocal(), request_id: expect.stringMatching(UUID) })
-    expect(sessionStorage.getItem(STORAGE_KEY)).toBe('conversation-1') // kept for a reload
+    // It continues the main chat that GET /agent/chat opened.
+    expect(body).toEqual({
+      message: 'What expires soon?',
+      as_of: todayLocal(),
+      request_id: expect.stringMatching(UUID),
+      conversation_id: 'conversation-1',
+    })
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull() // the backend remembers the main chat; nothing to store
   })
 
   it('shows a proposal, and Confirm sends it back with POST /agent/resume', async () => {
@@ -118,7 +165,7 @@ describe('AssistantPage (W07)', () => {
     const user = userEvent.setup()
     renderApp('/assistant')
 
-    await user.type(await screen.findByLabelText('Message the assistant'), 'I used two more tomatoes')
+    await user.type(await messageBox(),'I used two more tomatoes')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
     const card = await screen.findByRole('region', { name: 'One proposed change' })
@@ -158,7 +205,7 @@ describe('AssistantPage (W07)', () => {
     const user = userEvent.setup()
     renderApp('/assistant')
 
-    await user.type(await screen.findByLabelText('Message the assistant'), 'I used two more tomatoes')
+    await user.type(await messageBox(),'I used two more tomatoes')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     const card = await screen.findByRole('region', { name: 'One proposed change' })
     await user.click(within(card).getByRole('button', { name: 'Edit' }))
@@ -173,19 +220,112 @@ describe('AssistantPage (W07)', () => {
     expect(screen.getByText('It was three tomatoes')).toBeInTheDocument() // shown as the user's message
   })
 
-  it('brings the conversation back after a reload, with the proposal still waiting', async () => {
-    sessionStorage.setItem(STORAGE_KEY, 'conversation-1')
+  it('opens the saved main chat: earlier messages, and a proposal that is still waiting', async () => {
+    answerHistory({
+      state: { status: 'WAITING_INPUT', items: [proposal], interrupt_id: 'interrupt-1' },
+      messages: [
+        said('m-1', 'USER', 'I used two more tomatoes'),
+        said('m-2', 'ASSISTANT', 'Two tomatoes is about 0.3 kg. Shall I record that?'),
+        said('m-3', 'USER', 'Something said in another conversation', 'conversation-2'),
+      ],
+      next_before: 'm-1',
+    })
+    renderApp('/assistant')
+
+    expect(await screen.findByRole('region', { name: 'One proposed change' })).toBeInTheDocument()
+    expect(screen.getByText('I used two more tomatoes')).toBeInTheDocument()
+    expect(screen.getByText('Two tomatoes is about 0.3 kg. Shall I record that?')).toBeInTheDocument()
+    // History covers every conversation; only the one being continued is shown here.
+    expect(screen.queryByText('Something said in another conversation')).not.toBeInTheDocument()
+    // Older pages exist: they are on the history page.
+    expect(screen.getByRole('link', { name: 'Conversation history' })).toHaveAttribute('href', '/conversations')
+  })
+
+  it('sends photos with a message, shrunk and encoded, and shows them in the chat', async () => {
+    let body: { message?: string; images?: unknown } = {}
     server.use(
-      http.get('/api/v1/agent/conversations/:id/state', ({ params }) =>
-        params.id === 'conversation-1'
-          ? HttpResponse.json({ status: 'WAITING_INPUT', items: [proposal], interrupt_id: 'interrupt-1' })
-          : HttpResponse.json({ detail: { code: 'NOT_FOUND' } }, { status: 404 }),
+      http.post('/api/v1/agent/chat', async ({ request }) => {
+        body = (await request.json()) as typeof body
+        return sse(start, { type: 'done', status: 'COMPLETED', data: { status: 'COMPLETED', items: [] } })
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp('/assistant')
+    await messageBox()
+
+    await user.upload(screen.getByLabelText('Attach photos'), new File(['pixels'], 'receipt.jpg', { type: 'image/jpeg' }))
+    expect(await screen.findByAltText('Photo 1: receipt.jpg')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Send' })) // a photo alone can be sent
+
+    await waitFor(() =>
+      expect(body.images).toEqual([{ image_id: 'photo-receipt.jpg', mime_type: 'image/jpeg', data_base64: 'QUJD' }]),
+    )
+    expect(body.message).toBe('')
+    expect(screen.getByAltText('Photo you sent: receipt.jpg')).toBeInTheDocument()
+    expect(screen.queryByAltText('Photo 1: receipt.jpg')).not.toBeInTheDocument() // the box is empty again
+  })
+
+  it('refuses a file that isn’t a JPEG, PNG or WebP photo, and more than four photos', async () => {
+    // applyAccept: false = as if the file was dragged in, past the file dialog's filter.
+    const user = userEvent.setup({ applyAccept: false })
+    renderApp('/assistant')
+    await messageBox()
+    const attach = screen.getByLabelText('Attach photos')
+
+    await user.upload(attach, new File(['x'], 'IMG_0001.heic', { type: 'image/heic' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('“IMG_0001.heic” isn’t a JPEG, PNG or WebP photo.')
+
+    const five = [1, 2, 3, 4, 5].map((n) => new File(['x'], `shelf-${n}.png`, { type: 'image/png' }))
+    await user.upload(attach, five)
+    expect(await screen.findByRole('alert')).toHaveTextContent('You can send at most 4 photos at a time.')
+    expect(screen.queryByAltText(/^Photo 1/)).not.toBeInTheDocument()
+  })
+
+  it('New conversation starts a separate one, and Back to main chat returns to the saved chat', async () => {
+    let body: { conversation_id?: string } = {}
+    answerHistory({ messages: [said('m-1', 'USER', 'What expires soon?'), said('m-2', 'ASSISTANT', 'Milk, tomorrow.')] })
+    server.use(
+      http.post('/api/v1/agent/chat', async ({ request }) => {
+        body = (await request.json()) as typeof body
+        return sse(
+          { type: 'start', conversation_id: body.conversation_id!, request_id: 'r' },
+          { type: 'text_delta', delta: 'Noted.' },
+          { type: 'done', status: 'COMPLETED', data: { status: 'COMPLETED', items: [] } },
+        )
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp('/assistant')
+    expect(await screen.findByText('Milk, tomorrow.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'New conversation' }))
+    expect(screen.queryByText('Milk, tomorrow.')).not.toBeInTheDocument()
+    await user.type(await messageBox(), 'I bought rice')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText('Noted.')).toBeInTheDocument()
+
+    // A new id made by the browser, kept for this tab so a reload stays in this conversation.
+    expect(body.conversation_id).toMatch(UUID)
+    expect(body.conversation_id).not.toBe('conversation-1')
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBe(body.conversation_id)
+
+    await user.click(screen.getByRole('button', { name: 'Back to main chat' }))
+    expect(await screen.findByText('Milk, tomorrow.')).toBeInTheDocument()
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Back to main chat' })).not.toBeInTheDocument()
+  })
+
+  it('still lets you chat when the saved chat can’t be loaded', async () => {
+    server.use(
+      http.get('/api/v1/agent/chat', () =>
+        HttpResponse.json({ detail: { code: 'AGENT_UNAVAILABLE' } }, { status: 503 }),
       ),
     )
     renderApp('/assistant')
 
-    expect(await screen.findByRole('region', { name: 'One proposed change' })).toBeInTheDocument()
-    expect(screen.getByText(/The server may retain conversation history/)).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('We couldn’t load your saved conversation.')
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(await messageBox()).toBeEnabled()
   })
 
   it('offers Try again when the answer breaks off, and retries with the same request id', async () => {
@@ -206,7 +346,7 @@ describe('AssistantPage (W07)', () => {
     const user = userEvent.setup()
     renderApp('/assistant')
 
-    await user.type(await screen.findByLabelText('Message the assistant'), 'How much milk is left?')
+    await user.type(await messageBox(),'How much milk is left?')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('The assistant stopped before it finished.')
     await user.click(screen.getByRole('button', { name: 'Try again' }))
@@ -254,7 +394,7 @@ describe('AssistantPage (W07)', () => {
     const user = userEvent.setup()
     renderApp('/assistant')
 
-    await user.type(await screen.findByLabelText('Message the assistant'), 'I bought milk')
+    await user.type(await messageBox(),'I bought milk')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
     const card = await screen.findByRole('region', { name: 'One proposed change' })
@@ -276,7 +416,7 @@ describe('AssistantPage (W07)', () => {
     const user = userEvent.setup()
     renderApp('/assistant')
 
-    await user.type(await screen.findByLabelText('Message the assistant'), 'I used two more tomatoes')
+    await user.type(await messageBox(),'I used two more tomatoes')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     await screen.findByRole('region', { name: 'One proposed change' })
     await user.type(screen.getByLabelText('Message the assistant'), 'It was three tomatoes')
@@ -304,7 +444,7 @@ describe('AssistantPage (W07)', () => {
     const user = userEvent.setup()
     renderApp('/assistant')
 
-    await user.type(await screen.findByLabelText('Message the assistant'), 'I used two more tomatoes')
+    await user.type(await messageBox(),'I used two more tomatoes')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
     const card = await screen.findByRole('region', { name: 'One proposed change' })
@@ -333,7 +473,7 @@ describe('AssistantPage (W07)', () => {
     const user = userEvent.setup()
     renderApp('/assistant')
 
-    await user.type(await screen.findByLabelText('Message the assistant'), 'I used two more tomatoes')
+    await user.type(await messageBox(),'I used two more tomatoes')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     const card = await screen.findByRole('region', { name: 'One proposed change' })
     await user.click(within(card).getByRole('button', { name: 'Confirm' }))
@@ -341,8 +481,7 @@ describe('AssistantPage (W07)', () => {
     // The card now shows the latest version, and the message explaining why is still there.
     expect(await screen.findByText('Vegetables · Fridge · consume 3 each')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('That proposal changed in the meantime.')
-    // The chat wasn't reloaded, so the "earlier messages" note doesn't belong here.
-    expect(screen.queryByText(/Earlier messages aren’t shown/)).not.toBeInTheDocument()
+    // The messages already on screen are kept.
     expect(screen.getByText('I used two more tomatoes')).toBeInTheDocument()
   })
 })
