@@ -69,6 +69,47 @@
   color: var(--sf-text-body);
 }
 
+/* ---------- Reminders ---------- */
+
+.setting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: var(--sf-text-md);
+}
+
+.select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--sf-border-input);
+  border-radius: var(--sf-radius-input);
+  background: var(--sf-surface);
+  color: var(--sf-text);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--sf-text-md);
+}
+
+.check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--sf-green-600);
+}
+
+.settingNote {
+  min-height: 18px;
+  margin: 8px 0 4px;
+  font-size: var(--sf-text-sm);
+  color: var(--sf-green-700);
+}
+
 .stats {
   margin: 0;
 }
