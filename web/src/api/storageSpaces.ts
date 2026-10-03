@@ -10,6 +10,8 @@ export interface StorageSpace {
   name: string
   type: SpaceType
   status: 'ACTIVE' | 'ARCHIVED'
+  /** The space new stock goes to when none is named (e.g. "I bought milk" said to the assistant). One per user. */
+  is_default?: boolean
   created_at: string
   updated_at: string
 }
@@ -37,6 +39,11 @@ export function updateStorageSpace(id: string, changes: { name?: string; type?: 
 /** POST /storage-spaces/{id}/archive — refused (409 STATE_CONFLICT) while the space holds IN_STOCK items. */
 export function archiveStorageSpace(id: string): Promise<StorageSpace> {
   return apiFetch<StorageSpace>(`/storage-spaces/${id}/archive`, { method: 'POST' })
+}
+
+/** POST /storage-spaces/{id}/default — makes this ACTIVE space the user's only default one (no request body). */
+export function setDefaultStorageSpace(id: string): Promise<StorageSpace> {
+  return apiFetch<StorageSpace>(`/storage-spaces/${id}/default`, { method: 'POST' })
 }
 
 /** POST /storage-spaces/{id}/restore — 409 NAME_CONFLICT if an active space took its name meanwhile. */
