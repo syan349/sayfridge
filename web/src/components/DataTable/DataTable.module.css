@@ -34,6 +34,35 @@
   color: var(--sf-text-muted);
 }
 
+/* A sortable header: looks like the other headers, but it is a real button. */
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sortButton:hover {
+  color: var(--sf-text);
+}
+
+.sortArrow {
+  font-size: 8px;
+  color: var(--sf-green-700);
+}
+
+/* Not sorted by this column: a faint arrow hints that it can be. */
+.sortIdle {
+  color: var(--sf-text-faint);
+}
+
 .table tbody tr {
   border-bottom: 1px solid var(--sf-divider-row);
 }
