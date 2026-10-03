@@ -5,6 +5,7 @@ abstract final class ItemArtworkPalette {
 
   static const _colors = <String, int>{
     'assets/icons/home/default_avatar.png': 0xFFD7EBB9,
+    'assets/icons/inventory/default_item.png': 0xFFE5F4DB,
     'assets/icons/inventory/apple.png': 0xFFE5F5DC,
     'assets/icons/inventory/avocado.png': 0xFFE4F3D9,
     'assets/icons/inventory/bacon.png': 0xFFE5F5DB,

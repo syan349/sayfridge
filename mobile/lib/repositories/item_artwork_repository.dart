@@ -11,6 +11,10 @@ class ItemArtworkRepository {
 
   Future<String?> read(String itemId) async {
     final asset = await _storage.read(key: 'item_artwork_$itemId');
+    // Preserve an explicit default selection saved before the generic item icon.
+    if (asset == 'assets/icons/home/default_avatar.png') {
+      return ItemIcon.defaultAsset;
+    }
     return ItemIcon.isValidAsset(asset) ? asset : null;
   }
 

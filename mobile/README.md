@@ -73,7 +73,8 @@ browsers use available space. The frame includes dialogs and does not alter nati
 Assistant replies render Markdown headings, bold names, and hanging-indent lists.
 Body line height is 1.45; list items have 8px spacing and paragraph/section breaks
 have 14px spacing. Older plain-text lists also emphasize short labels before a
-colon. Stored messages retain their original text. The backend agent prompt
+colon. Ordinary introductions ending in a colon keep body weight; headings use
+explicit Markdown (`##`, `###`, or bold text). Stored messages retain their original text. The backend agent prompt
 requests this structure for new reports and needs backend deployment to take effect.
 Generated documents start with a brief introduction followed by a `##` title.
 `AssistantReply` keeps the introduction in a bubble and places the complete
@@ -162,7 +163,11 @@ Pillow installed, then rebuild the APK. Icon generation is a development step;
 it adds no app runtime dependency.
 
 Inventory tiles and item icon previews/library cards use each artwork's sampled
-green background, including manually selected icons and the default mascot.
+green background, including manually selected icons. Unmatched item names use
+`assets/icons/inventory/default_item.png`, the approved food container with a leaf.
+Its transparent foreground uses a uniform pale-green tile; previous saved default
+icon selections also resolve to this artwork. The app's AI mascot remains its
+separate avatar artwork.
 After replacing food artwork, run `python scripts/generate_item_artwork_palette.py`
 to refresh the palette. Both scripts read/package existing artwork without redrawing it.
 
