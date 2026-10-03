@@ -2,13 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:sayfridge/models/app_user.dart';
 import 'package:sayfridge/repositories/auth_repository.dart';
+import 'package:sayfridge/repositories/profile_preferences_repository.dart';
 import 'package:sayfridge/screens/sign_in_screen.dart';
 import 'package:sayfridge/screens/sign_up_screen.dart';
 import 'package:sayfridge/state/auth_controller.dart';
 
 void main() {
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   testWidgets('login shows progress and disables repeated submission', (
     tester,
   ) async {
@@ -74,6 +77,11 @@ void main() {
 
     expect(find.byKey(const Key('auth-loading-indicator')), findsNothing);
     expect(repository.registerCalls, 1);
+    final saved = await const ProfilePreferencesRepository().read(
+      repository.user.id,
+    );
+    expect(saved.fullName, 'Test User');
+    expect(saved.avatarAsset, 'assets/images/avatars/default_avatar.png');
   });
 }
 

@@ -105,14 +105,18 @@ class PrimaryAuthButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 58,
       child: FilledButton(
         onPressed: isLoading ? null : onPressed,
         style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 58),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.black,
           shape: const StadiumBorder(),
-          textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+          textStyle: const TextStyle(
+            fontFamily: 'Arial',
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         child: isLoading
             ? const SizedBox.square(

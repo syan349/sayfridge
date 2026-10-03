@@ -58,6 +58,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
       success = await widget.authController.register(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        nickname: _nameController.text,
+        avatarAsset: _avatar.assetPath,
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -67,7 +69,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account created. Please sign in.')),
+        SnackBar(
+          content: Text(
+            widget.authController.errorMessage ??
+                'Account created. Please sign in.',
+          ),
+        ),
       );
       Navigator.of(context).pop();
       return;
@@ -100,6 +107,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     key: Key('selected-avatar-${_avatar.name.toLowerCase()}'),
                     choice: _avatar,
                     size: 122,
+                    borderWidth: 4,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -123,14 +131,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 26),
                 AuthField(
                   key: const Key('sign-up-name'),
-                  label: 'Full Name',
-                  hint: 'Enter your full name',
+                  label: 'Nickname',
+                  hint: 'Enter your nickname',
                   controller: _nameController,
                   textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.name],
+                  autofillHints: const [AutofillHints.nickname],
                   validator: (value) {
-                    if (value == null || value.trim().length < 2) {
-                      return 'Please enter your full name';
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your nickname';
+                    }
+                    if (value.trim().length > 100) {
+                      return 'Please use 100 characters or fewer';
                     }
                     return null;
                   },

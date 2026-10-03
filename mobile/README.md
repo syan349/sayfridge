@@ -51,7 +51,9 @@ approval before deductions. Failed sends preserve input.
 
 Assistant is a secondary page: Back returns to its entry page and hides bottom
 navigation. Header controls remain fixed. Input sits above the safe area and shifts
-with the keyboard. `AppBottomNavigation` stays outside scroll content at the safe-area
+with the keyboard. Message avatars and speech tails stay near the top of each
+bubble as longer text extends the body downward. `AppBottomNavigation` stays
+outside scroll content at the safe-area
 bottom: 78% available width, icon/text gap 3 logical pixels and bottom spacing 28.
 Use the component's `extent` to reserve content space rather than adding duplicate margins.
 Desktop browsers show a centered 390px phone frame up to 844px tall; small/touch
@@ -72,8 +74,13 @@ on account changes. Full history listing is not provided by the backend.
 
 ## Profile and reminders
 
-Profile preferences (name, avatar and reminder settings) are local per-user data
+Profile preferences (nickname, avatar and reminder settings) are local per-user data
 through `ProfilePreferencesRepository`; they are not synchronized to the backend.
+Registration saves the nickname and selected avatar under the created user ID.
+Personal Information prefills the saved nickname, falling back to the same email
+prefix shown on Profile for older accounts without a saved name. The stored
+`full_name` key remains compatible with existing preferences. The avatar library
+uses four columns with a fixed confirmation button outside the scroll area.
 Guest menus lead to login and successful login returns to Profile. Email/password
 changes have no backend API and are not reported as successful.
 

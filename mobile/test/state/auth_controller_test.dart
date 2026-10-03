@@ -1,10 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:sayfridge/models/app_user.dart';
+import 'package:sayfridge/models/profile_preferences.dart';
 import 'package:sayfridge/repositories/auth_repository.dart';
+import 'package:sayfridge/repositories/profile_preferences_repository.dart';
 import 'package:sayfridge/services/api_exception.dart';
 import 'package:sayfridge/state/auth_controller.dart';
+import 'package:sayfridge/state/profile_controller.dart';
 
 void main() {
   late AppUser testUser;
@@ -12,6 +16,7 @@ void main() {
   late AuthController controller;
 
   setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
     testUser = AppUser(
       id: 'user-1',
       email: 'user@example.com',
@@ -139,6 +144,57 @@ void main() {
       expect(controller.errorMessage, isNull);
     });
 
+    test(
+      'registration identity survives a new session for the created user',
+      () async {
+        const profiles = ProfilePreferencesRepository();
+        await profiles.save(
+          'other-user',
+          const ProfilePreferences(fullName: 'Other'),
+        );
+        expect(
+          await controller.register(
+            email: testUser.email,
+            password: 'Password123!',
+            nickname: '  Kiwi  ',
+            avatarAsset: 'assets/images/avatars/milk_avatar.png',
+          ),
+          isTrue,
+        );
+        final nextAuth = AuthController(repository);
+        repository.restoredUser = testUser;
+        await nextAuth.initialize();
+        final nextProfile = ProfileController(nextAuth, profiles);
+        await nextProfile.reload();
+        // Construction starts loading; allow that read to finish.
+        await Future<void>.delayed(Duration.zero);
+        expect(nextProfile.displayName, 'Kiwi');
+        expect(nextProfile.preferences.avatarAsset, contains('milk_avatar'));
+        expect((await profiles.read('other-user')).fullName, 'Other');
+        nextProfile.dispose();
+        nextAuth.dispose();
+      },
+    );
+
+    test(
+      'local identity failure still reports successful account creation',
+      () async {
+        final auth = AuthController(repository, _FailingProfiles());
+        expect(
+          await auth.register(
+            email: testUser.email,
+            password: 'Password123!',
+            nickname: 'Kiwi',
+          ),
+          isTrue,
+        );
+        expect(auth.status, AuthStatus.unauthenticated);
+        expect(auth.errorMessage, contains('Account created. Please sign in.'));
+        expect(auth.errorMessage, contains('could not be saved'));
+        auth.dispose();
+      },
+    );
+
     test('logout clears the authenticated user', () async {
       repository.restoredUser = testUser;
       await controller.initialize();
@@ -151,6 +207,13 @@ void main() {
       expect(controller.user, isNull);
     });
   });
+}
+
+class _FailingProfiles extends ProfilePreferencesRepository {
+  @override
+  Future<void> save(String userId, ProfilePreferences preferences) async {
+    throw StateError('Storage unavailable');
+  }
 }
 
 class _FakeAuthRepository implements AuthRepository {

@@ -56,24 +56,31 @@ class ProfileAvatar extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         Positioned.fill(
-          child: ClipOval(
-            child: bytes == null
-                ? Image.asset(
-                    asset == ProfilePreferences.defaultAvatar
-                        ? 'assets/icons/home/default_avatar.png'
-                        : asset,
-                    fit: BoxFit.cover,
-                    cacheWidth: (size * 3).round(),
-                    errorBuilder: (_, _, _) =>
-                        Image.asset(ProfilePreferences.defaultAvatar),
-                  )
-                : Image.memory(
-                    bytes!,
-                    fit: BoxFit.cover,
-                    cacheWidth: (size * 3).round(),
-                    errorBuilder: (_, _, _) =>
-                        Image.asset(ProfilePreferences.defaultAvatar),
-                  ),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            padding: const EdgeInsets.all(4),
+            child: ClipOval(
+              child: bytes == null
+                  ? Image.asset(
+                      asset == ProfilePreferences.defaultAvatar
+                          ? 'assets/icons/home/default_avatar.png'
+                          : asset,
+                      fit: BoxFit.cover,
+                      cacheWidth: (size * 3).round(),
+                      errorBuilder: (_, _, _) =>
+                          Image.asset(ProfilePreferences.defaultAvatar),
+                    )
+                  : Image.memory(
+                      bytes!,
+                      fit: BoxFit.cover,
+                      cacheWidth: (size * 3).round(),
+                      errorBuilder: (_, _, _) =>
+                          Image.asset(ProfilePreferences.defaultAvatar),
+                    ),
+            ),
           ),
         ),
       ],

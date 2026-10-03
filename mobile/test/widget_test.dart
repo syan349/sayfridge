@@ -26,7 +26,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Create Account'), findsOneWidget);
-    expect(find.text('Full Name'), findsOneWidget);
+    expect(find.text('Nickname'), findsOneWidget);
     expect(find.byKey(const Key('sign-up-button')), findsOneWidget);
   });
 
@@ -56,7 +56,7 @@ void main() {
     await tester.tap(useAvatar);
     await tester.pumpAndSettle();
 
-    expect(find.text('Full Name'), findsOneWidget);
+    expect(find.text('Nickname'), findsOneWidget);
     expect(find.byKey(const Key('selected-avatar-tomato')), findsOneWidget);
   });
 }

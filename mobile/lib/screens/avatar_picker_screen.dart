@@ -145,55 +145,67 @@ class _AvatarPickerScreenState extends State<AvatarPickerScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      child: AuthContent(
-        padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Text(
-                widget.title,
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-            ),
-            const SizedBox(height: 28),
-            Text(
-              'Choose your avatar',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 5),
-            const Text(
-              'Pick one you like.',
-              style: TextStyle(color: AppColors.muted, fontSize: 16),
-            ),
-            const SizedBox(height: 26),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: avatarChoices.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 24,
-                crossAxisSpacing: 24,
-              ),
-              itemBuilder: (context, index) {
-                final choice = avatarChoices[index];
-                return AvatarBubble(
-                  key: Key('avatar-${choice.name.toLowerCase()}'),
-                  choice: choice,
-                  selected: identical(choice, _selected),
-                  onTap: () => setState(() => _selected = choice),
-                );
-              },
-            ),
-            const SizedBox(height: 32),
-            const SizedBox(height: 18),
-            PrimaryAuthButton(
+      title: widget.title,
+      footer: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 16, 28, 28),
+            child: PrimaryAuthButton(
               key: const Key('use-avatar-button'),
               label: 'Use this avatar',
               onPressed: _finish,
             ),
-          ],
+          ),
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: CustomScrollView(
+            key: const Key('avatar-library-scroll'),
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(28, 28, 28, 26),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Choose your avatar',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 5),
+                      const Text(
+                        'Pick one you like.',
+                        style: TextStyle(color: AppColors.muted, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
+                sliver: SliverGrid.builder(
+                  itemCount: avatarChoices.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 20,
+                    crossAxisSpacing: 16,
+                  ),
+                  itemBuilder: (context, index) {
+                    final choice = avatarChoices[index];
+                    return AvatarBubble(
+                      key: Key('avatar-${choice.name.toLowerCase()}'),
+                      choice: choice,
+                      selected: choice.assetPath == _selected.assetPath,
+                      onTap: () => setState(() => _selected = choice),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -206,6 +218,7 @@ class AvatarBubble extends StatelessWidget {
     this.size,
     this.imageBytes,
     this.selected = false,
+    this.borderWidth = 0,
     this.onTap,
     super.key,
   });
@@ -214,6 +227,7 @@ class AvatarBubble extends StatelessWidget {
   final double? size;
   final Uint8List? imageBytes;
   final bool selected;
+  final double borderWidth;
   final VoidCallback? onTap;
 
   @override
@@ -228,6 +242,11 @@ class AvatarBubble extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: Container(
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                  padding: EdgeInsets.all(borderWidth),
                   foregroundDecoration: selected
                       ? BoxDecoration(
                           shape: BoxShape.circle,

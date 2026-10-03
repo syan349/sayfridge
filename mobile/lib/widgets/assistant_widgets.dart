@@ -22,6 +22,7 @@ const exampleMessageStyle = TextStyle(
 const _bubbleTextInset = 12.0;
 const _bubbleTailWidth = 13.0;
 const _bubbleMaxWidth = 320.0;
+const _bubbleTailOffset = 23.5;
 
 class AssistantHeader extends StatelessWidget {
   const AssistantHeader({
@@ -159,7 +160,7 @@ class AssistantGreeting extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const AssistantAvatar(),
         const SizedBox(width: 11),
@@ -318,6 +319,7 @@ class AssistantReply extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       AssistantAvatar(size: avatarSize),
       const SizedBox(width: 11),
@@ -367,16 +369,13 @@ class AssistantActionBubble extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Padding(padding: EdgeInsets.only(top: 8), child: AssistantAvatar()),
+      const AssistantAvatar(),
       const SizedBox(width: 11),
       Flexible(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: _bubbleMaxWidth),
           child: ClipPath(
-            clipper: const _SpeechBubbleClipper(
-              tailOnLeft: true,
-              tailOffset: 26,
-            ),
+            clipper: const _SpeechBubbleClipper(tailOnLeft: true),
             child: Container(
               color: AppColors.primarySoft,
               padding: const EdgeInsets.fromLTRB(
@@ -417,10 +416,9 @@ List<InlineSpan> _assistantTextSpans(String message) {
 }
 
 class _SpeechBubbleClipper extends CustomClipper<Path> {
-  const _SpeechBubbleClipper({required this.tailOnLeft, this.tailOffset});
+  const _SpeechBubbleClipper({required this.tailOnLeft});
 
   final bool tailOnLeft;
-  final double? tailOffset;
 
   @override
   Path getClip(Size size) {
@@ -428,7 +426,7 @@ class _SpeechBubbleClipper extends CustomClipper<Path> {
     const tail = _bubbleTailWidth;
     final bodyLeft = tailOnLeft ? tail : 0.0;
     final bodyRight = tailOnLeft ? size.width : size.width - tail;
-    final centerY = tailOffset ?? size.height / 2;
+    const centerY = _bubbleTailOffset;
 
     // Draw the body and tail as one continuous outline. Keeping them in a
     // single subpath avoids an anti-aliased seam where two clipped shapes meet.
@@ -485,8 +483,7 @@ class _SpeechBubbleClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(covariant _SpeechBubbleClipper oldClipper) {
-    return tailOnLeft != oldClipper.tailOnLeft ||
-        tailOffset != oldClipper.tailOffset;
+    return tailOnLeft != oldClipper.tailOnLeft;
   }
 }
 

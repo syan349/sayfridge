@@ -19,9 +19,7 @@ class PersonalInformationScreen extends StatefulWidget {
 
 class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final _name = TextEditingController(
-    text: widget.controller.preferences.fullName,
-  );
+  late final _name = TextEditingController(text: widget.controller.displayName);
   late final _email = TextEditingController(
     text: widget.controller.authController.user?.email ?? '',
   );
@@ -124,14 +122,14 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
             child: Column(
               children: [
                 ProfileField(
-                  label: 'Full Name',
+                  label: 'Nickname',
                   controller: _name,
                   fieldKey: const Key('profile-name'),
-                  hint: 'Enter your full name',
-                  autofillHints: const [AutofillHints.name],
+                  hint: 'Enter your nickname',
+                  autofillHints: const [AutofillHints.nickname],
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Please enter your full name';
+                      return 'Please enter your nickname';
                     }
                     if (value.trim().length > 100) {
                       return 'Please use 100 characters or fewer';
