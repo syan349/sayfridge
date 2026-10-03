@@ -33,7 +33,7 @@ void main() {
     }
   });
 
-  test('unchanged Mobile controller restores and retries exact captured chat/resume payloads', () async {
+  test('Mobile controller opens captured requests from history and retries their exact chat/resume payloads', () async {
     var checked = 0;
     final decisions = <String>{};
     for (final row in streams) {
@@ -50,9 +50,13 @@ void main() {
       final relativePath = (row['path'] as String).replaceFirst('/api/v1', '');
       await store.write('compat-mobile', {'conversation_id': cid, 'messages': <String, String>{},
         'pending': {'path': relativePath, 'body': original}});
-      var posts = 0;
+      var posts = 0, stateReads = 0;
       final client = ApiClient(client: MockClient((request) async {
-        if (request.method == 'GET') return jsonResponse(terminal);
+        if (request.method == 'GET') {
+          stateReads++;
+          expect(request.url.path, '/api/v1/agent/conversations/$cid/state');
+          return jsonResponse(terminal);
+        }
         posts++;
         expect(request.url.path, row['path']);
         expect(jsonDecode(request.body), original);
@@ -61,6 +65,23 @@ void main() {
       final controller = AgentController(WorkspaceRepository(client, MemoryTokens()), store: store);
       try {
         await controller.bindUser('compat-mobile');
+        // Login/restart now shows welcome. Recovery remains an explicit history
+        // action, with the original captured write preserved rather than replayed.
+        expect(controller.conversationId, isNull);
+        expect(controller.messages, isEmpty);
+        expect(controller.canSend, isTrue);
+        expect(controller.canRetry, isFalse);
+        expect(controller.history.single.id, cid);
+        expect(controller.history.single.pendingRequest, {'path': relativePath, 'body': original});
+        expect(stateReads, 0);
+        expect(posts, 0);
+        await controller.bindUser('compat-mobile', reload: true);
+        expect(controller.history.single.pendingRequest, {'path': relativePath, 'body': original});
+        expect(stateReads, 0);
+        expect(posts, 0);
+        await controller.openConversation(cid);
+        expect(stateReads, 1);
+        expect(posts, 0);
         expect(controller.canRetry, isTrue);
         await controller.retry();
         expect(posts, 1);
