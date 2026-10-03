@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import InventoryItem, InventoryOperation, ItemCategory, ItemDefinition, StorageSpace
 from auth_test_support import exercise, request
+from catalog_test_support import seed_definition
 from inventory_test_support import inventory_context, seed_space, seed_inventory, payload, BASE
 
 pytestmark = pytest.mark.postgres
@@ -73,6 +74,31 @@ def test_inventory_list_visibility_filters_dates_order_and_empty_page(inventory_
     assert get("?q=rice")["total"]==3
     assert get("?q=%25")["total"]==0
     assert get("?q=_")["total"]==0
+
+
+@pytest.mark.ci
+def test_inventory_list_sort_options_keep_missing_values_last_and_page_stably(inventory_context):
+    c = inventory_context
+    apple = seed_definition(c[0], c[3].id, name="apple")
+    banana = seed_definition(c[0], c[3].id, name="Banana")
+    stamp = lambda day: datetime(2026, 1, day, tzinfo=timezone.utc)
+    rice = seed_inventory(c, expiry_date=date(2026, 3, 1), created_at=stamp(1))  # the fixture definition, "Rice"
+    apples = seed_inventory(c, item_definition_id=apple.id, expiry_date=date(2026, 1, 1), created_at=stamp(3))
+    bananas = seed_inventory(c, item_definition_id=banana.id, created_at=stamp(2))  # no expiry date
+    def ids(query=""):
+        response = request(c[0], "GET", BASE + query, headers=c[-1])
+        assert response.status_code == 200, response.text
+        return [row["id"] for row in response.json()["items"]]
+    order = lambda *rows: [str(row.id) for row in rows]
+    # Omitted parameters keep the original contract.
+    assert ids() == ids("?sort_by=expiry_date&sort_order=asc") == order(apples, rice, bananas)
+    assert ids("?sort_by=expiry_date&sort_order=desc") == order(rice, apples, bananas)  # undated stays last
+    assert ids("?sort_by=name") == order(apples, bananas, rice)  # case-insensitive
+    assert ids("?sort_by=name&sort_order=desc") == order(rice, bananas, apples)
+    assert ids("?sort_by=created_at&sort_order=desc") == order(apples, bananas, rice)
+    assert ids("?sort_by=name&page_size=2&page=2") == order(rice)
+    for invalid in ("?sort_by=quantity", "?sort_order=up"):
+        assert request(c[0], "GET", BASE + invalid, headers=c[-1]).status_code == 422
 
 
 def test_archived_associations_remain_readable_with_zero_estimate_and_current_names(inventory_context):

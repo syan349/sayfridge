@@ -164,6 +164,9 @@ class InventoryListQuery(BaseModel):
     expiry_to: CalendarDate | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
+    # Defaults keep the original order: soonest expiry first, undated rows last.
+    sort_by: Literal["expiry_date", "name", "created_at"] = "expiry_date"
+    sort_order: Literal["asc", "desc"] = "asc"
 
     @model_validator(mode="after")
     def validate_ranges(self):

@@ -54,7 +54,16 @@ async def get_inventory(session: AsyncSession, item_id: UUID, user_id: UUID) -> 
     return _read_model(row)
 
 
+def _inventory_order(columns, sort_by: str, sort_order: str):
+    """Deterministic page order: the requested column, then UUID. Missing values sort last either way."""
+    column = {"expiry_date": columns.expiry_date, "name": func.lower(columns.item_definition_name),
+              "created_at": columns.created_at}[sort_by]
+    return (column.desc() if sort_order == "desc" else column.asc()).nulls_last(), columns.id
+
+
 async def list_inventory(session: AsyncSession, user_id: UUID, **query):
+    # Internal callers (Agent tools) omit the sort keys and keep the default order.
+    sort = query.get("sort_by", "expiry_date"), query.get("sort_order", "asc")
     statement = _select_inventory(user_id)
     if query["status"] != "ALL":
         statement = statement.where(InventoryItem.status == query["status"])
@@ -70,10 +79,10 @@ async def list_inventory(session: AsyncSession, user_id: UUID, **query):
             statement = statement.where(column <= query[prefix + "_to"])
     filtered = statement.cte("filtered_inventory")
     total = select(func.count().label("total")).select_from(filtered).subquery()
-    page = (select(filtered).order_by(filtered.c.expiry_date.asc().nulls_last(), filtered.c.id)
+    page = (select(filtered).order_by(*_inventory_order(filtered.c, *sort))
             .offset(min((query["page"] - 1) * query["page_size"], 2**63 - 1)).limit(query["page_size"]).subquery())
     rows = (await session.execute(select(page, total.c.total).select_from(total).outerjoin(page, true())
-            .order_by(page.c.expiry_date.asc().nulls_last(), page.c.id))).mappings().all()
+            .order_by(*_inventory_order(page.c, *sort)))).mappings().all()
     return [_read_model(row) for row in rows if row["id"] is not None], rows[0]["total"]
 
 
