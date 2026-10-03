@@ -362,12 +362,13 @@ No owner IDs are returned. These APIs do not create operation history.
 ### GET /inventory-items — B07
 
 **200**, paginated Inventory responses. Read-only; count/items share one snapshot.
-Sort by expiry_date ascending, NULLS LAST, then UUID ascending.
+Default sort is expiry_date ascending, NULLS LAST, then UUID ascending.
 
 | Parameter | Default / meaning |
 | --- | --- |
 | status | IN_STOCK; also EMPTY, DISCARDED, ARCHIVED, ALL |
 | page, page_size | 1 and 20; page ≥1, page_size 1–100 |
+| sort_by, sort_order | expiry_date and asc; sort_by also accepts name (item definition name, case-insensitive) and created_at; sort_order also accepts desc. Missing values sort last in both directions; UUID ascending breaks ties. Other values return 422 |
 | q | Empty; trimmed literal case-insensitive substring of item definition name, at most 100 characters |
 | storage_space_id, category_id | Optional UUID filters; inaccessible/nonexistent matches yield empty results |
 | purchase_from, purchase_to | Optional inclusive YYYY-MM-DD boundaries |
