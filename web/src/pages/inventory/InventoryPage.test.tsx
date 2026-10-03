@@ -95,6 +95,52 @@ describe('InventoryPage (W03)', () => {
     expect(lastListRequest().get('category_id')).toBe(dairy.id)
   })
 
+  it('sorts by a column when its header is clicked, and flips the direction on a second click', async () => {
+    answerInventory([yogurt, milk])
+    const user = userEvent.setup()
+    renderApp('/inventory')
+    await screen.findByText('Yogurt')
+
+    // The default order (soonest expiry first) is the backend's own, so nothing is sent for it.
+    expect(lastListRequest().get('sort_by')).toBeNull()
+    expect(screen.getByRole('columnheader', { name: /Expires/ })).toHaveAttribute('aria-sort', 'ascending')
+    expect(screen.getByRole('columnheader', { name: /Item/ })).toHaveAttribute('aria-sort', 'none')
+
+    await user.click(screen.getByRole('button', { name: /Item/ }))
+    await waitFor(() => expect(lastListRequest().get('sort_by')).toBe('name'))
+    expect(lastListRequest().get('sort_order')).toBe('asc')
+    expect(screen.getByRole('columnheader', { name: /Item/ })).toHaveAttribute('aria-sort', 'ascending')
+
+    await user.click(screen.getByRole('button', { name: /Item/ }))
+    await waitFor(() => expect(lastListRequest().get('sort_order')).toBe('desc'))
+    expect(screen.getByRole('columnheader', { name: /Item/ })).toHaveAttribute('aria-sort', 'descending')
+    expect(lastListRequest().get('page')).toBe('1') // a new order starts at the first page
+  })
+
+  it('goes back to the normal order when the server doesn’t know the sort option', async () => {
+    server.use(
+      http.get('/api/v1/inventory-items', ({ request }) => {
+        const params = new URL(request.url).searchParams
+        if (params.get('sort_by')) {
+          return HttpResponse.json(
+            { detail: { code: 'VALIDATION_ERROR', message: 'Invalid request parameters', errors: [{ loc: ['query', 'sort_by'], msg: 'Extra inputs are not permitted' }] } },
+            { status: 422 },
+          )
+        }
+        return HttpResponse.json(params.get('page_size') === '1' ? page([], 1) : page([yogurt]))
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp('/inventory')
+    await screen.findByText('Yogurt')
+
+    await user.click(screen.getByRole('button', { name: /Item/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sorting by this column isn’t available on this server yet.')
+    await user.click(screen.getByRole('button', { name: 'Back to the normal order' }))
+
+    expect(await screen.findByText('Yogurt')).toBeInTheDocument()
+  })
+
   it('offers every category in the filter, including one from the second page', async () => {
     answerTwoCategoryPages()
     answerInventory([yogurt, milk])

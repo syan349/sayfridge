@@ -34,6 +34,14 @@
   color: var(--sf-text-muted);
 }
 
+.muted {
+  color: var(--sf-text-muted);
+}
+
+.savedNote {
+  margin: 0;
+}
+
 .formFooter .hint {
   margin: 0;
 }

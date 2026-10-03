@@ -2,16 +2,35 @@
 from __future__ import annotations
 
 from typing import Annotated, Literal
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.schemas.inventory import CalendarDate, ExpiryBucket, InventoryStatus
 from app.schemas.agent_media import AgentImage, validate_image_batch
+from app.schemas.agent_actions import AgentConversationState
 
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 MemoryCategory = Literal["UNIT_RELATIONSHIP", "USAGE_PREFERENCE", "ENTITY_ALIAS"]
+
+
+class PublicChatMessage(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+    id: UUID
+    conversation_id: UUID
+    role: Literal["USER", "ASSISTANT"]
+    content: str
+    created_at: datetime
+
+
+class PrimaryChatResponse(BaseModel):
+    conversation_id: UUID
+    state: AgentConversationState
+    messages: list[PublicChatMessage]
+    next_before: UUID | None = None
+    history_complete: bool
 
 
 class AgentChatRequest(BaseModel):

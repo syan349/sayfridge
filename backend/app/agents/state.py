@@ -30,6 +30,14 @@ class AgentState(TypedDict):
     proposal_retries: int
     prose_retries: int
     context_compaction: dict
+    conversation_summary: str
+    summary_cursor: str | None
+    summary_position: int
+    summary_pending_ids: list[str]
+    context_next: str
+    public_turn: dict
+    history_outbox: dict
+    resume_payload: dict
     suspended_items: list[dict]
     chat_requests: dict
     image_messages: list
@@ -51,3 +59,4 @@ class AgentContext:
     user_message: str = ""
     memory_cache: dict = field(default_factory=dict)
     inventory_cards: bool = False
+    history_writer: object = field(default=None, repr=False, compare=False)

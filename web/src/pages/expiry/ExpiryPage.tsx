@@ -12,18 +12,25 @@ import { PageHeader } from '../../components/PageHeader/PageHeader'
 import { Pagination } from '../../components/Pagination/Pagination'
 import { QuantityCell } from '../../components/QuantityCell/QuantityCell'
 import { formatLongDate, todayLocal } from '../../lib/dates'
+import { useReminders } from '../../lib/useReminders'
 import { useItemActions } from '../itemDetails/useItemActions'
 import styles from './ExpiryPage.module.css'
 
 const PAGE_SIZE = 20
 const DAY_CHOICES = [3, 7, 14]
 
+/** "3 days", "1 day" */
+const daysText = (days: number) => `${days} ${days === 1 ? 'day' : 'days'}`
+
 /** W09 — Expiry overview: what is overdue, expires today, or expires soon, with quick actions. */
 export function ExpiryPage() {
   // "Today" comes from the browser: the server doesn't know the user's time zone
   // (New Zealand is up to 13 hours ahead of UTC).
   const today = todayLocal()
-  const [daysBefore, setDaysBefore] = useState(3)
+  // The look-ahead starts at the user's reminder preference (Profile & settings).
+  const { reminders } = useReminders()
+  const [daysBefore, setDaysBefore] = useState(reminders.daysBefore)
+  const dayChoices = [...new Set([reminders.daysBefore, ...DAY_CHOICES])].sort((a, b) => a - b)
   const [bucket, setBucket] = useState<ExpiryBucket | null>(null)
   const [spaceId, setSpaceId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
@@ -38,7 +45,7 @@ export function ExpiryPage() {
   const tiles: { bucket: ExpiryBucket; label: string; tone: string }[] = [
     { bucket: 'overdue', label: 'Overdue', tone: styles.overdue },
     { bucket: 'today', label: 'Today', tone: styles.today },
-    { bucket: 'upcoming', label: `Next ${daysBefore} days`, tone: styles.upcoming },
+    { bucket: 'upcoming', label: `Next ${daysText(daysBefore)}`, tone: styles.upcoming },
   ]
 
   function toggleBucket(next: ExpiryBucket) {
@@ -89,7 +96,7 @@ export function ExpiryPage() {
     message = (
       <div className={styles.stateBox}>
         <p className={styles.stateTitle}>
-          {bucket ? 'Nothing in this group.' : `Nothing is overdue or expiring in the next ${daysBefore} days.`}
+          {bucket ? 'Nothing in this group.' : `Nothing is overdue or expiring in the next ${daysText(daysBefore)}.`}
         </p>
         <p>Items without an expiry date aren’t listed here.</p>
       </div>
@@ -122,7 +129,7 @@ export function ExpiryPage() {
                 setDaysBefore(Number(event.target.value))
                 setPage(1)
               }}
-              options={DAY_CHOICES.map((days) => ({ value: String(days), label: `Next ${days} days` }))}
+              options={dayChoices.map((days) => ({ value: String(days), label: `Next ${daysText(days)}` }))}
             />
           </>
         }

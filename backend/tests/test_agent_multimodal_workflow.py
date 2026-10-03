@@ -51,7 +51,8 @@ def test_cross_turn_image_review_supplement_cancel_and_replay(monkeypatch):
         assert state["image_task_active"] is False
         turn = str(uuid4())
         state = await graph.ainvoke({"messages": [human_message("Enter those", [], turn)], "turn_id": turn,
-            "turn_has_images": False, "items": [], "request_fingerprint": "second"}, config, context=context)
+            "turn_has_images": False, "items": [], "request_fingerprint": "second",
+            "context_next": "prepare_context"}, config, context=context)
         assert state["items"][0]["status"] == "NEEDS_CONFIRMATION" and not writes
         assert state["items"][0]["image_policy"]["source_image_ids"] == [str(initial_image.image_id)]
         before = state["items"][0]["proposal_id"]

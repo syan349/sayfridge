@@ -31,9 +31,12 @@ export function expirySummaryQuery(query: ExpiryQuery) {
   }
 }
 
-/** "Needs attention": overdue, today and the next 3 days — the first 5, for the dashboard and the sidebar. */
-export function attentionQuery(today: string) {
-  return expirySummaryQuery({ asOf: today, daysBefore: 3, storageSpaceId: null, bucket: null, page: 1, pageSize: 5 })
+/**
+ * "Needs attention": overdue, today and the next `daysBefore` days (the user's reminder
+ * preference) — the first 5, for the dashboard and the sidebar.
+ */
+export function attentionQuery(today: string, daysBefore: number) {
+  return expirySummaryQuery({ asOf: today, daysBefore, storageSpaceId: null, bucket: null, page: 1, pageSize: 5 })
 }
 
 export const storageSpacesQuery = {

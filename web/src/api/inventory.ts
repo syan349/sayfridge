@@ -45,9 +45,19 @@ export interface InventoryQuery {
   expiryTo: string | null
   page: number
   pageSize: number
+  /** Left out = the backend's default order: soonest expiry first, items without a date last. */
+  sort?: InventorySort
 }
 
-/** GET /inventory-items — one page, sorted by expiry date (soonest first, no date last). */
+/** What the list can be ordered by. Items without that value always come last. */
+export interface InventorySort {
+  by: 'expiry_date' | 'name' | 'created_at'
+  order: 'asc' | 'desc'
+}
+
+export const DEFAULT_INVENTORY_SORT: InventorySort = { by: 'expiry_date', order: 'asc' }
+
+/** GET /inventory-items — one page, in the default order unless `sort` asks for another. */
 export function listInventory(query: InventoryQuery, signal?: AbortSignal): Promise<Page<InventoryItem>> {
   return apiFetch<Page<InventoryItem>>('/inventory-items', {
     query: {
@@ -58,6 +68,8 @@ export function listInventory(query: InventoryQuery, signal?: AbortSignal): Prom
       expiry_to: query.expiryTo,
       page: query.page,
       page_size: query.pageSize,
+      sort_by: query.sort?.by,
+      sort_order: query.sort?.order,
     },
     signal,
   })
@@ -236,8 +248,16 @@ export interface NewInventoryItem {
  * POST /inventory-items/batch-create — up to 100 new items in one transaction:
  * all are saved, or none. On failure the error's itemIndex names the first bad row.
  */
-export function batchCreate(items: NewInventoryItem[]): Promise<BatchResult> {
-  return apiFetch<BatchResult>('/inventory-items/batch-create', { method: 'POST', body: { items } })
+export function batchCreate(items: NewInventoryItem[]): Promise<BatchCreateResult> {
+  return apiFetch<BatchCreateResult>('/inventory-items/batch-create', { method: 'POST', body: { items } })
+}
+
+/**
+ * InventoryBatchCreateResult. An item sent without an expiry date gets one estimated
+ * by the backend; `warnings` says for which items it did that, or couldn't.
+ */
+export interface BatchCreateResult extends BatchResult {
+  warnings?: { code: 'EXPIRY_ESTIMATED' | 'EXPIRY_ESTIMATION_FAILED'; message: string; item_id: string }[]
 }
 
 /** POST /inventory-items/batch-move — all or nothing: if one item fails, none move. */

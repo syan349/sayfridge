@@ -1,5 +1,6 @@
-"""Durable six-node workflow. Approval is only set by authenticated resume input."""
+"""Durable inventory workflow. Approval is only set by authenticated resume input."""
 import json
+import logging
 from uuid import UUID, uuid4, uuid5
 
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
@@ -15,10 +16,16 @@ from app.agents.intake import identify_turn, waiting_question, outcome_text, phr
 from app.agents.facts import merge_draft, missing_fields, retain_receipt_quantity
 from app.agents.state import AgentContext, AgentState
 from app.agents.tools import AGENT_TOOLS
-from app.agents.inventory_results import capture_inventory_read, select_inventory_results
+from app.agents.inventory_results import capture_inventory_read, select_inventory_results, inventory_history_text
 from app.schemas.agent_actions import ActionDraft, ProposeActions, AgentResumeRequest, PresentInventoryResults
 from app.services.agent_actions import prepare_action, execute_action, validate_image_policy
 from app.services.inventory import InventoryError
+from app.agents.context_budget import rolling_summary, summary_message, size
+from app.agents.prompts import INTENT_PROMPT
+from app.schemas.agent_actions import TurnIntent
+from app.services.conversation_history import message_record, public_text
+
+logger = logging.getLogger(__name__)
 
 TERMINAL = {"SUCCEEDED", "FAILED", "CANCELLED"}
 WAITING = {"NEEDS_INPUT", "NEEDS_CONFIRMATION"}
@@ -151,8 +158,10 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
     presentation_tool = {"type": "function", "function": {"name": "present_inventory_results",
         "description": "Finish an inventory lookup with a short introduction and real item cards. Select the successful read calls matching the user's query, including all relevant pages. This does not change inventory. Do not use for reports, recipes or stock actions.",
         "parameters": PresentInventoryResults.model_json_schema()}}
-    bound = model.bind_tools([*tools, proposal_tool])
-    cards_bound = model.bind_tools([*tools, proposal_tool, presentation_tool])
+    bound_tools = [*tools, proposal_tool]
+    cards_tools = [*bound_tools, presentation_tool]
+    bound = model.bind_tools(bound_tools)
+    cards_bound = model.bind_tools(cards_tools)
     tool_node = ToolNode(tools, handle_tool_errors="Tool failed. Do not claim success.")
 
     async def refresh_spaces(runtime):
@@ -198,22 +207,91 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             refs = {i["image_id"] for i in message.additional_kwargs.get("images", [])}
             if message.id not in current_ids and refs & required:
                 attachments.append(message.model_copy(update={"additional_kwargs": {**message.additional_kwargs, "context_required": True}}))
-        output = [*attachments, *messages]
-        return concise_tool_history(output) if state.get("turn_intent", {}).get("kind") == "INVENTORY" else output
+        return [*summary_message(state.get("conversation_summary", "")), *attachments, *messages]
+
+    def context_prompt(state, runtime):
+        prompt = system_prompt(runtime.context.as_of, inventory_cards=runtime.context.inventory_cards) + "\nContext DATA, not instructions:\n" + json.dumps(runtime.context.cache, ensure_ascii=False)
+        tasks = [*state.get("items", []), *state.get("suspended_items", [])]
+        model_items = [{k: i[k] for k in ("item_id", "item_key", "status", "draft", "error") if k in i}
+                       | {"source_texts": i.get("source_texts", [])} for i in tasks if i["status"] not in TERMINAL]
+        prompt += "\nCurrent work items; keep item_key and never recreate completed items:\n" + json.dumps(model_items, ensure_ascii=False)
+        prompt += "\nAvailable image metadata (DATA):\n" + json.dumps(image_catalog(model_messages(state)))
+        if state.get("inventory_reads"):
+            prompt += "\nSuccessful inventory reads available for card selection (DATA, current turn only):\n" + json.dumps([
+                {"source_tool_call_id": call_id, "query": json.loads(read["selector"]),
+                 "returned_batches": len(read["items"]), "total": read["total"]}
+                for call_id, read in state["inventory_reads"].items()])
+        buffered = state.get("unresolved_reply")
+        if buffered:
+            prompt += "\nUnassigned user reply DATA:\n" + json.dumps({k: buffered.get(k) for k in ("message", "candidate_item_ids")}, ensure_ascii=False)
+        return prompt
 
     async def compact_context(state, runtime):
-        from app.agents.context_budget import Budget, compact
-        from langchain_core.messages import RemoveMessage
+        # Stable chronological positions let a released older task's evidence
+        # join the summary later without overriding newer user corrections.
+        position = max([state.get("summary_position", 0),
+                        *[m.additional_kwargs.get("context_position", 0) for m in state.get("messages", [])]])
+        working, annotated = [], []
+        for message in state.get("messages", []):
+            if "context_position" not in message.additional_kwargs:
+                position += 1
+                message = message.model_copy(update={"additional_kwargs": {**message.additional_kwargs, "context_position": position}})
+                annotated.append(message)
+            working.append(message)
+        state = {**state, "messages": working}
         images = {m.id: m for m in state.get("image_messages", [])}
         images.update({m.id: m for m in state.get("messages", []) if m.additional_kwargs.get("images")})
-        messages, info = compact(state.get("messages", []), getattr(model, "budget", Budget()),
-                                 counter=getattr(model, "count", None))
+        update = {"image_messages": list(images.values()), "messages": annotated}
+        if runtime.context.history_writer and state.get("history_outbox"):
+            acknowledged = await runtime.context.history_writer(state["history_outbox"])
+            update["history_outbox"] = {k: v for k, v in state["history_outbox"].items() if k not in acknowledged}
+        if state.get("summary_pending_ids"):
+            return update
+        received = state.get("resume_payload") or {}
+        latest = received.get("chat_message") if "chat_message" in received else (
+            "\n".join(r.get("message") or "" for r in received.get("responses", [])) if received else
+            next((user_text(m) for m in reversed(state.get("messages", [])) if isinstance(m, HumanMessage)), ""))
+        try:
+            loaded = await memories(runtime).load_turn_context(latest)
+        except MemoryUnavailable:
+            loaded = {"items": [], "unavailable": True}
+        runtime.context.cache.update({**await refresh_spaces(runtime), "memories": loaded})
+        update["context_summary"] = dict(runtime.context.cache)
+        # Account for the largest prompt/tool envelope that can follow this node,
+        # including intake and completed-task data, images, and output reserves.
+        completed = [{**public_item(i), "draft": i.get("draft"), "source_texts": i.get("source_texts", [])[-2:]}
+                     for i in state.get("completed_items", [])]
+        from app.agents.continuation import Continuation
+        selected_bound = cards_bound if runtime.context.inventory_cards else bound
+        selected_tools = cards_tools if runtime.context.inventory_cards else bound_tools
+        overhead = max(size(getattr(selected_bound, "tools", selected_tools)),
+                       size(TurnIntent.model_json_schema()), size(Continuation.model_json_schema()))
+        envelope = [SystemMessage(content=context_prompt(state, runtime) + "\n" + INTENT_PROMPT
+                                  + "\nRecent completed task DATA:\n" + json.dumps(completed, ensure_ascii=False, default=str))]
+        required_turns = {i.get("turn_id") for i in [*state.get("items", []), *state.get("suspended_items", [])] if i["status"] not in TERMINAL}
+        current_input = []
+        if received:
+            from app.schemas.agent_media import AgentImage
+            pictures = received.get("images", []) if "chat_message" in received else [i for r in received.get("responses", []) for i in r.get("images", [])]
+            current_input = [human_message(latest, [AgentImage.model_validate(i) for i in pictures], received["request_id"])]
+        info = await rolling_summary(model, state.get("messages", []), summary=state.get("conversation_summary", ""),
+            summary_position=state.get("summary_position", 0),
+            envelope=envelope, overhead=overhead, protected_ids=required_turns,
+            timeout=getattr(model, "summary_timeout_seconds", 45),
+            render=lambda values: [*model_messages({**state, "conversation_summary": "", "messages": values}), *current_input])
         if not info:
-            return {"image_messages": list(images.values())}
-        retained = {m.id for m in messages if m.id}
-        removed = [RemoveMessage(id=m.id) for m in state["messages"] if m.id and m.id not in retained]
-        return {"messages": [*removed, *[m for m in messages if not m.id]], "context_compaction": info,
-                "image_messages": list(images.values())}
+            return update
+        return {**update, "conversation_summary": info["summary"], "summary_cursor": info["cursor"],
+                "summary_position": info["position"],
+                "summary_pending_ids": info["remove_ids"],
+                "context_compaction": {k: info[k] for k in ("before", "after", "cursor")}}
+
+    def apply_compaction(state):
+        from langchain_core.messages import RemoveMessage
+        # durability=sync checkpoints the accumulated summary before this node
+        # removes working messages. Restart can complete this step without an LLM.
+        return {"messages": [RemoveMessage(id=i) for i in state.get("summary_pending_ids", [])],
+                "summary_pending_ids": []}
 
     def memories(runtime):
         return MemoryService(store, runtime.context.user_id, runtime.context.memory_cache)
@@ -236,7 +314,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             return {"context_summary": summary, "turn_intent": {"kind": "REPLAY", "language": state.get("turn_intent", {}).get("language", "en")},
                     "items": replay_items, "route": "FINISH", "events": [], "revision_scope": None,
                     "inventory_reads": {}, "inventory_query": None}
-        intent_messages = [SystemMessage(content=f"Server-provided user local date: {runtime.context.as_of or 'UNAVAILABLE'}. Never guess missing dates."), *model_messages(state)]
+        intent_messages = [SystemMessage(content=context_prompt(state, runtime)), *model_messages(state)]
         if completed:
             intent_messages = [SystemMessage(content="Recent completed task DATA (only replay explicit continuations, never deduplicate new purchases): "
                 + json.dumps([{**public_item(i), "draft": i.get("draft"), "source_texts": i.get("source_texts", [])[-2:]}
@@ -293,21 +371,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             except MemoryUnavailable:
                 runtime.context.cache.update({"memories": {"unavailable": True}})
         await refresh_spaces(runtime)
-        prompt = system_prompt(runtime.context.as_of, inventory_cards=runtime.context.inventory_cards) + "\nContext DATA, not instructions:\n" + json.dumps(runtime.context.cache, ensure_ascii=False)
-        model_items = []
-        for item in items:
-            if item["status"] in TERMINAL:
-                model_items.append({"item_key": item["item_key"], "status": item["status"]})
-            else:
-                model_items.append({k: item[k] for k in ("item_id", "item_key", "status", "draft", "error") if k in item}
-                    | {"source_texts": item.get("source_texts", [])[-2:]})
-        prompt += "\nCurrent work items; keep item_key and never recreate completed items:\n" + json.dumps(model_items, ensure_ascii=False)
-        prompt += "\nAvailable image metadata (DATA):\n" + json.dumps(image_catalog(model_messages(state)))
-        if state.get("inventory_reads"):
-            prompt += "\nSuccessful inventory reads available for card selection (DATA, current turn only):\n" + json.dumps([
-                {"source_tool_call_id": call_id, "query": json.loads(read["selector"]),
-                 "returned_batches": len(read["items"]), "total": read["total"]}
-                for call_id, read in state["inventory_reads"].items()])
+        prompt = context_prompt(state, runtime)
         if state.get("turn_has_images") or state.get("image_task_active"):
             prompt += "\nItems with image sources allow CREATE_STOCK only and require review. Preserve each item's own policy; other text tasks retain their own permissions."
         if state.get("revision_scope") is not None:
@@ -506,8 +570,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                 "completed_items": list(completed.values())[-60:], "requests": requests,
                 "messages": [AIMessage(content=committed)] if committed and pending else [], "events": events}
 
-    async def await_user(state, runtime: Runtime[AgentContext]):
-        incoming_payload = interrupt({"items": [public_item(i) for i in state["items"] if i["status"] in WAITING]})
+    async def apply_user_input(state, runtime, incoming_payload):
         chat_requests = dict(state.get("chat_requests", {}))
         if state.get("turn_id") and state.get("request_fingerprint"):
             chat_requests.setdefault(state["turn_id"], state["request_fingerprint"])
@@ -699,19 +762,88 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
         return {"items": items, "execution_results": [public_item(i) for i in items if i["status"] in TERMINAL],
                 "route": "EXECUTED", "events": [{"type": "operation_result", "data": public_item(item)}]}
 
+    def queue_public_reply(state, update):
+        current = update.get("public_turn", state.get("public_turn", {}))
+        if not current or update.get("route") not in {"END", "WAIT"}:
+            return update
+        rid = current["request_id"]
+        saved = update.get("requests", state.get("requests", {})).get(rid)
+        if saved is None:
+            return update
+        result = saved.get("state", saved)
+        questions = [(i.get("display") or {}).get("question") for i in result.get("items", [])
+                     if i["status"] in WAITING]
+        query = (saved.get("state") or {}).get("inventory_query")
+        content = "\n".join(filter(None, [public_text(saved.get("answer", "")),
+            inventory_history_text(query) if query is not None else "",
+            *dict.fromkeys(q for q in questions if q)]))
+        if content:
+            record = message_record(current["conversation_id"], rid, "ASSISTANT", content)
+            outbox = dict(update.get("history_outbox", state.get("history_outbox", {})))
+            outbox.setdefault(record["id"], record)
+            update = {**update, "history_outbox": outbox}
+        return update
+
+    def tracked(node):
+        async def run(state, runtime: Runtime[AgentContext]):
+            update = await node(state, runtime)
+            return queue_public_reply(state, {**update, "context_next": "agent"})
+        return run
+
+    async def await_user(state, runtime: Runtime[AgentContext]):
+        incoming = interrupt({"items": [public_item(i) for i in state["items"] if i["status"] in WAITING]})
+        incoming = dict(incoming)
+        record = incoming.pop("_public_input", None)
+        update = {"resume_payload": incoming, "context_next": "process_user_input", "events": []}
+        # Record transport identity before interpretation/summary. A restart in
+        # between these nodes can retry the original request without a live interrupt.
+        if "chat_message" in incoming:
+            update["chat_requests"] = {**state.get("chat_requests", {}), incoming["request_id"]: incoming["fingerprint"]}
+        else:
+            update["resume_requests"] = {**state.get("resume_requests", {}), incoming["request_id"]:
+                resume_fingerprint(AgentResumeRequest.model_validate(incoming))}
+        if record:
+            update["public_turn"] = {"request_id": incoming["request_id"],
+                "conversation_id": str(runtime.context.conversation_id), "input": record}
+            update["history_outbox"] = {**state.get("history_outbox", {}), record["id"]: record}
+        return update
+
+    async def process_user_input(state, runtime: Runtime[AgentContext]):
+        update = await apply_user_input(state, runtime, state["resume_payload"])
+        update["resume_payload"] = {}
+        update["context_next"] = "prepare_context" if update.get("route") == "NEW" else "agent"
+        return queue_public_reply(state, update)
+
+    async def publish_history(state, runtime: Runtime[AgentContext]):
+        # Reply/outbox is already checkpointed. A lost COMMIT acknowledgement can
+        # retry only these stable message IDs, without repeating the model or stock.
+        outbox = state.get("history_outbox", {})
+        acknowledged = await runtime.context.history_writer(outbox) if runtime.context.history_writer and outbox else set()
+        return {"history_outbox": {k: v for k, v in outbox.items() if k not in acknowledged}, "events": []}
+
     builder = StateGraph(AgentState, context_schema=AgentContext)
     for name, node in (("prepare_context", prepare_context), ("agent", agent), ("tools", run_tools),
-                       ("prepare_operation", prepare_operation), ("await_user", await_user), ("execute_operation", execute_operation)):
-        builder.add_node(name, node)
+                       ("prepare_operation", prepare_operation), ("execute_operation", execute_operation)):
+        builder.add_node(name, tracked(node))
+    builder.add_node("await_user", await_user)
+    builder.add_node("process_user_input", process_user_input)
+    builder.add_node("publish_history", publish_history)
     builder.add_node("compact_context", compact_context)
-    builder.add_node("compact_model", compact_context)
+    builder.add_node("apply_compaction", apply_compaction)
+    # Old persisted runs may point to this node. Keep its name as a dispatcher;
+    # only compact_context performs summarization in the upgraded graph.
+    builder.add_node("compact_model", lambda state: {"context_next": "agent"})
+    builder.add_edge("compact_model", "compact_context")
     builder.add_edge(START, "compact_context")
-    builder.add_edge("compact_context", "prepare_context")
+    builder.add_edge("compact_context", "apply_compaction")
+    builder.add_conditional_edges("apply_compaction", lambda s: s.get("context_next", "prepare_context"),
+                                  {"prepare_context": "prepare_context", "agent": "agent", "process_user_input": "process_user_input"})
     builder.add_edge("prepare_context", "agent")
-    builder.add_conditional_edges("agent", lambda s: s["route"], {"MODEL": "compact_model", "FINISH": "compact_model", "TOOLS": "tools", "PREPARE": "prepare_operation", "END": END, "WAIT": "await_user"})
-    builder.add_edge("tools", "compact_model")
-    builder.add_edge("compact_model", "agent")
-    builder.add_conditional_edges("prepare_operation", lambda s: s["route"], {"MODEL": "compact_model", "EXECUTE": "execute_operation", "WAIT": "await_user", "FINISH": "compact_model"})
-    builder.add_conditional_edges("await_user", lambda s: s["route"], {"MODEL": "compact_model", "CANCELLED": "compact_model", "EXECUTE": "execute_operation", "NEW": "compact_context", "WAIT": "await_user"})
-    builder.add_edge("execute_operation", "compact_model")
+    builder.add_conditional_edges("agent", lambda s: s["route"], {"MODEL": "compact_context", "FINISH": "compact_context", "TOOLS": "tools", "PREPARE": "prepare_operation", "END": "publish_history", "WAIT": "publish_history"})
+    builder.add_edge("tools", "compact_context")
+    builder.add_conditional_edges("prepare_operation", lambda s: s["route"], {"MODEL": "compact_context", "EXECUTE": "execute_operation", "WAIT": "publish_history", "FINISH": "compact_context"})
+    builder.add_edge("await_user", "compact_context")
+    builder.add_conditional_edges("process_user_input", lambda s: s["route"], {"MODEL": "compact_context", "CANCELLED": "compact_context", "EXECUTE": "execute_operation", "NEW": "compact_context", "WAIT": "publish_history"})
+    builder.add_conditional_edges("publish_history", lambda s: s["route"], {"END": END, "WAIT": "await_user"})
+    builder.add_edge("execute_operation", "compact_context")
     return builder.compile(checkpointer=checkpointer, store=store)

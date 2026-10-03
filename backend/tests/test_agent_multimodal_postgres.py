@@ -24,7 +24,7 @@ from test_agent_workflow import ScriptModel, call, intake
 from test_agent_api_postgres import parse_events
 from agent_image_support import image_input
 
-pytestmark = pytest.mark.postgres
+pytestmark = [pytest.mark.postgres, pytest.mark.ci]
 
 
 def test_image_http_review_supplement_restart_and_duplicate_submission(inventory_context, monkeypatch):

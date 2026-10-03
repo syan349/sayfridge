@@ -8,6 +8,7 @@ import {
   createStorageSpace,
   listAllStorageSpaces,
   restoreStorageSpace,
+  setDefaultStorageSpace,
   updateStorageSpace,
   type SpaceType,
   type StorageSpace,
@@ -26,6 +27,7 @@ import { SpaceIcon } from '../../components/SpaceIcon/SpaceIcon'
 import { StatusPill } from '../../components/StatusPill/StatusPill'
 import { TextField } from '../../components/TextField/TextField'
 import { formatDate, todayLocal } from '../../lib/dates'
+import { useReminders } from '../../lib/useReminders'
 import { SpaceTypePicker } from './SpaceTypePicker'
 import { spaceTypeLabel } from './spaceTypes'
 import styles from './SpacesPage.module.css'
@@ -40,6 +42,7 @@ function spaceError(error: unknown): string {
 export function SpacesPage() {
   const queryClient = useQueryClient()
   const today = todayLocal()
+  const { reminders } = useReminders()
   const [editing, setEditing] = useState<StorageSpace | null>(null)
   const [archiving, setArchiving] = useState<StorageSpace | null>(null)
   const [blocked, setBlocked] = useState<{ space: StorageSpace; count: number } | null>(null)
@@ -54,9 +57,9 @@ export function SpacesPage() {
   const counts = useQueries({
     queries: spaceList.map((space) => inventoryCountQuery({ ...IN_STOCK_COUNT, storageSpaceId: space.id })),
   })
-  // "Expiring soon" per space: the next 3 days, grouped by space in the browser (≤100 items).
+  // "Expiring soon" per space: the user's look-ahead (3 days by default), grouped by space in the browser (≤100 items).
   const expiring = useQuery(
-    expirySummaryQuery({ asOf: today, daysBefore: 3, storageSpaceId: null, bucket: null, page: 1, pageSize: 100 }),
+    expirySummaryQuery({ asOf: today, daysBefore: reminders.daysBefore, storageSpaceId: null, bucket: null, page: 1, pageSize: 100 }),
   )
   const expiringIn = (spaceId: string) => expiring.data?.items.filter((item) => item.storage_space_id === spaceId).length
 
@@ -90,6 +93,18 @@ export function SpacesPage() {
     }
   }
 
+  /** The default space is where new stock goes when none is named, e.g. by the assistant. */
+  async function makeDefault(space: StorageSpace) {
+    setRowError(null)
+    try {
+      await setDefaultStorageSpace(space.id)
+      setNotice(`${space.name} is now your default space.`)
+      refresh()
+    } catch (error) {
+      setRowError(`${space.name} couldn’t be made the default: ${spaceError(error)}`)
+    }
+  }
+
   const columns: Column<StorageSpace>[] = [
     {
       key: 'space',
@@ -98,7 +113,10 @@ export function SpacesPage() {
         <div className={styles.spaceCell}>
           <SpaceIcon type={space.type} />
           <div>
-            <span className={styles.spaceName}>{space.name}</span>
+            <span className={styles.spaceName}>
+              {space.name}
+              {space.is_default && <span className={styles.defaultTag}>Default</span>}
+            </span>
             <span className={styles.created}>Created {formatDate(todayLocal(new Date(space.created_at)))}</span>
           </div>
         </div>
@@ -125,7 +143,7 @@ export function SpacesPage() {
     {
       key: 'actions',
       header: 'Actions',
-      width: '110px',
+      width: '150px',
       render: (space) => {
         if (space.status === 'ARCHIVED') {
           return (
@@ -140,6 +158,13 @@ export function SpacesPage() {
         const full = count !== undefined && count > 0 // known to hold items
         return (
           <div className={styles.actions}>
+            {!space.is_default && (
+              <IconButton label={`Make ${space.name} the default space`} onClick={() => void makeDefault(space)}>
+                <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m12 3 2.7 5.6 6.1.8-4.5 4.3 1.1 6.1-5.4-3-5.4 3 1.1-6.1L3.2 9.4l6.1-.8Z" />
+                </svg>
+              </IconButton>
+            )}
             <IconButton label={`Rename ${space.name}`} onClick={() => setEditing(space)}>
               <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 20h4L19 9l-4-4L4 16Z" />
@@ -231,7 +256,10 @@ export function SpacesPage() {
             getRowLabel={(space) => space.name}
             message={message}
           />
-          <p className={styles.footnote}>Archived spaces keep their history, and can be restored.</p>
+          <p className={styles.footnote}>
+            New stock goes to the default space when no space is named, for example when you tell the assistant “I
+            bought milk”. Archived spaces keep their history, and can be restored.
+          </p>
         </div>
 
         <CreateSpaceCard

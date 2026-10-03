@@ -25,6 +25,8 @@ class ScriptModel:
     def bind_tools(self, tools, **kwargs):
         return self
     async def ainvoke(self, messages, **kwargs):
+        if "agent_summary" in kwargs.get("config", {}).get("tags", []):
+            return AIMessage(content="Historical conversation facts retained.")
         if "agent_intake" in kwargs.get("config", {}).get("tags", []):
             return next(self.intents)
         if "agent_questions" in kwargs.get("config", {}).get("tags", []):
@@ -139,14 +141,18 @@ def test_inventory_cards_use_selected_reads_and_survive_replay_but_not_a_report(
         config = {"configurable": {"thread_id": "query-cards"}}
         context = AgentContext(user, None, uuid4(), inventory_cards=True)
         query = initial()
+        query["public_turn"] = {"request_id": query["turn_id"], "conversation_id": str(context.conversation_id)}
         first = await graph.ainvoke(query, config, context=context)
         result = public_state(first)["inventory_query"]
         assert result["items"][0]["id"] == owned_item["id"]
         assert result["items"][0]["is_estimated"] is True
         assert first["requests"][query["turn_id"]]["state"]["inventory_query"] == result
         assert first["messages"][-1].content == "Here’s what’s currently in your fridge."
+        public_reply = next(iter(first["history_outbox"].values()))["content"]
+        assert "Milk — estimated 1.5 L; Fridge (expiry: 2026-10-05)" in public_reply
+        assert owned_item["id"] not in public_reply
         second = await graph.ainvoke({"turn_id": str(uuid4()), "request_fingerprint": "report",
-            "messages": [HumanMessage(content="Generate an inventory report")], "items": []}, config, context=context)
+            "messages": [HumanMessage(content="Generate an inventory report")], "items": [], "context_next": "prepare_context"}, config, context=context)
         assert "inventory_query" not in public_state(second)
         assert second["messages"][-1].content.startswith("Here’s your report.")
         assert second["requests"][query["turn_id"]]["state"]["inventory_query"] == result

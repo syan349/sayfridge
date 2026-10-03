@@ -7,7 +7,14 @@ export interface Column<Row> {
   header: string
   /** Optional fixed width, e.g. "150px". The column without one takes the rest. */
   width?: string
+  /** When given, the header is a button that sorts by this (the value the backend's sort option takes). */
+  sortKey?: string
   render: (row: Row) => ReactNode
+}
+
+export interface TableSort {
+  by: string
+  order: 'asc' | 'desc'
 }
 
 interface Selection {
@@ -37,6 +44,10 @@ interface DataTableProps<Row> {
   onRowClick?: (row: Row) => void
   /** Marks a row with a problem (red), e.g. the row a batch save failed on. */
   isRowInvalid?: (row: Row) => boolean
+  /** How the rows are sorted now. The sorting itself is done by the backend, not here. */
+  sort?: TableSort
+  /** Called with a column's sortKey when its header is clicked. */
+  onSort?: (sortKey: string) => void
 }
 
 /** A real <table> in the design's style, with an optional checkbox per row. */
@@ -51,6 +62,8 @@ export function DataTable<Row>({
   busy = false,
   onRowClick,
   isRowInvalid,
+  sort,
+  onSort,
 }: DataTableProps<Row>) {
   const columnCount = columns.length + (selection ? 1 : 0)
   const selectedOnPage = selection ? rows.filter((row) => selection.selectedIds.has(getRowId(row))).length : 0
@@ -78,11 +91,33 @@ export function DataTable<Row>({
                 />
               </th>
             )}
-            {columns.map((column) => (
-              <th key={column.key} scope="col" className={styles.th}>
-                {column.header}
-              </th>
-            ))}
+            {columns.map((column) => {
+              if (!column.sortKey || !onSort) {
+                return (
+                  <th key={column.key} scope="col" className={styles.th}>
+                    {column.header}
+                  </th>
+                )
+              }
+              const sortKey = column.sortKey
+              const order = sort?.by === sortKey ? sort.order : null
+              return (
+                // aria-sort tells screen readers which column the table is sorted by, and which way.
+                <th
+                  key={column.key}
+                  scope="col"
+                  className={styles.th}
+                  aria-sort={order === null ? 'none' : order === 'asc' ? 'ascending' : 'descending'}
+                >
+                  <button type="button" className={styles.sortButton} onClick={() => onSort(sortKey)}>
+                    {column.header}
+                    <span aria-hidden="true" className={order ? styles.sortArrow : `${styles.sortArrow} ${styles.sortIdle}`}>
+                      {order === 'desc' ? '▼' : '▲'}
+                    </span>
+                  </button>
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody>

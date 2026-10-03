@@ -54,8 +54,9 @@ Native reminders are local notifications. Web notifications depend on browser
 permission and the open application; there is no server push service. Daily Check-in
 passes the user's edited text/images to the assistant with a request to confirm deductions.
 
-React conversation history displays labeled sample data. The recovery API restores
-pending business progress; it does not list all previous chats or return full image history.
+React conversation history lists the user's saved public messages from the main chat API,
+grouped by conversation. The recovery API restores pending business progress; saved history
+is text and does not return full image history.
 Email/password changes, account deletion and a server voice-quota API are not supplied.
 
 ## Scope boundaries

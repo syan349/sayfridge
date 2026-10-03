@@ -17,6 +17,15 @@ const emptyHousehold = [
   http.get('/api/v1/storage-spaces', () => HttpResponse.json(emptyPage)),
   http.get('/api/v1/item-categories', () => HttpResponse.json(emptyPage)),
   http.get('/api/v1/inventory-operations', () => HttpResponse.json(emptyPage)),
+  // The assistant opens the user's main chat: by default it exists and nothing was said yet.
+  http.get('/api/v1/agent/chat', () =>
+    HttpResponse.json({
+      conversation_id: 'conversation-1',
+      state: { status: 'COMPLETED', items: [] },
+      messages: [],
+      history_complete: true,
+    }),
+  ),
 ]
 
 // Any request without a handler (default or added) fails the test (see setup.ts),

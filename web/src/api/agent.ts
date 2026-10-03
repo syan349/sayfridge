@@ -140,10 +140,21 @@ function parseEvent(block: string): AgentEvent | null {
   }
 }
 
+/** AgentImage: one photo sent with a message, as base64 text inside the JSON body. */
+export interface AgentImage {
+  /** Made by the browser (a UUID), so a retry of the same request names the same photo. */
+  image_id: string
+  mime_type: 'image/jpeg' | 'image/png' | 'image/webp'
+  data_base64: string
+}
+
 /** AgentChatRequest */
 export interface ChatRequest {
+  /** May be empty when photos are sent. */
   message: string
-  /** Left out for the first message; the start event says which one was created. */
+  /** Up to 4 photos (a shelf, a receipt, a label). Stock read from a photo always waits for confirmation. */
+  images?: AgentImage[]
+  /** The conversation to continue: the main chat's id, or a side conversation started in this tab. */
   conversation_id?: string
   /** Today's date where the user is, like W09. */
   as_of: string
@@ -183,4 +194,40 @@ export async function resume(request: ResumeRequest, onEvent: (event: AgentEvent
 /** GET /agent/conversations/{id}/state — what was proposed and done (no message text). */
 export function getConversationState(conversationId: string, signal?: AbortSignal): Promise<AgentState> {
   return apiFetch<AgentState>(`/agent/conversations/${conversationId}/state`, { signal })
+}
+
+/** PublicChatMessage: one saved message, as the user saw it (photos appear as "[Image attached…]"). */
+export interface SavedMessage {
+  id: string
+  /** The conversation it was said in. History covers all of the user's conversations. */
+  conversation_id: string
+  role: 'USER' | 'ASSISTANT'
+  content: string
+  created_at: string
+}
+
+/** PrimaryChatResponse */
+export interface ChatHistory {
+  /** The user's main chat: the one the assistant page continues by default. */
+  conversation_id: string
+  /** What the main chat is waiting for or has done. */
+  state: AgentState
+  /** One page of saved messages, oldest first. */
+  messages: SavedMessage[]
+  /** Pass as `before` to get the page of older messages; absent when there are none. */
+  next_before?: string | null
+  /** False when some older messages (from before history was saved) may be missing. */
+  history_complete: boolean
+}
+
+/**
+ * GET /agent/chat — opens the user's main chat and reads saved messages, newest page
+ * first. `before` pages back in time. The backend keeps only what the user could see:
+ * their own words and the assistant's replies, never photos or internal steps.
+ */
+export function getChatHistory(options: { before?: string; pageSize?: number } = {}, signal?: AbortSignal): Promise<ChatHistory> {
+  return apiFetch<ChatHistory>('/agent/chat', {
+    query: { before: options.before, page_size: options.pageSize ?? 50 },
+    signal,
+  })
 }

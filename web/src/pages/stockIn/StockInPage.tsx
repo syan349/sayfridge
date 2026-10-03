@@ -59,10 +59,14 @@ export function StockInPage() {
   const [rows, setRows] = useState<BatchRow[]>([])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<{ rowKey?: string; message: string } | null>(null)
-  const [saved, setSaved] = useState<number | null>(null)
+  // What the last save did: how many items, and for how many the backend estimated an
+  // expiry date (or couldn't) because none was typed in.
+  const [saved, setSaved] = useState<{ count: number; estimated: number; undated: number } | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
 
-  const space = spaceList.find((option) => option.id === spaceId) ?? spaceList[0]
+  // Until the user picks one, the form uses their default space.
+  const space =
+    spaceList.find((option) => option.id === spaceId) ?? spaceList.find((option) => option.is_default) ?? spaceList[0]
 
   function addToBatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -100,7 +104,7 @@ export function StockInPage() {
     setSaveError(null)
     try {
       // One request for everything: the backend saves all rows or none of them.
-      await batchCreate(
+      const result = await batchCreate(
         rows.map((row) => ({
           storage_space_id: row.space.id,
           item_definition_id: row.definition.id,
@@ -110,7 +114,12 @@ export function StockInPage() {
           expiry_date: row.expiryDate || undefined,
         })),
       )
-      setSaved(rows.length)
+      const warnings = result.warnings ?? []
+      setSaved({
+        count: rows.length,
+        estimated: warnings.filter((warning) => warning.code === 'EXPIRY_ESTIMATED').length,
+        undated: warnings.filter((warning) => warning.code === 'EXPIRY_ESTIMATION_FAILED').length,
+      })
       setRows([])
       void queryClient.invalidateQueries({ queryKey: ['inventory'] })
     } catch (error) {
@@ -153,7 +162,13 @@ export function StockInPage() {
       ),
     },
     { key: 'space', header: 'Space', width: '140px', render: (row) => row.space.name },
-    { key: 'expires', header: 'Expires', width: '130px', render: (row) => (row.expiryDate ? formatDate(row.expiryDate) : '—') },
+    {
+      key: 'expires',
+      header: 'Expires',
+      width: '130px',
+      // Without a date, the backend estimates one when the batch is saved.
+      render: (row) => (row.expiryDate ? formatDate(row.expiryDate) : <span className={styles.muted}>Estimated on save</span>),
+    },
     { key: 'definition', header: 'Definition', width: '110px', render: (row) => <StatusPill status={row.definition.scope} /> },
     {
       key: 'remove',
@@ -172,6 +187,23 @@ export function StockInPage() {
   ]
 
   const itemsText = rows.length === 1 ? '1 item' : `${rows.length} items`
+
+  // After a save: say when the backend filled in expiry dates that weren't typed in.
+  const savedNotes: string[] = []
+  if (saved && saved.estimated > 0) {
+    savedNotes.push(
+      saved.estimated === 1
+        ? 'One expiry date was estimated, because none was entered. Check it in the inventory and correct it if needed.'
+        : `${saved.estimated} expiry dates were estimated, because none was entered. Check them in the inventory and correct them if needed.`,
+    )
+  }
+  if (saved && saved.undated > 0) {
+    savedNotes.push(
+      saved.undated === 1
+        ? 'One item has no expiry date: it couldn’t be estimated.'
+        : `${saved.undated} items have no expiry date: it couldn’t be estimated.`,
+    )
+  }
 
   return (
     <>
@@ -196,13 +228,21 @@ export function StockInPage() {
           <Banner
             tone="info"
             role="status"
-            title={`Saved ${saved === 1 ? '1 item' : `${saved} items`}.`}
+            title={`Saved ${saved.count === 1 ? '1 item' : `${saved.count} items`}.`}
             action={
               <Link to="/inventory" className={styles.bannerLink}>
                 View inventory
               </Link>
             }
-          />
+          >
+            {savedNotes.length > 0
+              ? savedNotes.map((note) => (
+                  <p key={note} className={styles.savedNote}>
+                    {note}
+                  </p>
+                ))
+              : undefined}
+          </Banner>
         )}
 
         <Card title="New item">
@@ -245,7 +285,10 @@ export function StockInPage() {
               <TextField label="Expires" type="date" value={expiryDate} onChange={(event) => setExpiryDate(event.target.value)} />
             </div>
             <div className={styles.formFooter}>
-              <p className={styles.hint}>Use the date printed on the packet where there is one; leave it empty if there isn’t.</p>
+              <p className={styles.hint}>
+                Use the date printed on the packet where there is one. Leave Expires empty and a date is estimated for you
+                when you save.
+              </p>
               <Button type="submit" variant="soft" size="lg" disabled={rows.length >= MAX_ROWS}>
                 Add to batch
               </Button>
