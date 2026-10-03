@@ -226,6 +226,19 @@ void main() {
     expect(ItemIcon.forName(''), ItemIcon.defaultAsset);
   });
 
+  test(
+    'a previously selected default icon keeps that choice after the artwork update',
+    () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'item_artwork_item-1': 'assets/icons/home/default_avatar.png',
+      });
+      expect(
+        await const ItemArtworkRepository().read('item-1'),
+        ItemIcon.defaultAsset,
+      );
+    },
+  );
+
   testWidgets(
     'typing matches immediately; manual icon survives edits and can return to automatic',
     (tester) async {
