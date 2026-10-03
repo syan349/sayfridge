@@ -17,6 +17,8 @@ class AgentComposer extends StatefulWidget {
     this.maxLength = 8000,
     this.inputKey = const Key('assistant-message-field'),
     this.textTopPadding = 6,
+    this.inline = false,
+    this.hintText,
     super.key,
   });
 
@@ -26,6 +28,8 @@ class AgentComposer extends StatefulWidget {
   final int maxLength;
   final Key inputKey;
   final double textTopPadding;
+  final bool inline;
+  final String? hintText;
   final VoidCallback? onPhotoPressed, onSendPressed;
   final Widget voiceButton;
 
@@ -167,9 +171,47 @@ class _AgentComposerState extends State<AgentComposer> {
     ],
   );
 
+  Widget _inlineTypingLayout() => Row(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+          child: TextField(
+            key: widget.inputKey,
+            controller: widget.controller,
+            focusNode: _focusNode,
+            enabled: widget.enabled && !widget.voiceActive,
+            minLines: 1,
+            maxLines: 4,
+            maxLength: widget.maxLength,
+            keyboardType: TextInputType.multiline,
+            style: const TextStyle(fontSize: 14, height: 1.35),
+            decoration: InputDecoration(
+              isCollapsed: true,
+              counterText: '',
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              hintText: widget.hintText,
+              hintStyle: const TextStyle(color: Color(0xFFA4A4AE)),
+            ),
+          ),
+        ),
+      ),
+      _ComposerButton(
+        tooltip: 'Switch to voice input',
+        icon: _assetIcon(AssistantAssets.microphone),
+        onPressed: widget.enabled && !widget.voiceActive ? _voiceMode : null,
+      ),
+    ],
+  );
+
   Widget _voiceLayout() => Row(
     children: [
-      _photoButton(),
+      if (!widget.inline) _photoButton(),
       if (widget.hasImages) const SizedBox(width: 42),
       Expanded(child: widget.voiceButton),
       _ComposerButton(
@@ -183,8 +225,11 @@ class _AgentComposerState extends State<AgentComposer> {
 
   @override
   Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 63),
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    constraints: BoxConstraints(minHeight: widget.inline ? 56 : 63),
+    padding: EdgeInsets.symmetric(
+      horizontal: widget.inline ? 8 : 12,
+      vertical: widget.inline ? 5 : 8,
+    ),
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(32),
@@ -197,7 +242,11 @@ class _AgentComposerState extends State<AgentComposer> {
         ),
       ],
     ),
-    child: _typing || widget.waiting ? _typingLayout() : _voiceLayout(),
+    child: _typing || widget.waiting
+        ? widget.inline
+              ? _inlineTypingLayout()
+              : _typingLayout()
+        : _voiceLayout(),
   );
 }
 

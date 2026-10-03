@@ -82,6 +82,17 @@ eligible proposals, with per-item results; clarification/unknown outcomes remain
 separate. Retain conversation/request identity during reconnects and query state
 before retrying. Current balances show exact or estimated state; exact measurements
 can be edited and recorded through reconciliation, while initial stock facts remain.
+Assistant review headers use a 56px item icon with 14px spacing before the name/status.
+Item clarification and "Describe another detail" reuse the shared composer as a
+compact, voice-first draft input: hold to speak, release to edit the transcript,
+or switch between keyboard and voice. Confirm submits the item-scoped answer;
+recording alone never sends it. Sliding up cancels speech and preserves the existing
+text/selected choices. These inline inputs accept up to 1,000 characters and have
+no photo or separate send action. Successful review cards say "Saved successfully"
+for both additions and updates; quantity conversion prompts prefer the server's
+user-facing question.
+While the keyboard is open for a pending item, the disabled main composer is
+hidden without discarding its text/photos, leaving space for inline editing.
 Inventory Delete enters selection, Confirm opens archival confirmation and Cancel
 clears selection. Item-details quantity actions use full-row controls.
 

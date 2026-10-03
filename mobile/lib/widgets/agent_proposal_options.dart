@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../repositories/workspace_repository.dart';
+import '../services/voice_input_service.dart';
+import 'agent_input_panel.dart';
 
 typedef ProposalResponse = ({String? inventoryId, String? message});
 
@@ -16,6 +18,8 @@ class AgentProposalOptions extends StatefulWidget {
     required this.editing,
     required this.enabled,
     required this.onChanged,
+    this.voiceInput,
+    this.onMessage,
     super.key,
   });
 
@@ -24,6 +28,8 @@ class AgentProposalOptions extends StatefulWidget {
   final String? errorCode;
   final bool editing, enabled;
   final ValueChanged<ProposalResponse> onChanged;
+  final VoiceInputService? voiceInput;
+  final ValueChanged<String>? onMessage;
 
   @override
   State<AgentProposalOptions> createState() => _AgentProposalOptionsState();
@@ -39,6 +45,7 @@ class _AgentProposalOptionsState extends State<AgentProposalOptions> {
   @override
   void initState() {
     super.initState();
+    _text.addListener(_changed);
     final candidates = _maps(widget.details['candidates']);
     if (candidates.isNotEmpty) {
       _groups[candidates.first.containsKey('item_definition_name')
@@ -55,6 +62,7 @@ class _AgentProposalOptionsState extends State<AgentProposalOptions> {
 
   @override
   void dispose() {
+    _text.removeListener(_changed);
     _text.dispose();
     super.dispose();
   }
@@ -200,19 +208,18 @@ class _AgentProposalOptionsState extends State<AgentProposalOptions> {
         ],
         if (!_loading && !hasOptions || _showText) ...[
           const SizedBox(height: 8),
-          TextField(
-            key: const Key('proposal-response-text'),
+          AgentInputPanel(
+            key: const Key('proposal-response-input'),
+            inputKey: const Key('proposal-response-text'),
             controller: _text,
             enabled: widget.enabled,
-            minLines: 1,
-            maxLines: 4,
+            inline: true,
+            voiceInput: widget.voiceInput,
+            onMessage: widget.onMessage,
             maxLength: 1000,
-            decoration: InputDecoration(
-              hintText: widget.editing
-                  ? 'Describe the change'
-                  : 'Enter the missing details',
-            ),
-            onChanged: (_) => _changed(),
+            hintText: widget.editing
+                ? 'Describe the change'
+                : 'Enter the missing details',
           ),
         ] else if (hasOptions)
           Align(
