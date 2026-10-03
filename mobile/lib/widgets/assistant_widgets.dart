@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../models/agent_image.dart';
+import '../models/assistant_document.dart';
 import 'app_bottom_navigation.dart';
+import 'assistant_message_content.dart';
 import 'inventory_card_trailing.dart';
 import 'page_back_button.dart';
 import 'quantity_badge.dart';
@@ -318,13 +320,41 @@ class AssistantReply extends StatelessWidget {
   final double avatarSize;
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) {
+    final document = AssistantDocument.fromMessage(message);
+    if (document != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _conversationBubble(document.introduction),
+          const SizedBox(height: 14),
+          Container(
+            key: const Key('assistant-document-card'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: AssistantMessageContent(
+              message: document.content,
+              textStyle: textStyle,
+            ),
+          ),
+        ],
+      );
+    }
+    return _conversationBubble(message);
+  }
+
+  Widget _conversationBubble(String content) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       AssistantAvatar(size: avatarSize),
       const SizedBox(width: 11),
       Flexible(
-        child: AssistantMessageBubble(message: message, textStyle: textStyle),
+        child: AssistantMessageBubble(message: content, textStyle: textStyle),
       ),
     ],
   );
@@ -350,11 +380,7 @@ class AssistantMessageBubble extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: _bubbleMaxWidth),
         padding: const EdgeInsets.fromLTRB(_bubbleTailWidth + 16, 16, 16, 16),
         color: AppColors.primarySoft,
-        child: Text.rich(
-          TextSpan(children: _assistantTextSpans(message)),
-          style: textStyle.copyWith(height: 1.35),
-          textWidthBasis: TextWidthBasis.longestLine,
-        ),
+        child: AssistantMessageContent(message: message, textStyle: textStyle),
       ),
     ),
   );
@@ -391,28 +417,6 @@ class AssistantActionBubble extends StatelessWidget {
       ),
     ],
   );
-}
-
-List<InlineSpan> _assistantTextSpans(String message) {
-  final spans = <InlineSpan>[];
-  final markup = RegExp(r'\*\*([^*]+)\*\*|^#{1,3}\s+([^\n]+)', multiLine: true);
-  var cursor = 0;
-  for (final match in markup.allMatches(message)) {
-    if (match.start > cursor) {
-      spans.add(TextSpan(text: message.substring(cursor, match.start)));
-    }
-    spans.add(
-      TextSpan(
-        text: match.group(1) ?? match.group(2),
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-    );
-    cursor = match.end;
-  }
-  if (cursor < message.length) {
-    spans.add(TextSpan(text: message.substring(cursor)));
-  }
-  return spans;
 }
 
 class _SpeechBubbleClipper extends CustomClipper<Path> {

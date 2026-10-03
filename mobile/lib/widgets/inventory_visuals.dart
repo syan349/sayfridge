@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/inventory_item.dart';
 import '../models/item_icon.dart';
+import '../models/item_artwork_palette.dart';
 import '../repositories/item_artwork_repository.dart';
 import '../theme/app_theme.dart';
 import 'inventory_card_trailing.dart';
@@ -181,22 +182,22 @@ class _InventoryArtworkState extends State<InventoryArtwork> {
   @override
   Widget build(BuildContext context) {
     final size = widget.size;
-    return Container(
-      width: size,
-      height: size,
-      padding: EdgeInsets.all(size * 0.09),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE9F7DF),
-        borderRadius: BorderRadius.circular(size * 0.2),
-      ),
-      child: FutureBuilder<String?>(
-        key: ValueKey(widget.item.id),
-        future: _artwork,
-        builder: (context, snapshot) => Image.asset(
-          snapshot.data ?? itemArtwork(widget.item),
-          fit: BoxFit.contain,
-        ),
-      ),
+    return FutureBuilder<String?>(
+      key: ValueKey(widget.item.id),
+      future: _artwork,
+      builder: (context, snapshot) {
+        final asset = snapshot.data ?? itemArtwork(widget.item);
+        return Container(
+          width: size,
+          height: size,
+          padding: EdgeInsets.all(size * 0.09),
+          decoration: BoxDecoration(
+            color: Color(ItemArtworkPalette.backgroundArgb(asset)),
+            borderRadius: BorderRadius.circular(size * 0.2),
+          ),
+          child: Image.asset(asset, fit: BoxFit.contain),
+        );
+      },
     );
   }
 }

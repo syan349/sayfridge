@@ -25,6 +25,24 @@ abstract final class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
       fontFamily: 'Arial',
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titleTextStyle: const TextStyle(
+          fontFamily: 'Arial',
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          color: AppColors.text,
+        ),
+        contentTextStyle: const TextStyle(
+          fontFamily: 'Arial',
+          fontSize: 16,
+          height: 1.45,
+          color: AppColors.text,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      ),
       textTheme: const TextTheme(
         displaySmall: TextStyle(
           color: AppColors.text,

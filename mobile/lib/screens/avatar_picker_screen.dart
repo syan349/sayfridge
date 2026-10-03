@@ -218,7 +218,7 @@ class AvatarBubble extends StatelessWidget {
     this.size,
     this.imageBytes,
     this.selected = false,
-    this.borderWidth = 0,
+    this.borderWidth = 2.5,
     this.onTap,
     super.key,
   });

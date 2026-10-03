@@ -116,11 +116,24 @@ void main() {
     await agent.bindUser('alice');
     agent.messages['user:report'] = 'Show me an inventory report';
     agent.messages['assistant:report'] =
-        'There are 12 in-stock batches:\n\n'
-        '- Arctic Box: Chicken Breast — 0.8 kg (expired Sep 27); apple — 5 pics.\n'
-        '- BoschFridge: Whole Milk — 2 L (expired Oct 1); Apples — estimated 4 each; Chicken Eggs — 3 each and 5 pieces; Tomatoes — 2 each and 2 pieces.\n'
-        '- Pantry Potter: Carrots — 1.6 kg; Rice — 1 kg and 1.5 kg; Apples — 2.3 kg.\n\n'
-        'Also recorded: Greek Yoghurt is empty, Chocolate is discarded, and Olive Oil is archived.';
+        'Here’s your inventory report.\n\n'
+        '## Inventory report\n\n12 in-stock batches.\n\n'
+        '### Arctic Box\n'
+        '- **Chicken Breast** — 0.8 kg (expired Sep 27).\n'
+        '- **Apple** — 5 pieces.\n\n'
+        '### BoschFridge\n'
+        '- **Whole Milk** — 2 L (expired Oct 1).\n'
+        '- **Apples** — estimated 4 each.\n'
+        '- **Chicken Eggs** — 3 each and 5 pieces.\n'
+        '- **Tomatoes** — 2 each and 2 pieces.\n\n'
+        '### Pantry Potter\n'
+        '- **Carrots** — 1.6 kg.\n'
+        '- **Rice** — 1 kg and 1.5 kg.\n'
+        '- **Apples** — 2.3 kg.\n\n'
+        '### Other records\n'
+        '- **Greek Yoghurt** — empty.\n'
+        '- **Chocolate** — discarded.\n'
+        '- **Olive Oil** — archived.';
     const captureKey = Key('assistant-top-avatar-capture');
     await tester.pumpWidget(
       MaterialApp(
@@ -150,18 +163,28 @@ void main() {
         .position
         .jumpTo(0);
     await tester.pumpAndSettle();
-    await tester.runAsync(() async {
-      final boundary = tester.renderObject<RenderRepaintBoundary>(
-        find.byKey(captureKey),
-      );
-      final image = await boundary.toImage(pixelRatio: 2);
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      await Directory(directory).create(recursive: true);
-      await File(
-        '$directory/assistant-top-avatar.png',
-      ).writeAsBytes(bytes!.buffer.asUint8List());
-      image.dispose();
-    });
+    Future<void> capture(String name) async {
+      await tester.runAsync(() async {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(captureKey),
+        );
+        final image = await boundary.toImage(pixelRatio: 2);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await Directory(directory).create(recursive: true);
+        await File(
+          '$directory/$name.png',
+        ).writeAsBytes(bytes!.buffer.asUint8List());
+        image.dispose();
+      });
+    }
+
+    await capture('assistant-report-top');
+    final scroll = tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position;
+    scroll.jumpTo(scroll.maxScrollExtent);
+    await tester.pumpAndSettle();
+    await capture('assistant-report-bottom');
     expect(tester.takeException(), isNull);
   });
 

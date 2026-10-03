@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/app_dialog.dart';
 import '../widgets/app_action_icon.dart';
 
 import '../widgets/page_scroll_fade.dart';
@@ -234,13 +236,13 @@ class StorageSpaceScreen extends StatelessWidget {
       if (hasStock) {
         await showDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (context) => AppDialog(
             title: const Text('Cannot archive this space'),
             content: Text(
               '${space.name} still contains in-stock items. Use, discard or move them before archiving.',
             ),
             actions: [
-              TextButton(
+              FilledButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('OK'),
               ),

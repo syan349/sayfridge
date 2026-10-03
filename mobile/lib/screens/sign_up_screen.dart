@@ -107,7 +107,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     key: Key('selected-avatar-${_avatar.name.toLowerCase()}'),
                     choice: _avatar,
                     size: 122,
-                    borderWidth: 4,
+                    borderWidth: 2.5,
                   ),
                 ),
                 const SizedBox(height: 12),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/item_icon.dart';
+import '../models/item_artwork_palette.dart';
 import '../theme/app_theme.dart';
 
 class ItemIconPicker extends StatelessWidget {
@@ -24,7 +25,11 @@ class ItemIconPicker extends StatelessWidget {
         label: 'Choose item icon',
         button: true,
         child: Material(
-          color: const Color(0xFFE9F7DF),
+          color: Color(
+            ItemArtworkPalette.backgroundArgb(
+              selectedAsset ?? ItemIcon.forName(name),
+            ),
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
             side: const BorderSide(color: Color(0xFFA8D589)),
@@ -179,15 +184,16 @@ class _IconLibraryState extends State<_IconLibrary> {
                         return Semantics(
                           selected: selected,
                           child: Material(
-                            color: selected
-                                ? AppColors.primarySoft
-                                : Colors.white.withValues(alpha: .65),
+                            color: Color(
+                              ItemArtworkPalette.backgroundArgb(icon.asset),
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                               side: BorderSide(
                                 color: selected
                                     ? AppColors.primaryDark
                                     : const Color(0xFFA8D589),
+                                width: selected ? 2 : 1,
                               ),
                             ),
                             clipBehavior: Clip.antiAlias,

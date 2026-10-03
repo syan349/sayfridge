@@ -57,19 +57,20 @@ class AppNotificationController extends ChangeNotifier {
   VoidCallback? onProcessExpired;
   VoidCallback? onDailyCheckIn;
   List<AppNotification> get notifications => _notifications;
+  bool get hasUnread => _notifications.isNotEmpty;
 
   void _queueEvaluate() {
     unawaited(_evaluate());
   }
 
   Future<void> _evaluate() async {
+    final run = ++_evaluation;
     final userId = authController.isAuthenticated
         ? authController.user?.id
         : null;
     if (userId != _activeUserId) {
       _activeUserId = userId;
       _shownThisSession.clear();
-      ++_evaluation;
     }
     if (userId == null || profileController.isLoading) {
       _setNotifications(const []);
@@ -79,7 +80,6 @@ class AppNotificationController extends ChangeNotifier {
         expiryController.status != ExpirySummaryLoadStatus.empty) {
       return;
     }
-    final run = ++_evaluation;
     final today = _dateKey(DateTime.now());
     final preferences = profileController.preferences;
     if (expiryController.daysBefore != preferences.daysBeforeExpiry) {
@@ -165,15 +165,27 @@ class AppNotificationController extends ChangeNotifier {
     final userId = authController.user?.id;
     if (userId == null) return;
     await repository.saveDate(userId, type.name, _dateKey(DateTime.now()));
+    if (_disposed ||
+        _activeUserId != userId ||
+        !authController.isAuthenticated ||
+        authController.user?.id != userId) {
+      return;
+    }
+    // Older reads may still contain the pre-dismissal state. Invalidate them
+    // before notifying Home, and refresh other candidates from current state.
+    ++_evaluation;
+    _setNotifications(
+      _notifications
+          .where((notification) => notification.type != type)
+          .toList(),
+    );
+    _queueEvaluate();
+    // OS cancellation must not hold the in-app inbox/badge in its unread state.
     await service.cancel(switch (type) {
       AppNotificationType.expired => NotificationService.expiredItemsId,
       AppNotificationType.expiring => NotificationService.expiringSoonId,
       AppNotificationType.daily => NotificationService.dailyCheckInId,
     });
-    _notifications = _notifications
-        .where((notification) => notification.type != type)
-        .toList(growable: false);
-    notifyListeners();
   }
 
   void _setNotifications(List<AppNotification> value) {

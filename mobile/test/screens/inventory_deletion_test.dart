@@ -188,7 +188,12 @@ void main() {
       expect(find.text('2 selected'), findsOneWidget);
       await tester.tap(find.byKey(const Key('batch-delete-confirm')));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, 'Cancel').last);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Cancel'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(fixture.writes, isEmpty);
       expect(find.text('2 selected'), findsOneWidget);

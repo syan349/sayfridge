@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../widgets/app_dialog.dart';
 import '../widgets/app_action_icon.dart';
 
 import '../widgets/page_scroll_fade.dart';
@@ -415,9 +417,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     _confirmingDelete = true;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.background,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      builder: (context) => AppDialog(
         title: Text(
           items.length == 1 ? 'Delete item?' : 'Delete ${items.length} items?',
         ),
@@ -425,7 +425,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           '${items.take(3).map((item) => item.itemDefinitionName).join(', ')}${items.length > 3 ? ' and ${items.length - 3} more' : ''}\n\nRemove from inventory? Operation history will be kept.',
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),

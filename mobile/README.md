@@ -59,6 +59,24 @@ Use the component's `extent` to reserve content space rather than adding duplica
 Desktop browsers show a centered 390px phone frame up to 844px tall; small/touch
 browsers use available space. The frame includes dialogs and does not alter native layout.
 
+Assistant replies render Markdown headings, bold names, and hanging-indent lists.
+Body line height is 1.45; list items have 8px spacing and paragraph/section breaks
+have 14px spacing. Older plain-text lists also emphasize short labels before a
+colon. Stored messages retain their original text. The backend agent prompt
+requests this structure for new reports and needs backend deployment to take effect.
+Generated documents start with a brief introduction followed by a `##` title.
+`AssistantReply` keeps the introduction in a bubble and places the complete
+document in a full-width rounded card below it. Untitled legacy inventory reports
+with storage-space bullets also use a card. Short replies and action reviews keep
+their normal conversation layout.
+
+Production confirmation dialogs share `AppDialog`: pale-green rounded cards, green
+filled primary actions with dark text, and unfilled green-outline cancel actions.
+Cancel aligns with the left content inset and the primary action aligns right;
+actions wrap vertically when large text cannot fit on one row.
+Sign in offers email/password only. The Recover password dialog has no email
+delivery endpoint yet and tells the user that no recovery email was sent.
+
 Photo stock displays review cards before writes. Confirm all handles selected
 eligible proposals, with per-item results; clarification/unknown outcomes remain
 separate. Retain conversation/request identity during reconnects and query state
@@ -81,6 +99,8 @@ Personal Information prefills the saved nickname, falling back to the same email
 prefix shown on Profile for older accounts without a saved name. The stored
 `full_name` key remains compatible with existing preferences. The avatar library
 uses four columns with a fixed confirmation button outside the scroll area.
+All library avatars have a white rim; Profile, Personal Information and signup
+use a thinner 2.5px rim.
 Guest menus lead to login and successful login returns to Profile. Email/password
 changes have no backend API and are not reported as successful.
 
@@ -90,9 +110,29 @@ expired, upcoming and check-in reminders; Mark as read suppresses repeats for th
 day. Process now opens expired inventory and uses the existing Discard confirmation,
 retaining its record. Production voice usage is unavailable: the current user API
 does not provide a request-count quota. The preview's 12/50 is sample data.
+Home's bell and the notification inbox share the same unread list. Mark as read
+updates the list after persistence without waiting for OS notification cancellation;
+older asynchronous queries cannot restore a dismissed notification.
 
 Profile tests live in `test/screens/profile_flow_test.dart` and
 `test/state/profile_controller_test.dart`.
+
+## Android launcher artwork
+
+Launcher resources use the SayFridge fridge/microphone artwork in
+`assets/launcher/launcher_avatar.png`, with density-specific legacy icons and
+an adaptive foreground/background for launcher masks.
+This launcher source removes the thin white circular edge from the mascot backdrop.
+The launcher background matches the green sampled inside the artwork so
+square/adaptive icons do not show a lighter frame around the circular source.
+After changing that asset, run `python scripts/generate_launcher_icons.py` with
+Pillow installed, then rebuild the APK. Icon generation is a development step;
+it adds no app runtime dependency.
+
+Inventory tiles and item icon previews/library cards use each artwork's sampled
+green background, including manually selected icons and the default mascot.
+After replacing food artwork, run `python scripts/generate_item_artwork_palette.py`
+to refresh the palette. Both scripts read/package existing artwork without redrawing it.
 
 ## Debug-only offline preview
 

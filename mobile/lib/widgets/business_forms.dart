@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'app_dialog.dart';
+
 import '../repositories/workspace_repository.dart';
 import '../services/api_exception.dart';
-import '../theme/app_theme.dart';
 import 'selection_field.dart';
 
 /// A dialog owns its controllers until its route is disposed (including exit animation).
@@ -109,11 +110,7 @@ class _BusinessFormState extends State<_BusinessForm> {
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
-    child: AlertDialog(
-      backgroundColor: AppColors.background,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-      actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+    child: AppDialog(
       title: Text(widget.title),
       content: SingleChildScrollView(
         child: Form(
@@ -162,7 +159,7 @@ class _BusinessFormState extends State<_BusinessForm> {
         ),
       ),
       actions: [
-        TextButton(
+        OutlinedButton(
           onPressed: _busy ? null : () => Navigator.pop(context, false),
           child: const Text('Close'),
         ),

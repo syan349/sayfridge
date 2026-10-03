@@ -626,6 +626,7 @@ void main() {
       'profile-reminders': ReminderSettingsScreen(controller: session.$2),
       'profile-voice': VoiceUsageScreen(usage: _usage),
       'signup-nickname': SignUpScreen(authController: session.$1),
+      'signin-no-social': SignInScreen(authController: session.$1),
     };
     for (final entry in pages.entries) {
       await tester.pumpWidget(_app(entry.value));
@@ -648,6 +649,13 @@ void main() {
       }
       expect(tester.takeException(), isNull);
       await _capture(tester, entry.key);
+      if (entry.key == 'signin-no-social') {
+        await tester.tap(find.text('Forgot password?'));
+        await tester.pumpAndSettle();
+        await _capture(tester, 'recover-password-dialog');
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+      }
     }
   });
 }

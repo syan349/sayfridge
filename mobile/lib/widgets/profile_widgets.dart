@@ -61,7 +61,7 @@ class ProfileAvatar extends StatelessWidget {
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(2.5),
             child: ClipOval(
               child: bytes == null
                   ? Image.asset(
