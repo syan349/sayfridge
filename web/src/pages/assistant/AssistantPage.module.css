@@ -46,6 +46,22 @@
   color: var(--sf-text-muted);
 }
 
+/* Photos sent with a message, inside the user's bubble. */
+.photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.photos img {
+  width: 96px;
+  height: 96px;
+  border: 1px solid var(--sf-border-card);
+  border-radius: var(--sf-radius-lg);
+  object-fit: cover;
+}
+
 .proposal {
   padding-left: 47px;
 }

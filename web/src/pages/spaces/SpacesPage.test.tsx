@@ -153,4 +153,36 @@ describe('SpacesPage (W04)', () => {
     expect(await screen.findByText('Restored Old chest freezer.')).toBeInTheDocument()
     expect(restored).toBe(oldFreezer.id)
   })
+
+  it('marks the default space and can make another one the default', async () => {
+    let madeDefault: { id: string; body: string } | null = null
+    server.use(
+      http.get('/api/v1/storage-spaces', () =>
+        // Before the change the fridge is the default; afterwards the freezer is.
+        HttpResponse.json(
+          page([
+            { ...fridge, is_default: madeDefault === null },
+            { ...freezer, is_default: madeDefault !== null },
+          ]),
+        ),
+      ),
+      http.post('/api/v1/storage-spaces/:id/default', async ({ params, request }) => {
+        madeDefault = { id: String(params.id), body: await request.text() }
+        return HttpResponse.json({ ...freezer, is_default: true })
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp('/spaces')
+
+    const fridgeRow = (await screen.findByRole('button', { name: 'Rename Fridge' })).closest('tr')!
+    expect(within(fridgeRow).getByText('Default')).toBeInTheDocument()
+    // The default space has nothing to offer here; the other one does.
+    expect(screen.queryByRole('button', { name: 'Make Fridge the default space' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Make Freezer the default space' }))
+
+    expect(await screen.findByText('Freezer is now your default space.')).toBeInTheDocument()
+    expect(madeDefault).toEqual({ id: freezer.id, body: '' }) // the endpoint takes no request body
+    const freezerRow = screen.getByRole('button', { name: 'Rename Freezer' }).closest('tr')!
+    await waitFor(() => expect(within(freezerRow).getByText('Default')).toBeInTheDocument())
+  })
 })

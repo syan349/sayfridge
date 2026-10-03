@@ -1,7 +1,14 @@
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listInventory, type InventoryItem, type InventoryQuery } from '../../api/inventory'
+import { ApiError } from '../../api/client'
+import {
+  DEFAULT_INVENTORY_SORT,
+  listInventory,
+  type InventoryItem,
+  type InventoryQuery,
+  type InventorySort,
+} from '../../api/inventory'
 import { categoriesQuery, inventoryCountQuery, storageSpacesQuery } from '../../api/queries'
 import { Button } from '../../components/Button/Button'
 import { ButtonLink } from '../../components/Button/ButtonLink'
@@ -15,6 +22,7 @@ import { SearchField } from '../../components/SearchField/SearchField'
 import { StatusPill } from '../../components/StatusPill/StatusPill'
 import { addDays, todayLocal } from '../../lib/dates'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import { useReminders } from '../../lib/useReminders'
 import { BulkBar } from './BulkBar'
 import { BulkResult } from './BulkResult'
 import type { BulkOutcome } from './bulkActions'
@@ -22,18 +30,24 @@ import { FilterBar, type InventoryFilters } from './FilterBar'
 import styles from './InventoryPage.module.css'
 
 export const PAGE_SIZE = 20
-const EXPIRING_SOON_DAYS = 3
 const DEFAULT_FILTERS: InventoryFilters = { spaceId: null, categoryId: null, status: 'IN_STOCK', expiringSoon: false }
 
 /** Turns what the user picked into the request for GET /inventory-items. */
-function toQuery(filters: InventoryFilters, search: string, page: number, pageSize: number, today: string): InventoryQuery {
+function toQuery(
+  filters: InventoryFilters,
+  search: string,
+  page: number,
+  pageSize: number,
+  today: string,
+  soonDays: number,
+): InventoryQuery {
   return {
     status: filters.status,
     q: search.trim(),
     storageSpaceId: filters.spaceId,
     categoryId: filters.categoryId,
-    // "Expiring ≤ 3 days" = expiry date up to 3 days from today (already expired included).
-    expiryTo: filters.expiringSoon ? addDays(today, EXPIRING_SOON_DAYS) : null,
+    // "Expiring ≤ N days" = expiry date up to N days from today (already expired included).
+    expiryTo: filters.expiringSoon ? addDays(today, soonDays) : null,
     page,
     pageSize,
   }
@@ -44,6 +58,7 @@ export function InventoryPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const today = todayLocal()
+  const soonDays = useReminders().reminders.daysBefore // the user's "expiring soon" window
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [searchText, setSearchText] = useState('')
@@ -52,9 +67,13 @@ export function InventoryPage() {
   // Selected rows, by id. We keep the whole item because writes need its current version.
   const [selected, setSelected] = useState<Map<string, InventoryItem>>(new Map())
   const [outcome, setOutcome] = useState<BulkOutcome | null>(null)
+  const [sort, setSort] = useState<InventorySort>(DEFAULT_INVENTORY_SORT)
+  const isDefaultSort = sort.by === DEFAULT_INVENTORY_SORT.by && sort.order === DEFAULT_INVENTORY_SORT.order
 
   // ---------- Data ----------
-  const listQuery = toQuery(filters, search, page, PAGE_SIZE, today)
+  // Sorting is done by the backend, over ALL matching items, not just the page shown.
+  // The default order is what the backend does anyway, so it isn't sent.
+  const listQuery = { ...toQuery(filters, search, page, PAGE_SIZE, today, soonDays), sort: isDefaultSort ? undefined : sort }
   const inventory = useQuery({
     // React Query caches by this key: any change in the filters is a new key, so a new request.
     queryKey: ['inventory', 'list', listQuery],
@@ -66,7 +85,7 @@ export function InventoryPage() {
   const spaceList = spaces.data?.items ?? []
 
   // The number on each chip = what that chip would show, with the other filters kept.
-  const countWith = (change: Partial<InventoryFilters>) => toQuery({ ...filters, ...change }, search, 1, 1, today)
+  const countWith = (change: Partial<InventoryFilters>) => toQuery({ ...filters, ...change }, search, 1, 1, today, soonDays)
   const chipQueries = {
     allSpaces: countWith({ spaceId: null }),
     expiringSoon: countWith({ expiringSoon: true }),
@@ -112,6 +131,16 @@ export function InventoryPage() {
     setSelected(new Map())
   }
 
+  /** A click on a column header: the same column again flips the direction, another one starts A→Z / soonest first. */
+  function changeSort(by: string) {
+    setSort((current) => ({
+      by: by as InventorySort['by'],
+      order: current.by === by && current.order === 'asc' ? 'desc' : 'asc',
+    }))
+    setPage(1)
+    setSelected(new Map())
+  }
+
   function toggleRow(id: string) {
     const row = rows.find((item) => item.id === id)
     setSelected((current) => {
@@ -146,6 +175,7 @@ export function InventoryPage() {
     {
       key: 'item',
       header: 'Item',
+      sortKey: 'name',
       render: (item) => <ItemCell name={item.item_definition_name} to={`/inventory/${item.id}`} />,
     },
     { key: 'category', header: 'Category', width: '130px', render: (item) => item.category_name },
@@ -155,6 +185,7 @@ export function InventoryPage() {
       key: 'expires',
       header: 'Expires',
       width: '150px',
+      sortKey: 'expiry_date',
       render: (item) => <ExpiryChip expiryDate={item.expiry_date} today={today} />,
     },
     { key: 'status', header: 'Status', width: '112px', render: (item) => <StatusPill status={item.status} /> },
@@ -171,6 +202,16 @@ export function InventoryPage() {
   let message: ReactNode = null
   if (inventory.isPending) {
     message = <p role="status">Loading your inventory…</p>
+  } else if (inventory.isError && !isDefaultSort && inventory.error instanceof ApiError && inventory.error.status === 422) {
+    // A backend that doesn't know the sort option yet refuses it (422): offer the normal order.
+    message = (
+      <div role="alert" className={styles.stateBox}>
+        <p className={styles.stateTitle}>Sorting by this column isn’t available on this server yet.</p>
+        <Button variant="secondary" size="sm" onClick={() => setSort(DEFAULT_INVENTORY_SORT)}>
+          Back to the normal order
+        </Button>
+      </div>
+    )
   } else if (inventory.isError) {
     message = (
       <div role="alert" className={styles.stateBox}>
@@ -242,6 +283,7 @@ export function InventoryPage() {
         filters={filters}
         spaces={spaceList}
         categories={categories.data ?? []}
+        soonDays={soonDays}
         onRetryCategories={categories.isError ? () => void categories.refetch() : undefined}
         counts={{
           allSpaces: allSpacesTotal,
@@ -274,6 +316,8 @@ export function InventoryPage() {
             message={message}
             busy={inventory.isFetching && !inventory.isPending}
             onRowClick={(item) => navigate(`/inventory/${item.id}`)}
+            sort={sort}
+            onSort={changeSort}
           />
         </div>
 

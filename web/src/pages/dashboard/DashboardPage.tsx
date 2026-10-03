@@ -15,6 +15,7 @@ import { QuantityCell } from '../../components/QuantityCell/QuantityCell'
 import { StatTile } from '../../components/StatTile/StatTile'
 import { TypeTag } from '../../components/Tag/Tag'
 import { formatLongDate, formatRelative, greeting, todayLocal } from '../../lib/dates'
+import { useReminders } from '../../lib/useReminders'
 import { useItemActions } from '../itemDetails/useItemActions'
 import styles from './DashboardPage.module.css'
 
@@ -37,10 +38,12 @@ export function DashboardPage() {
   const today = todayLocal()
   const name = user?.email.split('@')[0] ?? ''
   const { actionsFor, dialogs, notice, clearNotice } = useItemActions()
+  const { reminders } = useReminders() // how many days ahead counts as "expiring soon"
+  const soonDays = `${reminders.daysBefore} ${reminders.daysBefore === 1 ? 'day' : 'days'}`
 
   // ---------- Data (the same query keys as the sidebar and W03, so answers are shared) ----------
   const inStock = useQuery(inventoryCountQuery(IN_STOCK_COUNT))
-  const attention = useQuery(attentionQuery(today))
+  const attention = useQuery(attentionQuery(today, reminders.daysBefore))
   const spaces = useQuery(storageSpacesQuery)
   const spaceList = spaces.data?.items ?? []
   const spaceCounts = useQueries({
@@ -133,7 +136,7 @@ export function DashboardPage() {
             meta={
               counts && counts.overdue > 0
                 ? `${counts.overdue} already overdue`
-                : 'Nothing overdue — expiring within 3 days'
+                : `Nothing overdue — expiring within ${soonDays}`
             }
           />
           <StatTile
@@ -157,7 +160,7 @@ export function DashboardPage() {
               </p>
             )}
             {attention.data && attention.data.items.length === 0 && (
-              <p className={styles.empty}>Nothing is overdue or expiring in the next 3 days.</p>
+              <p className={styles.empty}>Nothing is overdue or expiring in the next {soonDays}.</p>
             )}
             {attention.data && attention.data.items.length > 0 && (
               <ul className={styles.attentionList}>

@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -65,6 +65,37 @@ describe('StockInPage (W06)', () => {
       ],
     })
     expect(screen.getByText('Nothing in the batch yet. Add items with the form above.')).toBeInTheDocument()
+  })
+
+  it('says when the backend estimated an expiry date that wasn’t entered', async () => {
+    server.use(
+      http.post('/api/v1/inventory-items/batch-create', () =>
+        HttpResponse.json(
+          { items: [], count: 1, warnings: [{ code: 'EXPIRY_ESTIMATED', message: 'Expiry date was estimated', item_id: 'new-1' }] },
+          { status: 201 },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    renderApp('/inventory/new')
+    await screen.findByRole('option', { name: 'Fridge' })
+
+    await addRow(user, 'Milk', '2', 'L') // no expiry date
+    expect(screen.getByText('Estimated on save')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save 1 item' }))
+
+    const saved = await screen.findByRole('status')
+    expect(saved).toHaveTextContent('Saved 1 item.')
+    expect(saved).toHaveTextContent('One expiry date was estimated, because none was entered.')
+  })
+
+  it('starts on the user’s default storage space', async () => {
+    server.use(
+      http.get('/api/v1/storage-spaces', () => HttpResponse.json(page([fridge, { ...freezer, is_default: true }]))),
+    )
+    renderApp('/inventory/new')
+
+    await waitFor(() => expect(screen.getByLabelText('Storage space')).toHaveValue(freezer.id))
   })
 
   it('highlights the row the backend rejected (item_index) and keeps the whole batch', async () => {

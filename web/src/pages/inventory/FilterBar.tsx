@@ -9,7 +9,7 @@ export interface InventoryFilters {
   spaceId: string | null
   categoryId: string | null
   status: InventoryStatus | 'ALL'
-  /** Expiring within 3 days, including items already past their date. */
+  /** Expiring within the user's "expiring soon" window, including items already past their date. */
   expiringSoon: boolean
 }
 
@@ -31,6 +31,8 @@ interface FilterBarProps {
   filters: InventoryFilters
   spaces: StorageSpace[]
   categories: ItemCategory[]
+  /** How many days ahead "expiring soon" looks (the user's reminder preference). */
+  soonDays: number
   /** How many items each chip would show; undefined while still loading. */
   counts: FilterCounts
   onChange: (change: Partial<InventoryFilters>) => void
@@ -44,7 +46,7 @@ function withCount(label: string, count: number | undefined) {
 }
 
 /** The row of filters under the page header. */
-export function FilterBar({ filters, spaces, categories, counts, onChange, onRetryCategories }: FilterBarProps) {
+export function FilterBar({ filters, spaces, categories, soonDays, counts, onChange, onRetryCategories }: FilterBarProps) {
   return (
     <div className={styles.bar}>
       <div role="group" aria-label="Storage space" className={styles.group}>
@@ -86,7 +88,7 @@ export function FilterBar({ filters, spaces, categories, counts, onChange, onRet
         selected={filters.expiringSoon}
         onClick={() => onChange({ expiringSoon: !filters.expiringSoon })}
       >
-        {withCount('Expiring ≤ 3 days', counts.expiringSoon)}
+        {withCount(`Expiring ≤ ${soonDays} ${soonDays === 1 ? 'day' : 'days'}`, counts.expiringSoon)}
       </ChipButton>
     </div>
   )

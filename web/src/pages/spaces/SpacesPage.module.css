@@ -40,6 +40,17 @@
   color: var(--sf-text);
 }
 
+.defaultTag {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--sf-fresh-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--sf-fresh-bg);
+  font-size: var(--sf-text-xs);
+  font-weight: 600;
+  color: var(--sf-fresh);
+}
+
 .created {
   display: block;
   font-size: 11.5px;
