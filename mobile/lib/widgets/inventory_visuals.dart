@@ -230,61 +230,88 @@ class InventoryItemTile extends StatelessWidget {
             border: Border.all(color: const Color(0xFFA8D589)),
             borderRadius: BorderRadius.circular(13),
           ),
-          child: Row(
-            children: [
-              InventoryArtwork(item: item, size: 59),
-              const SizedBox(width: 10),
-              Container(width: 1, height: 58, color: const Color(0xFFA8D589)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.itemDefinitionName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(height: 9),
-                    Row(
-                      children: [
-                        Flexible(
-                          child: QuantityBadge(
-                            text: quantityLabel(item),
-                            estimated: item.isEstimated,
-                          ),
-                        ),
-                        const Text(
-                          ' | ',
-                          style: TextStyle(color: AppColors.muted),
-                        ),
-                        Flexible(
-                          child: Text(
-                            item.storageSpaceName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.muted,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 4),
-              InventoryCardTrailing(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact =
+                  constraints.maxWidth < 300 ||
+                  (MediaQuery.textScalerOf(context).scale(16) > 19 &&
+                      constraints.maxWidth < 380);
+              final trailing = InventoryCardTrailing(
                 expiryText: expiryLabel(item.expiryDate),
                 expiryColor: expiryColor(
                   item.expiryDate,
                   daysBefore: ExpiryDisplayScope.daysBeforeExpiryOf(context),
                 ),
                 action: selectionControl,
-              ),
-            ],
+              );
+              final quantity = QuantityBadge(
+                text: quantityLabel(item),
+                estimated: item.isEstimated,
+              );
+              final storage = Text(
+                item.storageSpaceName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.muted, fontSize: 14),
+              );
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      InventoryArtwork(item: item, size: 59),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 1,
+                        height: 58,
+                        color: const Color(0xFFA8D589),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.itemDefinitionName,
+                              maxLines: compact ? 2 : 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(height: 9),
+                            if (compact)
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [quantity, storage],
+                              )
+                            else
+                              Row(
+                                children: [
+                                  Flexible(child: quantity),
+                                  const Text(
+                                    ' | ',
+                                    style: TextStyle(color: AppColors.muted),
+                                  ),
+                                  Flexible(child: storage),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (!compact) ...[const SizedBox(width: 4), trailing],
+                    ],
+                  ),
+                  if (compact)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: trailing,
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ),

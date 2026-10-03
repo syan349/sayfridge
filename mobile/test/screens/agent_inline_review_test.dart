@@ -6,15 +6,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/testing.dart';
 import 'package:sayfridge/models/agent_image.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
+import 'package:sayfridge/repositories/auth_repository.dart';
+import 'package:sayfridge/screens/sign_in_screen.dart';
+import 'package:sayfridge/screens/inventory_detail_screen.dart';
 import 'package:sayfridge/screens/agent_conversation_screen.dart';
 import 'package:sayfridge/services/api_client.dart';
+import 'package:sayfridge/services/auth_api_service.dart';
 import 'package:sayfridge/services/voice_input_service.dart';
 import 'package:sayfridge/state/agent_controller.dart';
+import 'package:sayfridge/state/auth_controller.dart';
 import 'package:sayfridge/theme/app_theme.dart';
 import 'package:sayfridge/widgets/assistant_widgets.dart';
+import 'package:sayfridge/widgets/inventory_visuals.dart';
 
 import '../support/integration_fixtures.dart';
 
@@ -30,7 +37,7 @@ Future<void> _capture(WidgetTester tester, String name) async {
           .map(
             (widget) => precacheImage(
               widget.image,
-              tester.element(find.byType(AgentConversationScreen)),
+              tester.element(find.byKey(_captureKey)),
             ),
           ),
     ),
@@ -74,11 +81,24 @@ Map<String, dynamic> _proposal({String? missing}) => {
 };
 
 class _Harness {
-  _Harness(Map<String, dynamic> proposal, {String? reply}) {
+  _Harness(
+    Map<String, dynamic> proposal, {
+    String? reply,
+    Map<String, dynamic>? query,
+  }) {
     item = proposal;
     api = ApiClient(
       client: MockClient((request) async {
         if (request.method == 'GET') {
+          if (request.url.path.contains('/inventory-items/')) {
+            detailReads.add(request.url.path);
+            expect(request.headers['authorization'], 'Bearer test-token');
+            return jsonResponse(
+              (query!['items'] as List).firstWhere(
+                (row) => row['id'] == request.url.path.split('/').last,
+              ),
+            );
+          }
           final options = request.url.path.endsWith('storage-spaces')
               ? [
                   {'id': 'fridge', 'name': 'Fridge'},
@@ -121,6 +141,7 @@ class _Harness {
                   : 'WAITING_INPUT',
               'interrupt_id': 'review',
               'items': [if (item.isNotEmpty) item],
+              'inventory_query': ?query,
             },
           },
         ]);
@@ -136,6 +157,7 @@ class _Harness {
   late final ApiClient api;
   late final AgentController agent;
   final posts = <Map<String, dynamic>>[];
+  final detailReads = <String>[];
 
   Future<void> open(
     WidgetTester tester, {
@@ -238,6 +260,7 @@ class _ReviewVoice implements VoiceInputService {
 }
 
 void main() {
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   setUpAll(() async {
     if (Platform.environment['ASSISTANT_CAPTURE_DIR'] == null) return;
     final text = FontLoader('Arial')
@@ -252,6 +275,81 @@ void main() {
       ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
     await Future.wait([text.load(), icons.load()]);
   });
+
+  testWidgets(
+    'inventory queries show real batches and open the selected authenticated detail',
+    (tester) async {
+      final harness = _Harness(
+        {},
+        reply: 'Here’s what’s currently in your fridge.',
+        query: {
+          'items': [
+            stockJson(),
+            {
+              ...stockJson(),
+              'id': 'item-2',
+              'item_definition_name': 'Apples',
+              'estimated_current_amount': '4',
+              'estimated_current_unit': 'each',
+              'estimated_at': '2026-10-03T01:00:00Z',
+              'display_amount': '4',
+              'display_unit': 'each',
+              'is_estimated': true,
+            },
+          ],
+          'total': 2,
+          'has_more': false,
+        },
+      );
+      await harness.open(
+        tester,
+        command: 'What is in my fridge?',
+        size: const Size(320, 568),
+        textScale: 1.3,
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('assistant-inventory-item-2')),
+      );
+      expect(find.byType(InventoryDetailScreen), findsOneWidget);
+      expect(harness.detailReads, ['/api/v1/inventory-items/item-2']);
+      expect(harness.posts, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'reports keep the wide document layout while queries expose partial results',
+    (tester) async {
+      final harness = _Harness(
+        {},
+        reply: 'Here is the first matching batch.',
+        query: {
+          'items': [stockJson()],
+          'total': 6,
+          'has_more': true,
+        },
+      );
+      await harness.open(tester, command: 'Find milk');
+      expect(find.byType(InventoryItemTile), findsOneWidget);
+      expect(
+        find.text('Showing 1 of 6 matching batches. See Inventory for more.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('assistant-document-card')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      final report = _Harness(
+        {},
+        reply:
+            'Here’s your report.\n\n## Inventory report\n\n### Fridge\n1. **Milk** — 2 L',
+      );
+      await report.open(tester, command: 'Generate an inventory report');
+      expect(find.byKey(const Key('assistant-document-card')), findsOneWidget);
+      expect(find.byType(InventoryItemTile), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'spoken clarification stays editable and submits only the pending item on Confirm',
@@ -448,209 +546,297 @@ void main() {
     },
   );
 
-  testWidgets('capture response states for layout review without live inventory writes', (
-    tester,
-  ) async {
-    if (Platform.environment['ASSISTANT_CAPTURE_DIR'] == null) return;
-    final add = <String, dynamic>{
-      ..._proposal(),
-      'original_text': 'Add 2 kg of apples to the fridge',
-      'preview': {
-        'draft': {
-          'quantity_value': '2',
-          'quantity_unit': 'kg',
-          'expiry_date': '2026-10-10',
+  testWidgets(
+    'capture response states for layout review without live inventory writes',
+    (tester) async {
+      if (Platform.environment['ASSISTANT_CAPTURE_DIR'] == null) return;
+      final add = <String, dynamic>{
+        ..._proposal(),
+        'original_text': 'Add 2 kg of apples to the fridge',
+        'preview': {
+          'draft': {
+            'quantity_value': '2',
+            'quantity_unit': 'kg',
+            'expiry_date': '2026-10-10',
+          },
+          'after': {
+            'confirmed_current_amount': '2',
+            'confirmed_current_unit': 'kg',
+          },
+          'calculation_method': 'EXACT',
         },
-        'after': {
-          'confirmed_current_amount': '2',
-          'confirmed_current_unit': 'kg',
+      };
+      final modify = <String, dynamic>{
+        'item_id': 'milk',
+        'proposal_id': 'milk-1',
+        'status': 'NEEDS_CONFIRMATION',
+        'original_text': 'I consumed 500 ml of milk',
+        'display': {
+          'item_name': 'Milk',
+          'space_name': 'Fridge',
+          'category_name': 'Dairy',
         },
-        'calculation_method': 'EXACT',
-      },
-    };
-    final modify = <String, dynamic>{
-      'item_id': 'milk',
-      'proposal_id': 'milk-1',
-      'status': 'NEEDS_CONFIRMATION',
-      'original_text': 'I consumed 500 ml of milk',
-      'display': {
-        'item_name': 'Milk',
-        'space_name': 'Fridge',
-        'category_name': 'Dairy',
-      },
-      'preview': {
-        'draft': {'quantity_value': '500', 'quantity_unit': 'ml'},
-        'before': {
-          'confirmed_current_amount': '2',
-          'confirmed_current_unit': 'L',
+        'preview': {
+          'draft': {'quantity_value': '500', 'quantity_unit': 'ml'},
+          'before': {
+            'confirmed_current_amount': '2',
+            'confirmed_current_unit': 'L',
+          },
+          'after': {
+            'confirmed_current_amount': '1.5',
+            'confirmed_current_unit': 'L',
+          },
+          'calculation_method': 'EXACT',
         },
-        'after': {
-          'confirmed_current_amount': '1.5',
-          'confirmed_current_unit': 'L',
+      };
+      final missing = <String, dynamic>{
+        'item_id': 'milk',
+        'proposal_id': 'milk-unknown',
+        'status': 'NEEDS_INPUT',
+        'original_text': 'I consumed 3 cups of milk',
+        'display': {
+          'item_name': 'Milk',
+          'question':
+              'How much milk does one cup hold? You can use a measurement or the amount on the packaging.',
         },
-        'calculation_method': 'EXACT',
-      },
-    };
-    final missing = <String, dynamic>{
-      'item_id': 'milk',
-      'proposal_id': 'milk-unknown',
-      'status': 'NEEDS_INPUT',
-      'original_text': 'I consumed 3 cups of milk',
-      'display': {
-        'item_name': 'Milk',
-        'question':
-            'How much milk does one cup hold? You can use a measurement or the amount on the packaging.',
-      },
-      'error': {
-        'code': 'REESTIMATE',
-        'message':
-            'Provide unit_relationship with a ratio and its source; do not calculate final balances',
-      },
-    };
-    for (final scenario
-        in <({String name, String command, Map<String, dynamic> item})>[
-          (
-            name: '01-add-review',
-            command: 'Add 2 kg of apples to the fridge',
-            item: add,
-          ),
-          (
-            name: '02-add-saved',
-            command: 'Add 2 kg of apples to the fridge',
-            item: {...add, 'status': 'SUCCEEDED'},
-          ),
-          (
-            name: '03-modify-review',
-            command: 'I consumed 500 ml of milk',
-            item: modify,
-          ),
-          (
-            name: '04-modify-saved',
-            command: 'I consumed 500 ml of milk',
-            item: {...modify, 'status': 'SUCCEEDED'},
-          ),
-          (
-            name: '05-missing-voice',
-            command: 'I consumed 3 cups of milk',
-            item: missing,
-          ),
-          (
-            name: '11-save-failed',
-            command: 'Add 2 kg of apples to the fridge',
-            item: {
-              ...add,
-              'status': 'FAILED',
-              'error': {
-                'code': 'VALIDATION_ERROR',
-                'message':
-                    'This change could not be saved. Please check the quantity and try again.',
-              },
-            },
-          ),
-          (
-            name: '12-cancelled',
-            command: 'I consumed 500 ml of milk',
-            item: {...modify, 'status': 'CANCELLED'},
-          ),
-          (
-            name: '13-choose-batch',
-            command: 'I consumed 500 ml of milk',
-            item: {
-              ...missing,
-              'original_text': 'I consumed 500 ml of milk',
-              'display': {
-                'item_name': 'Milk',
-                'question': 'Which batch of milk did you use?',
-              },
-              'error': {
-                'code': 'ITEM_REQUIRED',
-                'message': 'Choose a batch',
-                'details': {
-                  'candidates': [
-                    {
-                      'id': 'milk-fridge',
-                      'item_definition_name': 'Milk',
-                      'storage_space_name': 'Fridge',
-                      'confirmed_current_amount': '2',
-                      'confirmed_current_unit': 'L',
-                    },
-                    {
-                      'id': 'milk-freezer',
-                      'item_definition_name': 'Milk',
-                      'storage_space_name': 'Freezer',
-                      'confirmed_current_amount': '1',
-                      'confirmed_current_unit': 'L',
-                    },
-                  ],
+        'error': {
+          'code': 'REESTIMATE',
+          'message':
+              'Provide unit_relationship with a ratio and its source; do not calculate final balances',
+        },
+      };
+      for (final scenario
+          in <({String name, String command, Map<String, dynamic> item})>[
+            (
+              name: '01-add-review',
+              command: 'Add 2 kg of apples to the fridge',
+              item: add,
+            ),
+            (
+              name: '02-add-saved',
+              command: 'Add 2 kg of apples to the fridge',
+              item: {...add, 'status': 'SUCCEEDED'},
+            ),
+            (
+              name: '03-modify-review',
+              command: 'I consumed 500 ml of milk',
+              item: modify,
+            ),
+            (
+              name: '04-modify-saved',
+              command: 'I consumed 500 ml of milk',
+              item: {...modify, 'status': 'SUCCEEDED'},
+            ),
+            (
+              name: '05-missing-voice',
+              command: 'I consumed 3 cups of milk',
+              item: missing,
+            ),
+            (
+              name: '11-save-failed',
+              command: 'Add 2 kg of apples to the fridge',
+              item: {
+                ...add,
+                'status': 'FAILED',
+                'error': {
+                  'code': 'VALIDATION_ERROR',
+                  'message':
+                      'This change could not be saved. Please check the quantity and try again.',
                 },
               },
-            },
+            ),
+            (
+              name: '12-cancelled',
+              command: 'I consumed 500 ml of milk',
+              item: {...modify, 'status': 'CANCELLED'},
+            ),
+            (
+              name: '13-choose-batch',
+              command: 'I consumed 500 ml of milk',
+              item: {
+                ...missing,
+                'original_text': 'I consumed 500 ml of milk',
+                'display': {
+                  'item_name': 'Milk',
+                  'question': 'Which batch of milk did you use?',
+                },
+                'error': {
+                  'code': 'ITEM_REQUIRED',
+                  'message': 'Choose a batch',
+                  'details': {
+                    'candidates': [
+                      {
+                        'id': 'milk-fridge',
+                        'item_definition_name': 'Milk',
+                        'storage_space_name': 'Fridge',
+                        'confirmed_current_amount': '2',
+                        'confirmed_current_unit': 'L',
+                      },
+                      {
+                        'id': 'milk-freezer',
+                        'item_definition_name': 'Milk',
+                        'storage_space_name': 'Freezer',
+                        'confirmed_current_amount': '1',
+                        'confirmed_current_unit': 'L',
+                      },
+                    ],
+                  },
+                },
+              },
+            ),
+          ]) {
+        await tester.pumpWidget(const SizedBox.shrink());
+        final harness = _Harness(scenario.item);
+        await harness.open(tester, command: scenario.command);
+        await _capture(tester, scenario.name);
+        if (scenario.name == '05-missing-voice') {
+          await _tap(tester, _inlineControl(find.byTooltip('Type a message')));
+          await tester.enterText(
+            find.byKey(const Key('proposal-response-text')),
+            'One cup holds 250 ml, measured with my measuring cup.',
+          );
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          await _capture(tester, '06-missing-keyboard');
+        }
+        if (scenario.name == '03-modify-review') {
+          await _tap(tester, find.text('Edit details'));
+          await _tap(tester, find.text('Describe another detail'));
+          await _capture(tester, '07-edit-voice');
+          await _tap(tester, _inlineControl(find.byTooltip('Type a message')));
+          await tester.enterText(
+            find.byKey(const Key('proposal-response-text')),
+            'I used 300 ml, not 500 ml.',
+          );
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          await _capture(tester, '14-edit-keyboard');
+        }
+        expect(tester.takeException(), isNull);
+        expect(harness.posts, isEmpty);
+      }
+      final documents =
+          <
+            ({
+              String name,
+              String command,
+              String reply,
+              Map<String, dynamic>? query,
+            })
+          >[
+            (
+              name: '08-inventory-query',
+              command: 'What is in my fridge?',
+              reply: 'Here’s what’s currently in your fridge.',
+              query: {
+                'items': [
+                  {
+                    ...stockJson(amount: '2'),
+                    'id': 'milk',
+                    'item_definition_name': 'Whole Milk',
+                    'storage_space_name': 'BoschFridge',
+                    'display_unit': 'L',
+                    'expiry_date': '2026-10-01',
+                  },
+                  {
+                    ...stockJson(amount: '4'),
+                    'id': 'apples',
+                    'item_definition_name': 'Apples',
+                    'category_name': 'Fruit',
+                    'storage_space_name': 'BoschFridge',
+                    'display_unit': 'each',
+                    'expiry_date': '2026-10-05',
+                    'is_estimated': true,
+                    'estimated_current_amount': '4',
+                    'estimated_current_unit': 'each',
+                    'estimated_at': '2026-10-03T01:00:00Z',
+                  },
+                  {
+                    ...stockJson(amount: '3'),
+                    'id': 'eggs',
+                    'item_definition_name': 'Chicken Eggs',
+                    'category_name': 'Eggs',
+                    'storage_space_name': 'BoschFridge',
+                    'display_unit': 'each',
+                    'expiry_date': '2026-10-06',
+                  },
+                  {
+                    ...stockJson(amount: '2'),
+                    'id': 'tomatoes',
+                    'item_definition_name': 'Tomatoes',
+                    'category_name': 'Vegetables',
+                    'storage_space_name': 'BoschFridge',
+                    'display_unit': 'each',
+                    'expiry_date': '2026-10-09',
+                  },
+                ],
+                'total': 4,
+                'has_more': false,
+                'as_of': '2026-10-03',
+              },
+            ),
+            (
+              name: '09-inventory-report',
+              command: 'Generate an inventory report',
+              query: null,
+              reply:
+                  'Here’s your inventory report.\n\n## Inventory report\n\n**6 in-stock batches** across 2 storage spaces.\n\n### Fridge\n- **Milk** — 1.5 L, expires Oct 6.\n- **Apples** — 2 kg, expires Oct 10.\n- **Eggs** — 6 pieces, expires Oct 12.\n\n### Pantry\n- **Rice** — 1 kg.\n- **Pasta** — 500 g.\n- **Olive oil** — estimated 400 ml.\n\n### Use first\n**Milk** expires soon. Consider using it for breakfast or cooking.\n\n### Other records\n- **Yoghurt** — empty.\n- **Bread** — discarded.',
+            ),
+          ];
+      for (final document in documents) {
+        await tester.pumpWidget(const SizedBox.shrink());
+        final harness = _Harness(
+          {},
+          reply: document.reply,
+          query: document.query,
+        );
+        await harness.open(tester, command: document.command);
+        final position = tester
+            .state<ScrollableState>(find.byType(Scrollable).first)
+            .position;
+        position.jumpTo(0);
+        await tester.pumpAndSettle();
+        await _capture(tester, document.name);
+        if (document.name == '09-inventory-report') {
+          position.jumpTo(position.maxScrollExtent);
+          await tester.pumpAndSettle();
+          await _capture(tester, '10-report-bottom');
+        }
+        expect(harness.agent.items, isEmpty);
+        expect(harness.posts, isEmpty);
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      final authApi = ApiClient(
+        client: MockClient((_) async => jsonResponse({})),
+      );
+      final auth = AuthController(
+        AuthRepository(AuthApiService(authApi), MemoryTokens()),
+      );
+      addTearDown(authApi.close);
+      addTearDown(auth.dispose);
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: _captureKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.only(top: 47, bottom: 34),
+                devicePixelRatio: 2,
+              ),
+              child: child!,
+            ),
+            home: SignInScreen(authController: auth),
           ),
-        ]) {
-      await tester.pumpWidget(const SizedBox.shrink());
-      final harness = _Harness(scenario.item);
-      await harness.open(tester, command: scenario.command);
-      await _capture(tester, scenario.name);
-      if (scenario.name == '05-missing-voice') {
-        await _tap(tester, _inlineControl(find.byTooltip('Type a message')));
-        await tester.enterText(
-          find.byKey(const Key('proposal-response-text')),
-          'One cup holds 250 ml, measured with my measuring cup.',
-        );
-        FocusManager.instance.primaryFocus?.unfocus();
-        await tester.pumpAndSettle();
-        await _capture(tester, '06-missing-keyboard');
-      }
-      if (scenario.name == '03-modify-review') {
-        await _tap(tester, find.text('Edit details'));
-        await _tap(tester, find.text('Describe another detail'));
-        await _capture(tester, '07-edit-voice');
-        await _tap(tester, _inlineControl(find.byTooltip('Type a message')));
-        await tester.enterText(
-          find.byKey(const Key('proposal-response-text')),
-          'I used 300 ml, not 500 ml.',
-        );
-        FocusManager.instance.primaryFocus?.unfocus();
-        await tester.pumpAndSettle();
-        await _capture(tester, '14-edit-keyboard');
-      }
-      expect(tester.takeException(), isNull);
-      expect(harness.posts, isEmpty);
-    }
-    final documents = <({String name, String command, String reply})>[
-      (
-        name: '08-inventory-query',
-        command: 'What is in my fridge?',
-        reply:
-            'Your fridge has **3 in-stock batches**:\n\n- **Milk** — 1.5 L, expires Oct 6.\n- **Apples** — 2 kg, expires Oct 10.\n- **Eggs** — 6 pieces, expires Oct 12.\n\nMilk expires first, so try to use it soon.',
-      ),
-      (
-        name: '09-inventory-report',
-        command: 'Generate an inventory report',
-        reply:
-            'Here’s your inventory report.\n\n## Inventory report\n\n**6 in-stock batches** across 2 storage spaces.\n\n### Fridge\n- **Milk** — 1.5 L, expires Oct 6.\n- **Apples** — 2 kg, expires Oct 10.\n- **Eggs** — 6 pieces, expires Oct 12.\n\n### Pantry\n- **Rice** — 1 kg.\n- **Pasta** — 500 g.\n- **Olive oil** — estimated 400 ml.\n\n### Use first\n**Milk** expires soon. Consider using it for breakfast or cooking.\n\n### Other records\n- **Yoghurt** — empty.\n- **Bread** — discarded.',
-      ),
-    ];
-    for (final document in documents) {
-      await tester.pumpWidget(const SizedBox.shrink());
-      final harness = _Harness({}, reply: document.reply);
-      await harness.open(tester, command: document.command);
-      final position = tester
-          .state<ScrollableState>(find.byType(Scrollable).first)
-          .position;
-      position.jumpTo(0);
+        ),
+      );
       await tester.pumpAndSettle();
-      await _capture(tester, document.name);
-      if (document.name == '09-inventory-report') {
-        position.jumpTo(position.maxScrollExtent);
-        await tester.pumpAndSettle();
-        await _capture(tester, '10-report-bottom');
-      }
-      expect(harness.agent.items, isEmpty);
-      expect(harness.posts, isEmpty);
+      await _capture(tester, '15-sign-in');
       expect(tester.takeException(), isNull);
-    }
-  });
+    },
+  );
 
   testWidgets(
     'portrait and landscape photos preserve their ratio and align with the bubble body',

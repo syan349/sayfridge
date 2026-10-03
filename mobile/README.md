@@ -41,6 +41,15 @@ owns Render settings, APK build/install and release publication.
 
 ## Interaction and state
 
+Inventory queries show a short Assistant introduction followed by the existing
+inventory cards, with quantity, estimate styling, expiry and storage space. Tapping
+a card opens its authenticated batch detail. Query snapshots are saved with their
+reply across history/recovery; generated reports keep their wide document card and
+number items separately within each storage space, restarting at 1. The structured
+`inventory_query` reply requires the matching backend update; older backends keep
+their text replies. Inline clarification voice/keyboard fields use a thin border,
+12px corners and no shadow; the main composer keeps its existing style.
+
 Home, inventory/spaces, quantity operations, expiry and Assistant use real APIs.
 The Assistant and Daily Check-in share `AgentInputPanel`: hold the speech region
 to recognize English (`en-US`), release to await editable text, slide up to cancel,

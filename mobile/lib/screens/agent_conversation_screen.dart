@@ -4,18 +4,24 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:image_picker/image_picker.dart';
 
 import '../models/agent_input_draft.dart';
+import '../models/inventory_item.dart';
 import '../models/item_artwork_palette.dart';
+import '../repositories/inventory_repository.dart';
+import '../services/inventory_api_service.dart';
 import '../services/voice_input_service.dart';
 import '../state/agent_controller.dart';
+import '../state/inventory_detail_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/agent_input_panel.dart';
 import '../widgets/app_background.dart';
 import '../widgets/assistant_widgets.dart';
+import '../widgets/assistant_inventory_reply.dart';
 import '../widgets/assistant_welcome.dart';
 import '../widgets/assistant_scroll_layout.dart';
 import '../widgets/inventory_visuals.dart';
 import '../widgets/agent_proposal_options.dart';
 import 'conversation_history_screen.dart';
+import 'inventory_detail_screen.dart';
 
 class AgentConversationScreen extends StatefulWidget {
   const AgentConversationScreen({
@@ -164,6 +170,24 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     return widget.controller.error == null;
   }
 
+  void _openInventoryItem(InventoryItem item) {
+    final workspace = widget.controller.workspace;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => InventoryDetailScreen(
+          itemId: item.id,
+          controller: InventoryDetailController(
+            InventoryRepository(
+              InventoryApiService(workspace.client),
+              workspace.tokens,
+            ),
+            workspace: workspace,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _messageFor(String text) {
     final footer = _footerKey.currentContext?.findRenderObject() as RenderBox?;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -299,6 +323,15 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                                 agent.messageImages[message
                                                     .key] ??
                                                 const [],
+                                          )
+                                        : agent.inventoryQueries.containsKey(
+                                            message.key,
+                                          )
+                                        ? AssistantInventoryReply(
+                                            message: message.value,
+                                            query: agent
+                                                .inventoryQueries[message.key]!,
+                                            onItemTap: _openInventoryItem,
                                           )
                                         : AssistantReply(
                                             textStyle: exampleMessageStyle,

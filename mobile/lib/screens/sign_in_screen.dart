@@ -124,6 +124,8 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return AuthScaffold(
       child: AuthContent(
+        // Extra space below lifts the centered form by 40 logical pixels.
+        padding: const EdgeInsets.fromLTRB(28, 10, 28, 108),
         child: AutofillGroup(
           child: Form(
             key: _formKey,

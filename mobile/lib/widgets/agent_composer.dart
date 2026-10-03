@@ -232,15 +232,21 @@ class _AgentComposerState extends State<AgentComposer> {
     ),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(32),
-      border: Border.all(color: const Color(0xFFE5E7E1)),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x26000000),
-          blurRadius: 10,
-          offset: Offset(0, 5),
-        ),
-      ],
+      borderRadius: BorderRadius.circular(widget.inline ? 12 : 32),
+      border: Border.all(
+        color: widget.inline
+            ? const Color(0xFFB8C7A8)
+            : const Color(0xFFE5E7E1),
+      ),
+      boxShadow: widget.inline
+          ? null
+          : const [
+              BoxShadow(
+                color: Color(0x26000000),
+                blurRadius: 10,
+                offset: Offset(0, 5),
+              ),
+            ],
     ),
     child: _typing || widget.waiting
         ? widget.inline

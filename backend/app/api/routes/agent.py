@@ -223,6 +223,7 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
                 "image_task_active": bool(payload.images) or values.get("image_task_active", False),
                 "request_fingerprint": digest, "items": [], "pending_input": [],
                 "execution_results": [], "events": [], "final_only": False,
+                "inventory_reads": {}, "inventory_query": None,
                 "resume_requests": values.get("resume_requests", {})}
         as_of = payload.as_of or (date.fromisoformat(values["as_of"]) if snapshot.next and values.get("as_of") else None)
         context = AgentContext(user_id=user.id, as_of=as_of, conversation_id=conversation_id, user_message=payload.message)

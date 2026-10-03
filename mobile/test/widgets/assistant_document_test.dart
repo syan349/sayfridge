@@ -11,8 +11,11 @@ void main() {
       'Here is your report.\n\n$content',
     )!;
     expect(document.introduction, 'Here is your report.');
-    expect(document.content, content);
-    expect(AssistantDocument.fromMessage(content)!.content, content);
+    expect(
+      document.content,
+      '## Inventory report\n\n1. **Milk** — estimated 2 L',
+    );
+    expect(AssistantDocument.fromMessage(content)!.content, document.content);
     expect(
       AssistantDocument.fromMessage('Which storage space should I check?'),
       isNull,
@@ -31,7 +34,7 @@ void main() {
       'There are 2 in-stock batches:\n- Fridge: Milk — 2 L\n- Pantry: Rice — 1 kg',
     );
     expect(legacy, isNotNull);
-    expect(legacy!.content, contains('Milk — 2 L'));
+    expect(legacy!.content, contains('1. **Milk** — 2 L'));
     expect(
       AssistantDocument.fromMessage(
         '以下是你的食谱。\n\n## 番茄鸡蛋\n\n1. 煮熟。',
@@ -39,6 +42,59 @@ void main() {
       '以下是你的食谱。',
     );
   });
+
+  test(
+    'old reports number each item and restart for every space without merging amounts',
+    () {
+      final report = AssistantDocument.fromMessage(
+        'There are 12 in-stock batches:\n\n'
+        '- Arctic Box: Chicken Breast — 0.8 kg (expired Sep 27); apple — 5 pics.\n'
+        '- BoschFridge: Whole Milk — 2 L (expired Oct 1); Apples — estimated 4 each; Chicken Eggs — 3 each and 5 pieces; Tomatoes — 2 each and 2 pieces.\n'
+        '- Pantry Potter: Carrots — 1.6 kg; Rice — 1 kg and 1.5 kg; Apples — 2.3 kg.\n\n'
+        'Also recorded: Greek Yoghurt is empty, Chocolate is discarded, and Olive Oil is archived.',
+      )!;
+      expect(
+        report.content,
+        contains(
+          '### Arctic Box\n\n1. **Chicken Breast** — 0.8 kg (expired Sep 27)\n2. **apple** — 5 pics.',
+        ),
+      );
+      expect(
+        report.content,
+        contains(
+          '### BoschFridge\n\n1. **Whole Milk** — 2 L (expired Oct 1)\n2. **Apples** — estimated 4 each\n3. **Chicken Eggs** — 3 each and 5 pieces\n4. **Tomatoes** — 2 each and 2 pieces.',
+        ),
+      );
+      expect(
+        report.content,
+        contains(
+          '### Pantry Potter\n\n1. **Carrots** — 1.6 kg\n2. **Rice** — 1 kg and 1.5 kg\n3. **Apples** — 2.3 kg.',
+        ),
+      );
+      expect(
+        report.content,
+        contains(
+          '### Other records\n\n1. Greek Yoghurt is empty\n2. Chocolate is discarded\n3. Olive Oil is archived.',
+        ),
+      );
+      final recipe = '## Dinner recipe\n\n### Prepare\n3. Chop\n4. Cook';
+      expect(AssistantDocument.fromMessage(recipe)!.content, recipe);
+    },
+  );
+
+  test(
+    'modern report item labels stay items instead of becoming storage headings',
+    () {
+      final report = AssistantDocument.fromMessage(
+        '## Inventory report\n\n### Fridge\n- **Milk**: 2 L\n- Eggs: 3 each\n\n### Pantry\n8. Rice — 1 kg',
+      )!;
+      expect(
+        report.content,
+        contains('### Fridge\n1. **Milk**: 2 L\n2. Eggs: 3 each'),
+      );
+      expect(report.content, contains('### Pantry\n1. **Rice** — 1 kg'));
+    },
+  );
 
   testWidgets(
     'generated reports use full-width cards while short replies keep bubbles',

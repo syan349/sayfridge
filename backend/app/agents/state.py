@@ -36,6 +36,8 @@ class AgentState(TypedDict):
     completed_items: list[dict]
     unresolved_reply: dict | None
     revision_scope: list[str] | None
+    inventory_reads: dict
+    inventory_query: dict | None
 
 
 @dataclass(frozen=True, slots=True)
