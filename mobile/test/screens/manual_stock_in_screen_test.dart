@@ -219,6 +219,7 @@ void main() {
     expect(ItemIcon.forName('fresh APPLES'), endsWith('/apple.png'));
     expect(ItemIcon.forName('Whole milk'), endsWith('/milk.png'));
     expect(ItemIcon.forName('Chicken breast'), endsWith('/chicken_breast.png'));
+    expect(ItemIcon.forName('Chicken Eggs'), endsWith('/eggs.png'));
     expect(ItemIcon.forName('Eggplant'), endsWith('/eggplant.png'));
     expect(ItemIcon.forName('Pineapple'), ItemIcon.defaultAsset);
     expect(ItemIcon.forName('苹果'), endsWith('/apple.png'));

@@ -103,12 +103,14 @@ class ApiClient {
     String path, {
     required Map<String, dynamic> body,
     required String accessToken,
+    bool inventoryCards = false,
   }) async* {
     Future<http.StreamedResponse> open(String token) async {
       final request = http.Request('POST', ApiConfig.buildUri(path))
         ..headers.addAll({
           ..._headers(accessToken: token),
           'Accept': 'text/event-stream',
+          if (inventoryCards) 'X-SayFridge-Inventory-Cards': '1',
         })
         ..body = jsonEncode(body);
       return _client.send(request).timeout(ApiConfig.requestTimeout);

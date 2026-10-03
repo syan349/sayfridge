@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 from langchain_core.messages import ToolMessage
 
-from app.agents.inventory_results import capture_inventory_read, select_inventory_results
+from app.agents.inventory_results import capture_inventory_read, select_inventory_results, inventory_history_text
 from app.schemas.agent_actions import AgentConversationState
 
 
@@ -64,3 +64,12 @@ def test_overlapping_filters_do_not_double_count_batches():
     result = select_inventory_results({"a": read([item]), "b": read([item], args={"q": "milk"})}, ["a", "b"], None)
     assert len(result["items"]) == 1
     assert result["total"] is None and result["has_more"] is False
+
+
+def test_text_history_keeps_card_facts_without_internal_identifiers():
+    item = stock(estimated=True)
+    query = select_inventory_results({"read": read([item], total=3)}, ["read"], None)
+    text = inventory_history_text(query)
+    assert "Milk — estimated 1.5 L; Fridge (expiry: 2026-10-05)" in text
+    assert "Showing 1 of 3 matching batches." in text
+    assert item["id"] not in text and item["storage_space_id"] not in text

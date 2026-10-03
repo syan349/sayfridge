@@ -45,3 +45,20 @@ def select_inventory_results(reads, source_ids, as_of):
     total = next(iter(groups.values()))["total"] if len(groups) == 1 else None
     return AgentInventoryQuery(items=list(items.values()), total=total, as_of=as_of,
         has_more=any(len(g["items"]) < g["total"] for g in groups.values())).model_dump(mode="json")
+
+
+def inventory_history_text(query):
+    """Keep public history readable by clients that render text rather than cards."""
+    lines = []
+    for number, row in enumerate(query["items"], 1):
+        estimate = "estimated " if row["is_estimated"] else ""
+        line = f"{number}. {row['item_definition_name']} — {estimate}{row['display_amount']} {row['display_unit']}; {row['storage_space_name']}"
+        if row["expiry_date"]:
+            line += f" (expiry: {row['expiry_date']})"
+        if row["status"] != "IN_STOCK":
+            line += f" [{row['status']}]"
+        lines.append(line)
+    if query["has_more"]:
+        total = query.get("total")
+        lines.append(f"Showing {len(query['items'])} of {total} matching batches." if total is not None else "More matching batches are available.")
+    return "\n".join(lines)

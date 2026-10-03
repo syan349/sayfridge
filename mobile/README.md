@@ -47,7 +47,9 @@ a card opens its authenticated batch detail. Query snapshots are saved with thei
 reply across history/recovery; generated reports keep their wide document card and
 number items separately within each storage space, restarting at 1. The structured
 `inventory_query` reply requires the matching backend update; older backends keep
-their text replies. Inline clarification voice/keyboard fields use a thin border,
+their text replies. Assistant SSE requests opt in with
+`X-SayFridge-Inventory-Cards: 1`; other clients keep their full text query answers.
+Inline clarification voice/keyboard fields use a thin border,
 12px corners and no shadow; the main composer keeps its existing style.
 
 Home, inventory/spaces, quantity operations, expiry and Assistant use real APIs.

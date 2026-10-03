@@ -50,3 +50,4 @@ class AgentContext:
     cache: dict = field(default_factory=dict)
     user_message: str = ""
     memory_cache: dict = field(default_factory=dict)
+    inventory_cards: bool = False

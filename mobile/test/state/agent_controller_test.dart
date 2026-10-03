@@ -27,6 +27,7 @@ void main() {
             });
           }
           final body = jsonDecode(request.body) as Map;
+          expect(request.headers['x-sayfridge-inventory-cards'], '1');
           lastRequest = body['request_id'] as String;
           return eventResponse([
             {'type': 'text_delta', 'delta': 'Here is what I found.'},

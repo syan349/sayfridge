@@ -278,23 +278,11 @@ class InventoryItemTile extends StatelessWidget {
                               style: const TextStyle(fontSize: 16),
                             ),
                             const SizedBox(height: 9),
-                            if (compact)
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: [quantity, storage],
-                              )
-                            else
-                              Row(
-                                children: [
-                                  Flexible(child: quantity),
-                                  const Text(
-                                    ' | ',
-                                    style: TextStyle(color: AppColors.muted),
-                                  ),
-                                  Flexible(child: storage),
-                                ],
-                              ),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [quantity, storage],
+                            ),
                           ],
                         ),
                       ),

@@ -137,7 +137,7 @@ def test_inventory_cards_use_selected_reads_and_survive_replay_but_not_a_report(
             AIMessage(content="Here’s your report.\n\n## Inventory report\n\n### Fridge\n1. **Milk** — estimated 1.5 L")], intents=[intake(), intake()]),
             checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[list_inventory])
         config = {"configurable": {"thread_id": "query-cards"}}
-        context = AgentContext(user, None, uuid4())
+        context = AgentContext(user, None, uuid4(), inventory_cards=True)
         query = initial()
         first = await graph.ainvoke(query, config, context=context)
         result = public_state(first)["inventory_query"]
@@ -150,6 +150,32 @@ def test_inventory_cards_use_selected_reads_and_survive_replay_but_not_a_report(
         assert "inventory_query" not in public_state(second)
         assert second["messages"][-1].content.startswith("Here’s your report.")
         assert second["requests"][query["turn_id"]]["state"]["inventory_query"] == result
+    asyncio.run(scenario())
+
+
+def test_clients_without_card_capability_keep_the_inventory_text_answer(monkeypatch):
+    from test_agent_inventory_results import stock
+    from app.agents.workflow import public_state
+    setup_services(monkeypatch)
+    item = stock()
+    @tool
+    async def list_inventory() -> str:
+        """Read stock."""
+        return json.dumps({"ok": True, "items": [item], "total": 1})
+    class LegacyModel(ScriptModel):
+        async def ainvoke(self, messages, **kwargs):
+            if "agent_internal" in kwargs.get("config", {}).get("tags", []):
+                assert "present_inventory_results" not in messages[0].content
+            return await super().ainvoke(messages, **kwargs)
+    async def scenario():
+        graph = build_agent_graph(LegacyModel([
+            AIMessage(content="", tool_calls=[{"name": "list_inventory", "args": {}, "id": "read", "type": "tool_call"}]),
+            AIMessage(content="Your fridge contains 2 L of milk.")], intents=[intake()]),
+            checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[list_inventory])
+        result = await graph.ainvoke(initial(), {"configurable": {"thread_id": "legacy-client"}}, context=AgentContext(uuid4(), None, uuid4()))
+        assert "inventory_query" not in public_state(result)
+        assert result["inventory_reads"] == {}
+        assert result["messages"][-1].content == "Your fridge contains 2 L of milk."
     asyncio.run(scenario())
 
 

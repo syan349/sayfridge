@@ -540,6 +540,7 @@ class AgentController extends ChangeNotifier {
         pending['path'] as String,
         body: body,
         accessToken: token,
+        inventoryCards: true,
       )) {
         if (!_current(generation)) return;
         final data = event['data'] as Map<String, dynamic>?;
