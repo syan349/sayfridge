@@ -35,14 +35,14 @@ contacting a server. Real HTTP/browser testing is a separate Playwright suite:
 | --- | --- | --- |
 | `/login`, `/register` | W01 Sign in, W02 Create account | connected (`/auth/login`, `/auth/register`) |
 | `/` | Dashboard | connected (inventory, expiry summary, operations) |
-| `/inventory` | W03 Inventory, with bulk move / consume / archive | connected |
+| `/inventory` | W03 Inventory: search, filters, sorting by item name or expiry, bulk move / consume / archive | connected (`sort_by`, `sort_order` on `/inventory-items`) |
 | `/inventory/:id` | W05 Item details: record use, reconcile, edit, discard | connected |
-| `/inventory/new` | W06 Add items by hand (one all-or-nothing batch) | connected (`/inventory-items/batch-create`) |
-| `/spaces` | W04 Storage spaces | connected |
+| `/inventory/new` | W06 Add items by hand (one all-or-nothing batch); says which expiry dates were estimated | connected (`/inventory-items/batch-create`) |
+| `/spaces` | W04 Storage spaces, including the default space | connected (`/storage-spaces/{id}/default`) |
 | `/expiry` | W09 Expiry overview | connected (`/inventory-items/expiry-summary`) |
-| `/assistant` | W07 AI assistant (text only) | connected (`/agent/chat`, `/agent/resume`, streamed) |
-| `/conversations` | W08 Conversation history | **sample data** — no list endpoint yet |
-| `/settings` | W10 Profile and settings (read-only) | connected (`/auth/me`) |
+| `/assistant` | W07 AI assistant: text and up to 4 photos | connected (`/agent/chat`, `/agent/resume`, streamed) |
+| `/conversations` | W08 Conversation history | connected (`GET /agent/chat`) |
+| `/settings` | W10 Profile and settings: account details (read-only) and reminder settings | connected (`/auth/me`); reminder settings stay in the browser |
 | `/admin/accounts` | W11 Accounts (administrators only) | connected (`/admin/users`) |
 | `/guest` | Guest mode | placeholder — no guest access on the backend |
 | anything else | Page not found | — |
@@ -56,11 +56,25 @@ anyway.
 ## Assistant and sessions
 
 Fetch-based SSE readers stream authenticated POST replies. Cards use current
-proposal IDs and per-item results. State recovery restores pending progress;
-full conversation history remains a labeled sample page. The backend accepts
-text/images; this Web interface provides text input, while Mobile supplies
-camera/gallery/speech. See [client integration](../docs/reference/AGENT_FRONTEND_INTEGRATION.md)
+proposal IDs and per-item results. The assistant opens the user's saved main
+chat (`GET /agent/chat`) and state recovery restores pending progress; the
+history page groups the same saved messages by conversation and loads older
+ones on request. Saved history is text: a photo appears as the note the backend
+stores for it. See [client integration](../docs/reference/AGENT_FRONTEND_INTEGRATION.md)
 for confirmation and retry behavior.
+
+Photos (JPEG, PNG or WebP, up to 4 per message) are shrunk in the browser to at
+most 1600 px on the longest side and sent as JPEG, so a message stays within
+the backend's and the host's request size limits (`src/lib/photos.ts`). Speech
+input belongs to the Mobile app.
+
+## Reminders
+
+"Expiring soon" is a per-user setting (1, 3, 5 or 7 days; 3 by default) kept in
+this browser's `localStorage`, as the Mobile app keeps its own on the device.
+The sidebar counts, dashboard, expiry overview, storage spaces and inventory
+chip all use it. An optional browser notification appears once a day while
+SayFridge is open; there is no server push service (`src/lib/reminders.ts`).
 
 Access and refresh credentials are held in memory/sessionStorage for the tab.
 Authenticated requests renew access automatically once and share concurrent
@@ -68,8 +82,9 @@ renewal. Logout clears the local session and requests server revocation. If the
 logout request fails, local logout has completed but server revocation is unconfirmed.
 Suspended accounts and expired/revoked sessions require login again.
 
-Account email/password editing, account deletion, guest backend access and
-administrator task/audit dashboards are outside current delivery.
+Account email/password editing, account deletion, a server voice quota, guest
+backend access and administrator task/audit dashboards are outside current
+delivery: the backend has no endpoints for them.
 
 ## Structure and deployment
 
