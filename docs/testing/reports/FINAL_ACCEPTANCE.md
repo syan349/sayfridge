@@ -74,6 +74,13 @@ identity and cross-client acceptance are recorded in the sections above and belo
 
 ## Manual cross-client and Android validation
 
+The [manual integration test record](MANUAL_INTEGRATION_TEST_RECORD.md) preserves
+13 manual cases and observations under case IDs MT139-01–MT139-13.
+Use applicable case IDs to link release findings and retests to their original
+issues. The [source index](../evidence/manual-integration/2026-10-03/source-index.json)
+records the historical issue metadata. These historical findings remain separate
+from the results recorded below for the selected release.
+
 Use a dedicated ordinary account and an existing administrator account. Store their
 passwords only in the course-designated private channel. For each row record the
 actual result and screenshot/log reference. Native checks identify the Android
@@ -113,6 +120,7 @@ behavior and any team scope decision; do not erase earlier evidence.
 | Architecture and decisions | [System Architecture](../../architecture/README.md) |
 | Technical learning | [Learning and Design Evolution](../../learning/README.md) |
 | Security/privacy evidence | [Security and Privacy](../../security/README.md) |
+| Manual integration findings and follow-up | [Manual integration test record — issue #139](MANUAL_INTEGRATION_TEST_RECORD.md) |
 | Historical designs and results | [Project archive](../../archive/README.md) |
 | Weekly meetings, decisions and responsibilities | [Team Wiki](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/wiki) |
 
