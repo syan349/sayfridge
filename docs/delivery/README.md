@@ -205,6 +205,12 @@ Record database acceptance with `scripts/record_database_acceptance.py` (use
 `--help` for environment/date/output arguments). Keep the revision, seed check,
 schema verification, tested commit and initialization date with the release.
 
+Use the [manual integration test record](../testing/reports/MANUAL_INTEGRATION_TEST_RECORD.md)
+to select relevant development findings for Android and cross-client retesting.
+Carry its case IDs and original issue links into the
+[Final Acceptance Record](../testing/reports/FINAL_ACCEPTANCE.md#manual-cross-client-and-android-validation),
+alongside the selected release versions and actual outcomes.
+
 Then test Android stock entry/consumption → React view of the same account/data
 → quantity history and expiry → ordinary/admin permission checks. Include renewal,
 network interruption and selected device permissions. Record exact environment,
