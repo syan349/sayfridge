@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/app_dialog.dart';
 import '../state/auth_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth_scaffold.dart';
@@ -69,24 +71,34 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  void _showResetDialog() {
+  void _showRecoveryDialog() {
     final initialEmail = _emailController.text;
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Reset password'),
+      builder: (dialogContext) => AppDialog(
+        title: const Text('Recover password'),
         // The field owns its controller until the dialog's exit animation ends.
-        content: TextFormField(
-          initialValue: initialEmail,
-          keyboardType: TextInputType.emailAddress,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Email',
-            hintText: 'Enter your email',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Email',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 9),
+              TextFormField(
+                initialValue: initialEmail,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                decoration: const InputDecoration(hintText: 'Enter your email'),
+              ),
+            ],
           ),
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
@@ -112,6 +124,8 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return AuthScaffold(
       child: AuthContent(
+        // Extra space below lifts the centered form by 40 logical pixels.
+        padding: const EdgeInsets.fromLTRB(28, 10, 28, 108),
         child: AutofillGroup(
           child: Form(
             key: _formKey,
@@ -165,7 +179,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 const SizedBox(height: 18),
                 UnderlinedAction(
                   label: 'Forgot password?',
-                  onPressed: _showResetDialog,
+                  onPressed: _showRecoveryDialog,
                   color: AppColors.muted,
                   fontWeight: FontWeight.w500,
                 ),
@@ -176,101 +190,11 @@ class _SignInScreenState extends State<SignInScreen> {
                   onPressed: _submit,
                   isLoading: _isSubmitting,
                 ),
-                const SizedBox(height: 24),
-                const _OrDivider(),
-                const SizedBox(height: 22),
-                const Center(
-                  child: Text(
-                    'Join with your favourite social media account.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                  ),
-                ),
-                const SizedBox(height: 25),
-                const _SocialButtons(),
-                const SizedBox(height: 72),
+                const SizedBox(height: 40),
                 const _TermsText(),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Expanded(child: Divider(color: AppColors.muted)),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 18),
-          child: Text(
-            'or',
-            style: TextStyle(color: AppColors.muted, fontSize: 16),
-          ),
-        ),
-        Expanded(child: Divider(color: AppColors.muted)),
-      ],
-    );
-  }
-}
-
-class _SocialButtons extends StatelessWidget {
-  const _SocialButtons();
-
-  @override
-  Widget build(BuildContext context) {
-    const providers = [
-      ('Apple', 'assets/icons/social/apple_logo.png', 34.0),
-      ('Google', 'assets/icons/social/google_logo.png', 33.0),
-      ('Facebook', 'assets/icons/social/facebook_logo.png', 34.0),
-      ('X', 'assets/icons/social/twitter_logo.png', 31.0),
-    ];
-
-    return Center(
-      child: FractionallySizedBox(
-        widthFactor: 0.94,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            for (final provider in providers)
-              Semantics(
-                button: true,
-                label: 'Continue with ${provider.$1}',
-                child: Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '${provider.$1} sign in is ready to connect to the API.',
-                        ),
-                      ),
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    child: SizedBox(
-                      width: 60,
-                      height: 60,
-                      child: Center(
-                        child: Image.asset(
-                          provider.$2,
-                          width: provider.$3,
-                          height: provider.$3,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
         ),
       ),
     );

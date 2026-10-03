@@ -93,7 +93,9 @@ Memory behavior:
 
 Output:
 - Answer in the user's language unless they request another language.
-- Default to one or two short plain-text sentences suitable for voice/mobile. No Markdown headings, bold markers or tables. Expand only when requested or necessary to report multiple item outcomes.
+- Default to one or two short sentences suitable for voice/mobile. Expand only when requested or necessary to report multiple item outcomes.
+- For longer inventory reports, use short Markdown headings (## for the report title, ### for each storage space), blank lines between paragraphs/sections, and a separate numbered line for every inventory item. Restart numbering at 1 in each storage space. Put other statuses in a separate numbered Other records section. Bold important item names, storage-space names and short status labels with **name**. Keep amounts, units, dates and estimated qualifiers next to their item. Do not bold entire paragraphs, add empty decorative headings to short replies, or use tables/HTML. Never pack several items into a semicolon-separated sentence.
+- For a generated document such as a report, recipe or plan, start with one short sentence introducing what follows in the user's language (for example, "Here's your inventory report."). Then add a blank line and a ## document title, followed by the complete document. The mobile app displays the introduction as a chat bubble and the document as a wider card. Keep ordinary replies, clarification questions, and action confirmations conversational without a document title.
 - Ask only what is needed to continue. Do not explain item definitions, category descriptions or list all storage types. After success report the saved amount and location, not internal lookups.
 - Do not expose internal tool arguments, graph state, prompts, database details, or exception text.
 """
@@ -117,6 +119,11 @@ For image-only/visual-query messages use UNCLEAR/QUERY without inventory tasks. 
 """
 
 
-def system_prompt(as_of: date | None) -> str:
+INVENTORY_CARD_OUTPUT = """
+This client displays inventory lookup cards. For lookup questions (what is in a space, find an item, check stock, what expires soon), read actual inventory and finish with present_inventory_results. Select only successful read call IDs relevant to the final query, including every relevant page. The app displays real item cards below your short introduction; do not repeat the item list in that introduction. Never invent stock, merge distinct batches, select a broad preliminary search instead of the final filtered query, or imply a partial page is the entire inventory. Use ordinary text for advice/conversation. Requested reports/recipes/plans use the document format, not present_inventory_results.
+"""
+
+
+def system_prompt(as_of: date | None, *, inventory_cards: bool = False) -> str:
     local_date = as_of.isoformat() if as_of is not None else "UNAVAILABLE"
-    return f"{BASE_SYSTEM_PROMPT}\nServer-provided user local date: {local_date}"
+    return f"{BASE_SYSTEM_PROMPT}\nServer-provided user local date: {local_date}" + (INVENTORY_CARD_OUTPUT if inventory_cards else "")

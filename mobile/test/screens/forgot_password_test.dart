@@ -36,7 +36,7 @@ void main() {
         await tester.ensureVisible(find.text('Forgot password?'));
         await tester.tap(find.text('Forgot password?'));
         await tester.pumpAndSettle();
-        expect(find.text('Reset password'), findsOneWidget);
+        expect(find.text('Recover password'), findsOneWidget);
         final resetField = find.descendant(
           of: find.byType(AlertDialog),
           matching: find.byType(TextField),

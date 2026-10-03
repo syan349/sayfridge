@@ -13,11 +13,13 @@ import 'package:sayfridge/models/profile_preferences.dart';
 import 'package:sayfridge/repositories/auth_repository.dart';
 import 'package:sayfridge/repositories/profile_preferences_repository.dart';
 import 'package:sayfridge/screens/home_screen.dart';
+import 'package:sayfridge/screens/avatar_picker_screen.dart';
 import 'package:sayfridge/screens/password_reset_screen.dart';
 import 'package:sayfridge/screens/personal_information_screen.dart';
 import 'package:sayfridge/screens/profile_screen.dart';
 import 'package:sayfridge/screens/reminder_settings_screen.dart';
 import 'package:sayfridge/screens/sign_in_screen.dart';
+import 'package:sayfridge/screens/sign_up_screen.dart';
 import 'package:sayfridge/screens/voice_usage_screen.dart';
 import 'package:sayfridge/services/notification_service.dart';
 import 'package:sayfridge/state/auth_controller.dart';
@@ -41,7 +43,142 @@ final _usage = VoiceUsage(
 const _captureKey = Key('profile-capture');
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    final fontPath = Platform.environment['PROFILE_FONT_PATH'];
+    if (fontPath == null) return;
+    final fontData = await File(fontPath).readAsBytes();
+    for (final family in ['Arial', 'Roboto']) {
+      await (FontLoader(
+        family,
+      )..addFont(Future.value(ByteData.sublistView(fontData)))).load();
+    }
+    for (final font in {
+      'MaterialIcons': 'fonts/MaterialIcons-Regular.otf',
+      'packages/cupertino_icons/CupertinoIcons':
+          'packages/cupertino_icons/assets/CupertinoIcons.ttf',
+    }.entries) {
+      await (FontLoader(font.key)..addFont(rootBundle.load(font.value))).load();
+    }
+  });
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+
+  for (final savedName in ['', 'Demo User']) {
+    testWidgets('avatar-only edit prefills nickname from "$savedName"', (
+      tester,
+    ) async {
+      _phoneSize(tester);
+      const repository = ProfilePreferencesRepository();
+      await repository.save(_user.id, ProfilePreferences(fullName: savedName));
+      final auth = AuthController(_FakeAuthRepository(_user));
+      await auth.initialize();
+      final profile = ProfileController(auth, repository);
+      addTearDown(profile.dispose);
+      addTearDown(auth.dispose);
+      await _showProfile(tester, auth, profile);
+      final name = profile.displayName;
+      await tester.tap(find.text('Edit Personal Information'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nickname'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('profile-name')))
+            .controller!
+            .text,
+        name,
+      );
+      await tester.tap(find.text('choose one'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('avatar-milk')));
+      await tester.tap(find.byKey(const Key('use-avatar-button')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save changes'));
+      await tester.tap(find.text('Save changes'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PersonalInformationScreen), findsNothing);
+      final stored = await repository.read(_user.id);
+      expect(stored.fullName, name);
+      expect(stored.avatarAsset, contains('milk_avatar'));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in [const Size(390, 844), const Size(320, 568)]) {
+    testWidgets('avatar confirmation stays fixed while scrolling at $size', (
+      tester,
+    ) async {
+      _phoneSize(tester, size);
+      AvatarChoice? result;
+      await tester.pumpWidget(
+        _app(
+          Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () async {
+                  result = await Navigator.of(context).push<AvatarChoice>(
+                    MaterialPageRoute(
+                      builder: (_) => AvatarPickerScreen(
+                        title: 'Avatar library',
+                        initialAvatar: avatarChoices.first,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open library'),
+              ),
+            ),
+          ),
+          textScale: size.width == 320 ? 1.5 : 1,
+        ),
+      );
+      await tester.tap(find.text('Open library'));
+      await tester.pumpAndSettle();
+      // The lazy grid may not build the second row until the large test-font
+      // heading scrolls out of a short viewport.
+      if (find.byKey(const Key('avatar-carrot')).evaluate().isEmpty) {
+        await tester.ensureVisible(find.byKey(const Key('avatar-fridge')));
+        await tester.pumpAndSettle();
+      }
+      final firstRow = avatarChoices
+          .take(4)
+          .map(
+            (choice) => tester.getRect(
+              find.byKey(Key('avatar-${choice.name.toLowerCase()}')),
+            ),
+          )
+          .toList();
+      for (final rect in firstRow) {
+        expect(rect.top, firstRow.first.top);
+      }
+      expect(
+        tester.getRect(find.byKey(const Key('avatar-carrot'))).top,
+        greaterThan(firstRow.first.bottom),
+      );
+      final button = find.byKey(const Key('use-avatar-button'));
+      final initialRect = tester.getRect(button);
+      final labelRect = tester.getRect(find.text('Use this avatar'));
+      expect(labelRect.top, greaterThanOrEqualTo(initialRect.top));
+      expect(labelRect.bottom, lessThanOrEqualTo(initialRect.bottom));
+      expect(initialRect.bottom, lessThanOrEqualTo(size.height - 34));
+      await _capture(tester, 'avatar-library-${size.width.toInt()}');
+      await tester.drag(
+        find.byKey(const Key('avatar-library-scroll')),
+        const Offset(0, -500),
+      );
+      await tester.pumpAndSettle();
+      final last = find.byKey(const Key('avatar-fridge spirit rose'));
+      await tester.ensureVisible(last);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(button), initialRect);
+      await tester.tap(last);
+      await tester.pump();
+      await _capture(tester, 'avatar-library-scrolled-${size.width.toInt()}');
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(result?.assetPath, avatarChoices.last.assetPath);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('guest Profile routes to login, signup, assistant, and home', (
     tester,
@@ -458,31 +595,10 @@ void main() {
     }
   });
 
-  testWidgets('render six reference states for optional visual review', (
+  testWidgets('render profile and signup states for optional visual review', (
     tester,
   ) async {
     _phoneSize(tester);
-    final fontPath = Platform.environment['PROFILE_FONT_PATH'];
-    if (fontPath != null) {
-      await tester.runAsync(() async {
-        final loader = FontLoader('Arial');
-        loader.addFont(
-          Future.value(
-            ByteData.sublistView(await File(fontPath).readAsBytes()),
-          ),
-        );
-        await loader.load();
-        for (final font in {
-          'MaterialIcons': 'fonts/MaterialIcons-Regular.otf',
-          'packages/cupertino_icons/CupertinoIcons':
-              'packages/cupertino_icons/assets/CupertinoIcons.ttf',
-        }.entries) {
-          await (FontLoader(
-            font.key,
-          )..addFont(rootBundle.load(font.value))).load();
-        }
-      });
-    }
     final session = await _session();
     final guest = AuthController(_FakeAuthRepository(null));
     await guest.initialize();
@@ -509,6 +625,8 @@ void main() {
       'profile-password': const PasswordResetScreen(),
       'profile-reminders': ReminderSettingsScreen(controller: session.$2),
       'profile-voice': VoiceUsageScreen(usage: _usage),
+      'signup-nickname': SignUpScreen(authController: session.$1),
+      'signin-no-social': SignInScreen(authController: session.$1),
     };
     for (final entry in pages.entries) {
       await tester.pumpWidget(_app(entry.value));
@@ -531,6 +649,13 @@ void main() {
       }
       expect(tester.takeException(), isNull);
       await _capture(tester, entry.key);
+      if (entry.key == 'signin-no-social') {
+        await tester.tap(find.text('Forgot password?'));
+        await tester.pumpAndSettle();
+        await _capture(tester, 'recover-password-dialog');
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+      }
     }
   });
 }
@@ -606,6 +731,13 @@ Future<void> _showProfile(
 Future<void> _capture(WidgetTester tester, String name) async {
   final directory = Platform.environment['PROFILE_SCREENSHOT_DIR'];
   if (directory == null) return;
+  await tester.runAsync(() async {
+    await Future.wait([
+      for (final element in find.byType(Image).evaluate())
+        precacheImage((element.widget as Image).image, element),
+    ]);
+  });
+  await tester.pumpAndSettle();
   // Explicit opt-in only: screenshots are review artifacts, not committed goldens.
   await tester.runAsync(() async {
     final boundary = tester.renderObject<RenderRepaintBoundary>(

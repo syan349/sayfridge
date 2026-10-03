@@ -696,18 +696,13 @@ void main() {
     expect(find.text('Retry same request'), findsOneWidget);
   });
 
-  testWidgets('supporting photo replaces the visible pending proposal', (
+  testWidgets('inline clarification replaces the visible pending proposal', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final png = Uint8List.fromList(
-      base64Decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLJhgAAAABJRU5ErkJggg==',
-      ),
-    );
     Map<String, dynamic>? resumeBody;
     var calls = 0;
     final api = ApiClient(
@@ -787,12 +782,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: AgentConversationScreen(
-          controller: agent,
-          pickImages: () async => [
-            XFile.fromData(png, mimeType: 'image/png', name: 'label.png'),
-          ],
-        ),
+        home: AgentConversationScreen(controller: agent),
       ),
     );
 
@@ -802,8 +792,25 @@ void main() {
     await _tapAndFinish(tester, agent, find.byTooltip('Send message'));
     await tester.pumpAndSettle();
     expect(find.text('Unknown package'), findsOneWidget);
-    await tester.ensureVisible(find.text('Add supporting photo'));
-    await _tapAndFinish(tester, agent, find.text('Add supporting photo'));
+    expect(find.text('Add supporting photo'), findsNothing);
+    final inline = find.byKey(const Key('proposal-response-input'));
+    final keyboard = find.descendant(
+      of: inline,
+      matching: find.byTooltip('Type a message'),
+    );
+    await tester.ensureVisible(keyboard);
+    await tester.tap(keyboard);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('proposal-response-text')),
+      'Milk, one 1 litre carton',
+    );
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Confirm'));
+    await _tapAndFinish(
+      tester,
+      agent,
+      find.widgetWithText(FilledButton, 'Confirm'),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Unknown package'), findsNothing);
@@ -820,7 +827,7 @@ void main() {
     expect(find.text('Review notes'), findsOneWidget);
     expect(find.text('Check the expiry date'), findsOneWidget);
     expect(resumeBody?['responses'][0]['proposal_id'], 'old');
-    expect(resumeBody?['responses'][0]['images'], hasLength(1));
+    expect(resumeBody?['responses'][0]['message'], 'Milk, one 1 litre carton');
     expect(agent.items.single['proposal_id'], 'new');
   });
 
@@ -908,7 +915,7 @@ void main() {
       expect(calls, 2);
       expect(find.text('Failed'), findsOneWidget);
       expect(find.text('Not enough stock'), findsOneWidget);
-      expect(find.text('Added successfully'), findsNothing);
+      expect(find.text('Saved successfully'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

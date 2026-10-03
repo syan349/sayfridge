@@ -4,19 +4,24 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:image_picker/image_picker.dart';
 
 import '../models/agent_input_draft.dart';
-import '../models/agent_image.dart';
+import '../models/inventory_item.dart';
+import '../models/item_artwork_palette.dart';
+import '../repositories/inventory_repository.dart';
+import '../services/inventory_api_service.dart';
 import '../services/voice_input_service.dart';
 import '../state/agent_controller.dart';
+import '../state/inventory_detail_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/agent_input_panel.dart';
 import '../widgets/app_background.dart';
 import '../widgets/assistant_widgets.dart';
+import '../widgets/assistant_inventory_reply.dart';
 import '../widgets/assistant_welcome.dart';
 import '../widgets/assistant_scroll_layout.dart';
 import '../widgets/inventory_visuals.dart';
 import '../widgets/agent_proposal_options.dart';
-import 'camera_input_screen.dart';
 import 'conversation_history_screen.dart';
+import 'inventory_detail_screen.dart';
 
 class AgentConversationScreen extends StatefulWidget {
   const AgentConversationScreen({
@@ -165,6 +170,24 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
     return widget.controller.error == null;
   }
 
+  void _openInventoryItem(InventoryItem item) {
+    final workspace = widget.controller.workspace;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => InventoryDetailScreen(
+          itemId: item.id,
+          controller: InventoryDetailController(
+            InventoryRepository(
+              InventoryApiService(workspace.client),
+              workspace.tokens,
+            ),
+            workspace: workspace,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _messageFor(String text) {
     final footer = _footerKey.currentContext?.findRenderObject() as RenderBox?;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -185,9 +208,10 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom == 0
-        ? MediaQuery.paddingOf(context).bottom
-        : 0.0;
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final bottomInset = keyboardVisible
+        ? 0.0
+        : MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       body: Stack(
         children: [
@@ -300,6 +324,15 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                                     .key] ??
                                                 const [],
                                           )
+                                        : agent.inventoryQueries.containsKey(
+                                            message.key,
+                                          )
+                                        ? AssistantInventoryReply(
+                                            message: message.value,
+                                            query: agent
+                                                .inventoryQueries[message.key]!,
+                                            onItemTap: _openInventoryItem,
+                                          )
                                         : AssistantReply(
                                             textStyle: exampleMessageStyle,
                                             message: message.value,
@@ -314,7 +347,8 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                                   ),
                                   controller: agent,
                                   item: item,
-                                  pickImages: widget.pickImages,
+                                  voiceInput: widget.voiceInput,
+                                  onMessage: _messageFor,
                                 ),
                               if (agent.waiting)
                                 const Padding(
@@ -365,28 +399,39 @@ class _AgentConversationScreenState extends State<AgentConversationScreen> {
                             ],
                           ),
                         ),
-                        footer: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Padding(
-                              key: _footerKey,
-                              padding: const EdgeInsets.fromLTRB(25, 8, 25, 8),
-                              child: AgentInputPanel(
-                                controller: _message,
-                                textTopPadding: 14,
-                                enabled: agent.canSend,
-                                waiting: agent.waiting,
-                                reset: _inputReset,
-                                voiceInput: widget.voiceInput,
-                                pickImages: widget.pickImages,
-                                initialImages:
-                                    widget.initialDraft?.images ?? const [],
-                                submitOnMount: widget.initialDraft != null,
-                                onMessage: _messageFor,
-                                onSend: _send,
+                        // While answering an item, the keyboard needs the space
+                        // occupied by the disabled main composer. Offstage keeps
+                        // its draft/photos intact until the keyboard closes.
+                        footer: Offstage(
+                          offstage: agent.waiting && keyboardVisible,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Padding(
+                                key: _footerKey,
+                                padding: const EdgeInsets.fromLTRB(
+                                  25,
+                                  8,
+                                  25,
+                                  8,
+                                ),
+                                child: AgentInputPanel(
+                                  controller: _message,
+                                  textTopPadding: 14,
+                                  enabled: agent.canSend,
+                                  waiting: agent.waiting,
+                                  reset: _inputReset,
+                                  voiceInput: widget.voiceInput,
+                                  pickImages: widget.pickImages,
+                                  initialImages:
+                                      widget.initialDraft?.images ?? const [],
+                                  submitOnMount: widget.initialDraft != null,
+                                  onMessage: _messageFor,
+                                  onSend: _send,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -405,12 +450,14 @@ class _AgentItemCard extends StatefulWidget {
   const _AgentItemCard({
     required this.controller,
     required this.item,
-    this.pickImages,
+    this.voiceInput,
+    this.onMessage,
     super.key,
   });
   final AgentController controller;
   final Map<String, dynamic> item;
-  final Future<List<XFile>> Function()? pickImages;
+  final VoiceInputService? voiceInput;
+  final ValueChanged<String>? onMessage;
   @override
   State<_AgentItemCard> createState() => _AgentItemCardState();
 }
@@ -420,7 +467,6 @@ class _AgentItemCardState extends State<_AgentItemCard> {
   bool _editing = false;
   AgentController get controller => widget.controller;
   Map<String, dynamic> get item => widget.item;
-  Future<List<XFile>> Function()? get pickImages => widget.pickImages;
 
   Future<void> _confirm() async {
     if (item['status'] == 'NEEDS_CONFIRMATION' && !_editing) {
@@ -432,43 +478,6 @@ class _AgentItemCardState extends State<_AgentItemCard> {
         selectedId: _selectedId,
         message: _answerText,
       );
-    }
-  }
-
-  Future<void> _supportPhoto(BuildContext context) async {
-    try {
-      late final List<XFile> files;
-      if (pickImages != null) {
-        files = await pickImages!.call();
-      } else {
-        final selected = await Navigator.of(context).push<List<XFile>>(
-          MaterialPageRoute<List<XFile>>(
-            builder: (_) => const CameraInputScreen(),
-          ),
-        );
-        files = selected ?? [];
-      }
-      if (!context.mounted || files.isEmpty) return;
-      final images = <AgentImage>[];
-      for (final file in files.take(AgentImage.maxImages)) {
-        final image = AgentImage.fromPickedBytes(await file.readAsBytes());
-        image.validateDimensions();
-        images.add(image);
-      }
-      AgentImage.validateBatch(images);
-      await controller.respond(item, 'answer', images: images);
-    } on FormatException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to attach that photo.')),
-        );
-      }
     }
   }
 
@@ -502,11 +511,15 @@ class _AgentItemCardState extends State<_AgentItemCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 56,
+                  height: 56,
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE9F7DF),
+                    color: Color(
+                      ItemArtworkPalette.backgroundArgb(
+                        itemArtworkForName(heading),
+                      ),
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Image.asset(
@@ -514,7 +527,7 @@ class _AgentItemCardState extends State<_AgentItemCard> {
                     fit: BoxFit.contain,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,17 +541,31 @@ class _AgentItemCardState extends State<_AgentItemCard> {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      Chip(
-                        avatar: Icon(_statusIcon(status), size: 18),
-                        label: Text(_statusLabel(status)),
-                        labelStyle: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
                         ),
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        backgroundColor: _statusColor(status),
-                        side: BorderSide.none,
+                        decoration: BoxDecoration(
+                          color: _statusColor(status),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_statusIcon(status), size: 16),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                _statusLabel(status),
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -572,10 +599,18 @@ class _AgentItemCardState extends State<_AgentItemCard> {
                 values: _stringList(display?['review_notes']),
               ),
             if (preview != null) ...[
-              _DetailRow(
-                label: 'Calculation',
-                value: '${preview['calculation_method']}',
-              ),
+              if (_text(preview['calculation_method']) case final method?)
+                _DetailRow(
+                  label: 'Calculation',
+                  value: switch (method) {
+                    'EXACT' => 'Exact amount',
+                    'AI_ESTIMATED' ||
+                    'ESTIMATED' ||
+                    'ESTIMATE' => 'Estimated amount',
+                    'CONVERTED' => 'Converted amount',
+                    _ => method.replaceAll('_', ' ').toLowerCase(),
+                  },
+                ),
               if (preview['before'] is Map)
                 _DetailRow(
                   label: 'Before',
@@ -592,7 +627,7 @@ class _AgentItemCardState extends State<_AgentItemCard> {
               Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Text(
-                  '${error['message'] ?? error['code']}',
+                  _reviewMessage(error, display),
                   style: const TextStyle(
                     fontSize: 14,
                     height: 1.45,
@@ -610,6 +645,8 @@ class _AgentItemCardState extends State<_AgentItemCard> {
                 errorCode: error?['code'] as String?,
                 editing: _editing,
                 enabled: canRespond,
+                voiceInput: widget.voiceInput,
+                onMessage: widget.onMessage,
                 onChanged: (answer) => setState(() {
                   _selectedId = answer.inventoryId;
                   _answerText = answer.message;
@@ -679,13 +716,6 @@ class _AgentItemCardState extends State<_AgentItemCard> {
                           _editing ? 'Close editing' : 'Edit details',
                         ),
                       ),
-                    TextButton.icon(
-                      onPressed: canRespond
-                          ? () => _supportPhoto(context)
-                          : null,
-                      icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                      label: const Text('Add supporting photo'),
-                    ),
                   ],
                 ),
               ],
@@ -703,6 +733,22 @@ class _AgentItemCardState extends State<_AgentItemCard> {
     return text != null && text.startsWith(prefix) && text.endsWith(suffix)
         ? text.substring(prefix.length, text.length - suffix.length)
         : text;
+  }
+
+  String _reviewMessage(
+    Map<String, dynamic> error,
+    Map<String, dynamic>? display,
+  ) {
+    final question = _text(display?['question']);
+    if (question != null) return question;
+    if (error['code'] == 'REESTIMATE') {
+      // Unit conversion and qualitative estimates share this error code.
+      if (_text(error['message'])?.contains('unit_relationship') ?? false) {
+        return 'How much does one of these units hold? Tell me the conversion and where it comes from, for example from the packaging or a measurement.';
+      }
+      return 'Please tell me how much you used or how much remains, including the unit. An approximate amount is fine.';
+    }
+    return '${error['message'] ?? error['code']}';
   }
 
   String _balance(Map value) {
@@ -755,7 +801,7 @@ class _AgentItemCardState extends State<_AgentItemCard> {
   String _statusLabel(Object? status) => switch (status) {
     'NEEDS_INPUT' => 'Needs information',
     'NEEDS_CONFIRMATION' => 'Ready for review',
-    'SUCCEEDED' => 'Added successfully',
+    'SUCCEEDED' => 'Saved successfully',
     'FAILED' => 'Failed',
     'CANCELLED' => 'Cancelled',
     _ => status?.toString() ?? 'Pending',

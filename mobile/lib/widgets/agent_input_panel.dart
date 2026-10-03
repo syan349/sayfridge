@@ -19,7 +19,7 @@ import 'voice_recording_overlay.dart';
 class AgentInputPanel extends StatefulWidget {
   const AgentInputPanel({
     required this.controller,
-    required this.onSend,
+    this.onSend,
     this.enabled = true,
     this.waiting = false,
     this.pickImages,
@@ -31,11 +31,13 @@ class AgentInputPanel extends StatefulWidget {
     this.inputKey = const Key('assistant-message-field'),
     this.onMessage,
     this.textTopPadding = 6,
+    this.inline = false,
+    this.hintText,
     super.key,
-  });
+  }) : assert(inline || onSend != null);
 
   final TextEditingController controller;
-  final Future<bool> Function(AgentInputDraft draft) onSend;
+  final Future<bool> Function(AgentInputDraft draft)? onSend;
   final bool enabled, waiting, submitOnMount;
   final Future<List<XFile>> Function()? pickImages;
   final VoiceInputService? voiceInput;
@@ -44,6 +46,10 @@ class AgentInputPanel extends StatefulWidget {
   final Key inputKey;
   final ValueChanged<String>? onMessage;
   final double textTopPadding;
+
+  /// Item clarification only edits a draft; the enclosing Confirm submits it.
+  final bool inline;
+  final String? hintText;
 
   @override
   State<AgentInputPanel> createState() => _AgentInputPanelState();
@@ -226,13 +232,14 @@ class _AgentInputPanelState extends State<AgentInputPanel> {
   }
 
   Future<void> _send() async {
-    if (!_enabled || _recordingVoice) return;
+    final submit = widget.onSend;
+    if (widget.inline || submit == null || !_enabled || _recordingVoice) return;
     final draft = AgentInputDraft(text: _message.text, images: _images);
     if (draft.isEmpty) return;
     FocusScope.of(context).unfocus();
     setState(() => _sending = true);
     try {
-      final accepted = await widget.onSend(draft);
+      final accepted = await submit(draft);
       if (!mounted || !accepted) return;
       _message.clear();
       setState(() {
@@ -335,7 +342,9 @@ class _AgentInputPanelState extends State<AgentInputPanel> {
           ),
         ),
       AgentComposer(
-        key: const Key('assistant-bottom-action'),
+        key: Key(
+          widget.inline ? 'assistant-inline-action' : 'assistant-bottom-action',
+        ),
         controller: _message,
         voiceModeReset: _voiceModeReset,
         enabled: _enabled,
@@ -345,6 +354,8 @@ class _AgentInputPanelState extends State<AgentInputPanel> {
         maxLength: widget.maxLength,
         inputKey: widget.inputKey,
         textTopPadding: widget.textTopPadding,
+        inline: widget.inline,
+        hintText: widget.hintText,
         onPhotoPressed: _enabled && _images.length < AgentImage.maxImages
             ? _pickImages
             : null,
@@ -353,6 +364,7 @@ class _AgentInputPanelState extends State<AgentInputPanel> {
             ? _send
             : null,
         voiceButton: HoldToSpeakButton(
+          fontSize: widget.inline ? 14 : 16,
           enabled: _enabled && !_finishingVoice,
           recording: _recordingVoice,
           cancelling: _cancelVoice,

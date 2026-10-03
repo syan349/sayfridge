@@ -13,12 +13,14 @@ class HoldToSpeakButton extends StatefulWidget {
     required this.onMove,
     required this.onEnd,
     required this.onCancel,
+    this.fontSize = 16,
     super.key,
   });
 
   final bool enabled, recording, cancelling, finishing;
   final VoidCallback onStart, onEnd, onCancel;
   final ValueChanged<Offset> onMove;
+  final double fontSize;
 
   @override
   State<HoldToSpeakButton> createState() => _HoldToSpeakButtonState();
@@ -110,7 +112,7 @@ class _HoldToSpeakButtonState extends State<HoldToSpeakButton>
             maxLines: 2,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: widget.fontSize,
               height: 1.15,
               color: widget.cancelling ? Colors.red : const Color(0xFF9999A3),
             ),

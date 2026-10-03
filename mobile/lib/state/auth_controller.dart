@@ -1,15 +1,21 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/app_user.dart';
+import '../models/profile_preferences.dart';
 import '../repositories/auth_repository.dart';
+import '../repositories/profile_preferences_repository.dart';
 import '../services/api_exception.dart';
 
 enum AuthStatus { initial, checking, unauthenticated, authenticated, error }
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._authRepository);
+  AuthController(
+    this._authRepository, [
+    this._profileRepository = const ProfilePreferencesRepository(),
+  ]);
 
   final AuthRepository _authRepository;
+  final ProfilePreferencesRepository _profileRepository;
 
   AuthStatus _status = AuthStatus.initial;
   AppUser? _user;
@@ -48,11 +54,31 @@ class AuthController extends ChangeNotifier {
   Future<bool> register({
     required String email,
     required String password,
+    String? nickname,
+    String avatarAsset = ProfilePreferences.defaultAvatar,
   }) async {
     _startSubmission();
 
     try {
-      await _authRepository.register(email: email, password: password);
+      final user = await _authRepository.register(
+        email: email,
+        password: password,
+      );
+      if (nickname != null) {
+        try {
+          await _profileRepository.save(
+            user.id,
+            ProfilePreferences(
+              fullName: nickname.trim(),
+              avatarAsset: avatarAsset,
+            ),
+          );
+        } catch (_) {
+          // The account already exists; do not invite a duplicate registration.
+          _errorMessage =
+              'Account created. Please sign in. Your nickname and avatar could not be saved on this device; set them in Profile.';
+        }
+      }
 
       _status = AuthStatus.unauthenticated;
       return true;

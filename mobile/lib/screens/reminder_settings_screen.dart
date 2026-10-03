@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../widgets/app_dialog.dart';
+
 import '../services/notification_service.dart';
 import '../state/profile_controller.dart';
 import '../theme/app_theme.dart';
@@ -36,7 +38,7 @@ class ReminderSettingsScreen extends StatelessWidget {
     }
     final continueRequest = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AppDialog(
         title: const Text('Enable notifications?'),
         content: Text(
           kIsWeb
@@ -44,7 +46,7 @@ class ReminderSettingsScreen extends StatelessWidget {
               : 'SayFridge will use device notifications for expiry and daily inventory reminders at your selected time.',
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Not now'),
           ),
@@ -71,11 +73,11 @@ class ReminderSettingsScreen extends StatelessWidget {
   Future<void> _showStatus(BuildContext context, String message) =>
       showDialog<void>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => AppDialog(
           title: const Text('Device notifications'),
           content: Text(message),
           actions: [
-            TextButton(
+            FilledButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('OK'),
             ),

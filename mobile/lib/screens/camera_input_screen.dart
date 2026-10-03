@@ -1,6 +1,8 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../widgets/app_dialog.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../widgets/app_bottom_navigation.dart';
@@ -65,13 +67,13 @@ class _CameraInputScreenState extends State<CameraInputScreen> {
       final proceed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => AlertDialog(
+        builder: (context) => AppDialog(
           title: const Text('Camera access'),
           content: const Text(
             'SayFridge uses your camera only when you choose to photograph an item or label. Your browser will ask for device permission next.',
           ),
           actions: [
-            TextButton(
+            OutlinedButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('Not now'),
             ),

@@ -279,10 +279,12 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
                 "public_turn": {"request_id": str(request_id), "conversation_id": str(conversation_id), "input": record},
                 "history_outbox": {**values.get("history_outbox", {}), record["id"]: record},
                 "execution_results": [], "events": [], "final_only": False,
+                "inventory_reads": {}, "inventory_query": None,
                 "resume_requests": values.get("resume_requests", {})}
         as_of = payload.as_of or (date.fromisoformat(values["as_of"]) if snapshot.next and values.get("as_of") else None)
         context = AgentContext(user_id=user.id, as_of=as_of, conversation_id=conversation_id, user_message=payload.message,
-            history_writer=_history_writer(session, user.id, conversation_id, complete=not bool(values)))
+            history_writer=_history_writer(session, user.id, conversation_id, complete=not bool(values)),
+            inventory_cards=request.headers.get("x-sayfridge-inventory-cards") == "1")
         return _response(stack, resources, config, command, context, request, request_id, replay)
     except BaseException:
         await stack.aclose()
@@ -328,7 +330,8 @@ async def resume_agent(payload: AgentResumeRequest, request: Request, user: User
             replay, command = None, Command(resume={payload.interrupt_id: data})
         context = AgentContext(user_id=user.id, as_of=date.fromisoformat(snapshot.values["as_of"]) if snapshot.values.get("as_of") else None,
             conversation_id=payload.conversation_id, user_message="\n".join(r.message for r in payload.responses if r.message),
-            history_writer=_history_writer(session, user.id, payload.conversation_id))
+            history_writer=_history_writer(session, user.id, payload.conversation_id),
+            inventory_cards=request.headers.get("x-sayfridge-inventory-cards") == "1")
         return _response(stack, resources, config, command, context, request, payload.request_id, replay)
     except BaseException:
         await stack.aclose()

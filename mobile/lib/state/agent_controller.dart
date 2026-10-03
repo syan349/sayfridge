@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/agent_image.dart';
+import '../models/agent_inventory_query.dart';
 import '../repositories/workspace_repository.dart';
 import '../services/agent_session_store.dart';
 import '../services/api_exception.dart';
@@ -12,12 +13,14 @@ class SavedConversation {
     required this.messages,
     required this.updatedAt,
     this.messageImages = const {},
+    this.inventoryQueries = const {},
   });
 
   final String id;
   final Map<String, String> messages;
   final DateTime updatedAt;
   final Map<String, List<AgentImage>> messageImages;
+  final Map<String, AgentInventoryQuery> inventoryQueries;
 
   String get title {
     for (final entry in messages.entries) {
@@ -33,6 +36,8 @@ class SavedConversation {
     'messages': messages,
     'updated_at': updatedAt.toUtc().toIso8601String(),
     if (messageImages.isNotEmpty) 'message_images': _saveImages(messageImages),
+    if (inventoryQueries.isNotEmpty)
+      'inventory_queries': _saveQueries(inventoryQueries),
   };
 
   static SavedConversation? fromJson(Object? value) {
@@ -41,11 +46,32 @@ class SavedConversation {
       id: value['id'] as String,
       messages: _readMessages(value['messages']),
       messageImages: _readImages(value['message_images']),
+      inventoryQueries: _readQueries(value['inventory_queries']),
       updatedAt:
           DateTime.tryParse(value['updated_at']?.toString() ?? '') ??
           DateTime.now(),
     );
   }
+}
+
+Map<String, dynamic> _saveQueries(Map<String, AgentInventoryQuery> queries) => {
+  for (final entry in queries.entries) entry.key: entry.value.toJson(),
+};
+
+Map<String, AgentInventoryQuery> _readQueries(Object? value) {
+  final result = <String, AgentInventoryQuery>{};
+  if (value is! Map) return result;
+  for (final entry in value.entries) {
+    if (entry.key is! String || entry.value is! Map) continue;
+    try {
+      result[entry.key as String] = AgentInventoryQuery.fromJson(
+        Map<String, dynamic>.from(entry.value as Map),
+      );
+    } catch (_) {
+      // A damaged cached snapshot must not prevent recovering the conversation.
+    }
+  }
+  return result;
 }
 
 Map<String, String> _readMessages(Object? value) {
@@ -101,6 +127,7 @@ class AgentController extends ChangeNotifier {
   final Map<String, Map<String, dynamic>> _items = {};
   final Map<String, String> messages = {};
   final Map<String, List<AgentImage>> messageImages = {};
+  final Map<String, AgentInventoryQuery> inventoryQueries = {};
   final List<SavedConversation> _history = [];
   List<SavedConversation> get history => List.unmodifiable(_history);
   List<Map<String, dynamic>> get items => _items.values.toList();
@@ -134,6 +161,7 @@ class AgentController extends ChangeNotifier {
       _pending = saved?['pending'] as Map<String, dynamic>?;
       messages.addAll(_readMessages(saved?['messages']));
       messageImages.addAll(_readImages(saved?['message_images']));
+      inventoryQueries.addAll(_readQueries(saved?['inventory_queries']));
       final savedHistory = saved?['history'];
       if (savedHistory is List) {
         for (final record in savedHistory) {
@@ -165,6 +193,7 @@ class AgentController extends ChangeNotifier {
     _items.clear();
     messages.clear();
     messageImages.clear();
+    inventoryQueries.clear();
     _history.clear();
     busy = false;
   }
@@ -187,6 +216,8 @@ class AgentController extends ChangeNotifier {
         'messages': messages,
         if (messageImages.isNotEmpty)
           'message_images': _saveImages(messageImages),
+        if (inventoryQueries.isNotEmpty)
+          'inventory_queries': _saveQueries(inventoryQueries),
         'history': _history.map((entry) => entry.toJson()).toList(),
       });
     }
@@ -219,6 +250,7 @@ class AgentController extends ChangeNotifier {
         id: id,
         messages: Map.of(messages),
         messageImages: Map.of(messageImages),
+        inventoryQueries: Map.of(inventoryQueries),
         updatedAt: DateTime.now(),
       ),
     );
@@ -235,6 +267,7 @@ class AgentController extends ChangeNotifier {
     _items.clear();
     messages.clear();
     messageImages.clear();
+    inventoryQueries.clear();
   }
 
   Future<void> openConversation(String id) async {
@@ -247,6 +280,7 @@ class AgentController extends ChangeNotifier {
     conversationId = selected.id;
     messages.addAll(selected.messages);
     messageImages.addAll(selected.messageImages);
+    inventoryQueries.addAll(selected.inventoryQueries);
     busy = true;
     _notify();
     final generation = _generation;
@@ -468,13 +502,20 @@ class AgentController extends ChangeNotifier {
     }
   }
 
-  void _applyState(Map<String, dynamic> state) {
+  void _applyState(Map<String, dynamic> state, {String? replyKey}) {
     status = state['status'] as String? ?? status;
     interruptId = state['interrupt_id'] as String?;
     _items.clear();
     _mergeItems(state['items']);
     final pending = state['pending'];
     if (pending is Map) _mergeItems(pending['items']);
+    final query = state['inventory_query'];
+    final key = replyKey ?? 'assistant:${state['request_id']}';
+    if (query is Map && messages.containsKey(key)) {
+      inventoryQueries[key] = AgentInventoryQuery.fromJson(
+        Map<String, dynamic>.from(query),
+      );
+    }
   }
 
   Future<void> _run() async {
@@ -487,6 +528,7 @@ class AgentController extends ChangeNotifier {
     _verified = false;
     error = null;
     messages[replyKey] = '';
+    inventoryQueries.remove(replyKey);
     _notify();
     var terminal = false;
     try {
@@ -498,6 +540,7 @@ class AgentController extends ChangeNotifier {
         pending['path'] as String,
         body: body,
         accessToken: token,
+        inventoryCards: true,
       )) {
         if (!_current(generation)) return;
         final data = event['data'] as Map<String, dynamic>?;
@@ -518,7 +561,7 @@ class AgentController extends ChangeNotifier {
               status = 'WAITING_INPUT';
             }
           case 'done':
-            if (data != null) _applyState(data);
+            if (data != null) _applyState(data, replyKey: replyKey);
             status = event['status'] as String? ?? status;
             terminal = true;
             // RECOVERABLE is a checkpoint, not a completed acknowledgement.

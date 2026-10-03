@@ -5,10 +5,11 @@ import 'page_scroll_fade.dart';
 import 'page_back_button.dart';
 
 class AuthScaffold extends StatelessWidget {
-  const AuthScaffold({required this.child, this.title, super.key});
+  const AuthScaffold({required this.child, this.title, this.footer, super.key});
 
   final Widget child;
   final String? title;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +59,7 @@ class AuthScaffold extends StatelessWidget {
                   ),
                 ),
               Expanded(child: PageScrollFade(child: child)),
+              ?footer,
             ],
           ),
         ),

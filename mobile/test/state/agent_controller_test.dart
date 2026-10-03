@@ -12,6 +12,72 @@ import '../support/integration_fixtures.dart';
 
 void main() {
   test(
+    'query cards stay with their reply through history, recovery and user changes',
+    () async {
+      final store = MemoryAgentStore();
+      var count = 0;
+      String? lastRequest;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          if (request.method == 'GET') {
+            return jsonResponse({
+              'request_id': lastRequest,
+              'status': 'COMPLETED',
+              'items': [],
+            });
+          }
+          final body = jsonDecode(request.body) as Map;
+          expect(request.headers['x-sayfridge-inventory-cards'], '1');
+          lastRequest = body['request_id'] as String;
+          return eventResponse([
+            {'type': 'text_delta', 'delta': 'Here is what I found.'},
+            {
+              'type': 'done',
+              'data': {
+                'request_id': lastRequest,
+                'status': 'COMPLETED',
+                'items': [],
+                if (++count == 1)
+                  'inventory_query': {
+                    'items': [stockJson()],
+                    'total': 1,
+                    'has_more': false,
+                  },
+              },
+            },
+          ]);
+        }),
+      );
+      addTearDown(api.close);
+      final workspace = WorkspaceRepository(api, MemoryTokens());
+      final first = AgentController(workspace, store: store);
+      await first.bindUser('alice');
+      await first.send('What is in my fridge?');
+      final queryReply = first.inventoryQueries.keys.single;
+      final conversation = first.conversationId!;
+      expect(first.inventoryQueries[queryReply]!.items.single.id, 'item-1');
+      await first.send('Generate a report');
+      expect(first.inventoryQueries.keys, [queryReply]);
+      await first.newConversation();
+      expect(first.inventoryQueries, isEmpty);
+      expect(first.history.single.inventoryQueries.keys, [queryReply]);
+      first.dispose();
+      final restored = AgentController(workspace, store: store);
+      addTearDown(restored.dispose);
+      await restored.bindUser('alice');
+      await restored.openConversation(conversation);
+      expect(
+        restored.inventoryQueries[queryReply]!.items.single.displayAmount,
+        1.5,
+      );
+      await restored.bindUser('bob');
+      expect(restored.messages, isEmpty);
+      expect(restored.inventoryQueries, isEmpty);
+      expect(restored.history, isEmpty);
+    },
+  );
+
+  test(
     'earlier conversations survive restart and reopen with their messages',
     () async {
       final store = MemoryAgentStore();

@@ -44,6 +44,8 @@ class AgentState(TypedDict):
     completed_items: list[dict]
     unresolved_reply: dict | None
     revision_scope: list[str] | None
+    inventory_reads: dict
+    inventory_query: dict | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,4 +58,5 @@ class AgentContext:
     cache: dict = field(default_factory=dict)
     user_message: str = ""
     memory_cache: dict = field(default_factory=dict)
+    inventory_cards: bool = False
     history_writer: object = field(default=None, repr=False, compare=False)

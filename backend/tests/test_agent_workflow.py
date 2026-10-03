@@ -1,4 +1,5 @@
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from uuid import uuid4
@@ -114,6 +115,73 @@ def test_tool_runtime_user_is_injected(monkeypatch):
             checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[who])
         await graph.ainvoke(initial(), {"configurable": {"thread_id": "tools"}}, context=AgentContext(user, None, uuid4()))
         assert seen == [user]
+    asyncio.run(scenario())
+
+
+def test_inventory_cards_use_selected_reads_and_survive_replay_but_not_a_report(monkeypatch):
+    from langgraph.prebuilt import ToolRuntime
+    from app.agents.workflow import public_state
+    from test_agent_inventory_results import stock
+    setup_services(monkeypatch)
+    owned_item = stock(estimated=True)
+    user = uuid4()
+    @tool
+    async def list_inventory(runtime: ToolRuntime[AgentContext]) -> str:
+        """Read owned stock."""
+        assert runtime.context.user_id == user
+        return json.dumps({"ok": True, "items": [owned_item], "total": 1})
+    read_call = AIMessage(content="", tool_calls=[{"name": "list_inventory", "args": {}, "id": "owned-read", "type": "tool_call"}])
+    present = AIMessage(content="", tool_calls=[{"name": "present_inventory_results", "args": {
+        "introduction": "Here’s what’s currently in your fridge.", "source_tool_call_ids": ["owned-read"]},
+        "id": "cards", "type": "tool_call"}])
+    async def scenario():
+        graph = build_agent_graph(ScriptModel([read_call, present, read_call.model_copy(update={"id": str(uuid4())}),
+            AIMessage(content="Here’s your report.\n\n## Inventory report\n\n### Fridge\n1. **Milk** — estimated 1.5 L")], intents=[intake(), intake()]),
+            checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[list_inventory])
+        config = {"configurable": {"thread_id": "query-cards"}}
+        context = AgentContext(user, None, uuid4(), inventory_cards=True)
+        query = initial()
+        query["public_turn"] = {"request_id": query["turn_id"], "conversation_id": str(context.conversation_id)}
+        first = await graph.ainvoke(query, config, context=context)
+        result = public_state(first)["inventory_query"]
+        assert result["items"][0]["id"] == owned_item["id"]
+        assert result["items"][0]["is_estimated"] is True
+        assert first["requests"][query["turn_id"]]["state"]["inventory_query"] == result
+        assert first["messages"][-1].content == "Here’s what’s currently in your fridge."
+        public_reply = next(iter(first["history_outbox"].values()))["content"]
+        assert "Milk — estimated 1.5 L; Fridge (expiry: 2026-10-05)" in public_reply
+        assert owned_item["id"] not in public_reply
+        second = await graph.ainvoke({"turn_id": str(uuid4()), "request_fingerprint": "report",
+            "messages": [HumanMessage(content="Generate an inventory report")], "items": [], "context_next": "prepare_context"}, config, context=context)
+        assert "inventory_query" not in public_state(second)
+        assert second["messages"][-1].content.startswith("Here’s your report.")
+        assert second["requests"][query["turn_id"]]["state"]["inventory_query"] == result
+    asyncio.run(scenario())
+
+
+def test_clients_without_card_capability_keep_the_inventory_text_answer(monkeypatch):
+    from test_agent_inventory_results import stock
+    from app.agents.workflow import public_state
+    setup_services(monkeypatch)
+    item = stock()
+    @tool
+    async def list_inventory() -> str:
+        """Read stock."""
+        return json.dumps({"ok": True, "items": [item], "total": 1})
+    class LegacyModel(ScriptModel):
+        async def ainvoke(self, messages, **kwargs):
+            if "agent_internal" in kwargs.get("config", {}).get("tags", []):
+                assert "present_inventory_results" not in messages[0].content
+            return await super().ainvoke(messages, **kwargs)
+    async def scenario():
+        graph = build_agent_graph(LegacyModel([
+            AIMessage(content="", tool_calls=[{"name": "list_inventory", "args": {}, "id": "read", "type": "tool_call"}]),
+            AIMessage(content="Your fridge contains 2 L of milk.")], intents=[intake()]),
+            checkpointer=InMemorySaver(), store=InMemoryStore(), session_factory=fake_session, tools=[list_inventory])
+        result = await graph.ainvoke(initial(), {"configurable": {"thread_id": "legacy-client"}}, context=AgentContext(uuid4(), None, uuid4()))
+        assert "inventory_query" not in public_state(result)
+        assert result["inventory_reads"] == {}
+        assert result["messages"][-1].content == "Your fridge contains 2 L of milk."
     asyncio.run(scenario())
 
 

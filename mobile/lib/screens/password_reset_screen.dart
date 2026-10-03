@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/app_dialog.dart';
+
 import '../theme/app_theme.dart';
 import '../widgets/profile_widgets.dart';
 
@@ -49,13 +51,13 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     // Never store passwords locally or simulate a successful account change.
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => AppDialog(
         title: const Text('Password change unavailable'),
         content: const Text(
           'Password changes are not available yet. Your current password has not been changed.',
         ),
         actions: [
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),
           ),

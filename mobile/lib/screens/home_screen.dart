@@ -112,9 +112,7 @@ class HomeScreen extends StatelessWidget {
                                           const _IdleListenable(),
                                       builder: (context, _) {
                                         final hasUnread =
-                                            notificationController
-                                                ?.notifications
-                                                .isNotEmpty ??
+                                            notificationController?.hasUnread ??
                                             false;
                                         return IconButton(
                                           padding: EdgeInsets.zero,

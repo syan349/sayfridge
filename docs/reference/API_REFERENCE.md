@@ -1092,6 +1092,23 @@ Authorization: Bearer <token>
 | items | All work items in this turn, including completed and pending items |
 | interrupt_id | Present while interrupted; use the current value for resume |
 | pending | Current interrupt payload; pending.items contains items awaiting input |
+| inventory_query | Optional read-only lookup result: items (full InventoryItemRead snapshots), total (nullable for overlapping filters), has_more, as_of. Attached only to the current query reply; reports and stock actions omit it. |
+
+Inventory lookup replies such as “What is in my fridge?” can return a short
+introduction and cards when the client opts in with the HTTP request header
+`X-SayFridge-Inventory-Cards: 1`. Other clients keep text answers and do not
+receive the card presentation tool. Existing request bodies and retry identities
+are unchanged; older backends ignore the header and retain their text replies.
+For an opted-in lookup, the server returns the
+introduction followed by `inventory_query` in the final SSE `done.data` and in
+state recovery. The Agent selects successful, authenticated inventory reads
+from the current turn; cards never come from parsing model prose. Distinct
+batches keep distinct IDs, estimated display amounts retain `is_estimated`, and
+pagination gaps set `has_more`. The same snapshot is retained for request replay.
+Clients associate the cards with that reply, preserve them in conversation history,
+and open the existing inventory detail endpoint using each item's ID. Generated
+reports remain documents grouped by storage space, with item numbering restarting
+at 1 in each group.
 
 Item states are DRAFT, READY, NEEDS_INPUT, NEEDS_CONFIRMATION, SUCCEEDED, FAILED
 and CANCELLED. Optional fields without values can be omitted. COMPLETED means no

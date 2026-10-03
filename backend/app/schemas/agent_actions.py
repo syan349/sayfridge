@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.schemas.business import StorageSpaceCreate, ItemDefinitionCreate
-from app.schemas.inventory import CalendarDate, ShelfLifeInput
+from app.schemas.inventory import CalendarDate, ShelfLifeInput, InventoryItemRead
 from app.schemas.agent_media import AgentImage, validate_image_batch
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
@@ -199,6 +199,20 @@ class AgentItemView(BaseModel):
     display: dict | None = None
 
 
+class PresentInventoryResults(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    introduction: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=280)]
+    source_tool_call_ids: list[str] = Field(min_length=1, max_length=20)
+
+
+class AgentInventoryQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[InventoryItemRead]
+    total: int | None = Field(default=None, ge=0)
+    has_more: bool = False
+    as_of: CalendarDate | None = None
+
+
 class AgentConversationState(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request_id: UUID | None = None
@@ -206,3 +220,4 @@ class AgentConversationState(BaseModel):
     items: list[AgentItemView]
     interrupt_id: str | None = None
     pending: dict | None = None
+    inventory_query: AgentInventoryQuery | None = None
