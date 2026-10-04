@@ -3,13 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../repositories/workspace_repository.dart';
-import '../services/voice_input_service.dart';
-import 'agent_input_panel.dart';
 
 typedef ProposalResponse = ({String? inventoryId, String? message});
 
-/// Select real catalog/space/batch options, with text for details that cannot be
-/// inferred. Answers use the existing item-scoped resume contract.
+/// Select real catalog/space/batch options. Free text uses the chat composer.
 class AgentProposalOptions extends StatefulWidget {
   const AgentProposalOptions({
     required this.workspace,
@@ -18,8 +15,6 @@ class AgentProposalOptions extends StatefulWidget {
     required this.editing,
     required this.enabled,
     required this.onChanged,
-    this.voiceInput,
-    this.onMessage,
     super.key,
   });
 
@@ -28,24 +23,20 @@ class AgentProposalOptions extends StatefulWidget {
   final String? errorCode;
   final bool editing, enabled;
   final ValueChanged<ProposalResponse> onChanged;
-  final VoiceInputService? voiceInput;
-  final ValueChanged<String>? onMessage;
 
   @override
   State<AgentProposalOptions> createState() => _AgentProposalOptionsState();
 }
 
 class _AgentProposalOptionsState extends State<AgentProposalOptions> {
-  final _text = TextEditingController();
   final _groups = <String, List<Map<String, dynamic>>>{};
   final _selected = <String, Map<String, dynamic>>{};
   final _failed = <String>{};
-  bool _loading = false, _showText = false;
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    _text.addListener(_changed);
     final candidates = _maps(widget.details['candidates']);
     if (candidates.isNotEmpty) {
       _groups[candidates.first.containsKey('item_definition_name')
@@ -58,13 +49,6 @@ class _AgentProposalOptionsState extends State<AgentProposalOptions> {
     final spaces = _maps(widget.details['spaces']);
     if (spaces.isNotEmpty) _groups['space'] = spaces;
     _loadOptions();
-  }
-
-  @override
-  void dispose() {
-    _text.removeListener(_changed);
-    _text.dispose();
-    super.dispose();
   }
 
   List<Map<String, dynamic>> _maps(Object? value) => value is List
@@ -112,7 +96,6 @@ class _AgentProposalOptionsState extends State<AgentProposalOptions> {
         'Use category ${jsonEncode(category['name'])} (category_id: ${category['id']}).',
       if (_selected['space'] case final space?)
         'Use storage space ${jsonEncode(space['name'])} (storage_space_id: ${space['id']}).',
-      if (_text.text.trim().isNotEmpty) _text.text.trim(),
     ];
     widget.onChanged((
       inventoryId: _selected['batch']?['id'] as String?,
@@ -127,7 +110,6 @@ class _AgentProposalOptionsState extends State<AgentProposalOptions> {
 
   @override
   Widget build(BuildContext context) {
-    final hasOptions = _groups.values.any((options) => options.isNotEmpty);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -206,31 +188,6 @@ class _AgentProposalOptionsState extends State<AgentProposalOptions> {
             child: const Text('Retry choices'),
           ),
         ],
-        if (!_loading && !hasOptions || _showText) ...[
-          const SizedBox(height: 8),
-          AgentInputPanel(
-            key: const Key('proposal-response-input'),
-            inputKey: const Key('proposal-response-text'),
-            controller: _text,
-            enabled: widget.enabled,
-            inline: true,
-            voiceInput: widget.voiceInput,
-            onMessage: widget.onMessage,
-            maxLength: 1000,
-            hintText: widget.editing
-                ? 'Describe the change'
-                : 'Enter the missing details',
-          ),
-        ] else if (hasOptions)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: widget.enabled
-                  ? () => setState(() => _showText = true)
-                  : null,
-              child: const Text('Describe another detail'),
-            ),
-          ),
       ],
     );
   }

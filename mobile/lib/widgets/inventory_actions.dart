@@ -22,15 +22,6 @@ class InventoryActions extends StatelessWidget {
   final WorkspaceRepository? workspace;
   final Future<void> Function() reload;
 
-  bool get _isExpired {
-    final expiryDate = item.expiryDate;
-    if (expiryDate == null) return false;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
-    return expiry.isBefore(today);
-  }
-
   Future<void> _quantity(
     BuildContext context,
     String operation, {
@@ -263,7 +254,7 @@ class InventoryActions extends StatelessWidget {
               ),
             ),
           ],
-          if (item.isInStock && _isExpired) ...[
+          if (item.isInStock) ...[
             const SizedBox(height: 8),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -277,7 +268,7 @@ class InventoryActions extends StatelessWidget {
                   : () => _state(context, 'discard'),
               child: const _ActionLabel(
                 icon: AppActionIcon(ActionAssets.deleteWhite, size: 20),
-                label: 'Discard expired item',
+                label: 'Discard item',
               ),
             ),
           ],

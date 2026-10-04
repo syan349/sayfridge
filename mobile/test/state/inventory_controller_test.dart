@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sayfridge/models/expiry_summary.dart';
 import 'package:sayfridge/models/inventory_item.dart';
@@ -25,11 +27,62 @@ void main() {
     expect(repository.receivedPage, 2);
     expect(repository.receivedPageSize, 10);
   });
+
+  test(
+    'changing storage preserves the active search and all item filters',
+    () async {
+      final repository = _FakeInventoryRepository();
+      final controller = InventoryController(repository);
+      addTearDown(controller.dispose);
+      await controller.loadInventory(
+        query: 'milk',
+        categoryId: 'dairy',
+        purchaseFrom: DateTime(2026, 9, 1),
+        purchaseTo: DateTime(2026, 9, 30),
+        expiryFrom: DateTime(2026, 10, 1),
+        expiryTo: DateTime(2026, 10, 10),
+        page: 2,
+      );
+      await controller.loadStorageSpace('freezer');
+      expect(repository.receivedFilters, {
+        'query': 'milk',
+        'storageSpaceId': 'freezer',
+        'categoryId': 'dairy',
+        'purchaseFrom': DateTime(2026, 9, 1),
+        'purchaseTo': DateTime(2026, 9, 30),
+        'expiryFrom': DateTime(2026, 10, 1),
+        'expiryTo': DateTime(2026, 10, 10),
+      });
+      expect(repository.receivedPage, 1);
+    },
+  );
+
+  test(
+    'account reset invalidates an unfinished complete selection read',
+    () async {
+      final repository = _FakeInventoryRepository();
+      final controller = InventoryController(repository);
+      addTearDown(controller.dispose);
+      await controller.loadInventory();
+      repository.pending = Completer<InventoryPage>();
+      final selection = controller.matchingItems();
+      final expectation = expectLater(selection, throwsStateError);
+      controller.reset();
+      repository.pending!.complete(
+        const InventoryPage(items: [], total: 0, page: 1, pageSize: 100),
+      );
+      await expectation;
+      expect(controller.items, isEmpty);
+      expect(controller.status, InventoryLoadStatus.initial);
+    },
+  );
 }
 
 class _FakeInventoryRepository implements InventoryRepository {
   int? receivedPage;
   int? receivedPageSize;
+  Map<String, Object?>? receivedFilters;
+  Completer<InventoryPage>? pending;
 
   @override
   Future<InventoryItem> createInventoryItem(InventoryCreateRequest request) {
@@ -69,6 +122,16 @@ class _FakeInventoryRepository implements InventoryRepository {
   }) async {
     receivedPage = page;
     receivedPageSize = pageSize;
+    receivedFilters = {
+      'query': query,
+      'storageSpaceId': storageSpaceId,
+      'categoryId': categoryId,
+      'purchaseFrom': purchaseFrom,
+      'purchaseTo': purchaseTo,
+      'expiryFrom': expiryFrom,
+      'expiryTo': expiryTo,
+    };
+    if (pending != null) return pending!.future;
     return InventoryPage(
       items: const [],
       total: 0,

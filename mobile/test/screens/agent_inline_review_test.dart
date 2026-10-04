@@ -87,13 +87,22 @@ class _Harness {
     String? reply,
     Map<String, dynamic>? query,
     MemoryAgentStore? store,
+    List<Map<String, dynamic>> additionalItems = const [],
   }) {
     item = proposal;
+    otherItems.addAll(additionalItems);
     api = ApiClient(
       client: MockClient((request) async {
         if (request.method == 'GET') {
           if (request.url.path.contains('/agent/conversations/')) {
             stateReads++;
+            if (failResume) {
+              return jsonResponse({
+                'status': 'WAITING_INPUT',
+                'interrupt_id': 'review',
+                'items': [item, ...otherItems],
+              });
+            }
             return jsonResponse({'status': 'COMPLETED', 'items': []});
           }
           if (request.url.path.contains('/inventory-items/')) {
@@ -119,17 +128,33 @@ class _Harness {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         if (request.url.path.endsWith('/resume')) {
           posts.add(body);
+          if (failResume) {
+            return jsonResponse({'detail': 'Connection interrupted'}, 503);
+          }
           final answer = (body['responses'] as List).single as Map;
-          item = {
-            ...item,
-            'proposal_id': answer['decision'] == 'confirm'
-                ? item['proposal_id']
+          final current = answer['item_id'] == item['item_id']
+              ? item
+              : otherItems.firstWhere(
+                  (row) => row['item_id'] == answer['item_id'],
+                );
+          final updated = {
+            ...current,
+            'proposal_id':
+                const {'confirm', 'cancel'}.contains(answer['decision'])
+                ? current['proposal_id']
                 : 'revised',
-            'status': answer['decision'] == 'confirm'
-                ? 'SUCCEEDED'
-                : 'NEEDS_CONFIRMATION',
+            'status': switch (answer['decision']) {
+              'confirm' => 'SUCCEEDED',
+              'cancel' => 'CANCELLED',
+              _ => 'NEEDS_CONFIRMATION',
+            },
             'error': null,
           };
+          if (current == item) {
+            item = updated;
+          } else {
+            otherItems[otherItems.indexOf(current)] = updated;
+          }
         }
         return eventResponse([
           if (reply != null) {'type': 'text_delta', 'delta': reply},
@@ -137,16 +162,17 @@ class _Harness {
             'type': 'done',
             'data': {
               'status':
-                  item.isEmpty ||
-                      {
-                        'SUCCEEDED',
-                        'FAILED',
-                        'CANCELLED',
-                      }.contains(item['status'])
+                  [if (item.isNotEmpty) item, ...otherItems].every(
+                    (row) => {
+                      'SUCCEEDED',
+                      'FAILED',
+                      'CANCELLED',
+                    }.contains(row['status']),
+                  )
                   ? 'COMPLETED'
                   : 'WAITING_INPUT',
               'interrupt_id': 'review',
-              'items': [if (item.isNotEmpty) item],
+              'items': [if (item.isNotEmpty) item, ...otherItems],
               'inventory_query': ?query,
             },
           },
@@ -160,6 +186,8 @@ class _Harness {
   }
 
   late Map<String, dynamic> item;
+  final otherItems = <Map<String, dynamic>>[];
+  bool failResume = false;
   late final ApiClient api;
   late final AgentController agent;
   final posts = <Map<String, dynamic>>[];
@@ -241,8 +269,8 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
-Finder _inlineControl(Finder matching) => find.descendant(
-  of: find.byKey(const Key('proposal-response-input')),
+Finder _answerControl(Finder matching) => find.descendant(
+  of: find.byKey(const Key('assistant-bottom-action')),
   matching: matching,
 );
 
@@ -482,16 +510,21 @@ void main() {
   );
 
   testWidgets(
-    'spoken clarification stays editable and submits only the pending item on Confirm',
+    'spoken clarification stays editable and sends only the pending item from the bottom composer',
     (tester) async {
       final harness = _Harness(_proposal(missing: 'QUANTITY_REQUIRED'));
       final voice = _ReviewVoice('The measured quantity is 3 kg');
       await harness.open(tester, voiceInput: voice);
       expect(find.text('Add supporting photo'), findsNothing);
-      expect(find.byKey(const Key('proposal-response-text')), findsNothing);
-      final confirm = find.widgetWithText(FilledButton, 'Confirm');
-      expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
-      final hold = _inlineControl(find.text('Press and hold to speak'));
+      expect(find.byKey(const Key('assistant-answer-field')), findsNothing);
+      expect(find.widgetWithText(FilledButton, 'Confirm'), findsNothing);
+      expect(find.byKey(const Key('clarification-question')), findsOneWidget);
+      expect(
+        find.text('Please enter your answer below to continue.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('proposal-response-input')), findsNothing);
+      final hold = _answerControl(find.text('Hold to answer'));
       await tester.ensureVisible(hold);
       await tester.pumpAndSettle();
       final gesture = await tester.startGesture(tester.getCenter(hold));
@@ -500,12 +533,12 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
       expect(voice.stopped, isTrue);
-      final text = find.byKey(const Key('proposal-response-text'));
+      final text = find.byKey(const Key('assistant-answer-field'));
       expect(tester.widget<TextField>(text).controller!.text, voice.words);
       expect(tester.widget<TextField>(text).maxLength, 1000);
       expect(harness.posts, isEmpty);
       await tester.enterText(text, 'The measured quantity is 4 kg');
-      await _tap(tester, confirm);
+      await _tap(tester, _answerControl(find.byTooltip('Send message')));
       final answer = (harness.posts.single['responses'] as List).single;
       expect(answer['item_id'], 'apple');
       expect(answer['proposal_id'], 'original');
@@ -518,21 +551,121 @@ void main() {
   );
 
   testWidgets(
-    'cancelled inline speech preserves the typed clarification and selected choices',
+    'switching pending items keeps separate drafts and answers only the selected item',
+    (tester) async {
+      final harness = _Harness(
+        _proposal(missing: 'QUANTITY_REQUIRED'),
+        additionalItems: [
+          {
+            ..._proposal(missing: 'QUANTITY_REQUIRED'),
+            'item_id': 'milk',
+            'proposal_id': 'milk-proposal',
+            'display': {
+              'item_name': 'Milk',
+              'question': 'How much milk is left?',
+            },
+          },
+        ],
+      );
+      await harness.open(tester);
+      final text = find.byKey(const Key('assistant-answer-field'));
+      await _tap(tester, _answerControl(find.byTooltip('Type a message')));
+      expect(
+        tester.widget<TextField>(text).decoration!.hintText,
+        'Waiting for your answer...',
+      );
+      await tester.enterText(text, 'Three kilograms of apples');
+      await _tap(tester, find.text('Answer this item'));
+      await _tap(tester, _answerControl(find.byTooltip('Type a message')));
+      expect(tester.widget<TextField>(text).controller!.text, isEmpty);
+      await tester.enterText(text, 'Milk is 500 ml');
+      await _tap(tester, find.text('Answer this item'));
+      expect(
+        tester.widget<TextField>(text).controller!.text,
+        'Three kilograms of apples',
+      );
+      await _tap(tester, find.text('Answer this item'));
+      expect(tester.widget<TextField>(text).controller!.text, 'Milk is 500 ml');
+      await _tap(tester, _answerControl(find.byTooltip('Send message')));
+      final answer = (harness.posts.single['responses'] as List).single;
+      expect(answer['item_id'], 'milk');
+      expect(answer['proposal_id'], 'milk-proposal');
+      expect(answer['message'], 'Milk is 500 ml');
+      expect(
+        tester.widget<TextField>(text).controller!.text,
+        'Three kilograms of apples',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'failed bottom answers retain their draft for a same-request retry',
+    (tester) async {
+      final harness = _Harness(_proposal(missing: 'QUANTITY_REQUIRED'));
+      await harness.open(tester);
+      harness.failResume = true;
+      await _tap(tester, _answerControl(find.byTooltip('Type a message')));
+      final text = find.byKey(const Key('assistant-answer-field'));
+      await tester.enterText(text, 'Three kilograms of apples');
+      await _tap(tester, _answerControl(find.byTooltip('Send message')));
+      expect(harness.agent.error, isNotNull);
+      expect(
+        tester.widget<TextField>(text).controller!.text,
+        'Three kilograms of apples',
+      );
+      expect(harness.agent.canRespond, isFalse);
+      harness.failResume = false;
+      await _tap(tester, find.text('Retry same request'));
+      expect(harness.posts, hasLength(2));
+      expect(harness.posts.last, harness.posts.first);
+      expect(harness.agent.items.single['status'], 'NEEDS_CONFIRMATION');
+      expect(find.byKey(const Key('cancel-pending-answer')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('separate Cancel resolves only the active pending item', (
+    tester,
+  ) async {
+    final harness = _Harness(
+      _proposal(missing: 'QUANTITY_REQUIRED'),
+      additionalItems: [
+        {
+          ..._proposal(missing: 'QUANTITY_REQUIRED'),
+          'item_id': 'milk',
+          'proposal_id': 'milk-proposal',
+          'display': {'item_name': 'Milk'},
+        },
+      ],
+    );
+    await harness.open(tester);
+    await _tap(tester, find.byKey(const Key('cancel-pending-answer')));
+    final answer = (harness.posts.single['responses'] as List).single;
+    expect(answer['item_id'], 'apple');
+    expect(answer['proposal_id'], 'original');
+    expect(answer['decision'], 'cancel');
+    expect(harness.agent.items.first['status'], 'CANCELLED');
+    expect(harness.agent.items.last['status'], 'NEEDS_INPUT');
+    expect(find.byKey(const Key('cancel-pending-answer')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'cancelled answer speech preserves the typed clarification and selected choices',
     (tester) async {
       final harness = _Harness(_proposal(missing: 'CATEGORY_REQUIRED'));
       final voice = _ReviewVoice('This must not be submitted');
       await harness.open(tester, voiceInput: voice);
       await _tap(tester, find.byKey(const ValueKey('proposal-category-fruit')));
-      await _tap(tester, find.text('Describe another detail'));
-      await _tap(tester, _inlineControl(find.byTooltip('Type a message')));
-      final text = find.byKey(const Key('proposal-response-text'));
+      await _tap(tester, _answerControl(find.byTooltip('Type a message')));
+      final text = find.byKey(const Key('assistant-answer-field'));
       await tester.enterText(text, 'Keep in the fridge');
       await _tap(
         tester,
-        _inlineControl(find.byTooltip('Switch to voice input')),
+        _answerControl(find.byTooltip('Switch to voice input')),
       );
-      final hold = _inlineControl(find.text('Press and hold to speak'));
+      final hold = _answerControl(find.text('Hold to answer'));
       await tester.ensureVisible(hold);
       final gesture = await tester.startGesture(tester.getCenter(hold));
       await tester.pump();
@@ -542,12 +675,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(voice.cancelled, isTrue);
       expect(harness.posts, isEmpty);
-      await _tap(tester, _inlineControl(find.byTooltip('Type a message')));
+      await _tap(tester, _answerControl(find.byTooltip('Type a message')));
       expect(
         tester.widget<TextField>(text).controller!.text,
         'Keep in the fridge',
       );
-      await _tap(tester, find.widgetWithText(FilledButton, 'Confirm'));
+      await _tap(tester, _answerControl(find.byTooltip('Send message')));
       final answer = (harness.posts.single['responses'] as List).single;
       expect(answer['message'], contains('category_id: fruit'));
       expect(answer['message'], contains('Keep in the fridge'));
@@ -556,32 +689,33 @@ void main() {
     },
   );
 
-  testWidgets('inline voice and typing fit a small phone with enlarged text', (
-    tester,
-  ) async {
-    final harness = _Harness(_proposal(missing: 'QUANTITY_REQUIRED'));
-    await harness.open(tester, size: const Size(320, 568), textScale: 1.4);
-    expect(tester.takeException(), isNull);
-    await _tap(tester, _inlineControl(find.byTooltip('Type a message')));
-    await tester.enterText(
-      find.byKey(const Key('proposal-response-text')),
-      'Three kilograms of apples, stored in the fridge.',
-    );
-    tester.view.viewInsets = const FakeViewPadding(bottom: 200);
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-    expect(find.byKey(const Key('assistant-bottom-action')), findsNothing);
-    expect(
-      tester
-          .widget<TextField>(find.byKey(const Key('proposal-response-text')))
-          .controller!
-          .text,
-      'Three kilograms of apples, stored in the fridge.',
-    );
-    tester.view.viewInsets = const FakeViewPadding();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('assistant-bottom-action')), findsOneWidget);
-  });
+  testWidgets(
+    'bottom answer voice and typing fit a small phone with enlarged text',
+    (tester) async {
+      final harness = _Harness(_proposal(missing: 'QUANTITY_REQUIRED'));
+      await harness.open(tester, size: const Size(320, 568), textScale: 1.4);
+      expect(tester.takeException(), isNull);
+      await _tap(tester, _answerControl(find.byTooltip('Type a message')));
+      await tester.enterText(
+        find.byKey(const Key('assistant-answer-field')),
+        'Three kilograms of apples, stored in the fridge.',
+      );
+      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('assistant-bottom-action')), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('assistant-answer-field')))
+            .controller!
+            .text,
+        'Three kilograms of apples, stored in the fridge.',
+      );
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('assistant-bottom-action')), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'editing stays in the chat and uses choices before reconfirming the new proposal',
@@ -593,7 +727,7 @@ void main() {
       await _tap(tester, find.text('Edit details'));
       expect(find.byType(Dialog), findsNothing);
       expect(find.text('Change this proposal'), findsNothing);
-      expect(find.byKey(const Key('proposal-response-text')), findsNothing);
+      expect(find.byKey(const Key('assistant-answer-field')), findsNothing);
       await _tap(tester, find.byKey(const ValueKey('proposal-category-veg')));
       await _tap(tester, find.byKey(const ValueKey('proposal-space-pantry')));
       expect(harness.posts, isEmpty);
@@ -622,7 +756,7 @@ void main() {
     ) async {
       final harness = _Harness(_proposal(missing: missing));
       await harness.open(tester);
-      expect(find.byKey(const Key('proposal-response-text')), findsNothing);
+      expect(find.byKey(const Key('assistant-answer-field')), findsNothing);
       final button = find.widgetWithText(FilledButton, 'Confirm');
       expect(tester.widget<FilledButton>(button).onPressed, isNull);
       await _tap(
@@ -648,18 +782,18 @@ void main() {
   }
 
   testWidgets(
-    'details without choices are entered inline and survive keyboard resizing',
+    'details without choices use the bottom composer and survive keyboard resizing',
     (tester) async {
       final harness = _Harness(_proposal(missing: 'QUANTITY_REQUIRED'));
       await harness.open(tester);
       await _tap(
         tester,
         find.descendant(
-          of: find.byKey(const Key('proposal-response-input')),
+          of: find.byKey(const Key('assistant-bottom-action')),
           matching: find.byTooltip('Type a message'),
         ),
       );
-      final response = find.byKey(const Key('proposal-response-text'));
+      final response = find.byKey(const Key('assistant-answer-field'));
       await tester.ensureVisible(response);
       await tester.enterText(response, 'The measured quantity is 3 kg');
       tester.view.viewInsets = const FakeViewPadding(bottom: 280);
@@ -667,7 +801,7 @@ void main() {
       expect(tester.takeException(), isNull);
       tester.view.viewInsets = const FakeViewPadding();
       await tester.pumpAndSettle();
-      await _tap(tester, find.widgetWithText(FilledButton, 'Confirm'));
+      await _tap(tester, _answerControl(find.byTooltip('Send message')));
       expect(
         (harness.posts.single['responses'] as List).single['message'],
         'The measured quantity is 3 kg',
@@ -820,9 +954,12 @@ void main() {
         await harness.open(tester, command: scenario.command);
         await _capture(tester, scenario.name);
         if (scenario.name == '05-missing-voice') {
-          await _tap(tester, _inlineControl(find.byTooltip('Type a message')));
+          await _tap(tester, _answerControl(find.byTooltip('Type a message')));
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          await _capture(tester, 'answer-keyboard-empty');
           await tester.enterText(
-            find.byKey(const Key('proposal-response-text')),
+            find.byKey(const Key('assistant-answer-field')),
             'One cup holds 250 ml, measured with my measuring cup.',
           );
           FocusManager.instance.primaryFocus?.unfocus();
@@ -831,11 +968,10 @@ void main() {
         }
         if (scenario.name == '03-modify-review') {
           await _tap(tester, find.text('Edit details'));
-          await _tap(tester, find.text('Describe another detail'));
           await _capture(tester, '07-edit-voice');
-          await _tap(tester, _inlineControl(find.byTooltip('Type a message')));
+          await _tap(tester, _answerControl(find.byTooltip('Type a message')));
           await tester.enterText(
-            find.byKey(const Key('proposal-response-text')),
+            find.byKey(const Key('assistant-answer-field')),
             'I used 300 ml, not 500 ml.',
           );
           FocusManager.instance.primaryFocus?.unfocus();
