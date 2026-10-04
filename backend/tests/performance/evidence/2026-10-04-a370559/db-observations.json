@@ -1,0 +1,2414 @@
+[
+  {
+    "utc": "2026-10-04T01:07:59.813332+00:00",
+    "connections": 0,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:01.820591+00:00",
+    "connections": 1,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:03.824030+00:00",
+    "connections": 1,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:05.828690+00:00",
+    "connections": 1,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:07.833952+00:00",
+    "connections": 1,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:09.839025+00:00",
+    "connections": 1,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:11.844296+00:00",
+    "connections": 1,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:13.849594+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:15.856099+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:17.861843+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:19.870278+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:21.877215+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:23.883159+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:25.889778+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:27.895044+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:29.898944+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:31.904927+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:33.918438+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:35.925315+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:37.926860+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:39.929181+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:41.933211+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:43.936472+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:45.942382+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:47.948539+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:49.950291+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:51.955193+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:53.957657+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:55.961560+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:57.968864+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:08:59.973446+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:01.977813+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:03.981224+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:05.986766+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:07.993357+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:10.000039+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:12.004868+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:14.011254+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:16.017331+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:18.021259+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:20.025335+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:22.031920+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:24.036852+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:26.042275+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:28.045853+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:30.051956+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:32.056311+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:34.058629+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:36.063219+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:38.066918+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:40.073431+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:42.077221+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:44.083085+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:46.088497+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:48.093548+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:50.097189+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:52.100210+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:54.104277+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:56.111127+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:09:58.117460+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:00.124218+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:02.133594+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:04.135707+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:06.141240+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:08.147216+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:10.153102+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:12.154624+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:14.159234+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:16.160449+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:18.164186+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:20.169979+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:22.175374+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:24.180801+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:26.187559+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:28.194299+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:30.200019+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:32.205960+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:34.214208+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:36.220040+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:38.235401+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:40.241320+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:42.247219+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:44.250056+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:46.253871+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:48.257799+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:50.263663+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:52.267823+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:54.271838+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:56.277003+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:10:58.283702+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:00.286861+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:02.292735+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:04.298173+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:06.303635+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:08.306108+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:10.313215+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:12.319621+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:14.325970+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:16.331435+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:18.334560+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:20.340765+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:22.345524+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:24.348574+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:26.351558+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:28.355105+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:30.360962+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:32.366370+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:34.369667+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:36.370797+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:38.372571+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:40.378425+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:42.384870+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:44.387525+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:46.389475+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:48.395963+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:50.402498+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:52.405566+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:54.411044+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:56.416617+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:11:58.419250+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:00.425684+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:02.431287+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:04.436667+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:06.438484+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:08.442483+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:10.446328+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:12.451057+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:14.454218+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:16.457066+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:18.461650+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:20.464998+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:22.467406+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:24.471824+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:26.476650+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:28.481809+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:30.484459+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:32.488573+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:34.494849+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:36.496510+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:38.500733+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:40.507416+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:42.512454+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:44.518435+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:46.522737+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:48.528061+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:50.529751+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:52.532211+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:54.536375+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:56.542327+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:12:58.558139+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:00.564461+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:02.570554+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:04.575994+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:06.582226+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:08.586158+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:10.591444+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:12.595999+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:14.601726+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:16.607034+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:18.611613+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:20.613269+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:22.619430+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:24.622232+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:26.627708+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:28.629291+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:30.631931+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:32.638431+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:34.644734+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:36.647197+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:38.653116+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:40.655795+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:42.662649+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:44.669155+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:46.674050+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:48.676472+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:50.682486+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:52.693646+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:54.700617+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:56.706438+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:13:58.711529+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:00.715553+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:02.721404+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:04.727276+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:06.732073+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:08.736888+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:10.742029+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:12.744163+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:14.747602+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:16.757943+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:18.761044+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:20.764766+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:22.770155+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:24.771606+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:26.776028+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:28.781470+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:30.787533+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:32.789890+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:34.796509+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:36.802504+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:38.809174+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:40.811650+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:42.816874+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:44.819448+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:46.826152+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:48.829146+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:50.834242+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:52.839756+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:54.846862+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:56.851410+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:14:58.857694+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:00.860942+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:02.866462+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:04.869002+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:06.871349+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:08.875605+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:10.880483+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:12.885882+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:14.889298+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:16.895389+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:18.900698+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:20.903521+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:22.908543+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:24.914391+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:26.921456+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:28.928028+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:30.934690+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:32.941196+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:34.947391+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:36.950459+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:38.954460+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:40.956052+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:42.957380+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:44.958502+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:46.964439+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:48.969982+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:50.976056+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:52.981799+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:54.988849+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:56.995208+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:15:59.000285+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:01.006632+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:03.013306+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:05.018994+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:07.025438+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:09.030590+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:11.037088+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:13.043077+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:15.046078+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:17.052186+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:19.055735+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:21.061956+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:23.065814+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:25.070366+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:27.074496+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:29.082177+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:31.088176+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:33.094318+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:35.101091+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:37.103694+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:39.106469+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:41.109819+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:43.116163+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:45.118891+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:47.123907+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:49.130067+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:51.135399+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:53.137354+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:55.143603+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:57.150483+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:16:59.152187+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:01.153662+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:03.159491+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:05.163934+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:07.167053+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:09.172205+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:11.177772+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:13.180593+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:15.182101+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:17.188611+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:19.193870+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:21.200267+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:23.205501+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:25.212641+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:27.219306+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:29.222420+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:31.229117+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:33.231415+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:35.238144+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:37.244892+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:39.251859+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:41.259346+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:43.266086+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:45.272103+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:47.274100+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:49.279886+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:51.284290+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:53.290891+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:55.297592+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:57.300650+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:17:59.307295+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:01.309217+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:03.313892+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:05.315592+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:07.322352+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:09.328900+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:11.335187+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:13.342181+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:15.347342+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:17.351044+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:19.352435+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:21.354416+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:23.360374+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:25.367690+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:27.374147+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:29.380596+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:31.387117+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:33.393356+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:35.396532+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:37.400597+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:39.406228+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:41.412042+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:43.418913+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:45.423751+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:47.430523+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:49.434089+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:51.440359+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:53.443981+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:55.449335+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:57.456007+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:18:59.458247+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:01.463396+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:03.469978+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:05.476609+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:07.483531+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:09.490139+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:11.497000+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:13.503244+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:15.510207+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:17.513879+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:19.518675+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:21.523812+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:23.530031+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:25.534153+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:27.540407+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:29.547391+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:31.549100+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:33.553816+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:35.559035+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:37.562035+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:39.566342+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:41.571450+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:43.577810+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:45.580744+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:47.584287+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:49.590257+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:51.594833+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:53.600383+00:00",
+    "connections": 2,
+    "active": 1,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:55.605753+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:57.608953+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:19:59.613681+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:01.620298+00:00",
+    "connections": 2,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:03.626388+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:05.630910+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:07.633689+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:09.638454+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:11.641013+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:13.645338+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:15.651345+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:17.653471+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:19.668004+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:21.675146+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:23.681457+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:25.687959+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:27.691445+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:29.695236+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:31.699394+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:33.701936+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:35.703782+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:37.710440+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:39.713731+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:41.720295+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:43.725309+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:45.732209+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:47.738037+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:49.742747+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:51.744515+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:53.749072+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:55.754602+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:57.759296+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:20:59.766358+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:01.772648+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:03.778286+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:05.784352+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:07.789469+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:09.792147+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:11.797302+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:13.802236+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:15.809102+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:17.815884+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:19.821312+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:21.827266+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  },
+  {
+    "utc": "2026-10-04T01:21:23.833100+00:00",
+    "connections": 4,
+    "active": 0,
+    "lock_waiters": 0
+  }
+]

@@ -229,6 +229,18 @@ failure/cancellation/skipped/missing outcomes; YAML and reusable workflow target
 are checked locally. Run the complete multi-module suite through the manual GitHub workflow and
 retain its result and SHA as release evidence.
 
+## Performance record
+
+The [Performance Test Record](records/PERFORMANCE_TEST_RECORD.md) records the
+2026-10-04 measurements: a 10-minute, 5 RPS baseline with 100 users, 50,000
+inventory batches and 500,000 quantity operations; 120 hosted Vercel/Neon business
+reads; separate login/refresh and contention checks; and 10 real-model Agent
+samples. The REST baseline and hosted reads passed. Nine Agent samples completed;
+one returned `rate_limit_exceeded`. The record retains individual timings, the
+failure, code identities, cleanup verification and reproduction scripts. A separate
+historical section preserves the 2026-09-29 hosted latency measurements and the
+Vercel function-region comparison, with the original timing extract.
+
 ## Manual integration record
 
 The [Manual Integration Test Record](reports/MANUAL_INTEGRATION_TEST_RECORD.md)
@@ -248,6 +260,7 @@ results; issue closure does not establish a passing retest.
 
 | Work packages | Report | Scope |
 | --- | --- | --- |
+| Performance baseline and hosted response | [Performance test record](records/PERFORMANCE_TEST_RECORD.md) | 2026-09-29 hosted region comparison; 2026-10-04 large-data REST load, hosted reads, authentication, contention and real-model SSE timings |
 | Manual integration during development | [Manual integration test record — issue #139](reports/MANUAL_INTEGRATION_TEST_RECORD.md) | 13 cases with setup, steps, expected results, observations, fixes and evidence |
 | Documentation consolidation | [Documentation review — 2026-10-02](reports/DOCUMENTATION_REVIEW.md) | Navigation, links, command syntax, source consistency and evidence preservation |
 | Security 8.1–8.6 | [Security and Privacy](../security/README.md) | Authorization, hostile inputs, uploads, tokens, logging and dependency audit |

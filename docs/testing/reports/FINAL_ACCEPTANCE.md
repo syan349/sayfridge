@@ -36,6 +36,22 @@ The [delivery runbook](../../delivery/README.md) owns commands, configuration an
 deployment order. Run results identify the selected release rather than reusing
 older results as if they tested the final commit.
 
+## Performance verification — 2026-10-04
+
+The [Performance Test Record](../records/PERFORMANCE_TEST_RECORD.md) measures
+local main `a370559786f5305a36b0f48d729792451c38eaff` and hosted Backend
+`e538779976a46e1a218c8e4d59bbbaeb374fa9b3`. Their committed Backend trees are
+identical. The local baseline sustained 5 RPS for 10 minutes with 50,000 batches
+and 500,000 operations: 3,000 valid requests, read p95 37.64 ms, write p95 30.23 ms,
+and no errors or dropped arrivals. All 120 hosted read samples passed, with p95
+154.61 ms. Exact balance/version persistence and contention checks passed.
+
+Nine of 10 real-model Agent samples completed. The tenth returned
+`rate_limit_exceeded`; the record retains this finding and the model timings.
+Select and rerun the final release as needed, then enter its outcome in the
+release validation table above. These dated measurements preserve the tested
+versions and remain separate from the pending final release identity.
+
 ## Backend release-readiness verification — 2026-10-02
 
 The three authentication controls were rebuilt on the fresh main-derived branch

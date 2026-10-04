@@ -1,0 +1,1247 @@
+{
+  "started_utc": "2026-10-04T01:10:08.924919+00:00",
+  "api": "https://sayfridge-backend-preview.vercel.app/api/v1",
+  "client_location": "Auckland, New Zealand; operator Mac",
+  "transport": "HTTPS from operator internet connection to Vercel; existing Neon database",
+  "account": "ben.demo (existing ordinary demonstration account)",
+  "scope": "120 authenticated GETs at no more than 1 request/second; login/logout create/revoke only this test session; no business writes",
+  "harness_sha256": "e37da8aa54688241ef87f4bc2952b0da3ea01667b79ae8f353381b9f9cf61823",
+  "connection_reuse": true,
+  "timeout_seconds": 20,
+  "rows": [
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:15.949384+00:00",
+      "elapsed_ms": 82.438,
+      "status": 200,
+      "ok": true,
+      "phase": "warmup"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:17.035984+00:00",
+      "elapsed_ms": 129.699,
+      "status": 200,
+      "ok": true,
+      "phase": "warmup"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:18.169293+00:00",
+      "elapsed_ms": 82.171,
+      "status": 200,
+      "ok": true,
+      "phase": "warmup"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:19.255583+00:00",
+      "elapsed_ms": 75.973,
+      "status": 200,
+      "ok": true,
+      "phase": "warmup"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:20.334830+00:00",
+      "elapsed_ms": 99.429,
+      "status": 200,
+      "ok": true,
+      "phase": "warmup"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:21.436940+00:00",
+      "elapsed_ms": 168.085,
+      "status": 200,
+      "ok": true,
+      "phase": "warmup"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:21.605080+00:00",
+      "elapsed_ms": 77.462,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:22.605206+00:00",
+      "elapsed_ms": 115.263,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:23.607991+00:00",
+      "elapsed_ms": 176.542,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:24.612024+00:00",
+      "elapsed_ms": 136.971,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:25.616707+00:00",
+      "elapsed_ms": 70.75,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:26.616938+00:00",
+      "elapsed_ms": 74.94,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:27.620013+00:00",
+      "elapsed_ms": 73.581,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:28.623495+00:00",
+      "elapsed_ms": 76.007,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:29.627446+00:00",
+      "elapsed_ms": 73.359,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:30.631123+00:00",
+      "elapsed_ms": 71.226,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:31.636156+00:00",
+      "elapsed_ms": 87.316,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:32.636920+00:00",
+      "elapsed_ms": 74.971,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:33.641945+00:00",
+      "elapsed_ms": 88.98,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:34.645950+00:00",
+      "elapsed_ms": 143.048,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:35.646385+00:00",
+      "elapsed_ms": 110.882,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:36.649416+00:00",
+      "elapsed_ms": 159.295,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:37.654434+00:00",
+      "elapsed_ms": 87.242,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:38.659209+00:00",
+      "elapsed_ms": 71.666,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:39.664164+00:00",
+      "elapsed_ms": 76.339,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:40.667335+00:00",
+      "elapsed_ms": 69.822,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:41.671125+00:00",
+      "elapsed_ms": 67.689,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:42.671470+00:00",
+      "elapsed_ms": 66.884,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:43.674106+00:00",
+      "elapsed_ms": 78.853,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:44.675720+00:00",
+      "elapsed_ms": 90.56,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:45.679594+00:00",
+      "elapsed_ms": 138.081,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:46.680381+00:00",
+      "elapsed_ms": 154.608,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:47.684925+00:00",
+      "elapsed_ms": 134.14,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:48.685344+00:00",
+      "elapsed_ms": 80.972,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:49.690370+00:00",
+      "elapsed_ms": 86.465,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:50.693910+00:00",
+      "elapsed_ms": 70.013,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:51.698915+00:00",
+      "elapsed_ms": 81.383,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:52.702486+00:00",
+      "elapsed_ms": 66.965,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:53.707520+00:00",
+      "elapsed_ms": 70.916,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:54.710830+00:00",
+      "elapsed_ms": 68.884,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:55.710887+00:00",
+      "elapsed_ms": 72.031,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:56.715250+00:00",
+      "elapsed_ms": 82.158,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:57.719437+00:00",
+      "elapsed_ms": 126.007,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:58.723965+00:00",
+      "elapsed_ms": 109.906,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:10:59.724859+00:00",
+      "elapsed_ms": 150.781,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:00.728285+00:00",
+      "elapsed_ms": 68.145,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:01.729103+00:00",
+      "elapsed_ms": 84.878,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:02.730581+00:00",
+      "elapsed_ms": 111.971,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:03.735618+00:00",
+      "elapsed_ms": 83.454,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:04.739518+00:00",
+      "elapsed_ms": 75.007,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:05.743768+00:00",
+      "elapsed_ms": 66.923,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:06.744686+00:00",
+      "elapsed_ms": 72.815,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:07.749712+00:00",
+      "elapsed_ms": 75.548,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:08.754737+00:00",
+      "elapsed_ms": 103.647,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:09.757010+00:00",
+      "elapsed_ms": 152.365,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:10.760982+00:00",
+      "elapsed_ms": 127.488,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:11.764298+00:00",
+      "elapsed_ms": 70.085,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:12.768350+00:00",
+      "elapsed_ms": 218.74,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:13.770910+00:00",
+      "elapsed_ms": 69.212,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:14.773862+00:00",
+      "elapsed_ms": 83.172,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:15.778874+00:00",
+      "elapsed_ms": 72.759,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:16.779993+00:00",
+      "elapsed_ms": 70.574,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:17.784747+00:00",
+      "elapsed_ms": 75.784,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:18.785672+00:00",
+      "elapsed_ms": 64.704,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:19.789193+00:00",
+      "elapsed_ms": 74.285,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:20.793989+00:00",
+      "elapsed_ms": 126.731,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:21.795171+00:00",
+      "elapsed_ms": 102.574,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:22.797230+00:00",
+      "elapsed_ms": 147.999,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:23.801369+00:00",
+      "elapsed_ms": 69.379,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:24.803802+00:00",
+      "elapsed_ms": 81.674,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:25.804072+00:00",
+      "elapsed_ms": 68.339,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:26.804706+00:00",
+      "elapsed_ms": 78.927,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:27.806003+00:00",
+      "elapsed_ms": 73.284,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:28.810617+00:00",
+      "elapsed_ms": 69.771,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:29.813365+00:00",
+      "elapsed_ms": 87.285,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:30.814883+00:00",
+      "elapsed_ms": 71.325,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:31.819910+00:00",
+      "elapsed_ms": 104.959,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:32.821596+00:00",
+      "elapsed_ms": 157.866,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:33.825862+00:00",
+      "elapsed_ms": 129.857,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:34.827265+00:00",
+      "elapsed_ms": 175.65,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:35.832283+00:00",
+      "elapsed_ms": 74.393,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:36.836628+00:00",
+      "elapsed_ms": 71.587,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:37.838924+00:00",
+      "elapsed_ms": 71.874,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:38.843715+00:00",
+      "elapsed_ms": 73.876,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:39.847911+00:00",
+      "elapsed_ms": 75.817,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:40.852942+00:00",
+      "elapsed_ms": 70.024,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:41.855486+00:00",
+      "elapsed_ms": 68.512,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:42.855587+00:00",
+      "elapsed_ms": 82.973,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:43.860138+00:00",
+      "elapsed_ms": 127.777,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:44.863472+00:00",
+      "elapsed_ms": 104.677,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:45.868496+00:00",
+      "elapsed_ms": 147.225,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:46.872130+00:00",
+      "elapsed_ms": 72.991,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:47.875198+00:00",
+      "elapsed_ms": 90.358,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:48.878241+00:00",
+      "elapsed_ms": 125.419,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:49.879440+00:00",
+      "elapsed_ms": 78.899,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:50.884438+00:00",
+      "elapsed_ms": 125.218,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:51.886312+00:00",
+      "elapsed_ms": 96.332,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:52.891333+00:00",
+      "elapsed_ms": 74.565,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:53.894447+00:00",
+      "elapsed_ms": 106.849,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:54.899473+00:00",
+      "elapsed_ms": 90.249,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:55.900096+00:00",
+      "elapsed_ms": 138.317,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:56.903519+00:00",
+      "elapsed_ms": 119.53,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:57.904199+00:00",
+      "elapsed_ms": 75.686,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:58.909222+00:00",
+      "elapsed_ms": 74.233,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:11:59.910464+00:00",
+      "elapsed_ms": 69.27,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:00.910725+00:00",
+      "elapsed_ms": 77.013,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:01.912102+00:00",
+      "elapsed_ms": 76.738,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:02.915752+00:00",
+      "elapsed_ms": 72.734,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:03.919498+00:00",
+      "elapsed_ms": 72.345,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:04.924534+00:00",
+      "elapsed_ms": 70.951,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:05.926595+00:00",
+      "elapsed_ms": 80.597,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:06.929367+00:00",
+      "elapsed_ms": 117.198,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:07.934386+00:00",
+      "elapsed_ms": 104.029,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:08.938297+00:00",
+      "elapsed_ms": 145.645,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:09.939501+00:00",
+      "elapsed_ms": 80.618,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:10.943723+00:00",
+      "elapsed_ms": 75.947,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:11.944030+00:00",
+      "elapsed_ms": 79.592,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:12.947269+00:00",
+      "elapsed_ms": 153.193,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:13.950078+00:00",
+      "elapsed_ms": 118.364,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:14.954932+00:00",
+      "elapsed_ms": 168.111,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_list",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:15.960101+00:00",
+      "elapsed_ms": 95.664,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_search",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:16.965064+00:00",
+      "elapsed_ms": 102.28,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_space_filter",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:17.965667+00:00",
+      "elapsed_ms": 105.385,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "inventory_detail",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:18.970703+00:00",
+      "elapsed_ms": 134.226,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "operation_history_page",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:19.973487+00:00",
+      "elapsed_ms": 121.432,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    },
+    {
+      "scenario": "expiry_summary",
+      "method": "GET",
+      "utc": "2026-10-04T01:12:20.976995+00:00",
+      "elapsed_ms": 70.619,
+      "status": 200,
+      "ok": true,
+      "phase": "sample"
+    }
+  ],
+  "deployed_version": {
+    "service": "sayfridge-backend",
+    "version": "0.1.0",
+    "commit_sha": "e538779976a46e1a218c8e4d59bbbaeb374fa9b3"
+  },
+  "version_request": {
+    "scenario": "version",
+    "method": "GET",
+    "utc": "2026-10-04T01:10:08.963050+00:00",
+    "elapsed_ms": 4151.049,
+    "status": 200,
+    "ok": true
+  },
+  "login": {
+    "scenario": "login",
+    "method": "POST",
+    "utc": "2026-10-04T01:10:13.114128+00:00",
+    "elapsed_ms": 1675.096,
+    "status": 200,
+    "ok": true
+  },
+  "inventory_setup": {
+    "scenario": "inventory_setup",
+    "method": "GET",
+    "utc": "2026-10-04T01:10:14.789272+00:00",
+    "elapsed_ms": 155.534,
+    "status": 200,
+    "ok": true
+  },
+  "account_inventory_batches": 3,
+  "account_first_page_items": 3,
+  "sample_duration_seconds": 119.443,
+  "completed": true,
+  "logout": {
+    "scenario": "logout",
+    "method": "POST",
+    "utc": "2026-10-04T01:12:21.063578+00:00",
+    "elapsed_ms": 236.855,
+    "status": 204,
+    "ok": true
+  },
+  "summary": {
+    "requests": 120,
+    "failures": 0,
+    "p50_ms": 80.618,
+    "p95_ms": 154.608,
+    "p99_ms": 176.542,
+    "max_ms": 218.74
+  },
+  "scenarios": {
+    "expiry_summary": {
+      "requests": 20,
+      "failures": 0,
+      "p50_ms": 83.172,
+      "p95_ms": 157.866,
+      "p99_ms": 168.111,
+      "max_ms": 168.111
+    },
+    "inventory_detail": {
+      "requests": 20,
+      "failures": 0,
+      "p50_ms": 80.972,
+      "p95_ms": 159.295,
+      "p99_ms": 218.74,
+      "max_ms": 218.74
+    },
+    "inventory_list": {
+      "requests": 20,
+      "failures": 0,
+      "p50_ms": 81.383,
+      "p95_ms": 147.225,
+      "p99_ms": 152.365,
+      "max_ms": 152.365
+    },
+    "inventory_search": {
+      "requests": 20,
+      "failures": 0,
+      "p50_ms": 75.007,
+      "p95_ms": 154.608,
+      "p99_ms": 175.65,
+      "max_ms": 175.65
+    },
+    "inventory_space_filter": {
+      "requests": 20,
+      "failures": 0,
+      "p50_ms": 75.784,
+      "p95_ms": 150.781,
+      "p99_ms": 176.542,
+      "max_ms": 176.542
+    },
+    "operation_history_page": {
+      "requests": 20,
+      "failures": 0,
+      "p50_ms": 78.899,
+      "p95_ms": 127.777,
+      "p99_ms": 138.317,
+      "max_ms": 138.317
+    }
+  },
+  "finished_utc": "2026-10-04T01:12:21.300743+00:00"
+}
