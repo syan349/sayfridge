@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../widgets/page_scroll_fade.dart';
 
 import '../models/inventory_item.dart';
-import '../models/item_definition.dart';
 import '../repositories/item_artwork_repository.dart';
 import '../repositories/workspace_repository.dart';
 import '../widgets/storage_space_management.dart';
@@ -359,111 +358,21 @@ class _ManualStockInScreenState extends State<ManualStockInScreen> {
           ),
   );
 
-  Widget _nameField(bool enabled) => LayoutBuilder(
-    builder: (context, constraints) => RawAutocomplete<ItemDefinition>(
-      textEditingController: _nameController,
-      focusNode: _nameFocus,
-      displayStringForOption: (item) => item.name,
-      optionsBuilder: (value) {
-        final query = value.text.trim().toLowerCase();
-        if (query.isEmpty ||
-            !enabled ||
-            widget.controller.isLoadingDefinitions) {
-          return const Iterable<ItemDefinition>.empty();
-        }
-        return widget.controller.definitions.where(
-          (item) => item.name.toLowerCase().contains(query),
-        );
-      },
-      onSelected: (item) {
-        widget.controller.selectDefinition(item.id);
-        setState(() {});
-      },
-      fieldViewBuilder: (context, controller, focus, onSubmitted) =>
-          TextFormField(
-            key: const Key('add-item-name'),
-            controller: controller,
-            focusNode: focus,
-            enabled: enabled,
-            textCapitalization: TextCapitalization.sentences,
-            textInputAction: TextInputAction.next,
-            onChanged: (_) => setState(() {}),
-            onFieldSubmitted: (_) => onSubmitted(),
-            validator: (value) => (value?.trim().isEmpty ?? true)
-                ? 'Enter an item name.'
-                : value!.trim().length > 100
-                ? 'Maximum 100 characters'
-                : null,
-            decoration: InputDecoration(
-              hintText: 'Item name',
-              suffixIconConstraints: const BoxConstraints(
-                minWidth: 34,
-                minHeight: 40,
-              ),
-              suffixIcon: widget.controller.isLoadingDefinitions
-                  ? const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : IconButton(
-                      tooltip: 'Choose existing item',
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(Icons.keyboard_arrow_down, size: 22),
-                      onPressed: enabled ? _chooseExistingItem : null,
-                    ),
-            ),
-          ),
-      optionsViewBuilder: (context, onSelected, options) => Align(
-        alignment: Alignment.topLeft,
-        child: Material(
-          elevation: 3,
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(10),
-          child: SizedBox(
-            width: constraints.maxWidth,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 180),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (context, index) {
-                  final item = options.elementAt(index);
-                  return ListTile(
-                    title: Text(item.name),
-                    onTap: () => onSelected(item),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
+  Widget _nameField(bool enabled) => TextFormField(
+    key: const Key('add-item-name'),
+    controller: _nameController,
+    focusNode: _nameFocus,
+    enabled: enabled,
+    textCapitalization: TextCapitalization.sentences,
+    textInputAction: TextInputAction.next,
+    onChanged: (_) => setState(() {}),
+    validator: (value) => (value?.trim().isEmpty ?? true)
+        ? 'Enter an item name.'
+        : value!.trim().length > 100
+        ? 'Maximum 100 characters'
+        : null,
+    decoration: const InputDecoration(hintText: 'Item name'),
   );
-
-  Future<void> _chooseExistingItem() async {
-    _nameFocus.unfocus();
-    final id = await showSelectionSheet(
-      context,
-      title: 'Choose item',
-      options: {
-        for (final item in widget.controller.definitions) item.id: item.name,
-      },
-      selected: widget.controller.selectedDefinitionId,
-    );
-    if (!mounted || id == null) return;
-    final item = widget.controller.definitions
-        .where((item) => item.id == id)
-        .firstOrNull;
-    if (item == null) return;
-    _nameController.text = item.name;
-    widget.controller.selectDefinition(id);
-    setState(() {});
-  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
