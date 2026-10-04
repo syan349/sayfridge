@@ -189,8 +189,8 @@ fell from 57,962,360 to 949,427 (98.36% reduction, above the 70% requirement).
 Total serialized checkpoint/blob/write payload fell from 87,481,767 to 1,844,972
 bytes. Both runs retained 600 checkpoints. Nine warmed reads gave median latest
 state recovery of 4.07 ms versus 9.92 ms, within `baseline * 1.25 + 100 ms`.
-These are representative local serialization measurements, not physical disk
-usage, hosted latency, or a guarantee that checkpoint count/state size stops growing.
+Measurement scope: serialized local checkpoint size. Physical disk usage, hosted
+latency and long-term checkpoint growth require separate measurements.
 
 Tests cover update boundaries 49/50/51, reconstruction with a new saver/connection,
 legacy full-state upgrade, old pending confirmation executed exactly once, mixed

@@ -32,8 +32,9 @@ pass; no product-code or remote-database change was used to mask the failure.
 The configured remote database passed read-only ORM verification (11 tables,
 96 columns); its revision was `a261001_sessions`, with 25 active categories and
 105 inventory rows. Runtime/direct connection targets matched. This change has
-no ORM or migration edits. These checks do not establish the deployed service's
-environment configuration or confirm a code deployment.
+no ORM or migration edits. Verified target: the configured remote database.
+At the time of release, record deployed service configuration and version checks
+in the [Final Acceptance Record](FINAL_ACCEPTANCE.md).
 
 ## Category and schema verification — 2026-09-26
 
@@ -50,9 +51,9 @@ tests validate database checks and confirmation, not semantic classification acc
 
 ### Fixed model-evaluation cases
 
-These are manual/live-model evaluation expectations, not a rule-based classifier or a measured
-accuracy claim. Run with a seeded isolated test database and explicit live-model opt-in; record
-model/version, date, category result, clarification, and confirmation behavior.
+The table defines live-model acceptance cases. Run with a seeded isolated test
+database and explicit live-model opt-in; record model/version, date, classification,
+clarification and confirmation results per run.
 
 | Input | Expected result |
 | --- | --- |

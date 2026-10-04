@@ -58,6 +58,21 @@ initial facts stay unchanged, confirmed becomes 8 pieces, and the estimate is cl
 Subsequent operations use pieces. An incorrect stocktake is corrected by another
 RECONCILE. Reconciliation records a new confirmation even when the total is unchanged.
 
+## Correction and undo
+
+The current release provides no undo workflow for committed inventory operations.
+Directly restoring an earlier balance overwrites subsequent stock changes.
+An undo implementation must account for those changes and preserve the operation
+history.
+
+Users correct stock by entering the actual remaining total through RECONCILE.
+The correction creates a new operation record; earlier operations remain in the
+history. `UNDONE` and `undone_at` are reserved for an undo workflow.
+
+Cancel applies to a pending Agent proposal before its stock write. It does not
+reverse a completed operation. See the
+[product scope](../product/README.md#inventory-operation-undo).
+
 ## Batches and history
 
 Use ADD to supplement the same stock batch; create a new batch for a purchase with

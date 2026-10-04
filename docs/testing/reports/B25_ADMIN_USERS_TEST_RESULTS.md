@@ -30,7 +30,9 @@ python -m pytest -v tests/test_admin_users.py --strict-markers
 ## Verification status
 
 All 9 B25 scenarios passed locally in 56.00 seconds. Three representative scenarios
-are marked for the core selection. The complete regression suite and manual Postman
-acceptance remain pending. GitHub Actions is currently unavailable because the
-organization has exhausted its Actions quota. No database structure change or
-migration script is required.
+are marked for the core selection.
+
+On 2026-09-24, GitHub Actions execution was blocked by the organization's
+exhausted quota. This change used the existing schema and migrations. At the time
+of release, record Full Regression and manual Postman acceptance for the selected
+commit in the [Final Acceptance Record](FINAL_ACCEPTANCE.md).

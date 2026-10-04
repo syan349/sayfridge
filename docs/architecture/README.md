@@ -32,6 +32,19 @@ flowchart LR
 | Pooled and direct database connections | Runtime business queries use the pooled URL. Migrations, Agent persistence and conversation advisory locks use direct connections. |
 | Render plus Vercel plus Neon | Static clients are built separately from the Python service. Environment configuration supplies API origins, CORS and secrets. Deployment instructions belong to the delivery guide. |
 
+### Voice interaction and usage policy
+
+Mobile uses device/browser speech recognition to produce editable text. The
+Backend processes that text and returns text replies. The team selected this
+flow to focus on inventory reliability and control integration effort, latency
+and operating costs within the development schedule. Spoken replies and Backend
+speech processing are not implemented.
+
+The prototype has no cumulative per-user usage quota. The team deferred quota
+design until usage and cost data are available. The database voice counters are unused;
+authentication and request limits remain active. Current behavior and deferred
+work are recorded in the [product scope](../product/README.md#deferred-non-core-features).
+
 ## Request and data boundaries
 
 [Backend design](BACKEND_DESIGN.md) describes the HTTP lifecycle, transaction
@@ -42,7 +55,7 @@ maintains the graph, memory, confirmation and recovery rules.
 
 ## Capacity assumptions and scaling
 
-Use the following **initial engineering assumptions** to establish a repeatable performance baseline. They have not been validated by user research or measurements. Review them before the first performance test and update both load and acceptance targets when requirements change.
+The following **initial engineering assumptions** define the performance baseline. The [performance record](../testing/records/PERFORMANCE_TEST_RECORD.md) records the measured results. Update load assumptions and acceptance targets when requirements change.
 
 | Topic | Initial assumption and purpose |
 | --- | --- |
@@ -52,7 +65,7 @@ Use the following **initial engineering assumptions** to establish a repeatable 
 | Hotspots | Test independent spaces, different inventory items in the same space, and concurrent writes to the same item separately |
 | Initial performance target | After warm-up, sustain normal load for 10 minutes; read p95 ≤ 500 ms, ordinary single-item write p95 ≤ 1,000 ms, unexpected error rate < 1% |
 
-p95 means 95% of requests complete within that duration. These are targets to verify, not current performance promises. Reports must identify application/database specifications and regions, client location, data volume, connection pools, versions, and commands. Report cold starts, login password hashing, and batch operations separately. Track deliberately induced version/state conflicts separately rather than mixing them into normal-load results to conceal errors.
+p95 means 95% of requests complete within that duration. The table defines performance acceptance targets; the performance record contains measured results. Reports must identify application/database specifications and regions, client location, data volume, connection pools, versions, and commands. Report cold starts, login password hashing, and batch operations separately. Record deliberately induced version/state conflicts separately from normal-load errors.
 
 Measure API latency, errors, database connections, query time, and lock waits before optimizing. For slow queries, inspect execution plans, indexes, and pagination. For connection pressure, adjust per-instance limits so instance count times connection budget stays within database capacity. Consider more application instances when application CPU saturates. Current per-space serialization prioritizes correctness; if it becomes a bottleneck, review lock granularity and rerun consistency tests.
 

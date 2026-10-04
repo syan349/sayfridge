@@ -74,9 +74,9 @@ status and error body. A successful service return and the route's response
 metadata are assembled by FastAPI; application code does not manually concatenate
 the status, headers and JSON bytes.
 
-More APIs do not necessarily require more tables. Updating data requires no
-migration; adding fields requires matching model, table definition, schema and API
-updates.
+API endpoints expose operations over shared business entities. Data-only updates
+use the existing schema; adding fields requires matching model, migration, schema
+and API updates.
 
 ## 6. State and relationship rules
 
@@ -112,7 +112,7 @@ The session dependency only yields a session; exiting it does not commit busines
 
 After locking, fetch current database values instead of reusing ORM values cached during authentication or planning. Space ownership and catalog ownership are immutable. Lock order is space → category → definition → inventory, with IDs sorted within each type; lock only required records. Administrator changes to a single category/definition also respect relevant ordering. If batch relationships changed during the wait, roll back and return RESOURCE_CHANGED instead of acquiring reverse-order locks while already holding some locks.
 
-The implementation favors understandable serialization. Writes in the same space may wait for each other. Refine lock granularity only if performance requires it, with repeated consistency verification.
+Writes affecting the same space serialize through row locks. Use measured contention to guide lock-granularity changes, and rerun consistency tests after each change.
 
 ### 7.3 User-scoped idempotency
 
@@ -125,7 +125,7 @@ The implementation favors understandable serialization. Writes in the same space
 7. An existing non-SUCCESS record with the key produces an explicit conflict; do not automatically reapply historical state. The quantity-operation ledger records no failed requests, so a key may be retried before any success.
 8. No automatic expiry/deletion period is defined; keys remain with operation records. Any future history cleanup must reconsider the idempotency-retention promise.
 
-Spaces, catalog entries, and users have no version. After validation, update only submitted fields; the last write wins. This does not prevent stale edits overwriting metadata. Inventory versioning does not imply system-wide version protection.
+Inventory uses optimistic version checks. Space, catalog and user metadata use last-write-wins updates of submitted fields after validation; a later stale edit can overwrite the same metadata field.
 
 ### 7.4 Concurrency and failure verification
 

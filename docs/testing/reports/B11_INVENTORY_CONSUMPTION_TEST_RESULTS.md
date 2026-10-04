@@ -30,7 +30,7 @@ written to a temporary path rather than the repository.
 - The core set adds five B11 scenarios to the existing 44. The workflow job name
   remains test-job; automatic CI still selects the ci marker, while manual workflow
   dispatch runs the full suite.
-- GitHub Actions and manual Postman acceptance have not been run for B11.
+- Recorded execution: local pytest; remote Actions and manual Postman acceptance were not performed in this run.
 
 An initial run exposed inconsistent decimal serialization between creation and
 replay (2.5 versus 2.500). Normalizing the applied change to three decimal places
@@ -53,6 +53,7 @@ Five B11 core cases cover consume/replay lifecycle, estimated zero after full
 consumption, over-consumption before rounding, concurrent identical requests,
 and database insertion failure rollback. Boundary variants remain in the full suite.
 
-Manual Postman acceptance and remote CI remain pending. The previously reported
-GitHub Actions account billing restriction is separate from these local results.
-No database schema changes or new migration scripts are required.
+The implementation record notes a GitHub Actions account billing restriction.
+At the time of release, record remote CI and manual Postman acceptance for the
+selected commit in the [Final Acceptance Record](FINAL_ACCEPTANCE.md). B11 used
+the existing schema and migrations.

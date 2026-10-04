@@ -129,7 +129,7 @@ npx vercel deploy --prod --scope appix2 --env APP_COMMIT_SHA="$RELEASE_SHA"
 Ensure the linked project deploys this backend directory without a second `backend`
 path prefix. CLI login success and project access are separate checks; Not authorized
 requires the correct account/team access. Deployment Protection settings must allow
-the intended public client/assessor access. A successful build alone is not API acceptance.
+the intended public client/assessor access. After deployment, verify health, the selected commit, authentication and required APIs.
 
 Verify the public alias after deployment:
 

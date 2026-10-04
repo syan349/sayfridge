@@ -39,5 +39,6 @@ database-free regression also passed: 122 passed and 317 deselected in 0.38
 seconds. The full regression, including real PostgreSQL scenarios, passed: 439
 passed in 1893.58 seconds (31 minutes 33 seconds). The suite contains 31 new B12
 scenarios and four new B12 core scenarios; collection found 53 core scenarios in
-total. Remote CI and manual Postman acceptance remain pending. No schema change or
-new migration script is required.
+total. B12 used the existing schema and migrations. At the time of release, record remote
+CI and manual Postman acceptance for the selected commit in the
+[Final Acceptance Record](FINAL_ACCEPTANCE.md).

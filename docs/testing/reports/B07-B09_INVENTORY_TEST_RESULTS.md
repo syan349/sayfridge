@@ -31,7 +31,7 @@ database-free cases. Tests do not substitute a mock database.
 OpenAPI inspection verified four authenticated inventory operations and their
 business validation schemas. The existing workflow still uses `test-job` with a
 PostgreSQL 18 service; automatic runs select `-m ci`, manual dispatch runs all.
-No workflow change is needed. Local timing is not total GitHub Actions duration.
+Workflow selection was unchanged. The durations above measure local pytest execution.
 
 ## Covered contracts
 
@@ -59,11 +59,11 @@ No workflow change is needed. Local timing is not total GitHub Actions duration.
 
 ## Outstanding deployment and manual acceptance
 
-Manual Postman acceptance and remote CI remain pending. Before using inventory
-APIs, ensure the development database has nullable `inventory_item.notes`. The
-backend README provides the one-time structural synchronization SQL if needed.
-No change was made to Neon. Pre-release development does not require incremental
-migration or downgrade workflows; the initial schema is maintained directly.
+At this development stage, nullable `inventory_item.notes` was maintained in the
+initial schema; Neon was unchanged. At the time of release, apply the selected
+version's migrations using the [delivery runbook](../../delivery/README.md), and
+record manual Postman acceptance and remote CI in the
+[Final Acceptance Record](FINAL_ACCEPTANCE.md).
 
 See the [API contract](../../reference/API_REFERENCE.md#6-inventory--b07b09),
 [Postman guide](../POSTMAN_GUIDE.md), and [CI selection index](../README.md).
