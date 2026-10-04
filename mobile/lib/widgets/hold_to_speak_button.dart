@@ -14,6 +14,8 @@ class HoldToSpeakButton extends StatefulWidget {
     required this.onEnd,
     required this.onCancel,
     this.fontSize = 16,
+    this.idleText = 'Press and hold to speak',
+    this.semanticLabel = 'Hold to speak',
     super.key,
   });
 
@@ -21,6 +23,7 @@ class HoldToSpeakButton extends StatefulWidget {
   final VoidCallback onStart, onEnd, onCancel;
   final ValueChanged<Offset> onMove;
   final double fontSize;
+  final String idleText, semanticLabel;
 
   @override
   State<HoldToSpeakButton> createState() => _HoldToSpeakButtonState();
@@ -59,7 +62,7 @@ class _HoldToSpeakButtonState extends State<HoldToSpeakButton>
 
   @override
   Widget build(BuildContext context) => Tooltip(
-    message: 'Hold to speak',
+    message: widget.semanticLabel,
     triggerMode: TooltipTriggerMode.manual,
     child: Listener(
       behavior: HitTestBehavior.opaque,
@@ -87,7 +90,7 @@ class _HoldToSpeakButtonState extends State<HoldToSpeakButton>
       child: Semantics(
         button: true,
         enabled: widget.enabled,
-        label: 'Hold to speak',
+        label: widget.semanticLabel,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           width: double.infinity,
@@ -108,7 +111,7 @@ class _HoldToSpeakButtonState extends State<HoldToSpeakButton>
                 ? widget.cancelling
                       ? 'Release to cancel'
                       : 'Release to finish'
-                : 'Press and hold to speak',
+                : widget.idleText,
             maxLines: 2,
             textAlign: TextAlign.center,
             style: TextStyle(

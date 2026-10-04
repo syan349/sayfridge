@@ -28,11 +28,13 @@ class AgentInputPanel extends StatefulWidget {
     this.submitOnMount = false,
     this.reset = 0,
     this.maxLength = 8000,
+    this.maxLines = 6,
     this.inputKey = const Key('assistant-message-field'),
     this.onMessage,
     this.textTopPadding = 6,
     this.inline = false,
     this.hintText,
+    this.allowImages = true,
     super.key,
   }) : assert(inline || onSend != null);
 
@@ -42,7 +44,7 @@ class AgentInputPanel extends StatefulWidget {
   final Future<List<XFile>> Function()? pickImages;
   final VoiceInputService? voiceInput;
   final List<AgentImage> initialImages;
-  final int reset, maxLength;
+  final int reset, maxLength, maxLines;
   final Key inputKey;
   final ValueChanged<String>? onMessage;
   final double textTopPadding;
@@ -50,6 +52,7 @@ class AgentInputPanel extends StatefulWidget {
   /// Item clarification only edits a draft; the enclosing Confirm submits it.
   final bool inline;
   final String? hintText;
+  final bool allowImages;
 
   @override
   State<AgentInputPanel> createState() => _AgentInputPanelState();
@@ -256,7 +259,9 @@ class _AgentInputPanelState extends State<AgentInputPanel> {
   }
 
   Future<void> _pickImages() async {
-    if (!_enabled || _images.length >= AgentImage.maxImages) {
+    if (!widget.allowImages ||
+        !_enabled ||
+        _images.length >= AgentImage.maxImages) {
       return;
     }
     setState(() => _pickingImages = true);
@@ -352,11 +357,15 @@ class _AgentInputPanelState extends State<AgentInputPanel> {
         hasImages: _images.isNotEmpty,
         voiceActive: _recordingVoice,
         maxLength: widget.maxLength,
+        maxLines: widget.maxLines,
         inputKey: widget.inputKey,
         textTopPadding: widget.textTopPadding,
         inline: widget.inline,
         hintText: widget.hintText,
-        onPhotoPressed: _enabled && _images.length < AgentImage.maxImages
+        onPhotoPressed:
+            widget.allowImages &&
+                _enabled &&
+                _images.length < AgentImage.maxImages
             ? _pickImages
             : null,
         onSendPressed:
@@ -364,6 +373,10 @@ class _AgentInputPanelState extends State<AgentInputPanel> {
             ? _send
             : null,
         voiceButton: HoldToSpeakButton(
+          idleText: widget.waiting
+              ? 'Hold to answer'
+              : 'Press and hold to speak',
+          semanticLabel: widget.waiting ? 'Hold to answer' : 'Hold to speak',
           fontSize: widget.inline ? 14 : 16,
           enabled: _enabled && !_finishingVoice,
           recording: _recordingVoice,

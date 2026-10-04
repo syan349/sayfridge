@@ -505,9 +505,15 @@ void main() {
       await tester.tap(find.byKey(const Key('select-all')));
       await tester.pumpAndSettle();
       expect(find.text('5 selected'), findsOneWidget);
+      expect(
+        tester
+            .widget<Checkbox>(find.byKey(const Key('select-all-expired')))
+            .value,
+        isTrue,
+      );
       await tester.tap(find.byKey(const Key('select-all-expired')));
       await tester.pumpAndSettle();
-      expect(find.text('2 selected'), findsOneWidget);
+      expect(find.text('3 selected'), findsOneWidget);
       await tester.tap(find.byKey(const Key('select-all')));
       await tester.pumpAndSettle();
       expect(find.text('5 selected'), findsOneWidget);
@@ -524,6 +530,104 @@ void main() {
         (fixture.writes.single['items'] as List).map((item) => item['id']),
         ['expired-1', 'expired-2'],
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'manual selections synchronize All and Expired across the filtered pages',
+    (tester) async {
+      final fixture = _InventoryFixture();
+      addTearDown(fixture.dispose);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final expired = dateInput(today.subtract(const Duration(days: 1)));
+      fixture.rows = [
+        for (final entry in [
+          ('expired-1', expired),
+          ('expired-2', expired),
+          ('fresh', dateInput(today.add(const Duration(days: 2)))),
+          ('no-expiry', null),
+        ])
+          {...stockJson(), 'id': entry.$1, 'expiry_date': entry.$2},
+        {...stockJson(), 'id': 'other-space', 'storage_space_id': 'space-2'},
+        {...stockJson(), 'id': 'other-category', 'category_id': 'category-2'},
+        {...stockJson(), 'id': 'other-name', 'item_definition_name': 'Eggs'},
+        {...stockJson(), 'id': 'old-purchase', 'purchase_date': '2026-09-01'},
+      ];
+      await fixture.open(tester);
+      await fixture.controller.loadInventory(
+        storageSpaceId: 'space-1',
+        categoryId: 'category-1',
+        query: 'milk',
+        purchaseFrom: DateTime(2026, 9, 15),
+        pageSize: 2,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Delete items'));
+      await tester.pumpAndSettle();
+      bool checked(String key) =>
+          tester.widget<Checkbox>(find.byKey(Key(key))).value!;
+      final cards = find.descendant(
+        of: find.byType(InventoryItemTile),
+        matching: find.byType(Checkbox),
+      );
+      expect(find.text('Expired'), findsOneWidget);
+      expect(checked('select-all'), isFalse);
+      expect(checked('select-all-expired'), isFalse);
+      await tester.tap(cards.first);
+      await tester.pumpAndSettle();
+      expect(checked('select-all-expired'), isFalse);
+      await tester.tap(cards.last);
+      await tester.pumpAndSettle();
+      expect(checked('select-all-expired'), isTrue);
+      expect(checked('select-all'), isFalse);
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      await tester.tap(cards.first);
+      await tester.pumpAndSettle();
+      expect(checked('select-all'), isFalse);
+      await tester.tap(cards.last);
+      await tester.pumpAndSettle();
+      expect(find.text('4 selected'), findsOneWidget);
+      expect(checked('select-all'), isTrue);
+      expect(checked('select-all-expired'), isTrue);
+      await tester.tap(cards.first);
+      await tester.pumpAndSettle();
+      expect(checked('select-all'), isFalse);
+      expect(checked('select-all-expired'), isTrue);
+      await tester.tap(find.text('Previous'));
+      await tester.pumpAndSettle();
+      await tester.tap(cards.first);
+      await tester.pumpAndSettle();
+      expect(checked('select-all-expired'), isFalse);
+      await tester.tap(find.byKey(const Key('select-all')));
+      await tester.pumpAndSettle();
+      expect(find.text('4 selected'), findsOneWidget);
+      expect(checked('select-all'), isTrue);
+      expect(checked('select-all-expired'), isTrue);
+      await tester.tap(find.byKey(const Key('select-all')));
+      await tester.pumpAndSettle();
+      expect(find.text('0 selected'), findsOneWidget);
+      expect(checked('select-all-expired'), isFalse);
+      await tester.tap(find.byKey(const Key('select-all-expired')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('batch-delete-confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirm delete'));
+      await tester.pumpAndSettle();
+      expect((fixture.writes.single['items'] as List).map((row) => row['id']), [
+        'expired-1',
+        'expired-2',
+      ]);
+      expect(fixture.rows.map((row) => row['id']), [
+        'fresh',
+        'no-expiry',
+        'other-space',
+        'other-category',
+        'other-name',
+        'old-purchase',
+      ]);
       expect(tester.takeException(), isNull);
     },
   );
@@ -562,8 +666,6 @@ void main() {
       await fixture.open(tester);
       fixture.pendingRead = Completer<void>();
       await tester.tap(find.byTooltip('Delete items'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('select-all')));
       await tester.pump();
       expect(find.text('Selecting…'), findsOneWidget);
       await tester.tap(find.byKey(const Key('batch-delete-cancel')));

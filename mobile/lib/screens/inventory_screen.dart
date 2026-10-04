@@ -71,7 +71,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
   bool _selecting = false;
   int _selectionRequest = 0;
   List<InventoryItem>? _matchingItems;
-  bool _onlyExpiredSelection = false;
   bool _deletionBlocked = false;
   String? _deleteError;
   bool get _busy => _deleting || _selecting;
@@ -172,7 +171,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ++_selectionRequest;
       _selecting = false;
       _matchingItems = null;
-      _onlyExpiredSelection = false;
       _selected.clear();
       _deleteMode = false;
     });
@@ -185,7 +183,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _selected.remove(item.id);
       } else {
         _selected[item.id] = item;
-        if (!_isExpired(item)) _onlyExpiredSelection = false;
       }
     });
   }
@@ -214,7 +211,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     _deletionBlocked ||
                     _deleteMode
                 ? null
-                : () => setState(() => _deleteMode = true),
+                : () {
+                    setState(() => _deleteMode = true);
+                    _selectMatching(null);
+                  },
             icon: const AppActionIcon(ActionAssets.deleteBlack, size: 26),
           ),
         ),
@@ -239,12 +239,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ? _visibleItems
           : const []);
 
-  Future<void> _selectMatching(bool select, {bool expiredOnly = false}) async {
+  Future<void> _selectMatching(bool? select, {bool expiredOnly = false}) async {
     if (_busy || _deletionBlocked) return;
     final request = ++_selectionRequest;
     setState(() => _selecting = true);
     try {
-      final matches = await widget.controller.matchingItems();
+      final matches = _matchingItems ?? await widget.controller.matchingItems();
       if (!mounted || request != _selectionRequest || !_deleteMode) return;
       final visible = _selectedGroup == null
           ? matches
@@ -253,8 +253,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _matchingItems = visible;
         final ids = visible.map((item) => item.id).toSet();
         _selected.removeWhere((id, _) => !ids.contains(id));
-        if (select && expiredOnly) _selected.clear();
-        _onlyExpiredSelection = select && expiredOnly;
+        if (select == null) return;
         for (final item in visible) {
           if (expiredOnly && !_isExpired(item)) continue;
           if (select) {
@@ -295,7 +294,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 const SizedBox(width: 12),
                 Flexible(
                   child: _selectionOption(
-                    'Only expired',
+                    'Expired',
                     'select-all-expired',
                     expiredOnly: true,
                   ),
@@ -304,7 +303,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             );
             final labels = TextPainter(
               text: TextSpan(
-                text: 'AllOnly expiredConfirmCancel',
+                text: 'AllExpiredConfirmCancel',
                 style: Theme.of(context).textTheme.labelLarge!.copyWith(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -403,7 +402,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ? _selectionScope.where(_isExpired).toList()
         : _selectionScope;
     final checked =
-        _onlyExpiredSelection == expiredOnly &&
         items.isNotEmpty &&
         items.every((item) => _selected.containsKey(item.id));
     final enabled =
@@ -572,7 +570,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
       setState(() {
         _selected.clear();
         _matchingItems = null;
-        _onlyExpiredSelection = false;
         _deleteMode = false;
       });
       await widget.controller.reload();

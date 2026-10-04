@@ -84,7 +84,7 @@ class _SwipeDeleteCardState extends State<SwipeDeleteCard> {
                   width: 64,
                   height: double.infinity,
                   child: AnimatedOpacity(
-                    opacity: _offset == 0 ? 0 : 1,
+                    opacity: (_offset.abs() / _travel).clamp(0.0, 1.0),
                     duration: _dragging
                         ? Duration.zero
                         : const Duration(milliseconds: 180),
