@@ -134,3 +134,83 @@ $env:AGENT_LIVE_MODEL='1'
 ```
 
 The live-model tests are skipped unless explicitly enabled and incur API usage.
+
+## Context and incremental state verification — 2026-10-04
+
+### Later budget adjustment — 2026-10-04
+
+The final user-selected configuration raises only the application cap to 150K
+and trigger to 120K. The 50K soft target, 10K summary, 10K recent history and 20K
+summary generation allowance remain unchanged. Code defaults and local overrides
+were synchronized; targeted context/summary/quantity regressions passed after
+updating the threshold-dependent fixtures. No hosted configuration was changed.
+
+After the verification run below, the user selected a 100K application cap, 80K
+trigger, 50K soft target, and 10K each for visible summary and recent history.
+Summary generation now has a separate 20K allowance for reasoning plus visible
+text; ordinary output remains 8K. Reasoning effort/temperature stay unspecified.
+Code defaults, the example and local budget overrides were updated; hosted
+configuration was not changed. Non-PostgreSQL regressions passed 373 cases
+(602 deselected). No paid model calls were made for this adjustment.
+
+Using the configured model's tokenizer locally, fixed rules/tools were 8,132
+tokens (8,445 with cards). With 10K summary plus 10K history, estimated input is
+28,132/28,445 tokens; conservative budget including 8K output and 4,096 reserve
+is 47,261/47,653. Necessary task evidence/images add to those figures. The actual
+SDK summary request was inspected without sending it: generation limit 20,000,
+no explicit reasoning or sampling settings. The earlier 50K-run figures below
+remain historical evidence, not fresh 100K PostgreSQL/live-model acceptance.
+
+### Original 50K implementation verification
+
+Changes are based on `f5846e7`. No frontend files, ORM models, migrations, or shared
+database data were changed. No push or deployment was performed. Detailed counts
+and the representative benchmark are in
+[the verification record](../evidence/backend-release-readiness/context-state-optimization-2026-10-04.json).
+
+| Check | Observed result |
+| --- | --- |
+| Baseline non-PostgreSQL tests | 360 passed |
+| Complete offline backend run, local PostgreSQL 16 / Python 3.11 | 905 passed, 68 live-model cases skipped; 986.64 seconds |
+| Final CI subset | 226 passed, 749 deselected; 247.00 seconds |
+| Unchanged Web consumers | 3 passed |
+| Unchanged Mobile consumers | 3 passed |
+| Captured actual backend responses | 159 responses, including 98 successful SSE streams |
+| Shared business schema / Agent storage | Read-only checks passed; no migrations applied |
+| Real-model summary fidelity | Not run; release quality acceptance remains open |
+
+The full run began before two final regression cases were added; both additional
+cases passed separately and in the final CI subset. Existing client tests were
+run without modifying client source, tests or dependency files.
+
+The 200-turn synthetic graph benchmark uses real isolated PostgreSQL tables and
+compares identical final accumulated records. Target-field blob plus write bytes
+fell from 57,962,360 to 949,427 (98.36% reduction, above the 70% requirement).
+Total serialized checkpoint/blob/write payload fell from 87,481,767 to 1,844,972
+bytes. Both runs retained 600 checkpoints. Nine warmed reads gave median latest
+state recovery of 4.07 ms versus 9.92 ms, within `baseline * 1.25 + 100 ms`.
+These are representative local serialization measurements, not physical disk
+usage, hosted latency, or a guarantee that checkpoint count/state size stops growing.
+
+Tests cover update boundaries 49/50/51, reconstruction with a new saver/connection,
+legacy full-state upgrade, old pending confirmation executed exactly once, mixed
+history recovery, and frequency-1 delta-aware rollback. One picture followed by
+100 text turns produces only one image-collection update. A PostgreSQL cursor
+deadlock discovered during recovery validation was fixed by finishing checkpoint
+listing before nested graph-state hydration.
+
+Production-budget deterministic tests cover tokenized schema accounting, bounded
+recent history, summary correction/failure preservation, complete tool groups,
+protected evidence, omission notices, canonical result preservation and 20-item
+execution. A synthetic compaction example reduced measured budget from 87,676 to
+27,636 with 3,846 recent-history tokens. Its seven-token mock summary validates
+accounting/control flow only, not real summary quality. A configured-tokenizer
+check without model calls measured short requests at 22,282 budget units (22,673
+with inventory cards), including reserves, under the 50,000 application cap.
+
+Opt-in live acceptance now covers three cumulative summary cycles in English and
+Chinese, name corrections, quantities, pending rice and cancelled milk tasks.
+Run `AGENT_LIVE_MODEL=1` only for an explicitly approved model-cost run against the
+isolated test database. Until then, do not describe summary fidelity as validated.
+Deployment must explicitly update old environment overrides and keep delta-aware
+code for rollback; see the Backend README. Old checkpoint pruning is not included.

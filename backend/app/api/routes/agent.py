@@ -271,7 +271,7 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
                 command = {"messages": [human_message(payload.message, payload.images, str(request_id),
                     known_messages=[*values.get("image_messages", []), *values.get("messages", [])])],
                 "turn_id": str(request_id), "as_of": payload.as_of.isoformat() if payload.as_of else None,
-                "chat_requests": {**values.get("chat_requests", {}), str(request_id): digest},
+                "chat_requests": {str(request_id): digest},
                 "turn_has_images": bool(payload.images),
                 "image_task_active": bool(payload.images) or values.get("image_task_active", False),
                 "request_fingerprint": digest, "items": [], "pending_input": [],
@@ -279,8 +279,7 @@ async def chat_with_agent(payload: AgentChatRequest, request: Request, user: Use
                 "public_turn": {"request_id": str(request_id), "conversation_id": str(conversation_id), "input": record},
                 "history_outbox": {**values.get("history_outbox", {}), record["id"]: record},
                 "execution_results": [], "events": [], "final_only": False,
-                "inventory_reads": {}, "inventory_query": None,
-                "resume_requests": values.get("resume_requests", {})}
+                "inventory_reads": {}, "inventory_query": None}
         as_of = payload.as_of or (date.fromisoformat(values["as_of"]) if snapshot.next and values.get("as_of") else None)
         context = AgentContext(user_id=user.id, as_of=as_of, conversation_id=conversation_id, user_message=payload.message,
             history_writer=_history_writer(session, user.id, conversation_id, complete=not bool(values)),

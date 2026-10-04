@@ -129,12 +129,32 @@ progress, not a complete historical chat/image list.
 
 ## Context budget
 
-The default compaction trigger is 80,000 tokens, target 40,000, with a configured
-160,000 model/context limit and 8,000 output-token allowance. Token accounting
-reserves framing and output space. Compaction preserves recent complete turns,
-images and pending task state; older content becomes a bounded summary. A request
-that cannot fit returns CONTEXT_BUDGET_EXCEEDED instead of sending an oversized call.
-Configuration names and defaults are defined in `backend/app/agents/model.py`.
+The application budget is 150,000 tokens including output/safety reserves, with a
+120,000 trigger and 50,000 soft post-compaction target. The actual configured model
+limit is separate; the smaller limit wins. Text and tool schemas share the model
+tokenizer, plus a 25% allowance, 8,000 output tokens and a 4,096 safety reserve.
+The cumulative summary targets at most 10,000 visible tokens; recent completed
+history has a 10,000-token allowance. Current input and pending evidence are
+protected separately, including complete call/result groups. Summary generation
+reserves 20,000 tokens including reasoning; ordinary calls keep 8,000. Successful read-list
+excerpts may omit unrelated rows with an explicit incompleteness notice, without
+changing original tool results, business calculations or inventory cards.
+
+Summary input excludes pixels. The summary is checkpointed before working
+messages are removed; one length correction shares the 45-second total deadline.
+Failure preserves working history; necessary content that cannot fit returns
+CONTEXT_BUDGET_EXCEEDED. Summaries remain untrusted historical data, never fresh
+authorization or current inventory truth. Each conversation retains independent
+context; existing client new-conversation/startup behavior is unchanged.
+
+Request results, chat/resume fingerprints and archived image messages use native
+DeltaChannel patches with a full snapshot every 50 updates. Unchanged images do
+not create collection updates. This reduces repeated storage, not the number of
+checkpoints or the fully hydrated state size. It changes no table or public API.
+Dependencies are pinned; rollback must retain delta-readable code, optionally with
+snapshot frequency 1. History recovery hydrates each checkpoint through the graph
+reader without executing a model. Do not prune ancestor writes needed for replay.
+Configuration and rollout details are in the Backend README.
 
 ## Integration and evidence
 

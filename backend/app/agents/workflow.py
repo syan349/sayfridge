@@ -14,13 +14,14 @@ from app.agents.messages import user_text, human_message, image_catalog, resume_
 from app.agents.prompts import system_prompt
 from app.agents.intake import identify_turn, waiting_question, outcome_text, phrase_questions
 from app.agents.facts import merge_draft, missing_fields, retain_receipt_quantity
-from app.agents.state import AgentContext, AgentState
+from app.agents.state import AgentContext, agent_state_schema
 from app.agents.tools import AGENT_TOOLS
 from app.agents.inventory_results import capture_inventory_read, select_inventory_results, inventory_history_text
 from app.schemas.agent_actions import ActionDraft, ProposeActions, AgentResumeRequest, PresentInventoryResults
 from app.services.agent_actions import prepare_action, execute_action, validate_image_policy
 from app.services.inventory import InventoryError
-from app.agents.context_budget import rolling_summary, summary_message, size
+from app.agents.context_budget import Budget, rolling_summary, summary_message, size
+from app.agents.context_views import clean_tool_results, protected_message_ids
 from app.agents.prompts import INTENT_PROMPT
 from app.schemas.agent_actions import TurnIntent
 from app.services.conversation_history import message_record, public_text
@@ -147,7 +148,7 @@ def error_info(exc):
             "details": getattr(exc, "details", {})}
 
 
-def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools=None):
+def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools=None, snapshot_frequency=50):
     if session_factory is None:
         from app.db.session import AsyncSessionFactory
         session_factory = AsyncSessionFactory
@@ -181,10 +182,23 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
         runtime.context.cache.update(summary)
         return summary
 
-    def model_messages(state):
+    def clean_reads(messages, state):
+        tasks = [*state.get("items", []), *state.get("suspended_items", [])]
+        required_turns = {i.get("turn_id") for i in tasks if i["status"] not in TERMINAL}
+        protected = protected_message_ids(messages, required_turns)
+        priority = {str(i.get("draft", {}).get(k)) for i in tasks
+                    for k in ("inventory_item_id", "item_definition_id", "storage_space_id")
+                    if i.get("draft", {}).get(k)}
+        measure_text = getattr(model, "count_text", lambda text: size(text))
+        return clean_tool_results(messages, measure_text,
+            limit=getattr(model, "budget", Budget()).tool_result_limit,
+            protected_ids=protected, priority_ids=priority)
+
+    def model_messages(state, *, clean=True):
         messages = list(state.get("messages", []))
         archived = state.get("image_messages", [])
-        required = {str(ref) for item in state.get("items", [])
+        tasks = [*state.get("items", []), *state.get("suspended_items", [])]
+        required = {str(ref) for item in tasks
                     if item["status"] not in TERMINAL for ref in [*item.get("draft", {}).get("source_image_ids", []),
                         *item.get("image_policy", {}).get("source_image_ids", [])]}
         latest = next((m for m in reversed(messages) if isinstance(m, HumanMessage)), None)
@@ -207,6 +221,8 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             refs = {i["image_id"] for i in message.additional_kwargs.get("images", [])}
             if message.id not in current_ids and refs & required:
                 attachments.append(message.model_copy(update={"additional_kwargs": {**message.additional_kwargs, "context_required": True}}))
+        if clean:
+            messages = clean_reads(messages, state)
         return [*summary_message(state.get("conversation_summary", "")), *attachments, *messages]
 
     def context_prompt(state, runtime):
@@ -240,8 +256,10 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             working.append(message)
         state = {**state, "messages": working}
         images = {m.id: m for m in state.get("image_messages", [])}
-        images.update({m.id: m for m in state.get("messages", []) if m.additional_kwargs.get("images")})
-        update = {"image_messages": list(images.values()), "messages": annotated}
+        image_updates = [m for m in working if m.additional_kwargs.get("images") and images.get(m.id) != m]
+        update = {"messages": annotated}
+        if image_updates:
+            update["image_messages"] = image_updates
         if runtime.context.history_writer and state.get("history_outbox"):
             acknowledged = await runtime.context.history_writer(state["history_outbox"])
             update["history_outbox"] = {k: v for k, v in state["history_outbox"].items() if k not in acknowledged}
@@ -264,8 +282,10 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
         from app.agents.continuation import Continuation
         selected_bound = cards_bound if runtime.context.inventory_cards else bound
         selected_tools = cards_tools if runtime.context.inventory_cards else bound_tools
-        overhead = max(size(getattr(selected_bound, "tools", selected_tools)),
-                       size(TurnIntent.model_json_schema()), size(Continuation.model_json_schema()))
+        schema_cost = model.schema_tokens if hasattr(model, "schema_tokens") else size
+        schema_tokens = max(schema_cost(getattr(selected_bound, "tools", selected_tools)),
+                            schema_cost(TurnIntent.model_json_schema()), schema_cost(Continuation.model_json_schema()))
+        overhead = model.conservative(schema_tokens) if hasattr(model, "conservative") else schema_tokens
         envelope = [SystemMessage(content=context_prompt(state, runtime) + "\n" + INTENT_PROMPT
                                   + "\nRecent completed task DATA:\n" + json.dumps(completed, ensure_ascii=False, default=str))]
         required_turns = {i.get("turn_id") for i in [*state.get("items", []), *state.get("suspended_items", [])] if i["status"] not in TERMINAL}
@@ -274,9 +294,16 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             from app.schemas.agent_media import AgentImage
             pictures = received.get("images", []) if "chat_message" in received else [i for r in received.get("responses", []) for i in r.get("images", [])]
             current_input = [human_message(latest, [AgentImage.model_validate(i) for i in pictures], received["request_id"])]
-        info = await rolling_summary(model, state.get("messages", []), summary=state.get("conversation_summary", ""),
+        measure = getattr(model, "raw_count", getattr(model, "count", lambda values: sum(size(m) for m in values)))
+        # Clean copies are also used as summary evidence, while removal IDs still
+        # refer to canonical messages. Archived attachments aren't summarized here.
+        summary_input = clean_reads(state.get("messages", []), state)
+        before_clean = measure([*envelope, *model_messages(state, clean=False), *current_input]) + schema_tokens
+        after_clean = measure([*envelope, *model_messages(state), *current_input]) + schema_tokens
+        logger.info("agent_context_cleanup before_input=%s after_input=%s", before_clean, after_clean)
+        info = await rolling_summary(model, summary_input, summary=state.get("conversation_summary", ""),
             summary_position=state.get("summary_position", 0),
-            envelope=envelope, overhead=overhead, protected_ids=required_turns,
+            envelope=envelope, overhead=overhead, schema_tokens=schema_tokens, protected_ids=required_turns,
             timeout=getattr(model, "summary_timeout_seconds", 45),
             render=lambda values: [*model_messages({**state, "conversation_summary": "", "messages": values}), *current_input])
         if not info:
@@ -284,7 +311,8 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
         return {**update, "conversation_summary": info["summary"], "summary_cursor": info["cursor"],
                 "summary_position": info["position"],
                 "summary_pending_ids": info["remove_ids"],
-                "context_compaction": {k: info[k] for k in ("before", "after", "cursor")}}
+                "context_compaction": {**{k: info[k] for k in ("before", "after", "cursor", "summary_tokens", "recent_tokens", "input_tokens", "output_reserve", "safety_margin")},
+                                       "before_clean": before_clean, "after_clean": after_clean}}
 
     def apply_compaction(state):
         from langchain_core.messages import RemoveMessage
@@ -474,7 +502,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             if state.get("prose_retries", 0) < 2:
                 return {"messages": [response], "route": "MODEL", "events": [], "prose_retries": state.get("prose_retries", 0) + 1}
             return {"messages": [response], "route": "PREPARE", "events": []}
-        requests = dict(state.get("requests", {}))
+        requests = {}
         suspended = state.get("suspended_items", [])
         requests[state["turn_id"]] = {"fingerprint": state["request_fingerprint"],
             "state": public_state({**state, "items": [*items, *suspended], "inventory_query": inventory_query}), "answer": response.content}
@@ -559,7 +587,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
             if item["status"] in WAITING and not item.get("question"):
                 item["question"] = waiting_question(item, language)
         pending = [public_item(i) for i in items if i["status"] in WAITING]
-        requests = dict(state.get("requests", {}))
+        requests = {}
         committed = outcome_text([i for i in items if i["status"] in TERMINAL], language)
         if pending:
             requests[state["turn_id"]] = {"fingerprint": state["request_fingerprint"],
@@ -571,8 +599,8 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                 "messages": [AIMessage(content=committed)] if committed and pending else [], "events": events}
 
     async def apply_user_input(state, runtime, incoming_payload):
-        chat_requests = dict(state.get("chat_requests", {}))
-        if state.get("turn_id") and state.get("request_fingerprint"):
+        chat_requests = {}
+        if state.get("turn_id") and state.get("request_fingerprint") and state["turn_id"] not in state.get("chat_requests", {}):
             chat_requests.setdefault(state["turn_id"], state["request_fingerprint"])
         if "chat_message" in incoming_payload:
             from app.agents.continuation import interpret_continuation
@@ -589,7 +617,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                 saved = {"fingerprint": incoming_payload["fingerprint"],
                          "state": public_state({**state, "turn_id": incoming_payload["request_id"]})}
                 return {"route": "WAIT", "chat_requests": chat_requests,
-                        "requests": {**state.get("requests", {}), incoming_payload["request_id"]: saved}, "events": []}
+                        "requests": {incoming_payload["request_id"]: saved}, "events": []}
             routed = await interpret_continuation(model, waiting, text, images=images,
                                                   messages=model_messages(state), unresolved=buffered,
                                                   completed=[{**public_item(i), "draft": i.get("draft")} for i in state.get("completed_items", [])])
@@ -600,7 +628,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                 saved = {"fingerprint": incoming_payload["fingerprint"],
                     "state": public_state({**state, "turn_id": incoming_payload["request_id"], "items": [*selected, *waiting]}), "answer": answer_text}
                 return {"route": "WAIT", "chat_requests": chat_requests,
-                    "requests": {**state.get("requests", {}), incoming_payload["request_id"]: saved},
+                    "requests": {incoming_payload["request_id"]: saved},
                     "messages": [AIMessage(content=answer_text)],
                     "events": [{"type": "operation_result", "data": public_item(i)} for i in selected]}
             if routed.mode in {"NEW", "QUERY"}:
@@ -655,7 +683,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                         "images": [i.model_dump(mode="json") for i in canonical_images([
                             *[AgentImage.model_validate(i) for i in buffered.get("images", [])], *images], history)]}
                 updated = [{**i, "question": question} if i["item_id"] in waiting_ids else i for i in state["items"]]
-                requests = {**state.get("requests", {}), incoming_payload["request_id"]: {
+                requests = {incoming_payload["request_id"]: {
                     "fingerprint": incoming_payload["fingerprint"],
                     "state": public_state({**state, "turn_id": incoming_payload["request_id"], "items": updated})}}
                 return {"route": "WAIT", "items": updated, "chat_requests": chat_requests,
@@ -724,11 +752,11 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
                 "unresolved_reply": None if consumed_buffer else state.get("unresolved_reply"),
                 "revision_scope": [i["item_key"] for i in items if i["item_id"] in incoming and incoming[i["item_id"]].decision in {"answer", "edit"}],
                 "turn_id": str(payload.request_id),
-                "request_fingerprint": chat_requests.get(str(payload.request_id), resume_fingerprint(payload)),
+                "request_fingerprint": chat_requests.get(str(payload.request_id), state.get("chat_requests", {}).get(str(payload.request_id), resume_fingerprint(payload))),
                 "turn_intent": {**state.get("turn_intent", {}), "kind": "INVENTORY"},
                 "image_task_active": state.get("image_task_active", False) or any(r.images for r in payload.responses)
                     or any(i["status"] not in TERMINAL and i.get("image_policy", {}).get("requires_review") for i in items),
-                "resume_requests": {**state.get("resume_requests", {}), str(payload.request_id): resume_fingerprint(payload)}, "events": [], "proposal_retries": 0, "prose_retries": 0}
+                "resume_requests": {str(payload.request_id): resume_fingerprint(payload)}, "events": [], "proposal_retries": 0, "prose_retries": 0}
 
     async def execute_operation(state, runtime: Runtime[AgentContext]):
         items = [dict(i) for i in state["items"]]
@@ -798,9 +826,9 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
         # Record transport identity before interpretation/summary. A restart in
         # between these nodes can retry the original request without a live interrupt.
         if "chat_message" in incoming:
-            update["chat_requests"] = {**state.get("chat_requests", {}), incoming["request_id"]: incoming["fingerprint"]}
+            update["chat_requests"] = {incoming["request_id"]: incoming["fingerprint"]}
         else:
-            update["resume_requests"] = {**state.get("resume_requests", {}), incoming["request_id"]:
+            update["resume_requests"] = {incoming["request_id"]:
                 resume_fingerprint(AgentResumeRequest.model_validate(incoming))}
         if record:
             update["public_turn"] = {"request_id": incoming["request_id"],
@@ -821,7 +849,7 @@ def build_agent_graph(model, *, checkpointer, store, session_factory=None, tools
         acknowledged = await runtime.context.history_writer(outbox) if runtime.context.history_writer and outbox else set()
         return {"history_outbox": {k: v for k, v in outbox.items() if k not in acknowledged}, "events": []}
 
-    builder = StateGraph(AgentState, context_schema=AgentContext)
+    builder = StateGraph(agent_state_schema(snapshot_frequency), context_schema=AgentContext)
     for name, node in (("prepare_context", prepare_context), ("agent", agent), ("tools", run_tools),
                        ("prepare_operation", prepare_operation), ("execute_operation", execute_operation)):
         builder.add_node(name, tracked(node))

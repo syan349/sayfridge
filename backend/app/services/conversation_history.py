@@ -194,11 +194,17 @@ async def recover_messages(checkpointer, user_id, conversation_id):
     """
     from langchain_core.messages import HumanMessage
     from app.agents.messages import user_text
+    from app.agents.state import history_state_reader
     config = {"configurable": {"thread_id": f"user:{user_id}:conversation:{conversation_id}", "checkpoint_ns": ""}}
     records, observed = {}, {}
-    async for row in checkpointer.alist(config):
-        values = row.checkpoint.get("channel_values", {})
-        stamp = row.checkpoint["ts"]
+    reader = history_state_reader(checkpointer)
+    # PostgreSQL alist holds a saver cursor/lock while yielding. Finish listing
+    # before nested get_state calls, or a single-connection saver deadlocks.
+    checkpoints = [(row.config, row.checkpoint["ts"]) async for row in checkpointer.alist(config)]
+    for checkpoint_config, stamp in checkpoints:
+        # Delta-backed channels may be absent or snapshot sentinels in alist.
+        # The public graph API hydrates both legacy and incremental checkpoints.
+        values = (await reader.aget_state(checkpoint_config)).values
         for record in values.get("history_outbox", {}).values():
             records[record["id"]] = dict(record)
         current = values.get("public_turn", {})
