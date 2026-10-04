@@ -1,0 +1,217 @@
+[
+  {
+    "sample": 1,
+    "scenario": "clarification",
+    "utc": "2026-10-04T01:20:02.693843+00:00",
+    "http_status": 200,
+    "item_statuses": [
+      "NEEDS_INPUT"
+    ],
+    "business_successes": 0,
+    "http_stream_ok": true,
+    "workflow_ok": true,
+    "outcome": "WAITING_INPUT",
+    "persistence_verified": null,
+    "first_content_ms": 12961.816,
+    "total_ms": 12982.04,
+    "events": {
+      "start": 1,
+      "text_delta": 1,
+      "action_required": 1,
+      "done": 1
+    }
+  },
+  {
+    "sample": 2,
+    "scenario": "inventory_read",
+    "utc": "2026-10-04T01:20:15.676546+00:00",
+    "http_status": 200,
+    "item_statuses": [],
+    "business_successes": 0,
+    "http_stream_ok": true,
+    "workflow_ok": true,
+    "outcome": "COMPLETED",
+    "persistence_verified": null,
+    "first_content_ms": 7420.312,
+    "total_ms": 7444.917,
+    "events": {
+      "start": 1,
+      "text_delta": 1,
+      "done": 1
+    }
+  },
+  {
+    "sample": 3,
+    "scenario": "consume",
+    "utc": "2026-10-04T01:20:23.121934+00:00",
+    "http_status": 200,
+    "item_statuses": [
+      "SUCCEEDED"
+    ],
+    "business_successes": 1,
+    "http_stream_ok": true,
+    "workflow_ok": true,
+    "outcome": "COMPLETED",
+    "persistence_verified": true,
+    "first_content_ms": 8003.924,
+    "total_ms": 8082.76,
+    "events": {
+      "start": 1,
+      "operation_preview": 1,
+      "operation_result": 1,
+      "text_delta": 1,
+      "done": 1
+    }
+  },
+  {
+    "sample": 4,
+    "scenario": "stock_entry",
+    "utc": "2026-10-04T01:20:31.205095+00:00",
+    "http_status": 200,
+    "item_statuses": [
+      "SUCCEEDED"
+    ],
+    "business_successes": 1,
+    "http_stream_ok": true,
+    "workflow_ok": true,
+    "outcome": "COMPLETED",
+    "persistence_verified": true,
+    "first_content_ms": 9085.083,
+    "total_ms": 9175.839,
+    "events": {
+      "start": 1,
+      "operation_preview": 1,
+      "operation_result": 1,
+      "text_delta": 1,
+      "done": 1
+    }
+  },
+  {
+    "sample": 5,
+    "scenario": "clarification",
+    "utc": "2026-10-04T01:20:40.381878+00:00",
+    "http_status": 200,
+    "item_statuses": [
+      "NEEDS_INPUT"
+    ],
+    "business_successes": 0,
+    "http_stream_ok": true,
+    "workflow_ok": true,
+    "outcome": "WAITING_INPUT",
+    "persistence_verified": null,
+    "first_content_ms": 9479.674,
+    "total_ms": 9495.751,
+    "events": {
+      "start": 1,
+      "text_delta": 1,
+      "action_required": 1,
+      "done": 1
+    }
+  },
+  {
+    "sample": 6,
+    "scenario": "inventory_read",
+    "utc": "2026-10-04T01:20:49.878550+00:00",
+    "http_status": 200,
+    "item_statuses": [],
+    "business_successes": 0,
+    "http_stream_ok": true,
+    "workflow_ok": true,
+    "outcome": "COMPLETED",
+    "persistence_verified": null,
+    "first_content_ms": 6714.271,
+    "total_ms": 6736.017,
+    "events": {
+      "start": 1,
+      "text_delta": 1,
+      "done": 1
+    }
+  },
+  {
+    "sample": 7,
+    "scenario": "consume",
+    "utc": "2026-10-04T01:20:56.615323+00:00",
+    "http_status": 200,
+    "item_statuses": [
+      "SUCCEEDED"
+    ],
+    "business_successes": 1,
+    "http_stream_ok": true,
+    "workflow_ok": true,
+    "outcome": "COMPLETED",
+    "persistence_verified": true,
+    "first_content_ms": 6766.943,
+    "total_ms": 6864.244,
+    "events": {
+      "start": 1,
+      "operation_preview": 1,
+      "operation_result": 1,
+      "text_delta": 1,
+      "done": 1
+    }
+  },
+  {
+    "sample": 8,
+    "scenario": "stock_entry",
+    "utc": "2026-10-04T01:21:03.480173+00:00",
+    "http_status": 200,
+    "item_statuses": [
+      "SUCCEEDED"
+    ],
+    "business_successes": 1,
+    "http_stream_ok": true,
+    "workflow_ok": true,
+    "outcome": "COMPLETED",
+    "persistence_verified": true,
+    "first_content_ms": 7531.439,
+    "total_ms": 7629.502,
+    "events": {
+      "start": 1,
+      "operation_preview": 1,
+      "operation_result": 1,
+      "text_delta": 1,
+      "done": 1
+    }
+  },
+  {
+    "sample": 9,
+    "scenario": "clarification",
+    "utc": "2026-10-04T01:21:11.110417+00:00",
+    "http_status": 200,
+    "item_statuses": [
+      "NEEDS_INPUT"
+    ],
+    "business_successes": 0,
+    "http_stream_ok": true,
+    "workflow_ok": true,
+    "outcome": "WAITING_INPUT",
+    "persistence_verified": null,
+    "first_content_ms": 9702.401,
+    "total_ms": 9720.252,
+    "events": {
+      "start": 1,
+      "text_delta": 1,
+      "action_required": 1,
+      "done": 1
+    }
+  },
+  {
+    "sample": 10,
+    "scenario": "inventory_read",
+    "utc": "2026-10-04T01:21:20.831418+00:00",
+    "http_status": 200,
+    "error_code": "rate_limit_exceeded",
+    "item_statuses": [],
+    "business_successes": 0,
+    "http_stream_ok": false,
+    "workflow_ok": false,
+    "outcome": null,
+    "persistence_verified": null,
+    "first_content_ms": null,
+    "total_ms": 4174.009,
+    "events": {
+      "start": 1,
+      "error": 1
+    }
+  }
+]

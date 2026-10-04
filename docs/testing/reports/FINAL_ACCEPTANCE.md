@@ -36,6 +36,22 @@ The [delivery runbook](../../delivery/README.md) owns commands, configuration an
 deployment order. Run results identify the selected release rather than reusing
 older results as if they tested the final commit.
 
+## Performance verification — 2026-10-04
+
+The [Performance Test Record](../records/PERFORMANCE_TEST_RECORD.md) measures
+local main `a370559786f5305a36b0f48d729792451c38eaff` and hosted Backend
+`e538779976a46e1a218c8e4d59bbbaeb374fa9b3`. Their committed Backend trees are
+identical. The local baseline sustained 5 RPS for 10 minutes with 50,000 batches
+and 500,000 operations: 3,000 valid requests, read p95 37.64 ms, write p95 30.23 ms,
+and no errors or dropped arrivals. All 120 hosted read samples passed, with p95
+154.61 ms. Exact balance/version persistence and contention checks passed.
+
+Nine of 10 real-model Agent samples completed. The tenth returned
+`rate_limit_exceeded`; the record retains this finding and the model timings.
+Select and rerun the final release as needed, then enter its outcome in the
+release validation table above. These dated measurements preserve the tested
+versions and remain separate from the pending final release identity.
+
 ## Backend release-readiness verification — 2026-10-02
 
 The three authentication controls were rebuilt on the fresh main-derived branch
@@ -73,6 +89,13 @@ that main version, repeat hosted checks and record its production SHA. Final rel
 identity and cross-client acceptance are recorded in the sections above and below.
 
 ## Manual cross-client and Android validation
+
+The [manual integration test record](MANUAL_INTEGRATION_TEST_RECORD.md) preserves
+13 manual cases and observations under case IDs MT139-01–MT139-13.
+Use applicable case IDs to link release findings and retests to their original
+issues. The [source index](../evidence/manual-integration/2026-10-03/source-index.json)
+records the historical issue metadata. These historical findings remain separate
+from the results recorded below for the selected release.
 
 Use a dedicated ordinary account and an existing administrator account. Store their
 passwords only in the course-designated private channel. For each row record the
@@ -113,6 +136,7 @@ behavior and any team scope decision; do not erase earlier evidence.
 | Architecture and decisions | [System Architecture](../../architecture/README.md) |
 | Technical learning | [Learning and Design Evolution](../../learning/README.md) |
 | Security/privacy evidence | [Security and Privacy](../../security/README.md) |
+| Manual integration findings and follow-up | [Manual integration test record — issue #139](MANUAL_INTEGRATION_TEST_RECORD.md) |
 | Historical designs and results | [Project archive](../../archive/README.md) |
 | Weekly meetings, decisions and responsibilities | [Team Wiki](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/wiki) |
 

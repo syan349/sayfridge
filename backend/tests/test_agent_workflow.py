@@ -19,6 +19,11 @@ from app.services.inventory import InventoryError
 
 
 class ScriptModel:
+    # This stub has no provider tokenizer: workflow fallback meters serialized
+    # UTF-8 bytes (including base64). Keep its explicit fixture budget separate
+    # from the production 50K token budget, tested with a real local tokenizer.
+    from app.agents.context_budget import Budget
+    budget = Budget(trigger=80000, target=40000, limit=160000)
     def __init__(self, messages, *, intents=()):
         self.messages = iter(messages)
         self.intents = iter(intents)

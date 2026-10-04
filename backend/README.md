@@ -153,17 +153,74 @@ defines the incremental `GET /agent/chat` entry and its public-history cursor.
 Existing clients continue using their current POST and state APIs; reopening the
 complete public transcript requires their later adoption of the GET entry.
 
-`AGENT_CONTEXT_TRIGGER=80000`, `AGENT_CONTEXT_TARGET=40000`,
-`AGENT_CONTEXT_LIMIT=160000`, `AGENT_MODEL_CONTEXT_LIMIT=160000`, and
-`AGENT_OUTPUT_TOKENS=8000` are the initial configurable defaults. Accounting
-includes rules, tool schemas, relevant memory/task data, image input and output
-reserves. `AGENT_SUMMARY_TIMEOUT_SECONDS=45` bounds the entire summarization step.
-The current model merges the previous summary with older full text, checkpoints
-that result, then removes eligible working messages in a separate node. Recent
-text, pending evidence and complete tool call/result groups remain available.
-Public messages are retained separately. Failed summarization retains the prior
-state; requests that cannot fit safely return `CONTEXT_BUDGET_EXCEEDED` for retry.
-This implementation adds neither LangMem nor retrieval of old public messages.
+Agent context uses an application limit of 150,000 tokens, including output and
+safety reserves. Defaults are `AGENT_CONTEXT_TRIGGER=120000`,
+`AGENT_CONTEXT_TARGET=50000` (a soft target), `AGENT_CONTEXT_LIMIT=150000`,
+`AGENT_MODEL_CONTEXT_LIMIT=160000` and `AGENT_OUTPUT_TOKENS=8000`. The smaller of
+the application/model limits wins. Messages and tool schemas use the same model
+tokenizer, with a 25% conservative allowance and a 4,096-token safety reserve.
+Opaque provider blocks retain conservative accounting. Token-meter failure stops
+before network execution, without exposing provider exception content.
+
+`AGENT_RECENT_TOKENS=10000` bounds recent completed history; the current turn and
+pending evidence are protected separately. `AGENT_TOOL_RESULT_TOKENS=2000` bounds
+eligible successful read-list excerpts. Excerpts retain full selected rows,
+query/total/page information and an explicit omission notice. Protected evidence,
+errors and necessary candidate data are not truncated. Canonical tool outputs,
+receipts and inventory cards are unaffected. Unneeded historical pixels are not
+sent to the model; the historical pictures themselves remain recoverable.
+
+`AGENT_SUMMARY_TARGET_TOKENS=10000` and `AGENT_SUMMARY_MAX_TOKENS=10000` control the
+cumulative summary independently of normal output.
+`AGENT_SUMMARY_OUTPUT_TOKENS=20000` separately reserves generation space for
+reasoning plus summary text; the visible summary still has a 10,000-token cap.
+Reasoning effort, temperature and top_p remain unspecified. Short histories need no summary;
+sparse facts need not fill the target. The prior summary and cleaned older messages
+produce a new summary, which is checkpointed before working messages are removed.
+Recent complete tool groups and pending evidence are preserved. One overlength
+correction is allowed; `AGENT_SUMMARY_TIMEOUT_SECONDS=45` covers all chunks and
+the correction. Failure keeps the prior working history. Required context that
+cannot fit returns `CONTEXT_BUDGET_EXCEEDED` for retry. Public messages remain
+separate; this adds neither historical retrieval nor LangMem.
+
+### Incremental checkpoint storage and rollout
+
+No business/Agent table changes, Alembic revision, backfill or frontend contract
+change is required. The existing Agent checkpoint migrations through version 9
+are sufficient. Before release, run the read-only schema/storage checks against
+the intended target. Missing prerequisites require a separately reviewed remote
+migration before deployment; passing local setup is not remote readiness.
+
+The pinned LangGraph 1.2.12, checkpoint 4.2.0 and PostgreSQL saver 3.1.2 support
+`DeltaChannel` (Beta). Only request results, chat/resume fingerprints and archived
+image messages use it. Nodes write patches; unchanged images produce no update.
+`AGENT_DELTA_SNAPSHOT_FREQUENCY=50` writes full snapshots periodically. Ordinary
+messages retain their existing reducer. Old complete checkpoints seed the new
+representation without a batch conversion. History recovery uses framework state
+hydration, not raw delta blobs; dry-run recovery invokes no model and writes nothing.
+
+Keep `durability="sync"`. Same-ID retries and business receipt transactions keep
+their existing behavior. This reduces repeated serialized writes, not the total
+number of checkpoints or the size of a fully hydrated long-lived state. It does
+not reclaim old storage, expire requests, or delete photos/checkpoints.
+
+Deploy with a brief Agent request drain so old/new writers do not process the same
+threads concurrently. Update existing environment overrides explicitly: old values
+in `.env` or hosting settings take precedence over these new defaults. Do not edit
+or publish real credentials. No shared-database write is a release prerequisite
+when the read-only checks pass.
+
+Rollback must keep delta-aware code and pinned dependencies. Set
+`AGENT_DELTA_SNAPSHOT_FREQUENCY=1` and restart the compatible build for a full
+snapshot on each updated channel; this is not a rollback to old application code.
+Do not prune ancestor checkpoints: delta recovery depends on their writes.
+
+Content-free logs distinguish raw input/schema tokens, conservative budget use,
+output reserve, cleanup counts, summary duration, checkpoint operation duration,
+and serialized blob/write byte counts. They contain no prompts, user text, image
+data or credentials. Byte counts describe serialized payloads, not SQL/index disk
+space, and repeated retries can log attempted writes. Compare local benchmark
+results with the deployed environment before making performance claims.
 
 The backend CI subset includes durable history/recovery regressions. CI also feeds
 captured responses from FastAPI and isolated PostgreSQL to unchanged Web and Mobile

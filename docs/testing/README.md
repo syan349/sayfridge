@@ -229,10 +229,39 @@ failure/cancellation/skipped/missing outcomes; YAML and reusable workflow target
 are checked locally. Run the complete multi-module suite through the manual GitHub workflow and
 retain its result and SHA as release evidence.
 
+## Performance record
+
+The [Performance Test Record](records/PERFORMANCE_TEST_RECORD.md) records the
+2026-10-04 measurements: a 10-minute, 5 RPS baseline with 100 users, 50,000
+inventory batches and 500,000 quantity operations; 120 hosted Vercel/Neon business
+reads; separate login/refresh and contention checks; and 10 real-model Agent
+samples. The REST baseline and hosted reads passed. Nine Agent samples completed;
+one returned `rate_limit_exceeded`. The record retains individual timings, the
+failure, code identities, cleanup verification and reproduction scripts. A separate
+historical section preserves the 2026-09-29 hosted latency measurements and the
+Vercel function-region comparison, with the original timing extract.
+
+## Manual integration record
+
+The [Manual Integration Test Record](reports/MANUAL_INTEGRATION_TEST_RECORD.md)
+contains 13 team-reviewed cases covering onboarding, inventory, AI interactions,
+session renewal, ownership and mobile usability. Each case records setup, steps,
+expected behavior, observations and corrective work. The
+[evidence index](evidence/manual-integration/2026-10-03/source-index.json) retains
+finding metadata and screenshot references.
+
+Use its case IDs in emulator/device retests and the
+[Final Acceptance Record](reports/FINAL_ACCEPTANCE.md#manual-cross-client-and-android-validation).
+Record each run's date, tester, client/device, APK and Backend versions, outcome
+and evidence. Manual observations, browser E2E and release acceptance have separate
+results; issue closure does not establish a passing retest.
+
 ## Reports
 
 | Work packages | Report | Scope |
 | --- | --- | --- |
+| Performance baseline and hosted response | [Performance test record](records/PERFORMANCE_TEST_RECORD.md) | 2026-09-29 hosted region comparison; 2026-10-04 large-data REST load, hosted reads, authentication, contention and real-model SSE timings |
+| Manual integration during development | [Manual integration test record — issue #139](reports/MANUAL_INTEGRATION_TEST_RECORD.md) | 13 cases with setup, steps, expected results, observations, fixes and evidence |
 | Documentation consolidation | [Documentation review — 2026-10-02](reports/DOCUMENTATION_REVIEW.md) | Navigation, links, command syntax, source consistency and evidence preservation |
 | Security 8.1–8.6 | [Security and Privacy](../security/README.md) | Authorization, hostile inputs, uploads, tokens, logging and dependency audit |
 | Agent multimodal | [Image input and stock review](reports/AGENT_MULTIMODAL_TEST_RESULTS.md) | Inline images, cross-turn context, supplements, mandatory review, checkpoint recovery and live-model acceptance |

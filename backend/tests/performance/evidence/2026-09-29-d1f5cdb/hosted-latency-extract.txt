@@ -1,0 +1,111 @@
+Historical hosted latency measurements — 2026-09-29
+Extract prepared on 2026-10-04 from the original execution log.
+Timestamps below are UTC; Auckland time was UTC+13 (NZDT).
+REST values: seconds until the full HTTP response body was read.
+SSE values: seconds since request start; complete means stream closure.
+Credential values, response bodies and request-ID suffixes are excluded.
+
+Phase labels:
+Initial investigation: function iad1; Neon ap-southeast-2 (Sydney).
+Intermediate redeployment: function remained iad1.
+Final region verification: function syd1; Neon remained in Sydney.
+Version endpoint before and after final region change: d1f5cdbba0e4f573dd88f3ba9829f2abbaca458c.
+
+[2026-09-29T01:37:16.004Z] Initial investigation
+/health 200 4.811 syd1::iad1::[request-id omitted]
+/health 200 0.393 syd1::iad1::[request-id omitted]
+/health 200 0.438 syd1::iad1::[request-id omitted]
+/api/v1/system/version 200 0.498 syd1::iad1::[request-id omitted]
+/api/v1/auth/login 200 5.17 syd1::iad1::[request-id omitted]
+/api/v1/auth/me 200 1.089 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items?page=1&page_size=20 200 1.499 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items/expiry-summary?as_of=2026-09-29&days_before=3&page=1&page_size=20 200 1.387 syd1::iad1::[request-id omitted]
+
+[2026-09-29T01:37:29.069Z] Initial investigation
+/api/v1/auth/me 200 1.081 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items?page=1&page_size=20 200 1.32 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items/expiry-summary?as_of=2026-09-29&days_before=3&page=1&page_size=20 200 1.327 syd1::iad1::[request-id omitted]
+/api/v1/auth/me 200 1.065 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items?page=1&page_size=20 200 1.295 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items/expiry-summary?as_of=2026-09-29&days_before=3&page=1&page_size=20 200 1.371 syd1::iad1::[request-id omitted]
+
+[2026-09-29T01:38:27.348Z] Initial investigation
+PROBE Please reply only with Hello. Do not access or change inventory or memories.
+headers 200 5.768
+event: start 5.768
+event: text_delta 12.897
+event: done 13.632
+complete 14.286 {'event: start': 1, 'event: text_delta': 1, 'event: done': 1}
+PROBE List my inventory items. Do not change inventory or memories.
+headers 200 2.783
+event: start 2.791
+
+[2026-09-29T01:38:34.916Z] Initial investigation
+event: text_delta 14.799
+event: done 15.686
+complete 15.902 {'event: start': 1, 'event: text_delta': 1, 'event: done': 1}
+
+[2026-09-29T01:47:45.781Z] Intermediate redeployment
+/health 200 0.811 syd1::iad1::[request-id omitted]
+
+[2026-09-29T01:48:05.127Z] Intermediate redeployment
+/health 200 0.793 syd1::iad1::[request-id omitted]
+/health 200 0.652 syd1::iad1::[request-id omitted]
+/api/v1/system/version 200 0.748 syd1::iad1::[request-id omitted]
+/api/v1/auth/login 200 5.147 syd1::iad1::[request-id omitted]
+/api/v1/auth/me 200 1.049 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items?page=1&page_size=20 200 1.312 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items/expiry-summary?as_of=2026-09-29&days_before=3&page=1&page_size=20 200 1.306 syd1::iad1::[request-id omitted]
+/api/v1/auth/me 200 1.047 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items?page=1&page_size=20 200 1.255 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items/expiry-summary?as_of=2026-09-29&days_before=3&page=1&page_size=20 200 1.254 syd1::iad1::[request-id omitted]
+/api/v1/auth/me 200 1.159 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items?page=1&page_size=20 200 1.245 syd1::iad1::[request-id omitted]
+/api/v1/inventory-items/expiry-summary?as_of=2026-09-29&days_before=3&page=1&page_size=20 200 1.266 syd1::iad1::[request-id omitted]
+PROBE Please reply only with Hello. Do not access or change inventory or memories.
+
+[2026-09-29T01:48:34.079Z] Intermediate redeployment
+headers 200 5.878 syd1::iad1::[request-id omitted]
+event: start 5.878
+event: text_delta 15.678
+event: done 16.361
+complete 16.564 {'event: start': 1, 'event: text_delta': 1, 'event: done': 1}
+PROBE List my inventory items. Do not change inventory or memories.
+headers 200 2.758 syd1::iad1::[request-id omitted]
+event: start 2.768
+event: text_delta 12.381
+event: done 13.445
+complete 13.686 {'event: start': 1, 'event: text_delta': 1, 'event: done': 1}
+
+[2026-09-29T01:50:24.593Z] Final region verification
+/health 200 0.665 syd1::syd1::[request-id omitted]
+
+[2026-09-29T01:50:34.621Z] Final region verification
+/health 200 0.465 syd1::syd1::[request-id omitted]
+/health 200 0.524 syd1::syd1::[request-id omitted]
+/api/v1/system/version 200 0.541 syd1::syd1::[request-id omitted]
+/api/v1/auth/login 200 0.571 syd1::syd1::[request-id omitted]
+/api/v1/auth/me 200 0.46 syd1::syd1::[request-id omitted]
+/api/v1/inventory-items?page=1&page_size=20 200 0.209 syd1::syd1::[request-id omitted]
+/api/v1/inventory-items/expiry-summary?as_of=2026-09-29&days_before=3&page=1&page_size=20 200 0.448 syd1::syd1::[request-id omitted]
+/api/v1/auth/me 200 0.188 syd1::syd1::[request-id omitted]
+/api/v1/inventory-items?page=1&page_size=20 200 0.277 syd1::syd1::[request-id omitted]
+/api/v1/inventory-items/expiry-summary?as_of=2026-09-29&days_before=3&page=1&page_size=20 200 0.208 syd1::syd1::[request-id omitted]
+/api/v1/auth/me 200 0.243 syd1::syd1::[request-id omitted]
+/api/v1/inventory-items?page=1&page_size=20 200 0.196 syd1::syd1::[request-id omitted]
+/api/v1/inventory-items/expiry-summary?as_of=2026-09-29&days_before=3&page=1&page_size=20 200 0.208 syd1::syd1::[request-id omitted]
+PROBE Please reply only with Hello. Do not access or change inventory or memories.
+headers 200 1.308 syd1::syd1::[request-id omitted]
+event: start 1.317
+
+[2026-09-29T01:50:45.496Z] Final region verification
+event: text_delta 6.195
+event: done 6.212
+complete 6.216 {'event: start': 1, 'event: text_delta': 1, 'event: done': 1}
+PROBE List my inventory items. Do not change inventory or memories.
+headers 200 0.304 syd1::syd1::[request-id omitted]
+event: start 0.314
+event: text_delta 6.911
+event: done 7.013
+complete 7.015 {'event: start': 1, 'event: text_delta': 1, 'event: done': 1}
+

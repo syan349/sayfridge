@@ -24,11 +24,16 @@ class AgentModelSettings(BaseSettings):
     api_key: SecretStr = Field(alias="AGENT_API_KEY", repr=False)
     timeout_seconds: float = Field(default=60, alias="AGENT_TIMEOUT_SECONDS", gt=0, le=600)
     max_retries: int = Field(default=2, alias="AGENT_MAX_RETRIES", ge=0, le=10)
-    context_trigger: int = Field(default=80000, alias="AGENT_CONTEXT_TRIGGER")
-    context_target: int = Field(default=40000, alias="AGENT_CONTEXT_TARGET")
-    context_limit: int = Field(default=160000, alias="AGENT_CONTEXT_LIMIT")
+    context_trigger: int = Field(default=120000, alias="AGENT_CONTEXT_TRIGGER")
+    context_target: int = Field(default=50000, alias="AGENT_CONTEXT_TARGET")
+    context_limit: int = Field(default=150000, alias="AGENT_CONTEXT_LIMIT")
     model_context_limit: int = Field(default=160000, alias="AGENT_MODEL_CONTEXT_LIMIT")
     output_tokens: int = Field(default=8000, alias="AGENT_OUTPUT_TOKENS")
+    recent_tokens: int = Field(default=10000, alias="AGENT_RECENT_TOKENS", gt=0)
+    summary_target_tokens: int = Field(default=10000, alias="AGENT_SUMMARY_TARGET_TOKENS", gt=0)
+    summary_max_tokens: int = Field(default=10000, alias="AGENT_SUMMARY_MAX_TOKENS", gt=0)
+    summary_output_tokens: int = Field(default=20000, alias="AGENT_SUMMARY_OUTPUT_TOKENS", gt=0)
+    tool_result_tokens: int = Field(default=2000, alias="AGENT_TOOL_RESULT_TOKENS", gt=0)
     summary_timeout_seconds: float = Field(default=45, alias="AGENT_SUMMARY_TIMEOUT_SECONDS", gt=0, le=120)
 
     @field_validator("model_name", "api_base")
@@ -56,7 +61,10 @@ def create_agent_model() -> BudgetModel:
     settings = get_agent_model_settings()
     budget = Budget(trigger=settings.context_trigger, target=settings.context_target,
                     limit=settings.context_limit, model_limit=settings.model_context_limit,
-                    output=settings.output_tokens)
+                    output=settings.output_tokens, recent=settings.recent_tokens,
+                    summary_target=settings.summary_target_tokens, summary_limit=settings.summary_max_tokens,
+                    summary_output=settings.summary_output_tokens,
+                    tool_result_limit=settings.tool_result_tokens)
     model = BudgetModel(ChatOpenAI(
         model=settings.model_name,
         base_url=settings.api_base,

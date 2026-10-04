@@ -1,0 +1,28 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 02ec95582dc7, create initial eight tables
+INFO  [alembic.runtime.migration] Running upgrade 02ec95582dc7 -> a260929_defaults, Ensure one active default space per user.
+INFO  [alembic.runtime.migration] Running upgrade a260929_defaults -> a261001_sessions, Add revocable sessions and rotating refresh credentials.
+INFO  [alembic.runtime.migration] Running upgrade a261001_sessions -> a261002_categories, User-owned categories and batch-specific category edits.
+INFO  [alembic.runtime.migration] Running upgrade a261002_categories -> a261002_chat, Public chat history and one primary chat per user; retain all legacy IDs.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.schemas
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.tables
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.types
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.constraints
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.defaults
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.comments
+No new upgrade operations detected.
+Business database initialized and verified:
+  schema: perf_d9db869f2fbb49b1ba402b4f9762f1dc
+  ORM tables: 11 present
+  ORM columns: 100 present
+  ORM foreign keys: 13 present
+  ORM constraints: 37 present
+  ORM indexes: 21 present
+  public categories: 25 present
+Agent database initialized and verified:
+  schema: perf_d9db869f2fbb49b1ba402b4f9762f1dc_agent
+  search_path: perf_d9db869f2fbb49b1ba402b4f9762f1dc_agent
+Fresh-database initialization completed successfully.

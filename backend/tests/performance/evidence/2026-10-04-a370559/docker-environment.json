@@ -1,0 +1,7 @@
+{
+  "server_version": "29.7.2",
+  "operating_system": "Docker Desktop",
+  "cpus": 10,
+  "memory_bytes": 8319504384,
+  "collection": "docker info during the run"
+}
