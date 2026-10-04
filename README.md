@@ -119,7 +119,7 @@ native acceptance. The selected APK/device results belong in the
 
 ```mermaid
 flowchart LR
-    Android[Flutter Android] -->|HTTPS REST / SSE| API[FastAPI on Vercel]
+    Android[Flutter Android] -->|HTTPS REST / SSE| API["FastAPI (including LangGraph Agent)<br/>Hosted on Vercel"]
     MobileWeb[Flutter Web on Render] -->|HTTPS REST / SSE| API
     Web[React Web on Render] -->|HTTPS REST / SSE| API
     API --> Services[Validated business services]
@@ -169,12 +169,12 @@ content; module READMEs retain local setup and checks.
 
 | Canvas criterion | What to inspect | Evidence entry |
 | --- | --- | --- |
-| 1. Integrated system (8%) | Distinct Mobile/Web workflows using the same accounts, API, and persisted inventory | [Product scope](docs/product/README.md), [API reference](docs/reference/API_REFERENCE.md), [browser E2E](docs/testing/README.md#core-e2e) |
+| 1. Integrated system (8%) | Distinct Mobile/Web workflows using the same accounts, API, and persisted inventory | [Product scope](docs/product/README.md), [API reference](docs/reference/API_REFERENCE.md), [Agent client integration](docs/reference/AGENT_FRONTEND_INTEGRATION.md), [browser E2E](docs/testing/README.md#core-e2e) |
 | 2. Flutter and chosen tools (10%) | Widgets, state/controllers, repositories, navigation, asynchronous API handling, and cloud integration | [Mobile guide](mobile/README.md), [Mobile source](mobile/lib), [architecture](docs/architecture/README.md) |
 | 3. Independent learning (6%) | Persistent AI workflows, multimodal input, refresh sessions, PostgreSQL connection behavior, and CI composition | [Learning and Design Evolution](docs/learning/README.md) |
 | 4. Genuine user need (8%) | Target users, user stories, and delivered stock/expiry workflows | [User stories and verification](docs/product/README.md#core-user-stories-and-evidence) |
 | 5. Mobile capabilities (10%) | Camera/gallery, editable speech, gestures, and local notifications | [Mobile capabilities](#mobile-capabilities-and-user-value), [manual integration record](docs/testing/reports/MANUAL_INTEGRATION_TEST_RECORD.md), [native acceptance record](docs/testing/reports/FINAL_ACCEPTANCE.md#manual-cross-client-and-android-validation) |
-| 6. Architecture and justification (10%) | Diagram, REST/SSE choices, transaction boundaries, recovery, and capacity planning | [System Architecture](docs/architecture/README.md), [quantity rules](docs/architecture/QUANTITY_STATE_DESIGN.md), [performance record](docs/testing/records/PERFORMANCE_TEST_RECORD.md) |
+| 6. Architecture and justification (10%) | Diagram, REST/SSE choices, transaction boundaries, recovery, and capacity planning | [System Architecture](docs/architecture/README.md), [LangGraph Agent workflow](docs/architecture/AGENT_DESIGN.md#six-node-workflow), [quantity rules](docs/architecture/QUANTITY_STATE_DESIGN.md), [performance record](docs/testing/records/PERFORMANCE_TEST_RECORD.md) |
 | 7. Engineering practice (8%) | Module boundaries, locked dependencies, validation, migrations, local lint/analyze commands, and CI | [Repository layout](#repository-layout), [Backend](backend/README.md), [Web](web/README.md), [Mobile](mobile/README.md), [.gitignore](.gitignore) |
 | 8. Testing strategy (10%) | Unit, API/database, component/widget, browser, manual/native, model, and performance verification | [Testing strategy and reports](docs/testing/README.md), [CI workflows](.github/workflows) |
 | 9. Security and privacy (4%) | Ownership/role checks, sessions, hostile inputs, image metadata, secret handling, and OWASP-related findings | [Security and Privacy](docs/security/README.md) |
