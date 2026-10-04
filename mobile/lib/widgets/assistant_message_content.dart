@@ -111,12 +111,10 @@ List<_Block> _blocks(String message) {
     }
     final heading = RegExp(r'^#{1,3}\s+(.+?)\s*#*$').firstMatch(line);
     final bullet = RegExp(r'^(?:[-*•]\s+|(\d+[.)])\s+)(.+)$').firstMatch(line);
-    final plainHeading =
-        line.length <= 80 &&
-        (line.endsWith(':') || line.endsWith('：')) &&
-        bullet == null;
+    // A colon alone does not make a heading: query introductions often end in
+    // one. Explicit Markdown headings/bold and legacy list labels stay styled.
     final boldHeading = RegExp(r'^\*\*[^*]+\*\*[:：]?$').hasMatch(line);
-    if (heading != null || plainHeading || boldHeading) {
+    if (heading != null || boldHeading) {
       flush();
       result.add(
         _Block(

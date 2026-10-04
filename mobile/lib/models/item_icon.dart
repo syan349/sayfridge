@@ -7,7 +7,7 @@ class ItemIcon {
   final List<String> keywords;
   String get asset => 'assets/icons/inventory/$id.png';
 
-  static const defaultAsset = 'assets/icons/home/default_avatar.png';
+  static const defaultAsset = 'assets/icons/inventory/default_item.png';
   static const library = [
     ItemIcon('apple', 'Apple', ['apple', 'apples', '苹果']),
     ItemIcon('avocado', 'Avocado', ['avocado', 'avocados', '牛油果']),

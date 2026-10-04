@@ -5,6 +5,28 @@ import 'package:sayfridge/widgets/assistant_message_content.dart';
 
 void main() {
   testWidgets(
+    'a query introduction ending in a colon keeps normal body weight',
+    (tester) async {
+      const introduction = 'Here’s what’s currently in your fridge:';
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: AssistantMessageContent(
+              message: introduction,
+              textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            ),
+          ),
+        ),
+      );
+      final text = tester.widget<RichText>(
+        find.text(introduction, findRichText: true),
+      );
+      expect(text.text.style!.fontWeight, FontWeight.w400);
+      expect(text.text.toPlainText(), introduction);
+    },
+  );
+
+  testWidgets(
     'report hierarchy preserves facts and distinguishes paragraphs from list rows',
     (tester) async {
       tester.view.physicalSize = const Size(320, 568);

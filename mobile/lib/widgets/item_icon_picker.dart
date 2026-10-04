@@ -159,7 +159,7 @@ class _IconLibraryState extends State<_IconLibrary> {
               const SizedBox(height: 12),
               TextButton.icon(
                 onPressed: () => Navigator.pop(context, ItemIcon.defaultAsset),
-                icon: const Icon(Icons.inventory_2_outlined),
+                icon: Image.asset(ItemIcon.defaultAsset, width: 30, height: 30),
                 label: const Text('Default icon'),
               ),
               icons.isEmpty

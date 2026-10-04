@@ -362,6 +362,73 @@ void main() {
   );
 
   testWidgets(
+    'query introduction stays regular and unmatched items use the food container icon',
+    (tester) async {
+      const introduction = 'Here’s what’s currently in your fridge:';
+      final harness = _Harness(
+        {},
+        reply: introduction,
+        query: {
+          'items': [
+            {
+              ...stockJson(amount: '400'),
+              'id': 'coconut-cream',
+              'item_definition_name': 'Coconut Cream',
+              'display_unit': 'ml',
+              'storage_space_name': 'BoschFridge',
+              'expiry_date': '2026-10-15',
+            },
+            {
+              ...stockJson(amount: '250'),
+              'id': 'miso-paste',
+              'item_definition_name': 'Miso Paste',
+              'display_unit': 'g',
+              'storage_space_name': 'BoschFridge',
+              'expiry_date': '2026-10-23',
+            },
+            {
+              ...stockJson(amount: '2'),
+              'id': 'milk',
+              'item_definition_name': 'Whole Milk',
+              'display_unit': 'L',
+              'storage_space_name': 'BoschFridge',
+              'expiry_date': '2026-10-01',
+            },
+          ],
+          'total': 3,
+          'has_more': false,
+        },
+      );
+      await harness.open(tester, command: 'What is in my fridge?');
+      final position = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      position.jumpTo(0);
+      await tester.pumpAndSettle();
+      final intro = tester.widget<RichText>(
+        find.text(introduction, findRichText: true),
+      );
+      expect(intro.text.style!.fontWeight, FontWeight.w400);
+      expect(find.byType(InventoryItemTile), findsNWidgets(3));
+      final assets = tester
+          .widgetList<Image>(find.byType(Image))
+          .map((widget) => widget.image)
+          .whereType<AssetImage>()
+          .map((image) => image.assetName);
+      expect(
+        assets.where((asset) => asset.endsWith('/default_item.png')),
+        hasLength(2),
+      );
+      expect(
+        assets.where((asset) => asset.endsWith('/milk.png')),
+        hasLength(1),
+      );
+      await _capture(tester, 'query-default-item-icon');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'saved inventory report text uses the introduction and wide document layout',
     (tester) async {
       final store = MemoryAgentStore();

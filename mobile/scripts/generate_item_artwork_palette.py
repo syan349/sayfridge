@@ -13,15 +13,20 @@ def background(path):
         image = source.convert('RGBA')
         width, height = image.size
         colors = []
+        alphas = []
         # Sample clear background near the four edges, away from central artwork.
         for x, y in ((.5, .08), (.08, .5), (.92, .5), (.5, .92)):
             center_x, center_y = round(x * width), round(y * height)
             for dx in range(-3, 4):
                 for dy in range(-3, 4):
                     r, g, b, a = image.getpixel((center_x + dx, center_y + dy))
+                    alphas.append(a)
                     if a >= 240 and r >= 160 and g - r >= 5 and g - b >= 8:
                         colors.append((r, g, b))
         if not colors:
+            if max(alphas) < 240:
+                # Foreground-only artwork uses the app's uniform pale-green tile.
+                return 'E5F4DB'
             raise ValueError(f'No green background found in {path}')
         return ''.join(f'{round(median(channel)):02X}' for channel in zip(*colors))
 
@@ -29,9 +34,10 @@ def background(path):
 def generate():
     model = (ROOT / 'lib/models/item_icon.dart').read_text(encoding='utf-8')
     names = re.findall(r"ItemIcon\(\s*'([^']+)'", model)
-    assets = ['assets/icons/home/default_avatar.png'] + [
+    default_asset = re.search(r"static const defaultAsset = '([^']+)'", model).group(1)
+    assets = list(dict.fromkeys(['assets/icons/home/default_avatar.png', default_asset] + [
         f'assets/icons/inventory/{name}.png' for name in names
-    ]
+    ]))
     entries = '\n'.join(
         f"    '{asset}': 0xFF{background(ROOT / asset)}," for asset in assets
     )
