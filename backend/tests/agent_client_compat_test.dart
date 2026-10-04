@@ -10,6 +10,7 @@ import 'package:sayfridge/state/agent_controller.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
 import 'package:sayfridge/models/inventory_item.dart';
 import 'package:sayfridge/widgets/inventory_actions.dart';
+import 'package:sayfridge/screens/agent_conversation_screen.dart';
 import '../../mobile/test/support/integration_fixtures.dart';
 
 void main() {
@@ -101,6 +102,75 @@ void main() {
     expect(checked, greaterThan(10));
     expect(decisions, containsAll(['confirm', 'answer', 'edit', 'cancel']));
   });
+
+  for (final reason in ['NO_MATCH', 'AMBIGUOUS']) {
+    final cases = streams.where((row) {
+      final last = events(row).last;
+      if (last['type'] != 'done') return false;
+      final items = last['data']['items'] as List;
+      if (items.length != 1 || items.single['status'] != 'NEEDS_INPUT' ||
+          items.single['error']?['details']?['reason'] != reason) return false;
+      final cid = row['request']['conversation_id'];
+      return streams.any((reply) => (reply['path'] as String).endsWith('/resume') &&
+          reply['request']['conversation_id'] == cid &&
+          reply['request']['responses'][0]['decision'] == 'answer');
+    }).toList();
+    testWidgets('unchanged Mobile displays $reason and submits the existing answer contract', (tester) async {
+      final row = cases.first;
+      final state = Map<String, dynamic>.from(events(row).last['data'] as Map);
+      final item = Map<String, dynamic>.from((state['items'] as List).single as Map);
+      final cid = row['request']['conversation_id'] as String;
+      final reply = streams.firstWhere((reply) => (reply['path'] as String).endsWith('/resume') &&
+          reply['request']['conversation_id'] == cid && reply['request']['responses'][0]['decision'] == 'answer');
+      final expected = reply['request']['responses'][0] as Map;
+      var posts = 0;
+      final client = ApiClient(client: MockClient((request) async {
+        if (request.method == 'GET') return jsonResponse(state);
+        posts++;
+        final sent = jsonDecode(request.body) as Map;
+        expect(request.url.path, '/api/v1/agent/resume');
+        expect(sent['conversation_id'], cid);
+        expect(sent['interrupt_id'], state['interrupt_id']);
+        expect(sent['responses'], [expected]);
+        return http.Response(reply['body'] as String, 200, headers: {'content-type': reply['content_type'] as String});
+      }));
+      final store = MemoryAgentStore();
+      await store.write('target-compat', {'conversation_id': cid, 'messages': <String, String>{}, 'status': 'WAITING_INPUT'});
+      final controller = AgentController(WorkspaceRepository(client, MemoryTokens()), store: store);
+      await controller.bindUser('target-compat');
+      await controller.openConversation(cid);
+      expect(controller.canRespond, isTrue);
+      await tester.pumpWidget(MaterialApp(home: AgentConversationScreen(controller: controller)));
+      await tester.pumpAndSettle();
+      expect(find.text(item['display']['question'] as String), findsOneWidget);
+      expect(find.text('inventory item id'), findsNothing);
+      if (reason == 'AMBIGUOUS') {
+        final candidate = (item['error']['details']['candidates'] as List).first as Map;
+        final choice = find.textContaining('Apples · ${candidate['storage_space_name']}');
+        await tester.ensureVisible(choice);
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+        final confirm = find.widgetWithText(FilledButton, 'Confirm');
+        await tester.ensureVisible(confirm);
+        await tester.tap(confirm);
+      } else {
+        final bottom = find.byKey(const Key('assistant-bottom-action'));
+        await tester.tap(find.descendant(of: bottom, matching: find.byTooltip('Type a message')));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(const Key('assistant-answer-field')), expected['message'] as String);
+        await tester.pumpAndSettle();
+        await tester.tap(find.descendant(of: bottom, matching: find.byTooltip('Send message')));
+      }
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+      expect(posts, 1);
+      expect(controller.error, isNull);
+      expect(controller.items.single['status'], 'SUCCEEDED');
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+      client.close();
+    }, skip: cases.isEmpty);
+  }
 
   testWidgets('existing expired discard cancels without a write, confirms and refreshes with the real backend result', (tester) async {
     final row = traces.firstWhere((r) => (r['path'] as String).endsWith('/discard') && r['status'] == 200

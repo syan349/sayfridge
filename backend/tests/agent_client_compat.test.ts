@@ -2,13 +2,14 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createElement, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, expect, it } from 'vitest'
+import { act, render, fireEvent, renderHook, waitFor } from '@testing-library/react'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { readEventStream, type AgentEvent } from '../../web/src/api/agent'
 import { setToken } from '../../web/src/api/tokenStore'
 import { useAssistant } from '../../web/src/pages/assistant/useAssistant'
 import { server } from '../../web/src/test/server'
+import { ProposalCard } from '../../web/src/components/ProposalCard/ProposalCard'
 
 interface Trace {
   path: string
@@ -28,6 +29,33 @@ beforeEach(() => {
   sessionStorage.clear()
   setToken('isolated-client-test-token', 900)
 })
+
+// Optional in older captures, required by the new backend recovery fixtures.
+for (const reason of ['NO_MATCH', 'AMBIGUOUS']) {
+  const target = streams.flatMap((row) => events(row).flatMap((event) =>
+    event.type === 'action_required' ? event.data.items : []))
+    .find((item) => (item.error?.details as { reason?: string })?.reason === reason)
+  it.skipIf(!target)(`unchanged Web proposal renders ${reason} and submits its existing answer shape`, () => {
+    const item = target!
+    const onAnswer = vi.fn()
+    const view = render(createElement(ProposalCard, { items: [item], busy: false, onAnswer }))
+    expect(view.getByText(item.display!.question!)).toBeTruthy()
+    expect(view.queryByText('inventory item id')).toBeNull()
+    const candidate = item.error?.details?.candidates?.[0]
+    if (candidate) {
+      fireEvent.click(view.getByRole('button', { name: new RegExp(candidate.storage_space_name) }))
+      expect(onAnswer.mock.calls[0][0]).toEqual([{ item_id: item.item_id, proposal_id: item.proposal_id,
+        decision: 'answer', selected_inventory_item_id: candidate.id }])
+    } else {
+      fireEvent.click(view.getByRole('button', { name: 'Answer', exact: true }))
+      fireEvent.change(view.getByLabelText('Your answer'), { target: { value: 'Apples in Kitchen' } })
+      fireEvent.click(view.getByRole('button', { name: 'Send', exact: true }))
+      expect(onAnswer.mock.calls[0][0]).toEqual([{ item_id: item.item_id, proposal_id: item.proposal_id,
+        decision: 'answer', message: 'Apples in Kitchen' }])
+    }
+    view.unmount()
+  })
+}
 
 it('unchanged Web parser consumes actual backend responses across UTF-8 chunks and heartbeat comments', async () => {
   expect(streams.length).toBeGreaterThan(10)
@@ -72,7 +100,10 @@ it('unchanged Web hook keeps the start ID and resends the whole request after a 
 })
 
 it('unchanged Web hook restores an actual pending state and confirms its original proposal', async () => {
-  const waiting = traces.find((r) => r.method === 'GET' && r.path.endsWith('/state') && r.status === 200 && JSON.parse(r.body).status === 'WAITING_INPUT')!
+  const waiting = traces.find((r) => r.method === 'GET' && r.path.endsWith('/state') && r.status === 200
+    && JSON.parse(r.body).status === 'WAITING_INPUT' && streams.some((s) => s.path.endsWith('/resume')
+      && s.request?.conversation_id === r.path.split('/')[5]
+      && (s.request.responses as { decision: string }[]).some((a) => a.decision === 'confirm')) )!
   const state = JSON.parse(waiting.body)
   const cid = waiting.path.split('/')[5]
   const resume = streams.find((r) => r.path.endsWith('/resume') && r.request?.conversation_id === cid
