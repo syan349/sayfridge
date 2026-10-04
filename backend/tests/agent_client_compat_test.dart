@@ -10,6 +10,8 @@ import 'package:sayfridge/state/agent_controller.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
 import 'package:sayfridge/models/inventory_item.dart';
 import 'package:sayfridge/widgets/inventory_actions.dart';
+import 'package:sayfridge/screens/agent_conversation_screen.dart';
+import 'package:sayfridge/widgets/agent_proposal_options.dart';
 import '../../mobile/test/support/integration_fixtures.dart';
 
 void main() {
@@ -101,6 +103,98 @@ void main() {
     expect(checked, greaterThan(10));
     expect(decisions, containsAll(['confirm', 'answer', 'edit', 'cancel']));
   });
+
+  for (final reason in ['NO_MATCH', 'AMBIGUOUS']) {
+    Map<String, dynamic>? matchingReply(Map<String, dynamic> row, Map item) {
+      for (final reply in streams) {
+        if (!(reply['path'] as String).endsWith('/resume') ||
+            reply['request']['conversation_id'] != row['request']['conversation_id']) continue;
+        final answers = reply['request']['responses'] as List;
+        if (answers.length != 1) continue;
+        final answer = answers.single as Map;
+        if (answer['decision'] != 'answer' || answer['item_id'] != item['item_id'] ||
+            answer['proposal_id'] != item['proposal_id']) continue;
+        if (reason == 'AMBIGUOUS') {
+          final candidates = item['error']['details']['candidates'] as List;
+          if (!candidates.any((candidate) => candidate['id'] == answer['selected_inventory_item_id']) ||
+              answer.containsKey('message') || answer.containsKey('images')) continue;
+        } else if (answer['message'] is! String || answer.containsKey('images') ||
+            answer.containsKey('selected_inventory_item_id')) {
+          continue;
+        }
+        final last = events(reply).last;
+        if (last['type'] == 'done' && (last['data']['items'] as List).any((result) =>
+            result['item_id'] == item['item_id'] && result['status'] == 'SUCCEEDED')) return reply;
+      }
+      return null;
+    }
+    final cases = streams.where((row) {
+      final last = events(row).last;
+      if (last['type'] != 'done') return false;
+      final items = last['data']['items'] as List;
+      if (items.length != 1 || items.single['status'] != 'NEEDS_INPUT' ||
+          items.single['error']?['details']?['reason'] != reason) return false;
+      return matchingReply(row, items.single as Map) != null;
+    }).toList();
+    testWidgets('unchanged Mobile displays $reason and submits the existing answer contract', (tester) async {
+      final row = cases.first;
+      final state = Map<String, dynamic>.from(events(row).last['data'] as Map);
+      final item = Map<String, dynamic>.from((state['items'] as List).single as Map);
+      final cid = row['request']['conversation_id'] as String;
+      final reply = matchingReply(row, item)!;
+      final expected = reply['request']['responses'][0] as Map;
+      var posts = 0;
+      final client = ApiClient(client: MockClient((request) async {
+        if (request.method == 'GET') return jsonResponse(state);
+        posts++;
+        final sent = jsonDecode(request.body) as Map;
+        expect(request.url.path, '/api/v1/agent/resume');
+        expect(sent['conversation_id'], cid);
+        expect(sent['interrupt_id'], state['interrupt_id']);
+        expect(sent['responses'], [expected]);
+        return http.Response(reply['body'] as String, 200, headers: {'content-type': reply['content_type'] as String});
+      }));
+      final store = MemoryAgentStore();
+      await store.write('target-compat', {'conversation_id': cid, 'messages': <String, String>{}, 'status': 'WAITING_INPUT'});
+      final controller = AgentController(WorkspaceRepository(client, MemoryTokens()), store: store);
+      await controller.bindUser('target-compat');
+      await controller.openConversation(cid);
+      expect(controller.canRespond, isTrue);
+      await tester.pumpWidget(MaterialApp(home: AgentConversationScreen(controller: controller)));
+      await tester.pumpAndSettle();
+      expect(find.text(item['display']['question'] as String), findsOneWidget);
+      expect(find.text('inventory item id'), findsNothing);
+      if (reason == 'AMBIGUOUS') {
+        final candidates = item['error']['details']['candidates'] as List;
+        final selected = candidates.indexWhere((candidate) => candidate['id'] == expected['selected_inventory_item_id']);
+        expect(selected, greaterThanOrEqualTo(0));
+        // Captured items need not be Apples; two batches may have identical labels.
+        final choice = find.descendant(of: find.byType(AgentProposalOptions),
+            matching: find.byType(OutlinedButton)).at(selected);
+        await tester.ensureVisible(choice);
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+        final confirm = find.widgetWithText(FilledButton, 'Confirm');
+        await tester.ensureVisible(confirm);
+        await tester.tap(confirm);
+      } else {
+        final bottom = find.byKey(const Key('assistant-bottom-action'));
+        await tester.tap(find.descendant(of: bottom, matching: find.byTooltip('Type a message')));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(const Key('assistant-answer-field')), expected['message'] as String);
+        await tester.pumpAndSettle();
+        await tester.tap(find.descendant(of: bottom, matching: find.byTooltip('Send message')));
+      }
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+      expect(posts, 1);
+      expect(controller.error, isNull);
+      expect(controller.items.single['status'], 'SUCCEEDED');
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+      client.close();
+    }, skip: cases.isEmpty);
+  }
 
   testWidgets('existing expired discard cancels without a write, confirms and refreshes with the real backend result', (tester) async {
     final row = traces.firstWhere((r) => (r['path'] as String).endsWith('/discard') && r['status'] == 200

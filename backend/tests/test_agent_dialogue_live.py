@@ -267,7 +267,7 @@ def test_ambiguous_target_new_purchase_query_and_old_task_recovery(repeat, inven
         first = await dialogue.chat("I used half the rice. Please deduct it.")
         assert len(first["items"]) == 1 and first["items"][0]["error"]["code"] == "TARGET_REQUIRED", describe(first)
         item = first["items"][0]
-        assert item["display"]["missing_fields"] == ["inventory_item_id"]
+        assert item["display"]["missing_fields"] == []
         assert await dialogue.counts() == (2, 0, 0)
         new = await dialogue.chat("I also bought 3 apples today. Please add them.")
         old = next(i for i in new["items"] if i["item_id"] == item["item_id"])

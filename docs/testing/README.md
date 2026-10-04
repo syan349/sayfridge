@@ -4,6 +4,33 @@ This is the project's testing entry point for assessment criterion 8. Tests are
 maintained alongside feature development: historical feature reports and commits
 record the unit, API, database, UI and Agent checks added during implementation.
 
+## Start here
+
+| Record | What to read it for |
+| --- | --- |
+| [Functional Test and Bug Fix Record (Excel)](reports/Functional%20Test%20and%20Bug%20Fix%20Record%20%28English%29.xlsx) | 157 functional testing and bug-fix records grouped by feature, with testers, dates, observed results and corrective work |
+| [Manual Integration Test Record](reports/MANUAL_INTEGRATION_TEST_RECORD.md) | 13 team-reviewed integration cases with setup, steps, observations and corrective work |
+| [Performance Test Record](records/PERFORMANCE_TEST_RECORD.md) | Measured load, hosted response times, authentication, contention and live-model timings |
+| [Final Acceptance Record](reports/FINAL_ACCEPTANCE.md) | Results for the selected submission release, entered after release testing |
+
+The Excel workbook consolidates functional tests and historical defects. Its
+test outcomes and subsequent improvements are separate fields; a recorded fix
+does not change the original test result. It complements the detailed manual
+integration record and does not replace final release acceptance.
+
+For automated execution, see [Fast CI](#fast-ci-entry-point),
+[Core E2E](#core-e2e) and [Full Regression](#unified-full-regression).
+For feature-specific results, use the [report index](#reports) below.
+
+## Where records are kept
+
+| Location | Contents |
+| --- | --- |
+| `reports/` | Test reports, manual observations and bug-fix records in Markdown or Excel |
+| `evidence/` | Supporting test outputs and evidence files, including JUnit XML and JSON records |
+| `records/` | The performance test record |
+| [Postman guide](POSTMAN_GUIDE.md) | Instructions for manual API requests |
+
 ## Strategy and execution
 
 | Layer | Trigger | Coverage and environment |
@@ -247,9 +274,7 @@ Vercel function-region comparison, with the original timing extract.
 The [Manual Integration Test Record](reports/MANUAL_INTEGRATION_TEST_RECORD.md)
 contains 13 team-reviewed cases covering onboarding, inventory, AI interactions,
 session renewal, ownership and mobile usability. Each case records setup, steps,
-expected behavior, observations and corrective work. The
-[evidence index](evidence/manual-integration/2026-10-03/source-index.json) retains
-finding metadata and screenshot references.
+expected behavior, observations and corrective work.
 
 Use its case IDs in emulator/device retests and the
 [Final Acceptance Record](reports/FINAL_ACCEPTANCE.md#manual-cross-client-and-android-validation).
@@ -259,12 +284,17 @@ results. Track issue resolution and manual retest outcome in separate fields.
 
 ## Reports
 
+### Functional and manual testing
+
+| Record | Scope |
+| --- | --- |
+| [Functional Test and Bug Fix Record (Excel)](reports/Functional%20Test%20and%20Bug%20Fix%20Record%20%28English%29.xlsx) | 157 records covering accounts, storage, inventory, AI, images, camera, voice, notifications and related checks; retains original outcomes and subsequent improvements |
+| [Manual integration test record — issue #139](reports/MANUAL_INTEGRATION_TEST_RECORD.md) | 13 cases with setup, steps, expected results, observations, fixes and evidence |
+
+### Automated and feature-level verification
+
 | Work packages | Report | Scope |
 | --- | --- | --- |
-| Performance baseline and hosted response | [Performance test record](records/PERFORMANCE_TEST_RECORD.md) | 2026-09-29 hosted region comparison; 2026-10-04 large-data REST load, hosted reads, authentication, contention and real-model SSE timings |
-| Manual integration during development | [Manual integration test record — issue #139](reports/MANUAL_INTEGRATION_TEST_RECORD.md) | 13 cases with setup, steps, expected results, observations, fixes and evidence |
-| Documentation consolidation | [Documentation review — 2026-10-02](reports/DOCUMENTATION_REVIEW.md) | Navigation, links, command syntax, source consistency and evidence preservation |
-| Security 8.1–8.6 | [Security and Privacy](../security/README.md) | Authorization, hostile inputs, uploads, tokens, logging and dependency audit |
 | Agent multimodal | [Image input and stock review](reports/AGENT_MULTIMODAL_TEST_RESULTS.md) | Inline images, cross-turn context, supplements, mandatory review, checkpoint recovery and live-model acceptance |
 | Agent V0.2 | [Agent workflow verification](reports/AGENT_V02_TEST_RESULTS.md) | Memory, estimates, per-item transactions, resume, recovery, and live-model acceptance |
 | B01–B03 | [Authentication](reports/B01-B03_AUTH_TEST_RESULTS.md) | Registration, login, and current user |
@@ -279,7 +309,16 @@ results. Track issue resolution and manual retest outcome in separate fields.
 | B15 | [Inventory batches](reports/B15_INVENTORY_BATCH_TEST_RESULTS.md) | Atomic batch creation, movement, and archival |
 | B22 | [Expiry summary](reports/B22_EXPIRY_SUMMARY_TEST_RESULTS.md) | On-demand expiry buckets, filters, pagination, and ownership |
 | B25 | [Administrator accounts](reports/B25_ADMIN_USERS_TEST_RESULTS.md) | Permission, safe reads, filtering, status changes, and no-op writes |
+
+### Performance, security and release acceptance
+
+| Area | Record | Scope |
+| --- | --- | --- |
+| Performance baseline and hosted response | [Performance test record](records/PERFORMANCE_TEST_RECORD.md) | 2026-09-29 hosted region comparison; 2026-10-04 large-data REST load, hosted reads, authentication, contention and real-model SSE timings |
+| Security 8.1–8.6 | [Security and Privacy](../security/README.md) | Authorization, hostile inputs, uploads, tokens, logging and dependency audit |
 | Database release readiness | [Database isolation and acceptance evidence](reports/DATABASE_ACCEPTANCE.md) | Environment guards, migration/seed evidence, transaction rollback, and idempotency |
+| Documentation consolidation | [Documentation review — 2026-10-02](reports/DOCUMENTATION_REVIEW.md) | Navigation, links, command syntax, source consistency and evidence preservation |
+| Final release validation | [Final Acceptance Record](reports/FINAL_ACCEPTANCE.md) | Automated, deployed and Android results for the selected submission release; prepared record until those tests are run |
 
 Manual requests: [Postman guide](POSTMAN_GUIDE.md).
 Setup and database configuration: [backend README](../../backend/README.md).

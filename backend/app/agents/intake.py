@@ -7,6 +7,7 @@ from langchain_core.messages import SystemMessage, ToolMessage
 from app.agents.prompts import INTENT_PROMPT
 from app.schemas.agent_actions import TurnIntent
 from app.agents.facts import missing_fields
+from app.agents.target_resolution import target_reason, lookup_observation
 
 
 async def identify_turn(model, messages, *, known_completed_ids=(), known_image_ids=None):
@@ -43,6 +44,18 @@ def waiting_question(item, language):
     name = (draft.get("new_definition") or {}).get("name") or draft.get("item_query") or ("这件物品" if zh else "this item")
     code = item.get("error", {}).get("code")
     missing = missing_fields(item)
+    reason = target_reason(item.get("error"))
+    if reason == "MISSING_QUERY":
+        return "你要修改哪种物品的库存？" if zh else "Which item would you like to update?"
+    if reason == "NO_MATCH":
+        observation = lookup_observation(item)
+        questions = {
+            "FAILED": ("暂时无法读取库存完成核对，请稍后重试。", "Inventory could not be checked right now. Please retry later."),
+            "EMPTY": ("当前没有在库物品，请核对物品是否已经入库。", "There are no in-stock items. Please check whether the item has been added."),
+            "INCOMPLETE": (f"尚未完成库存核对，请补充{name}在库存中的名称或存放位置。", f"The inventory check is incomplete. Please specify the stored name or location of {name}."),
+        }
+        fallback = (f"暂未匹配到{name}，请补充库存中的名称或存放位置。", f"I could not match {name} to your stock. Please specify its stored name or location.")
+        return questions.get(observation, fallback)[0 if zh else 1]
     if code in {"INITIAL_QUANTITY_REQUIRED", "QUANTITY_REQUIRED"}:
         if missing == ["quantity_unit"]:
             amount = draft.get("quantity_value", "")
@@ -104,6 +117,7 @@ class Questions(BaseModel):
 async def phrase_questions(model, items, messages, language):
     """One bounded call per changed group; failure keeps field-specific fallbacks."""
     candidates = [i for i in items if i["status"] == "NEEDS_INPUT" and not i.get("question")
+                  and target_reason(i.get("error")) not in {"NO_MATCH", "MISSING_QUERY"}
                   and i.get("error", {}).get("code") not in {"CATEGORY_REQUIRED", "MEMORY_SAVE_UNAVAILABLE", "PROPOSAL_REQUIRED"}]
     if not candidates:
         return
