@@ -57,7 +57,55 @@ passes the user's edited text/images to the assistant with a request to confirm 
 React conversation history lists the user's saved public messages from the main chat API,
 grouped by conversation. The recovery API restores pending business progress; saved history
 is text and does not return full image history.
-Email/password changes, account deletion and a server voice-quota API are not supplied.
+Email changes and account deletion are not implemented.
+
+## Deferred non-core features
+
+### Voice replies and usage quotas
+
+The initial design included spoken input and spoken replies. The delivered Mobile
+client converts speech to editable text using device/browser speech recognition.
+The user reviews the transcript, sends it to the AI assistant and receives a text
+reply. Text-to-speech replies and Backend audio processing are not implemented.
+
+The team selected transcription and text replies to focus development on reliable
+inventory workflows and control integration effort, response latency and running
+costs within the project schedule.
+
+The prototype has no cumulative per-user usage quota. The team chose to keep
+access open during prototype evaluation and use observed demand and operating
+costs to inform a later quota policy. Database voice-limit, used-duration and
+reset-time fields remain unused. They are reserved for metering and cost controls
+for a later voice service. Authentication, request limits and model-provider
+limits apply independently of these fields.
+
+### Password changes and forgotten-password recovery
+
+Password changes and forgotten-password recovery are not implemented. The Mobile
+change-password form displays an unavailable message and leaves the password
+unchanged. The recovery form displays an unavailable message and sends no email.
+Administrator account management provides status changes, not password resets.
+
+### Conversation title management
+
+Web and Mobile history lists derive their display titles from the first user
+message. Web shortens the first line to 60 characters; Mobile uses the first
+nonempty user message. AI-generated summary titles, user naming and renaming,
+and a workflow for storing these titles in `conversation.title` are not
+implemented. The team prioritized AI interaction and saved chat history.
+
+### Inventory operation undo
+
+Undo for committed inventory operations is not implemented. Reversing an earlier
+operation must account for subsequent stock changes. Directly restoring the
+previous quantity overwrites those later changes. The team deferred this
+workflow to preserve stock consistency.
+
+Users correct the actual remaining quantity with RECONCILE. It creates a new
+operation record and retains the original history. `UNDONE` and `undone_at` are
+reserved for a later undo workflow. Cancel dismisses a pending proposal before
+its stock write; it does not reverse a committed operation. See the
+[quantity rules](../architecture/QUANTITY_STATE_DESIGN.md#correction-and-undo).
 
 ## Scope boundaries
 

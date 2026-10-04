@@ -28,8 +28,8 @@ erDiagram
     user ||--o{ auth_session : opens
     auth_session ||--o{ auth_refresh_credential : rotates
     user ||--o{ agent_inventory_action : owns_receipts
-    user ||--o{ conversation : legacy_mapping
-    conversation ||--o{ conversation_message : legacy_mapping
+    user ||--o{ conversation : owns_history
+    conversation ||--o{ conversation_message : contains_messages
 ```
 
 ## Table reference
@@ -68,7 +68,7 @@ Constraints and indexes:
 
 ### `user`
 
-Accounts, Argon2 password hashes, role/status and internal voice counters.
+Accounts, Argon2 password hashes, role/status and reserved voice counters.
 
 | Column | PostgreSQL type | Nullable |
 | --- | --- | --- |
@@ -92,6 +92,12 @@ Constraints and indexes:
 - `ck_user_voice_used_nonnegative`: voice_used_seconds >= 0.
 - `pk_user`: PrimaryKeyConstraint: id.
 - `uq_user_email`: UniqueConstraint: email.
+
+`voice_limit_seconds`, `voice_used_seconds` and `voice_quota_reset_at` are unused.
+New accounts default to zero limit/usage and a NULL reset time. The application
+does not meter speech duration or enforce a cumulative per-user quota through
+these fields. They are reserved for voice-service metering and quota management;
+see the [voice policy](../product/README.md#voice-replies-and-usage-quotas).
 
 ### `agent_inventory_action`
 
@@ -136,13 +142,16 @@ Constraints and indexes:
 
 ### `conversation`
 
-Legacy conversation mapping; current Agent messages use LangGraph checkpoints.
+Conversation ownership and public chat history. LangGraph checkpoints retain
+Agent workflow and recovery state.
 
 | Column | PostgreSQL type | Nullable |
 | --- | --- | --- |
 | `id` | `UUID` | No |
 | `user_id` | `UUID` | No |
 | `title` | `VARCHAR(200)` | Yes |
+| `is_primary` | `BOOLEAN` | No |
+| `history_complete` | `BOOLEAN` | No |
 | `created_at` | `TIMESTAMP WITH TIME ZONE` | No |
 | `updated_at` | `TIMESTAMP WITH TIME ZONE` | No |
 
@@ -151,6 +160,13 @@ Constraints and indexes:
 - `fk_conversation_user_id_user`: user_id → user.id.
 - `pk_conversation`: PrimaryKeyConstraint: id.
 - `ix_conversation_user_updated_desc`: conversation.user_id, updated_at DESC.
+- `uq_conversation_primary_user`: unique user_id where is_primary is true.
+
+`title` is reserved for persisted title management. Clients currently derive
+history-list titles from the first user message; no title-generation or rename
+workflow writes this field. `is_primary` identifies the user's main chat;
+`history_complete` records public-history coverage. See
+[conversation title management](../product/README.md#conversation-title-management).
 
 ### `item_definition`
 
@@ -222,7 +238,9 @@ Constraints and indexes:
 
 ### `conversation_message`
 
-Legacy message mapping; current Agent does not write chat content here.
+Saved public USER/ASSISTANT text messages for conversation history. Images are
+represented by attachment text; Agent checkpoints retain workflow messages and
+recovery state.
 
 | Column | PostgreSQL type | Nullable |
 | --- | --- | --- |
@@ -326,6 +344,12 @@ Constraints and indexes:
 - `ix_inventory_operation_item_created`: inventory_operation.inventory_item_id, inventory_operation.created_at.
 - `ix_inventory_operation_item_status`: inventory_operation.inventory_item_id, inventory_operation.status.
 
+`UNDONE` and `undone_at` are reserved for an undo workflow. The current write API
+creates SUCCESS quantity operations and provides no undo endpoint. History reads
+can represent stored UNDONE records. Quantity correction creates a new RECONCILE
+record and preserves earlier operations; see
+[correction and undo](QUANTITY_STATE_DESIGN.md#correction-and-undo).
+
 ## Agent persistence and consistency
 
 LangGraph checkpoint/store tables use a separate configured Agent schema on the
@@ -333,7 +357,7 @@ same PostgreSQL service by default. They are initialized explicitly, not by API
 startup. Checkpoints retain messages/images and pending tasks; the Store retains
 user-scoped memory. Business receipts are separate from checkpoint progress.
 Their conversation identifier is a logical reference rather than a foreign key
-to the legacy conversation table.
+to the conversation history table.
 
 Quantity-operation idempotency is user-scoped in the stored key. Constraints,
 ordered row locks, version checks and transaction ownership jointly protect stock;

@@ -32,6 +32,19 @@ flowchart LR
 | Pooled and direct database connections | Runtime business queries use the pooled URL. Migrations, Agent persistence and conversation advisory locks use direct connections. |
 | Render plus Vercel plus Neon | Static clients are built separately from the Python service. Environment configuration supplies API origins, CORS and secrets. Deployment instructions belong to the delivery guide. |
 
+### Voice interaction and usage policy
+
+Mobile uses device/browser speech recognition to produce editable text. The
+Backend processes that text and returns text replies. The team selected this
+flow to focus on inventory reliability and control integration effort, latency
+and operating costs within the development schedule. Spoken replies and Backend
+speech processing are not implemented.
+
+The prototype has no cumulative per-user usage quota. The team deferred quota
+design until usage and cost data are available. The database voice counters are unused;
+authentication and request limits remain active. Current behavior and deferred
+work are recorded in the [product scope](../product/README.md#deferred-non-core-features).
+
 ## Request and data boundaries
 
 [Backend design](BACKEND_DESIGN.md) describes the HTTP lifecycle, transaction

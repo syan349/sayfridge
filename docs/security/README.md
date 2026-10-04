@@ -55,6 +55,12 @@ Full Regression and release results are linked from the
 | CORS | Explicit origin allowlist, no wildcard configuration or cookie credentials. Tests cover allowed/rejected origins and validation/body-limit responses. Protected endpoints also require authentication. |
 | Login throttling | Client/account limits are process-local; each Vercel instance maintains its own counters. |
 
+The authentication API provides registration, login, current identity, refresh
+and logout. Password changes and forgotten-password recovery are not implemented.
+Mobile forms report that these actions are unavailable. Administrator account
+management changes account status and provides no password-reset operation. See
+[password scope](../product/README.md#password-changes-and-forgotten-password-recovery).
+
 ### Hostile input and uploads — 8.3
 
 | Scenario | Verified outcome |

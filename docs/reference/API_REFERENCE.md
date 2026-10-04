@@ -175,8 +175,13 @@ not delete inventory or conversation data. A server logout requires connectivity
 local credential deletion alone does not revoke a server session.
 
 Access JWTs issued before this change retain their original expiry and have no
-revocable session ID. Login again to obtain the new session credentials. Profile editing,
-password change and cookie login are separate from these endpoints.
+revocable session ID. Login again to obtain the new session credentials.
+
+Password changes and forgotten-password recovery have no API endpoints. The
+Mobile forms display unavailable messages. Administrator endpoints manage account
+status and provide no password-reset operation. Profile editing and cookie login
+are not part of this authentication contract. See
+[password scope](../product/README.md#password-changes-and-forgotten-password-recovery).
 
 ## 3. Storage spaces — B04
 
@@ -724,6 +729,11 @@ RECONCILE uses calculation_method=EXACT, affects_state=CONFIRMED, and stores NUL
 applied_change_amount/unit because it confirms a total rather than a reliable delta.
 Decimal amounts serialize as strings. Internal idempotency keys are never returned.
 
+`undone_at` and the readable `UNDONE` status are reserved for an undo workflow;
+there is no endpoint to undo a committed operation. Correct the actual remaining
+quantity with a new RECONCILE operation. See
+[correction and undo](../architecture/QUANTITY_STATE_DESIGN.md#correction-and-undo).
+
 **Retry:** resend the same key, inventory ID, and literal business input. A matching
 successful operation returns its unchanged record plus current inventory, even if
 version/state changed since the original request. expected_version is not compared
@@ -866,6 +876,11 @@ No database migration is needed.
 Stock completion text is derived from actual per-item results (English/Chinese),
 not a second model interpretation of whether approval is needed. Estimated remaining
 quantities stay labeled as estimates. Queries still use model-generated plain text.
+
+Speech input reaches the Agent as user-reviewed text. The Backend has no raw-audio
+transcription, text-to-speech reply or voice-quota management endpoint. The
+prototype has no cumulative per-user usage quota; request limits apply separately.
+See [voice policy](../product/README.md#voice-replies-and-usage-quotas).
 
 Start with the [frontend interaction guide](AGENT_FRONTEND_INTEGRATION.md).
 Graph/memory rules: [architecture](../architecture/AGENT_DESIGN.md). Environment and storage:
