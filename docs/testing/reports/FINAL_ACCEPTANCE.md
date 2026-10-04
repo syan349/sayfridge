@@ -37,25 +37,28 @@ deployment order. At the time of release, record the selected commit with each r
 
 ## Full Regression run history
 
-Two manually triggered Full Regression runs passed on `main`. The retained JSON
+Three manually triggered Full Regression runs passed on `main`. The retained JSON
 summaries reproduce the contents read from the supplied downloads. Displayed run
 times, durations and the triggering account are recorded from the supplied Actions
 screenshots. Run #1 explicitly displays GMT+13; run #2 displays "Today at 18:18",
 recorded as 2026-10-04 using the date on which the screenshot was supplied.
+Run #3 displays "25 minutes ago" in the screenshot supplied on 2026-10-04;
+its date is recorded, but the exact clock time remains TBC.
 
 | Run | Execution date/time | Tested commit | Triggered by | Duration | Outcome | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | [#1](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/actions/runs/36999895826) | 2026-10-03 00:14 GMT+13 | `269531b1a7cf4843ef5f9b049a9dd8e693f710d1` | syan349 | 4m 29s | PASS | [JSON summary](../evidence/full-regression/36999895826/regression-summary.json) |
 | [#2](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/actions/runs/37179497627) | 2026-10-04 18:18 (displayed local time) | `d3358cda5dbe49b177c8d94ce8a1b81394364448` | syan349 | 5m 21s | PASS | [JSON summary](../evidence/full-regression/37179497627/regression-summary.json) |
+| [#3](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/actions/runs/37190832320) | 2026-10-04 (exact time TBC) | `8cea6def159ee9cb3e1fd9139e6ab0a52279c2b7` | syan349 | 6m 27s | PASS | [JSON summary](../evidence/full-regression/37190832320/regression-summary.json) |
 
-Both summaries report successful `revision`, `backend-full`, `frontend-full` and
+All three summaries report successful `revision`, `backend-full`, `frontend-full` and
 `browser-e2e` jobs. Their stated scope is the Backend offline full suite, Web
 Vitest/typecheck/build, Flutter unit/widget suite and eight Chromium E2E scenarios.
 They exclude live OpenAI opt-in tests, `manual_preview` screenshot exporters, and
 Android/iOS builds and device testing. Detailed per-test counts are not provided
 in these summaries.
 
-These results preserve regression evidence for the two listed commits. Once the
+These results preserve regression evidence for the three listed commits. Once the
 final release commit is selected, link its matching run (or a new run) in the
 automated release validation table. Final release acceptance and Android device
 testing remain pending.

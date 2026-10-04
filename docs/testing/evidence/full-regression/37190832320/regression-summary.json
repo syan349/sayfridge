@@ -1,0 +1,18 @@
+{
+  "commit": "8cea6def159ee9cb3e1fd9139e6ab0a52279c2b7",
+  "workflow_commit": "8cea6def159ee9cb3e1fd9139e6ab0a52279c2b7",
+  "run_id": "37190832320",
+  "jobs": {
+    "revision": "success",
+    "backend-full": "success",
+    "frontend-full": "success",
+    "browser-e2e": "success"
+  },
+  "passed": true,
+  "scope": "Backend offline full suite; Web Vitest/typecheck/build; Flutter unit/widget suite; 8 Chromium E2E scenarios",
+  "excluded": [
+    "live OpenAI opt-in tests",
+    "manual_preview screenshot exporters",
+    "Android/iOS builds and device testing"
+  ]
+}
