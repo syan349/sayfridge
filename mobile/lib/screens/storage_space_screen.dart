@@ -127,7 +127,7 @@ class StorageSpaceScreen extends StatelessWidget {
                 style: TextStyle(fontFamily: 'Arial'),
               ),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 24),
           SizedBox(
             height: 53,
             child: FilledButton.icon(
