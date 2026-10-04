@@ -309,8 +309,7 @@ New conversations retain the welcome view.
 
 **Follow-up:** the edited issue is Closed while its Project field is Todo. Its title
 changed after closure on October 2; the observation date and matching fix need
-confirmation. The [source index](../evidence/manual-integration/2026-10-03/source-index.json)
-preserves that timeline.
+confirmation.
 
 ## Evidence and retest entries
 
@@ -319,8 +318,6 @@ Screenshots: [#144 — 2](https://github.com/UOA-CS734-S2-2026/project-implement
 [#146 — 1](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/issues/146#issue-5653983188),
 [#147 — 4](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/issues/147#issue-5654203592).
 Issue #149 mentions a screenshot; the referenced attachment has not been located.
-The [source index](../evidence/manual-integration/2026-10-03/source-index.json) retains
-report timestamps, ownership, closure events and change links.
 
 For each run, record: **date/time; tester; client/device/OS; APK/source commit;
 Backend version/environment; case IDs; observed result; screenshot/log; fix and
