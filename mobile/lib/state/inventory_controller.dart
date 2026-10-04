@@ -41,6 +41,7 @@ class InventoryController extends ChangeNotifier {
   String get inventoryStatus => _inventoryStatus;
   String get query => _query;
   String? get storageSpaceId => _storageSpaceId;
+  String? get categoryId => _categoryId;
   bool get hasItemFilters =>
       _query.isNotEmpty ||
       _categoryId != null ||
@@ -136,6 +137,57 @@ class InventoryController extends ChangeNotifier {
   }
 
   Future<void> reload() => loadPage(_page);
+
+  Future<void> loadStorageSpace(String? id, {int pageSize = 20}) =>
+      loadInventory(
+        status: _inventoryStatus,
+        query: _query,
+        storageSpaceId: id,
+        categoryId: _categoryId,
+        purchaseFrom: _purchaseFrom,
+        purchaseTo: _purchaseTo,
+        expiryFrom: _expiryFrom,
+        expiryTo: _expiryTo,
+        pageSize: pageSize,
+      );
+
+  /// Read the complete current result without changing the displayed page.
+  Future<List<InventoryItem>> matchingItems() async {
+    final sequence = _requestSequence;
+    final status = _inventoryStatus;
+    final query = _query;
+    final storageSpaceId = _storageSpaceId;
+    final categoryId = _categoryId;
+    final purchaseFrom = _purchaseFrom;
+    final purchaseTo = _purchaseTo;
+    final expiryFrom = _expiryFrom;
+    final expiryTo = _expiryTo;
+    final matches = <String, InventoryItem>{};
+    for (var page = 1; ; page++) {
+      final result = await _repository.getInventory(
+        status: status,
+        query: query,
+        storageSpaceId: storageSpaceId,
+        categoryId: categoryId,
+        purchaseFrom: purchaseFrom,
+        purchaseTo: purchaseTo,
+        expiryFrom: expiryFrom,
+        expiryTo: expiryTo,
+        page: page,
+        pageSize: 100,
+      );
+      if (sequence != _requestSequence) {
+        throw StateError('Inventory changed while selecting items. Try again.');
+      }
+      for (final item in result.items) {
+        matches[item.id] = item;
+      }
+      if (!result.hasNextPage) return matches.values.toList();
+      if (result.items.isEmpty) {
+        throw StateError('Unable to load the complete inventory selection.');
+      }
+    }
+  }
 
   Future<void> loadPage(int page) {
     return loadInventory(

@@ -128,20 +128,20 @@ void main() {
         setState(() => item = InventoryItem.fromJson(current));
       }),
     ))));
-    expect(find.text('Discard expired item'), findsOneWidget);
-    await tester.tap(find.text('Discard expired item'));
+    expect(find.text('Discard item'), findsOneWidget);
+    await tester.tap(find.text('Discard item'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
     expect(writes, 0);
     expect(item.status, 'IN_STOCK');
-    await tester.tap(find.text('Discard expired item'));
+    await tester.tap(find.text('Discard item'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
     expect(writes, 1);
     expect(reloads, 2);
-    expect(find.text('Discard expired item'), findsNothing);
+    expect(find.text('Discard item'), findsNothing);
     expect(item.status, 'DISCARDED');
     expect(item.displayQuantity, InventoryItem.fromJson(after).displayQuantity);
   });

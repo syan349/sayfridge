@@ -73,7 +73,7 @@ in [the project scope](docs/product/README.md).
 
 ```mermaid
 flowchart LR
-    Android[Flutter Android] -->|HTTPS REST / SSE| API[FastAPI on Vercel]
+    Android[Flutter Android] -->|HTTPS REST / SSE| API["FastAPI (including LangGraph Agent)<br/>Hosted on Vercel"]
     MobileWeb[Flutter Web on Render] -->|HTTPS REST / SSE| API
     Web[React Web on Render] -->|HTTPS REST / SSE| API
     API -->|SQLAlchemy / psycopg| DB[(Neon PostgreSQL)]
@@ -94,6 +94,7 @@ content; module READMEs retain local setup and checks.
 | Subject | Maintained entry | Assessment evidence |
 | --- | --- | --- |
 | Product and user needs | [Product Scope](docs/product/README.md) | Target users, core stories and delivered workflows; criteria 1 and 4 |
+| LangGraph Agent workflow | [Agent Workflow](docs/architecture/AGENT_DESIGN.md#six-node-workflow) | Workflow diagram, node responsibilities, clarification and confirmation |
 | Architecture and engineering | [System Architecture](docs/architecture/README.md) | Diagram, decisions, protocol choices and capacity assumptions; criteria 6 and 7 |
 | API and client integration | [API Reference](docs/reference/API_REFERENCE.md), [Agent Client Integration](docs/reference/AGENT_FRONTEND_INTEGRATION.md) | Shared contracts and recovery/UI behavior |
 | Testing | [Testing Strategy and Evidence](docs/testing/README.md) | CI/E2E/regression strategy, feature reports and raw evidence; criterion 8 |

@@ -696,7 +696,7 @@ void main() {
     expect(find.text('Retry same request'), findsOneWidget);
   });
 
-  testWidgets('inline clarification replaces the visible pending proposal', (
+  testWidgets('bottom clarification replaces the visible pending proposal', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1080, 2400);
@@ -793,23 +793,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Unknown package'), findsOneWidget);
     expect(find.text('Add supporting photo'), findsNothing);
-    final inline = find.byKey(const Key('proposal-response-input'));
+    final composer = find.byKey(const Key('assistant-bottom-action'));
     final keyboard = find.descendant(
-      of: inline,
+      of: composer,
       matching: find.byTooltip('Type a message'),
     );
     await tester.ensureVisible(keyboard);
     await tester.tap(keyboard);
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.byKey(const Key('proposal-response-text')),
+      find.byKey(const Key('assistant-answer-field')),
       'Milk, one 1 litre carton',
     );
-    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Confirm'));
     await _tapAndFinish(
       tester,
       agent,
-      find.widgetWithText(FilledButton, 'Confirm'),
+      find.descendant(of: composer, matching: find.byTooltip('Send message')),
     );
     await tester.pumpAndSettle();
 

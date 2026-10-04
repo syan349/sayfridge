@@ -15,6 +15,7 @@ class AgentComposer extends StatefulWidget {
     this.waiting = false,
     this.voiceActive = false,
     this.maxLength = 8000,
+    this.maxLines = 6,
     this.inputKey = const Key('assistant-message-field'),
     this.textTopPadding = 6,
     this.inline = false,
@@ -26,6 +27,7 @@ class AgentComposer extends StatefulWidget {
   final bool enabled, hasImages, waiting, voiceActive;
   final int voiceModeReset;
   final int maxLength;
+  final int maxLines;
   final Key inputKey;
   final double textTopPadding;
   final bool inline;
@@ -125,7 +127,7 @@ class _AgentComposerState extends State<AgentComposer> {
           controller: widget.controller,
           focusNode: _focusNode,
           enabled: widget.enabled && !widget.voiceActive,
-          maxLines: 6,
+          maxLines: widget.maxLines,
           minLines: 1,
           maxLength: widget.maxLength,
           keyboardType: TextInputType.multiline,
@@ -141,9 +143,11 @@ class _AgentComposerState extends State<AgentComposer> {
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
             disabledBorder: InputBorder.none,
-            hintText: widget.waiting
-                ? 'Answer the pending items above'
-                : 'Send message ...',
+            hintText:
+                widget.hintText ??
+                (widget.waiting
+                    ? 'Waiting for your answer...'
+                    : 'Send message ...'),
             hintStyle: const TextStyle(color: Color(0xFFA4A4AE), fontSize: 16),
           ),
         ),
@@ -248,7 +252,7 @@ class _AgentComposerState extends State<AgentComposer> {
               ),
             ],
     ),
-    child: _typing || widget.waiting
+    child: _typing || (widget.waiting && !widget.enabled)
         ? widget.inline
               ? _inlineTypingLayout()
               : _typingLayout()

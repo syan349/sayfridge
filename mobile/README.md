@@ -49,8 +49,10 @@ number items separately within each storage space, restarting at 1. The structur
 `inventory_query` reply requires the matching backend update; older backends keep
 their text replies. Assistant SSE requests opt in with
 `X-SayFridge-Inventory-Cards: 1`; other clients keep their full text query answers.
-Inline clarification voice/keyboard fields use a thin border,
-12px corners and no shadow; the main composer keeps its existing style.
+Clarification questions appear in their own Assistant bubbles. Users answer
+through the bottom composer, with "Hold to answer" in voice mode and
+"Waiting for your answer..." in keyboard mode. The prompt above the separate
+Cancel action says "Please enter your answer below to continue."
 
 Home, inventory/spaces, quantity operations, expiry and Assistant use real APIs.
 The Assistant and Daily Check-in share `AgentInputPanel`: hold the speech region
@@ -99,18 +101,22 @@ separate. Retain conversation/request identity during reconnects and query state
 before retrying. Current balances show exact or estimated state; exact measurements
 can be edited and recorded through reconciliation, while initial stock facts remain.
 Assistant review headers use a 56px item icon with 14px spacing before the name/status.
-Item clarification and "Describe another detail" reuse the shared composer as a
-compact, voice-first draft input: hold to speak, release to edit the transcript,
-or switch between keyboard and voice. Confirm submits the item-scoped answer;
-recording alone never sends it. Sliding up cancels speech and preserves the existing
-text/selected choices. These inline inputs accept up to 1,000 characters and have
-no photo or separate send action. Successful review cards say "Saved successfully"
+Item clarification and edits use the bottom composer, with no input fields inside
+review bubbles. The active item determines which proposal receives the answer;
+multiple pending items can be answered individually. Hold to speak, release to edit
+the transcript, then send explicitly. Sliding up cancels speech and preserves
+the existing text/selected choices. Answers accept up to 1,000 characters.
+Catalog/space/batch choices remain available and can be confirmed directly.
+The ordinary message/photo draft stays intact while answering a pending item.
+Successful review cards say "Saved successfully"
 for both additions and updates; quantity conversion prompts prefer the server's
 user-facing question.
-While the keyboard is open for a pending item, the disabled main composer is
-hidden without discarding its text/photos, leaving space for inline editing.
+The answer composer remains available when the keyboard opens and follows its inset.
 Inventory Delete enters selection, Confirm opens archival confirmation and Cancel
-clears selection. Item-details quantity actions use full-row controls.
+clears selection. All and Expired reflect the actual selected items across every
+page of the current storage/search/filter result. Selecting All also selects its
+expired items; selecting Expired changes only that subset. Items outside the
+current result are excluded. Item-details quantity actions use full-row controls.
 
 Credentials use FlutterSecureStorage. Access renews automatically; concurrent
 requests share renewal. Logout waits for server revocation before clearing credentials,
