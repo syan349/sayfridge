@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import re
+import logging
+from time import perf_counter
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -19,6 +21,44 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 SCHEMA_PATTERN = re.compile(r"^[a-z_][a-z0-9_]*$")
+logger = logging.getLogger(__name__)
+
+
+class MeasuredPostgresSaver(AsyncPostgresSaver):
+    """Pinned saver behavior with content-free timing/serialized-byte metrics."""
+
+    def _dump_blobs(self, *args, **kwargs):
+        rows = super()._dump_blobs(*args, **kwargs)
+        logger.info("agent_checkpoint_payload kind=blobs rows=%s bytes=%s", len(rows), sum(len(r[-1] or b"") for r in rows))
+        return rows
+
+    def _dump_writes(self, *args, **kwargs):
+        rows = super()._dump_writes(*args, **kwargs)
+        logger.info("agent_checkpoint_payload kind=writes rows=%s bytes=%s", len(rows), sum(len(r[-1]) for r in rows))
+        return rows
+
+    async def _measured(self, operation, call):
+        start, outcome = perf_counter(), "ok"
+        try:
+            return await call
+        except BaseException:
+            outcome = "failed"
+            raise
+        finally:
+            logger.info("agent_checkpoint_io operation=%s outcome=%s elapsed_ms=%.3f",
+                        operation, outcome, (perf_counter() - start) * 1000)
+
+    async def aput(self, *args, **kwargs):
+        return await self._measured("checkpoint_write", super().aput(*args, **kwargs))
+
+    async def aput_writes(self, *args, **kwargs):
+        return await self._measured("pending_write", super().aput_writes(*args, **kwargs))
+
+    async def aget_tuple(self, *args, **kwargs):
+        return await self._measured("checkpoint_read", super().aget_tuple(*args, **kwargs))
+
+    async def aget_delta_channel_history(self, *args, **kwargs):
+        return await self._measured("delta_read", super().aget_delta_channel_history(*args, **kwargs))
 
 
 class AgentPersistenceSettings(BaseSettings):
@@ -45,6 +85,7 @@ class AgentPersistenceSettings(BaseSettings):
     )
     recursion_limit: int = Field(default=12, alias="AGENT_RECURSION_LIMIT", ge=3, le=50)
     workflow_step_limit: int = Field(default=128, alias="AGENT_WORKFLOW_STEP_LIMIT", ge=16, le=512)
+    delta_snapshot_frequency: int = Field(default=50, alias="AGENT_DELTA_SNAPSHOT_FREQUENCY", ge=1, le=1000)
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -147,12 +188,13 @@ async def get_agent_resources() -> AgentResources:
         pool: AsyncConnectionPool | None = None
         try:
             pool = await create_agent_pool(settings)
-            checkpointer = AsyncPostgresSaver(pool)
+            checkpointer = MeasuredPostgresSaver(pool)
             store = AsyncPostgresStore(pool)
             graph = build_agent_graph(
                 model,
                 checkpointer=checkpointer,
                 store=store,
+                snapshot_frequency=settings.delta_snapshot_frequency,
             )
             _resources = AgentResources(
                 pool=pool,

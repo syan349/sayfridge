@@ -121,7 +121,7 @@ def test_budget_preserves_complete_recent_groups_and_refuses_oversize():
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("changes", [{"limit": 275000}, {"target": 90000}, {"model_limit": 10000}])
+@pytest.mark.parametrize("changes", [{"limit": 275000}, {"target": Budget().trigger}, {"model_limit": 10000}])
 def test_invalid_budget_cannot_disable_cap(changes):
     with pytest.raises(ValueError):
         Budget(**changes)

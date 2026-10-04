@@ -43,7 +43,8 @@ def test_chat_supplement_and_query_do_not_lose_or_recreate_work(monkeypatch, dec
         model = ScriptModel([call([proposed]), AIMessage(content="Inventory answer") if decision == "query" else call([revised])],
                             intents=[intake([proposed]), intake(kind="QUERY")])
         from app.agents.context_budget import Budget
-        model.budget = Budget(output=1000)
+        # This test must exercise compaction regardless of production defaults.
+        model.budget = Budget(trigger=80000, target=40000, limit=160000, output=1000)
         graph = workflow.build_agent_graph(model, checkpointer=InMemorySaver(), store=InMemoryStore(),
                                            session_factory=fake_session, tools=[])
         config = {"configurable": {"thread_id": str(uuid4())}, "recursion_limit": 128}

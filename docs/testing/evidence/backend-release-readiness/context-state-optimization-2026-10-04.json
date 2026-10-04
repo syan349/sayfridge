@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-04",
+  "baseline_commit": "f5846e74e1bd1f8897a5202a7c55534c6e62cdc6",
+  "scope": {
+    "frontend_changes": false,
+    "schema_changes": false,
+    "shared_database_writes": false,
+    "deployed": false,
+    "live_model_calls": false
+  },
+  "environment": {
+    "python": "3.11.2",
+    "postgres": "16",
+    "database": "isolated local *_test database",
+    "langgraph": "1.2.12",
+    "checkpoint": "4.2.0",
+    "postgres_saver": "3.1.2"
+  },
+  "baseline": {
+    "offline_non_postgres_passed": 360
+  },
+  "validation": {
+    "offline_full": {
+      "passed": 905,
+      "skipped": 68,
+      "failures": 0,
+      "seconds": 986.64,
+      "skip_reason": "Explicit opt-in for model API costs; not executed"
+    },
+    "web_unchanged_client_tests_passed": 3,
+    "mobile_unchanged_client_tests_passed": 3,
+    "captured_backend_responses": 159,
+    "successful_sse_responses": 98,
+    "real_summary_quality": "NOT_RUN",
+    "ci": {
+      "passed": 226,
+      "deselected": 749,
+      "failures": 0,
+      "seconds": 247
+    },
+    "note": "Full run collected before two final regression cases were added; both additional cases passed separately and in the final CI subset."
+  },
+  "database_read_only": {
+    "business_schema_passed": true,
+    "tables": 11,
+    "columns": 100,
+    "foreign_keys": 13,
+    "constraints": 37,
+    "indexes": 21,
+    "agent_storage_check_passed": true
+  },
+  "benchmark": {
+    "description": "Representative observed 200-turn synthetic two-node graph comparison on real local PostgreSQL; NOT hosted performance or physical database size",
+    "turns": 200,
+    "full": {
+      "target_blob_bytes": 28981180,
+      "target_write_bytes": 28981180,
+      "target_bytes": 57962360,
+      "all_serialized_bytes": 87481767,
+      "checkpoint_records": 600,
+      "median_read_ms": 4.0663
+    },
+    "delta": {
+      "target_blob_bytes": 670252,
+      "target_write_bytes": 279175,
+      "target_bytes": 949427,
+      "all_serialized_bytes": 1844972,
+      "checkpoint_records": 600,
+      "median_read_ms": 9.9176
+    },
+    "reduction": 0.983619938870674,
+    "read_sample_count": 9,
+    "acceptance": {
+      "minimum_reduction": 0.7,
+      "max_delta_read_ms": "1.25 * baseline median + 100"
+    }
+  },
+  "tokenizer_check": {
+    "description": "Offline use of configured model tokenizer; no network model calls",
+    "standard": {
+      "input": 3359,
+      "schemas": 4789,
+      "budget_used": 22282
+    },
+    "cards": {
+      "input": 3490,
+      "schemas": 4971,
+      "budget_used": 22673
+    },
+    "limit": 50000
+  },
+  "compaction_example": {
+    "kind": "deterministic synthetic model; NOT summary quality evidence",
+    "before_budget": 87676,
+    "after_budget": 27636,
+    "summary_tokens": 7,
+    "recent_tokens": 3846,
+    "input_tokens": 12432,
+    "output_reserve": 8000,
+    "safety_margin": 4096,
+    "note": "Sparse mock output; does not demonstrate a real 4-6K summary or fidelity."
+  }
+}
