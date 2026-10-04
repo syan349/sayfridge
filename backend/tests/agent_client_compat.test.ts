@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createElement, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, fireEvent, renderHook, waitFor } from '@testing-library/react'
+import { act, render, fireEvent, renderHook, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { readEventStream, type AgentEvent } from '../../web/src/api/agent'
@@ -41,11 +41,17 @@ for (const reason of ['NO_MATCH', 'AMBIGUOUS']) {
     const view = render(createElement(ProposalCard, { items: [item], busy: false, onAnswer }))
     expect(view.getByText(item.display!.question!)).toBeTruthy()
     expect(view.queryByText('inventory item id')).toBeNull()
-    const candidate = item.error?.details?.candidates?.[0]
-    if (candidate) {
-      fireEvent.click(view.getByRole('button', { name: new RegExp(candidate.storage_space_name) }))
-      expect(onAnswer.mock.calls[0][0]).toEqual([{ item_id: item.item_id, proposal_id: item.proposal_id,
-        decision: 'answer', selected_inventory_item_id: candidate.id }])
+    const candidates = item.error?.details?.candidates?.slice(0, 5) ?? []
+    if (candidates.length) {
+      // Location and even the entire label can be identical for distinct batches.
+      // Verify every displayed option submits its own ID, including collisions.
+      const buttons = within(view.getByRole('group', { name: 'Which one?' })).getAllByRole('button')
+      expect(buttons).toHaveLength(candidates.length)
+      candidates.forEach((candidate, index) => {
+        fireEvent.click(buttons[index])
+        expect(onAnswer.mock.calls[index][0]).toEqual([{ item_id: item.item_id, proposal_id: item.proposal_id,
+          decision: 'answer', selected_inventory_item_id: candidate.id }])
+      })
     } else {
       fireEvent.click(view.getByRole('button', { name: 'Answer', exact: true }))
       fireEvent.change(view.getByLabelText('Your answer'), { target: { value: 'Apples in Kitchen' } })
@@ -56,6 +62,31 @@ for (const reason of ['NO_MATCH', 'AMBIGUOUS']) {
     view.unmount()
   })
 }
+
+const multipleBatches = streams.flatMap((row) => events(row).flatMap((event) =>
+  event.type === 'action_required' ? event.data.items : []))
+  .find((item) => (item.error?.details?.candidates?.length ?? 0) >= 2)
+it.skipIf(!multipleBatches)('distinct real batch IDs remain selectable when both visible labels are identical', () => {
+  const original = multipleBatches!
+  const [first, second] = original.error!.details!.candidates!
+  // Keep actual captured identities and reproduce the same-location/same-amount
+  // collision independently of which fixture happens to be captured first.
+  const candidates = [first, { ...second, storage_space_name: first.storage_space_name,
+    display_amount: first.display_amount, display_unit: first.display_unit, expiry_date: first.expiry_date }]
+  expect(first.id).not.toBe(second.id)
+  const item = { ...original, error: { ...original.error!, details: { ...original.error!.details, candidates } } }
+  const onAnswer = vi.fn()
+  const view = render(createElement(ProposalCard, { items: [item], busy: false, onAnswer }))
+  const buttons = within(view.getByRole('group', { name: 'Which one?' })).getAllByRole('button')
+  expect(buttons).toHaveLength(2)
+  expect(buttons[0].textContent).toBe(buttons[1].textContent)
+  buttons.forEach((button, index) => {
+    fireEvent.click(button)
+    expect(onAnswer.mock.calls[index][0]).toEqual([{ item_id: item.item_id, proposal_id: item.proposal_id,
+      decision: 'answer', selected_inventory_item_id: candidates[index].id }])
+  })
+  view.unmount()
+})
 
 it('unchanged Web parser consumes actual backend responses across UTF-8 chunks and heartbeat comments', async () => {
   expect(streams.length).toBeGreaterThan(10)
