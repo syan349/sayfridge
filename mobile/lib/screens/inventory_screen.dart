@@ -68,12 +68,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
   late InventoryCategoryGroup? _selectedGroup;
   final Map<String, InventoryItem> _selected = {};
   bool _deleteMode = false, _deleting = false, _confirmingDelete = false;
+  bool _selecting = false;
+  int _selectionRequest = 0;
+  List<InventoryItem>? _matchingItems;
+  bool _onlyExpiredSelection = false;
   bool _deletionBlocked = false;
   String? _deleteError;
+  bool get _busy => _deleting || _selecting;
 
   @override
   void initState() {
     super.initState();
+    _selectedCategoryId = widget.controller.categoryId;
     _selectedGroup = widget.initialCategoryGroup;
     if (_selectedGroup != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -116,7 +122,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(25, 8, 25, 13),
                         child: IgnorePointer(
-                          ignoring: _deleting,
+                          ignoring: _busy,
                           child: InventoryToolbar(
                             storagePicker: _StoragePill(
                               onScopeChanged: _clearSelection,
@@ -135,7 +141,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                       Expanded(
                         child: IgnorePointer(
-                          ignoring: _deleting,
+                          ignoring: _busy,
                           child: PageScrollFade(
                             child: AnimatedBuilder(
                               animation: widget.controller,
@@ -163,24 +169,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void _clearSelection() {
     if (_deleting) return;
     setState(() {
+      ++_selectionRequest;
+      _selecting = false;
+      _matchingItems = null;
+      _onlyExpiredSelection = false;
       _selected.clear();
       _deleteMode = false;
     });
   }
 
   void _selectItem(InventoryItem item) {
-    if (_deleting) return;
-    if (!_selected.containsKey(item.id) && _selected.length >= 100) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select up to 100 items per deletion.')),
-      );
-      return;
-    }
+    if (_busy) return;
     setState(() {
       if (_selected.containsKey(item.id)) {
         _selected.remove(item.id);
       } else {
         _selected[item.id] = item;
+        if (!_isExpired(item)) _onlyExpiredSelection = false;
       }
     });
   }
@@ -195,7 +200,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           child: IconButton(
             tooltip: 'Add inventory',
             padding: EdgeInsets.zero,
-            onPressed: _deleting ? null : widget.onAddItemTap,
+            onPressed: _busy ? null : widget.onAddItemTap,
             icon: const Icon(Icons.add_circle_outline, size: 27),
           ),
         ),
@@ -205,7 +210,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             padding: EdgeInsets.zero,
             onPressed:
                 widget.controller.workspace == null ||
-                    _deleting ||
+                    _busy ||
                     _deletionBlocked ||
                     _deleteMode
                 ? null
@@ -217,123 +222,230 @@ class _InventoryScreenState extends State<InventoryScreen> {
     ),
   );
 
+  bool _isExpired(InventoryItem item) {
+    final date = item.expiryDate;
+    if (date == null) return false;
+    final now = DateTime.now();
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).isBefore(DateTime(now.year, now.month, now.day));
+  }
+
+  List<InventoryItem> get _selectionScope =>
+      _matchingItems ??
+      (widget.controller.total <= widget.controller.items.length
+          ? _visibleItems
+          : const []);
+
+  Future<void> _selectMatching(bool select, {bool expiredOnly = false}) async {
+    if (_busy || _deletionBlocked) return;
+    final request = ++_selectionRequest;
+    setState(() => _selecting = true);
+    try {
+      final matches = await widget.controller.matchingItems();
+      if (!mounted || request != _selectionRequest || !_deleteMode) return;
+      final visible = _selectedGroup == null
+          ? matches
+          : matches.where(_selectedGroup!.includes).toList();
+      setState(() {
+        _matchingItems = visible;
+        final ids = visible.map((item) => item.id).toSet();
+        _selected.removeWhere((id, _) => !ids.contains(id));
+        if (select && expiredOnly) _selected.clear();
+        _onlyExpiredSelection = select && expiredOnly;
+        for (final item in visible) {
+          if (expiredOnly && !_isExpired(item)) continue;
+          if (select) {
+            _selected[item.id] = item;
+          } else {
+            _selected.remove(item.id);
+          }
+        }
+      });
+    } catch (error) {
+      if (mounted && request == _selectionRequest) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(businessError(error))));
+      }
+    } finally {
+      if (mounted && request == _selectionRequest) {
+        setState(() => _selecting = false);
+      }
+    }
+  }
+
   Widget _selectionControls() => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 25),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            SizedBox(
-              width: 28,
-              height: 48,
-              child: Checkbox(
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-                value:
-                    _visibleItems.isNotEmpty &&
-                    _visibleItems.every(
-                      (item) => _selected.containsKey(item.id),
-                    ),
-                activeColor: AppColors.primaryDark,
-                onChanged: _deleting || _visibleItems.isEmpty
-                    ? null
-                    : (all) {
-                        if (all == true &&
-                            _selected.length +
-                                    _visibleItems
-                                        .where(
-                                          (item) =>
-                                              !_selected.containsKey(item.id),
-                                        )
-                                        .length >
-                                100) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Select up to 100 items per deletion.',
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-                        setState(() {
-                          if (all == true) {
-                            for (final item in _visibleItems) {
-                              if (_selected.length < 100 ||
-                                  _selected.containsKey(item.id)) {
-                                _selected[item.id] = item;
-                              }
-                            }
-                          } else {
-                            for (final item in _visibleItems) {
-                              _selected.remove(item.id);
-                            }
-                          }
-                        });
-                      },
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'Select this page',
-                style: TextStyle(fontSize: 13, height: 1.2),
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(
-              key: const Key('batch-delete-confirm'),
-              onPressed: _deleting || _deletionBlocked || _selected.isEmpty
-                  ? null
-                  : () => _deleteItems(_selected.values.toList()),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.text,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                minimumSize: const Size(0, 40),
-                textStyle: Theme.of(context).textTheme.labelLarge!.copyWith(
-                  fontSize: 13,
+        const Text(
+          'Delete Selected Items',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 2),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final options = Row(
+              children: [
+                _selectionOption('All', 'select-all'),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: _selectionOption(
+                    'Only expired',
+                    'select-all-expired',
+                    expiredOnly: true,
+                  ),
+                ),
+              ],
+            );
+            final labels = TextPainter(
+              text: TextSpan(
+                text: 'AllOnly expiredConfirmCancel',
+                style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
               ),
-              child: const Text('Confirm'),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton(
-              key: const Key('batch-delete-cancel'),
-              onPressed: _deleting ? null : _clearSelection,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryDark,
-                backgroundColor: const Color(0xBFFFFFFF),
-                side: const BorderSide(color: AppColors.primary),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                minimumSize: const Size(0, 40),
-                textStyle: Theme.of(context).textTheme.labelLarge!.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Cancel'),
-            ),
-          ],
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+            )..layout();
+            // Account for checkbox widths, button padding and row gaps.
+            final fits = labels.width + 112 <= constraints.maxWidth;
+            labels.dispose();
+            return fits
+                ? Row(
+                    children: [
+                      Expanded(child: options),
+                      const SizedBox(width: 10),
+                      _selectionActions(),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      options,
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _selectionActions(),
+                      ),
+                    ],
+                  );
+          },
         ),
         Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(top: 3, bottom: 8),
           child: Text(
-            '${_selected.length} selected',
-            style: const TextStyle(color: AppColors.muted, fontSize: 13),
+            _selecting ? 'Selecting…' : '${_selected.length} selected',
+            style: const TextStyle(color: AppColors.muted, fontSize: 12),
           ),
         ),
       ],
     ),
   );
+
+  Widget _selectionActions() => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      FilledButton(
+        key: const Key('batch-delete-confirm'),
+        onPressed: _busy || _deletionBlocked || _selected.isEmpty
+            ? null
+            : () => _deleteItems(_selected.values.toList()),
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.text,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          minimumSize: const Size(0, 38),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          textStyle: Theme.of(context).textTheme.labelLarge!.copyWith(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text('Confirm'),
+      ),
+      const SizedBox(width: 8),
+      OutlinedButton(
+        key: const Key('batch-delete-cancel'),
+        onPressed: _deleting ? null : _clearSelection,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primaryDark,
+          backgroundColor: const Color(0xBFFFFFFF),
+          side: const BorderSide(color: AppColors.primary),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          minimumSize: const Size(0, 38),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          textStyle: Theme.of(context).textTheme.labelLarge!.copyWith(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text('Cancel'),
+      ),
+    ],
+  );
+
+  Widget _selectionOption(
+    String label,
+    String key, {
+    bool expiredOnly = false,
+  }) {
+    final items = expiredOnly
+        ? _selectionScope.where(_isExpired).toList()
+        : _selectionScope;
+    final checked =
+        _onlyExpiredSelection == expiredOnly &&
+        items.isNotEmpty &&
+        items.every((item) => _selected.containsKey(item.id));
+    final enabled =
+        !_busy &&
+        !_deletionBlocked &&
+        widget.controller.status == InventoryLoadStatus.loaded;
+    void toggle() => _selectMatching(!checked, expiredOnly: expiredOnly);
+    return InkWell(
+      onTap: enabled ? toggle : null,
+      borderRadius: BorderRadius.circular(8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 22,
+              child: Checkbox(
+                key: Key(key),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                value: checked,
+                activeColor: AppColors.primaryDark,
+                onChanged: enabled ? (_) => toggle() : null,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.2,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _deletionError() => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 25),
@@ -392,7 +504,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _refreshAfterDeletion() async {
-    if (_deleting) return;
+    if (_busy) return;
     _clearSelection();
     await widget.controller.reload();
     if (!mounted) return;
@@ -409,7 +521,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final workspace = widget.controller.workspace;
     if (workspace == null ||
         items.isEmpty ||
-        _deleting ||
+        _busy ||
         _confirmingDelete ||
         _deletionBlocked) {
       return;
@@ -442,17 +554,31 @@ class _InventoryScreenState extends State<InventoryScreen> {
       _deleting = true;
       _deleteError = null;
     });
+    var deleted = 0;
     try {
-      await workspace.archiveItems(items);
+      for (var start = 0; start < items.length; start += 100) {
+        final end = (start + 100).clamp(0, items.length);
+        final batch = items.sublist(start, end);
+        await workspace.archiveItems(batch);
+        deleted += batch.length;
+        if (!mounted) return;
+        setState(() {
+          for (final item in batch) {
+            _selected.remove(item.id);
+          }
+        });
+      }
       if (!mounted) return;
       setState(() {
         _selected.clear();
+        _matchingItems = null;
+        _onlyExpiredSelection = false;
         _deleteMode = false;
       });
       await widget.controller.reload();
       if (widget.controller.status == InventoryLoadStatus.empty &&
           widget.controller.page > 1) {
-        await widget.controller.loadPage(widget.controller.page - 1);
+        await widget.controller.loadPage(1);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -468,7 +594,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         setState(() {
           _deletionBlocked = true;
           _deleteError =
-              '${businessError(error)}\nReload inventory before trying again.';
+              '${deleted > 0 ? '$deleted items deleted. ' : ''}${businessError(error)}\nReload inventory before trying again.';
         });
       }
     } finally {
@@ -808,11 +934,7 @@ class _StoragePill extends StatelessWidget {
           inventoryController: controller,
           onSelected: (id) {
             onScopeChanged?.call();
-            controller.loadInventory(
-              query: controller.query,
-              storageSpaceId: id,
-              pageSize: pageSize,
-            );
+            controller.loadStorageSpace(id, pageSize: pageSize);
           },
         ),
       );
@@ -865,18 +987,35 @@ class _InventoryResults extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                TextButton(
-                  onPressed: controller.page > 1
-                      ? () => _loadPage(controller.page - 1)
-                      : null,
-                  child: const Text('Previous'),
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: controller.page > 1
+                        ? () => _loadPage(controller.page - 1)
+                        : null,
+                    child: const Text('Previous'),
+                  ),
                 ),
-                Text('Page ${controller.page}'),
-                TextButton(
-                  onPressed: controller.hasNextPage
-                      ? () => _loadPage(controller.page + 1)
-                      : null,
-                  child: const Text('Next'),
+                Expanded(
+                  child: Text(
+                    'Page ${controller.page}',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: controller.hasNextPage
+                        ? () => _loadPage(controller.page + 1)
+                        : null,
+                    child: const Text('Next'),
+                  ),
                 ),
               ],
             ),

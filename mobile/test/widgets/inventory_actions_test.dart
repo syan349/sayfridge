@@ -46,7 +46,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Discard expired item'), findsOneWidget);
+    expect(find.text('Discard item'), findsOneWidget);
     expect(find.text('Mark as used up'), findsOneWidget);
 
     await tester.tap(find.text('Mark as used up'));
@@ -57,6 +57,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(reloads, 1);
   });
+
+  for (final expiry in [null, '2099-10-08']) {
+    testWidgets('in-stock item with expiry $expiry can be discarded', (
+      tester,
+    ) async {
+      var writes = 0;
+      var reloads = 0;
+      final json = stockJson()..['expiry_date'] = expiry;
+      final api = ApiClient(
+        client: MockClient((request) async {
+          writes++;
+          expect(request.method, 'POST');
+          expect(request.url.path, '/api/v1/inventory-items/item-1/discard');
+          expect(jsonDecode(request.body), {'expected_version': 1});
+          return jsonResponse({...json, 'status': 'DISCARDED', 'version': 2});
+        }),
+      );
+      addTearDown(api.close);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: InventoryActions(
+              item: InventoryItem.fromJson(json),
+              workspace: WorkspaceRepository(api, MemoryTokens()),
+              reload: () async => reloads++,
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Discard item'));
+      await tester.pumpAndSettle();
+      expect(find.text('Discard this item?'), findsOneWidget);
+      expect(writes, 0);
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+      expect(writes, 1);
+      expect(reloads, 1);
+    });
+  }
 
   testWidgets('empty item no longer offers discard or used-up actions', (
     tester,

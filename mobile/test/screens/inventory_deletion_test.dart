@@ -1,10 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:sayfridge/models/item_icon.dart';
 import 'package:sayfridge/repositories/inventory_repository.dart';
 import 'package:sayfridge/repositories/workspace_repository.dart';
 import 'package:sayfridge/screens/inventory_screen.dart';
@@ -18,7 +24,78 @@ import 'package:sayfridge/widgets/page_scroll_fade.dart';
 
 import '../support/integration_fixtures.dart';
 
+const _captureKey = Key('inventory-review-capture');
+
+Future<void> _capture(
+  WidgetTester tester,
+  String name, {
+  double pixelRatio = 2,
+}) async {
+  final directory = Platform.environment['INVENTORY_CAPTURE_DIR'];
+  if (directory == null) return;
+  await tester.runAsync(() async {
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(_captureKey),
+    );
+    final image = await boundary.toImage(pixelRatio: pixelRatio);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    final file = File('$directory/$name.png');
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(data!.buffer.asUint8List());
+    image.dispose();
+  });
+}
+
+Future<void> _captureSwipeAnimation(WidgetTester tester, Finder card) async {
+  if (Platform.environment['INVENTORY_ANIMATION'] != '1') return;
+  final context = tester.element(card);
+  await tester.runAsync(() async {
+    for (final name in ['Milk', 'Eggs']) {
+      await precacheImage(AssetImage(ItemIcon.forName(name)), context);
+    }
+  });
+  await tester.pumpAndSettle();
+  var frame = 0;
+  Future<void> capture() => _capture(
+    tester,
+    'swipe-frame-${(frame++).toString().padLeft(3, '0')}',
+    pixelRatio: 1,
+  );
+  await capture();
+  final gesture = await tester.startGesture(tester.getCenter(card));
+  await gesture.moveBy(const Offset(-24, 0));
+  for (var index = 0; index < 20; index++) {
+    await gesture.moveBy(const Offset(-3.6, 0));
+    await tester.pump(const Duration(milliseconds: 50));
+    await capture();
+  }
+  await gesture.up();
+  await tester.pumpAndSettle();
+  await capture();
+  await tester.tap(card);
+  await tester.pump();
+  for (var index = 0; index < 7; index++) {
+    await tester.pump(const Duration(milliseconds: 30));
+    await capture();
+  }
+  await tester.pumpAndSettle();
+  await capture();
+}
+
 void main() {
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+  setUpAll(() async {
+    final fontPath = Platform.environment['INVENTORY_FONT_PATH'];
+    if (fontPath == null) return;
+    final data = ByteData.sublistView(await File(fontPath).readAsBytes());
+    for (final family in ['Arial', 'Roboto']) {
+      await (FontLoader(family)..addFont(Future.value(data))).load();
+    }
+    await (FontLoader(
+      'MaterialIcons',
+    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+  });
+
   testWidgets(
     'inventory fade reaches the screen bottom and end cards clear the system inset',
     (tester) async {
@@ -77,6 +154,7 @@ void main() {
       addTearDown(fixture.dispose);
       await fixture.open(tester);
       final card = find.byType(SwipeDeleteCard).first;
+      await _captureSwipeAnimation(tester, card);
       final content = find
           .descendant(of: card, matching: find.byType(InventoryItemTile))
           .first;
@@ -94,6 +172,9 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
       final drag = await tester.startGesture(tester.getCenter(card));
       await drag.moveBy(const Offset(-24, 0));
+      await drag.moveBy(const Offset(-24, 0));
+      await tester.pump();
+      await _capture(tester, 'swipe-during-drag');
       await drag.moveBy(const Offset(-200, 0));
       await tester.pump();
       final travel = initial.dx - tester.getTopLeft(content).dx;
@@ -105,6 +186,7 @@ void main() {
       expect(initial.dx - tester.getTopLeft(content).dx, closeTo(travel, 0.1));
       await drag.up();
       await tester.pumpAndSettle();
+      await _capture(tester, 'swipe-revealed');
       expect(find.byType(AlertDialog), findsNothing);
       expect(fixture.writes, isEmpty);
       await tester.tap(find.byKey(const Key('swipe-delete-action')).first);
@@ -167,7 +249,7 @@ void main() {
       await fixture.open(tester, width: 320);
       await tester.tap(find.byTooltip('Delete items'));
       await tester.pumpAndSettle();
-      expect(find.byType(Checkbox), findsNWidgets(3));
+      expect(find.byType(Checkbox), findsNWidgets(4));
       expect(
         tester
             .widget<FilledButton>(find.byKey(const Key('batch-delete-confirm')))
@@ -186,6 +268,7 @@ void main() {
       await tester.tap(find.byType(Checkbox).first);
       await tester.pumpAndSettle();
       expect(find.text('2 selected'), findsOneWidget);
+      await _capture(tester, 'batch-selection-320');
       await tester.tap(find.byKey(const Key('batch-delete-confirm')));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -297,6 +380,239 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Select all deletes every page in All Spaces above 100 items', (
+    tester,
+  ) async {
+    final fixture = _InventoryFixture();
+    addTearDown(fixture.dispose);
+    fixture.rows = [
+      for (var index = 1; index <= 125; index++)
+        {
+          ...stockJson(),
+          'id': 'item-$index',
+          'storage_space_id': index.isEven ? 'space-1' : 'space-2',
+        },
+    ];
+    await fixture.open(tester);
+    await tester.tap(find.byTooltip('Delete items'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('select-all')));
+    await tester.pumpAndSettle();
+    expect(find.text('125 selected'), findsOneWidget);
+    await _capture(tester, 'batch-selection-411');
+    expect(fixture.controller.page, 1);
+    expect(fixture.controller.items, hasLength(20));
+    expect(fixture.writes, isEmpty);
+    await tester.tap(find.byKey(const Key('batch-delete-confirm')));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete 125 items?'), findsOneWidget);
+    await tester.tap(find.text('Confirm delete'));
+    await tester.pumpAndSettle();
+    expect(fixture.writes.map((body) => (body['items'] as List).length), [
+      100,
+      25,
+    ]);
+    expect(fixture.rows, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Select all respects storage, search, category and date filters',
+    (tester) async {
+      final fixture = _InventoryFixture();
+      addTearDown(fixture.dispose);
+      final matching = {...stockJson(), 'expiry_date': '2026-10-08'};
+      fixture.rows = [
+        for (var index = 1; index <= 105; index++)
+          {...matching, 'id': 'match-$index'},
+        {...matching, 'id': 'other-space', 'storage_space_id': 'space-2'},
+        {...matching, 'id': 'other-category', 'category_id': 'category-2'},
+        {...matching, 'id': 'other-name', 'item_definition_name': 'Eggs'},
+        {...matching, 'id': 'old-purchase', 'purchase_date': '2026-09-01'},
+        {...matching, 'id': 'late-purchase', 'purchase_date': '2026-09-30'},
+        {...matching, 'id': 'early-expiry', 'expiry_date': '2026-10-01'},
+        {...matching, 'id': 'late-expiry', 'expiry_date': '2026-10-20'},
+      ];
+      await fixture.open(tester);
+      await fixture.controller.loadInventory(
+        storageSpaceId: 'space-1',
+        query: 'milk',
+        categoryId: 'category-1',
+        purchaseFrom: DateTime(2026, 9, 15),
+        purchaseTo: DateTime(2026, 9, 25),
+        expiryFrom: DateTime(2026, 10, 5),
+        expiryTo: DateTime(2026, 10, 10),
+      );
+      await tester.pumpAndSettle();
+      fixture.reads.clear();
+      await tester.tap(find.byTooltip('Delete items'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('select-all')));
+      await tester.pumpAndSettle();
+      expect(find.text('105 selected'), findsOneWidget);
+      expect(fixture.reads, hasLength(2));
+      for (final query in fixture.reads) {
+        expect(query['storage_space_id'], 'space-1');
+        expect(query['q'], 'milk');
+        expect(query['category_id'], 'category-1');
+        expect(query['purchase_from'], '2026-09-15');
+        expect(query['purchase_to'], '2026-09-25');
+        expect(query['expiry_from'], '2026-10-05');
+        expect(query['expiry_to'], '2026-10-10');
+      }
+      await tester.tap(find.byKey(const Key('batch-delete-confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirm delete'));
+      await tester.pumpAndSettle();
+      expect(fixture.rows, hasLength(7));
+      expect(
+        fixture.rows.any((row) => (row['id'] as String).startsWith('match-')),
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'expired selection spans pages and excludes today and no expiry',
+    (tester) async {
+      final fixture = _InventoryFixture();
+      addTearDown(fixture.dispose);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      fixture.rows = [
+        for (final entry in [
+          ('today', today),
+          ('expired-1', today.subtract(const Duration(days: 1))),
+          ('future', today.add(const Duration(days: 1))),
+          ('expired-2', today.subtract(const Duration(days: 5))),
+          ('no-expiry', null),
+        ])
+          {...stockJson(), 'id': entry.$1, 'expiry_date': dateInput(entry.$2)},
+      ];
+      fixture.rows.last['expiry_date'] = null;
+      await fixture.open(tester, pageSize: 1, width: 320);
+      await tester.tap(find.byTooltip('Delete items'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('select-all-expired')));
+      await tester.pumpAndSettle();
+      expect(find.text('2 selected'), findsOneWidget);
+      expect(
+        tester.widget<Checkbox>(find.byKey(const Key('select-all'))).value,
+        isFalse,
+      );
+      await tester.tap(find.byKey(const Key('select-all')));
+      await tester.pumpAndSettle();
+      expect(find.text('5 selected'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('select-all-expired')));
+      await tester.pumpAndSettle();
+      expect(find.text('2 selected'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('select-all')));
+      await tester.pumpAndSettle();
+      expect(find.text('5 selected'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('select-all')));
+      await tester.pumpAndSettle();
+      expect(find.text('0 selected'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('select-all-expired')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('batch-delete-confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirm delete'));
+      await tester.pumpAndSettle();
+      expect(
+        (fixture.writes.single['items'] as List).map((item) => item['id']),
+        ['expired-1', 'expired-2'],
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('failed selection reads never produce a partial selection', (
+    tester,
+  ) async {
+    final fixture = _InventoryFixture();
+    addTearDown(fixture.dispose);
+    fixture.rows = [
+      for (var index = 1; index <= 101; index++)
+        {...stockJson(), 'id': 'item-$index'},
+    ];
+    await fixture.open(tester);
+    fixture.failedReadPage = 2;
+    await tester.tap(find.byTooltip('Delete items'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('select-all')));
+    await tester.pumpAndSettle();
+    expect(find.text('0 selected'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('batch-delete-confirm')))
+          .onPressed,
+      isNull,
+    );
+    expect(fixture.writes, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'cancel while selecting prevents a late response from selecting',
+    (tester) async {
+      final fixture = _InventoryFixture();
+      addTearDown(fixture.dispose);
+      await fixture.open(tester);
+      fixture.pendingRead = Completer<void>();
+      await tester.tap(find.byTooltip('Delete items'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('select-all')));
+      await tester.pump();
+      expect(find.text('Selecting…'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('batch-delete-cancel')));
+      await tester.pump();
+      fixture.pendingRead!.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(Checkbox), findsNothing);
+      expect(fixture.writes, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'a later batch failure reports progress and blocks blind retries',
+    (tester) async {
+      final fixture = _InventoryFixture();
+      addTearDown(fixture.dispose);
+      fixture.rows = [
+        for (var index = 1; index <= 125; index++)
+          {...stockJson(), 'id': 'item-$index'},
+      ];
+      await fixture.open(tester);
+      fixture.failure = 'conflict';
+      fixture.failedWrite = 2;
+      await tester.tap(find.byTooltip('Delete items'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('select-all')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('batch-delete-confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirm delete'));
+      await tester.pumpAndSettle();
+      expect(fixture.rows, hasLength(25));
+      expect(find.text('25 selected'), findsOneWidget);
+      expect(find.textContaining('100 items deleted.'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('batch-delete-confirm')))
+            .onPressed,
+        isNull,
+      );
+      fixture.failure = null;
+      await tester.tap(find.text('Reload inventory'));
+      await tester.pumpAndSettle();
+      expect(find.text('Reload inventory'), findsNothing);
+      expect(fixture.writes, hasLength(2));
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _InventoryFixture {
@@ -318,13 +634,17 @@ class _InventoryFixture {
     {...stockJson(version: 3), 'id': 'item-2', 'item_definition_name': 'Eggs'},
   ];
   Completer<void>? pending;
+  Completer<void>? pendingRead;
+  int? failedReadPage;
+  int? failedWrite;
   String? failure;
 
   Future<http.Response> _request(http.Request request) async {
     if (request.method == 'POST') {
       final body = jsonDecode(request.body) as Map<String, dynamic>;
       writes.add(body);
-      if (failure == 'conflict') {
+      if (failure == 'conflict' &&
+          (failedWrite == null || failedWrite == writes.length)) {
         return jsonResponse({
           'detail': {
             'code': 'VERSION_CONFLICT',
@@ -354,9 +674,37 @@ class _InventoryFixture {
     final pageSize = int.parse(
       request.url.queryParameters['page_size'] ?? '20',
     );
+    if (pendingRead != null) await pendingRead!.future;
+    if (failedReadPage == page) {
+      return jsonResponse({'detail': 'Unable to load inventory'}, 500);
+    }
+    final query = request.url.queryParameters;
+    final filtered = rows.where((row) {
+      for (final field in ['storage_space_id', 'category_id', 'status']) {
+        if (query[field] != null && row[field] != query[field]) return false;
+      }
+      if (query['q'] != null &&
+          !(row['item_definition_name'] as String).toLowerCase().contains(
+            query['q']!.toLowerCase(),
+          )) {
+        return false;
+      }
+      for (final field in ['purchase', 'expiry']) {
+        final date = row['${field}_date'] as String?;
+        final from = query['${field}_from'];
+        final to = query['${field}_to'];
+        if (from != null && (date == null || date.compareTo(from) < 0)) {
+          return false;
+        }
+        if (to != null && (date == null || date.compareTo(to) > 0)) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
     return jsonResponse({
-      'items': rows.skip((page - 1) * pageSize).take(pageSize).toList(),
-      'total': rows.length,
+      'items': filtered.skip((page - 1) * pageSize).take(pageSize).toList(),
+      'total': filtered.length,
       'page': page,
       'page_size': pageSize,
     });
@@ -386,7 +734,10 @@ class _InventoryFixture {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: InventoryScreen(controller: controller, onAddItemTap: () {}),
+        home: RepaintBoundary(
+          key: _captureKey,
+          child: InventoryScreen(controller: controller, onAddItemTap: () {}),
+        ),
       ),
     );
     await tester.pumpAndSettle();

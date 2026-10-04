@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'app_action_icon.dart';
+import '../theme/app_theme.dart';
 
 /// A left swipe reveals an action; only tapping it asks to delete the item.
 class SwipeDeleteCard extends StatefulWidget {
@@ -71,9 +72,10 @@ class _SwipeDeleteCardState extends State<SwipeDeleteCard> {
               _dragging = false;
             }),
       onHorizontalDragCancel: _close,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(13),
+      child: ClipRect(
+        clipper: const _SwipeRevealClipper(),
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             Positioned.fill(
               child: Align(
@@ -83,7 +85,9 @@ class _SwipeDeleteCardState extends State<SwipeDeleteCard> {
                   height: double.infinity,
                   child: AnimatedOpacity(
                     opacity: _offset == 0 ? 0 : 1,
-                    duration: const Duration(milliseconds: 180),
+                    duration: _dragging
+                        ? Duration.zero
+                        : const Duration(milliseconds: 180),
                     child: ExcludeSemantics(
                       excluding: _offset == 0,
                       child: Material(
@@ -120,8 +124,36 @@ class _SwipeDeleteCardState extends State<SwipeDeleteCard> {
                 child: AbsorbPointer(
                   absorbing: _offset < 0,
                   child: Material(
-                    color: Colors.transparent,
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(13),
+                    clipBehavior: Clip.antiAlias,
                     child: widget.child,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: -24,
+              top: 0,
+              bottom: 0,
+              width: 48,
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: (_offset.abs() / 32).clamp(0.0, 1.0),
+                  duration: _dragging
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.background,
+                          AppColors.background,
+                          Color(0x00F7FDED),
+                        ],
+                        stops: [0, 0.18, 1],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -131,4 +163,15 @@ class _SwipeDeleteCardState extends State<SwipeDeleteCard> {
       ),
     ),
   );
+}
+
+/// Let the leading edge fade through the list gutter before it is clipped.
+class _SwipeRevealClipper extends CustomClipper<Rect> {
+  const _SwipeRevealClipper();
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(-24, 0, size.width, size.height);
+
+  @override
+  bool shouldReclip(_SwipeRevealClipper oldClipper) => false;
 }
