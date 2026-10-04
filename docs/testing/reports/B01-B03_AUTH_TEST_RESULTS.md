@@ -1,6 +1,6 @@
 # B01–B03 Authentication Test Results
 
-Validation date: 2026-09-11. Work packages: B01 registration, B02 login, B03 current user. These results describe the local working-tree implementation at the time of testing, not a claim of completed remote CI or team review. No tested commit SHA was recorded because the changes had not yet been committed.
+Validation date: 2026-09-11. Work packages: B01 registration, B02 login, B03 current user. Tested target: the local uncommitted working tree. Commit SHA: not recorded.
 
 Design: [Backend design handbook](../../architecture/BACKEND_DESIGN.md). Usage: [API reference](../../reference/API_REFERENCE.md).
 
@@ -26,7 +26,7 @@ python -m pytest -v -m "not postgres"
 
 Local tests load the isolated Neon direct URL from the ignored .env.test file. CI provides TEST_DATABASE_URL for its disposable PostgreSQL 18 service and needs no Neon credentials. Both use the shared database fixture in [conftest.py](../../../backend/tests/conftest.py), which migrates and drops a new random schema per test. The [.env.test.example](../../../backend/.env.test.example) template contains placeholders only. The application .env is not a test-connection fallback.
 
-The Docker verification ran on the developer's Mac, not a GitHub-hosted runner. Actual GitHub Actions execution remains pending a push, PR, or manual dispatch. No commit or push was performed as part of that verification. The user separately confirmed successful Postman-to-Neon authentication integration testing.
+Execution environment: developer Mac with Docker PostgreSQL 18. Remote Actions execution was not recorded in this run. The user separately confirmed successful Postman-to-Neon authentication integration testing.
 
 ## 2. Delivered behavior
 
@@ -40,7 +40,7 @@ Parameter errors retain HTTP 422 and a detail list, but omit raw input and ctx, 
 
 ## 3. Historical automated validation before removing the fake session
 
-The result in this section predates the shared real-database fixtures. It is retained for traceability and is not the current test split.
+The result in this section predates the shared real-database fixtures. Its recorded split is 3 PostgreSQL and 42 offline cases; section 1 records the later real-database fixture selection.
 
 Environment: Python 3.11.16, SQLAlchemy 2.0.52, FastAPI 0.141.1, psycopg 3.3.5. Database: the isolated Neon sayfridge_auth_test database through its direct connection. Cleanup-oriented tests did not run in neondb.
 
@@ -76,13 +76,15 @@ An HTTP client sent the same 11 scenarios as the local Postman collection to Uvi
 
 That automated HTTP run is separate from a Postman application or Collection Runner result. It used the application .env pooled connection. Its uniquely created temporary account was cleaned by ID and email without modifying other accounts.
 
-The user subsequently confirmed successful Postman testing against the local FastAPI service and remote Neon database, after importing the collection through Postman Web and synchronizing it to VS Code. This is a recorded manual confirmation, not a claim that a Runner report was exported. The collection is currently a local optional artifact excluded from the planned documentation commit. Postman-created accounts are not automatically cleaned by pytest.
+The user subsequently confirmed successful Postman testing against the local FastAPI service and remote Neon database, after importing the collection through Postman Web and synchronizing it to VS Code. Manual verification was confirmed by the user; no Collection Runner export was retained. The collection is currently a local optional artifact excluded from the planned documentation commit. Postman-created accounts are not automatically cleaned by pytest.
 
-## 5. Remaining acceptance and limits
+## 5. Release verification
 
-- Remote GitHub Actions results must still be confirmed after submission. The workflow uses Python 3.12 and isolated PostgreSQL 18; the local container run is supporting evidence, not a remote CI run.
-- The team must review the changes and link code and test results to GitHub Issues. No commit, push, or task closure is implied by this report.
-- Web/Flutter integration and device acceptance, cloud application deployment, performance testing, and full security acceptance remain later project work and are not claimed complete here.
-- Unit/API/integration results do not turn every design in the backend handbook into an implemented feature. This report covers B01–B03 only.
+Coverage: B01 registration, B02 login and B03 current-user APIs. The recorded
+workflow used Python 3.12 with isolated PostgreSQL 18. At the time of release,
+record remote CI, Web/Flutter and device acceptance, deployed checks,
+performance and security results for the selected commit in the
+[Final Acceptance Record](FINAL_ACCEPTANCE.md). Link team review and test results
+to the corresponding Issues and PRs.
 
 No database passwords, JWT signing secrets, or real tokens are included in this report. Real .env and .env.test files and generated virtual environments remain ignored by Git. Preserve the date and code revision with future reruns so readers can distinguish results from different versions.

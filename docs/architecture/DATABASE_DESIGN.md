@@ -399,13 +399,13 @@ coconut milk is plant milk, cooking coconut milk is a cooking ingredient under s
 
 ### Classification references
 
-This is a product-design adaptation, not a scientifically validated optimal 25-class taxonomy.
-Sources inform boundaries and retail vocabulary; no standards-compliance claim is made.
+The 25 categories were selected for household inventory entry and filtering.
+The following sources inform category boundaries and retail vocabulary.
 
 - [FAO/WHO GIFT food groups](https://www.fao.org/gift-individual-food-consumption/methodology/food-groups-and-sub-groups): groupings differ by analytic purpose.
 - [EFSA FoodEx2](https://www.efsa.europa.eu/en/data/data-standardisation): food classification and descriptive properties.
 - [GS1 GPC](https://www.gs1.org/standards/gpc/get-started): common product group definitions.
-- [New World fridge categories](https://www.newworld.co.nz/shop/category/fridge-deli-and-eggs) and [pantry categories](https://www.newworld.co.nz/shop/category/pantry): local retail vocabulary, not household usability evidence.
+- [New World fridge categories](https://www.newworld.co.nz/shop/category/fridge-deli-and-eggs) and [pantry categories](https://www.newworld.co.nz/shop/category/pantry): local retail vocabulary.
 
 ## Category migration
 
@@ -413,9 +413,8 @@ Migration `a261002_categories` follows `a261001_sessions`. It adds the nullable
 category owner and inventory category override foreign keys, and replaces the
 global category-name uniqueness constraint with separate public/private indexes.
 Existing category IDs, inventory IDs, quantities and dates are retained. Existing
-categories remain public and existing batches start without overrides. Deployment
-requires applying the migration to the intended database; passing local tests does
-not establish shared-database readiness. Use the
+categories remain public and existing batches start without overrides. Apply the migration to the intended deployment database, then verify its revision
+and schema using the
 [delivery runbook](../delivery/README.md#database-initialization-and-migration).
 
 The downgrade refuses to run while private categories or batch overrides exist;

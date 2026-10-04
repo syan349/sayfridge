@@ -24,7 +24,7 @@ python -m pytest -v -m ci --strict-markers --junitxml=test-results.xml
 - Full regression: 346 passed in 77.42 seconds (67 database-free, 279 PostgreSQL).
 - Core regression: 44 passed, 302 deselected in 12.12 seconds, including six B10
   cases. The separate core command generated JUnit output successfully.
-- GitHub Actions and manual Postman acceptance have not been run for this change.
+- Recorded execution: local pytest; remote Actions and manual Postman acceptance were not performed in this run.
 
 ## Coverage
 
@@ -48,6 +48,7 @@ through manual workflow dispatch.
 
 ## Remaining acceptance
 
-Manual Postman testing and remote CI are still pending. No database schema change
-is needed for B10. The project owner resolved unit storage to trim surrounding
+At the time of release, record manual Postman testing and remote CI for the
+selected commit in the [Final Acceptance Record](FINAL_ACCEPTANCE.md). B10 used
+the existing database schema. The project owner resolved unit storage to trim surrounding
 whitespace while preserving case; the preview response decision remains separate.

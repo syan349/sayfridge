@@ -29,9 +29,9 @@ Use each item's outcome rather than treating a partially successful turn as all-
 
 Saved `display.question` supports recovery without another generated question.
 An ended stream stops loading but can leave confirmation buttons available.
-An interrupted stream is not proof of failure: query state, then reuse the original
-request/action identity. Retain local thumbnails and in-flight input; recovery does
-not return full chat or image history. Confirmation must bind current interrupt and
+After stream interruption, query server state and retry with the original
+request/action identity. State recovery returns current business progress; retain
+local thumbnails and in-flight input for chat/image display. Confirmation must bind current interrupt and
 proposal IDs. Expired proposals require state refresh.
 
 Continuous chat can supply clarification, revision, cancellation, confirmation or

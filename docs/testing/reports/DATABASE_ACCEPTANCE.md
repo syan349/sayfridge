@@ -41,8 +41,9 @@ through the same target guard. It starts a read-only transaction and records:
 - verified table, column, constraint, foreign-key and index counts.
 
 The command exits nonzero when migration or seed state differs from the repository.
-An evidence file is a point-in-time record and should be regenerated for final
-acceptance; it does not replace migration, seed, reset, backup or restore procedures.
+At the time of release, generate a new acceptance record for the selected commit
+after migration, seed and schema verification. Operational procedures are maintained
+in the [delivery runbook](../../delivery/README.md).
 
 ## Transaction and retry acceptance matrix
 

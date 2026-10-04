@@ -18,9 +18,10 @@ record the unit, API, database, UI and Agent checks added during implementation.
 Fast CI favors core business boundaries and bounded runtime. Full regression adds
 Backend cases without repeating real-model calls in routine PRs. Unit/UI mocks
 exercise deterministic client behavior; E2E verifies actual persistence and CORS.
-Native Android and model behavior require their own evidence. Performance targets
-in [architecture](../architecture/README.md#capacity-assumptions-and-scaling) are
-engineering assumptions, not measured results.
+Native Android and model behavior have separate evidence records.
+[Architecture](../architecture/README.md#capacity-assumptions-and-scaling) defines
+performance targets; the [performance record](records/PERFORMANCE_TEST_RECORD.md)
+contains measured results.
 
 ## Fast CI entry point
 
@@ -80,8 +81,7 @@ This suite contains **eight browser scenarios**:
 
 Requests are real and are not intercepted. Each test has a unique account.
 Fixture setup and persistence assertions also use authenticated real HTTP calls;
-the business action under test is performed through Web UI. Archival is the
-supported removal action; the suite does not invent a hard-delete API.
+the business action under test is performed through Web UI. This suite exercises archival as the removal action.
 
 The [runner](../../backend/scripts/run_e2e.py) starts a fresh Backend process and
 Playwright starts a production Web build with the actual Backend URL. Different
@@ -217,7 +217,8 @@ job outcomes and test scope in the Actions summary and `full-regression-summary`
 are retained for seven days. Download them when preparing final submission evidence.
 Backend's regular PR fast timeout remains ten minutes.
 
-This workflow runs automated regression, not deployment or Android packaging.
+This workflow runs automated regression. Deployment and Android packaging use
+the [delivery runbook](../delivery/README.md).
 Live OpenAI acceptance needs a separate explicit opt-in and credentials; native
 Android validation and manual screenshot exporters remain separate activities.
 Their exclusion is recorded in the summary. Web and Flutter currently use the
@@ -254,7 +255,7 @@ Use its case IDs in emulator/device retests and the
 [Final Acceptance Record](reports/FINAL_ACCEPTANCE.md#manual-cross-client-and-android-validation).
 Record each run's date, tester, client/device, APK and Backend versions, outcome
 and evidence. Manual observations, browser E2E and release acceptance have separate
-results; issue closure does not establish a passing retest.
+results. Track issue resolution and manual retest outcome in separate fields.
 
 ## Reports
 
@@ -287,7 +288,8 @@ Setup and database configuration: [backend README](../../backend/README.md).
 
 [Recorded testing notes](reports/TESTING_IMPLEMENTATION_NOTES.md) retain dated
 category/schema, frontend and session verification results formerly embedded here.
-Reports are snapshots, not current-suite totals; overlapping selections are not added.
+Each report identifies its tested date, revision and selection. Report overlapping
+selections separately.
 Security conclusions remain in [Security and Privacy](../security/README.md), which
 links the original redacted audit/JUnit files under `evidence/security/`.
 
@@ -306,6 +308,6 @@ available through the [project archive](../archive/README.md).
 ## Final release evidence
 
 Use the [Final Acceptance Record](reports/FINAL_ACCEPTANCE.md) to record one
-selected main release's automated, deployed and Android results. It is currently
-a prepared record, not a passing test report. Keep existing feature reports and
-raw attachments alongside the final record.
+selected main release's automated, deployed and Android results. At the time of
+release, enter each result, tested commit and evidence link. Status: awaiting
+final-release execution. Keep feature reports and raw attachments alongside it.

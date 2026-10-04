@@ -1,7 +1,7 @@
 # B04 Storage-Space Test Results
 
 Validation date: 2026-09-13. Tested working tree: `syan349_feat_backend_apis`,
-based on `1efc65e58409` (PR #61 merge). B04 changes are not committed or pushed.
+based on `1efc65e58409` (PR #61 merge). Test target: the uncommitted B04 working tree.
 
 Design: [Backend design handbook](../../architecture/BACKEND_DESIGN.md), sections 3, 4.2, and 7.
 Manual usage: [B04 API reference](../../reference/API_REFERENCE.md#3-storage-spaces--b04).
@@ -63,10 +63,9 @@ query-observation wrappers do not replace the database or return fabricated data
 The `test-job` workflow uses the same test definitions. After the CI selection
 update, automatic PR/main runs select 22 marked core cases (6 B01–B03 and 16 B04);
 manual workflow dispatch and default local pytest run all 115. Its job name and
-PostgreSQL service configuration were not changed. See the [CI selection policy](../README.md#ci-selection-policy). This local run is not a GitHub Actions result; remote B04 CI awaits a PR
-or another configured trigger. Manual B04 Postman/Neon and Web/Flutter acceptance
-are pending. No remote deployment, performance baseline, commit, push, or Issue
-closure is claimed.
+PostgreSQL service configuration were not changed. See the [CI selection policy](../README.md#ci-selection-policy). Recorded execution: local PostgreSQL tests. At the time of release, record remote
+CI, manual Postman/Neon and Web/Flutter acceptance for the selected commit in the
+[Final Acceptance Record](FINAL_ACCEPTANCE.md).
 
 Stock-creation and movement APIs are outside B04. Their future implementations
 must take the same space row lock and recheck ACTIVE state before adding stock,
@@ -83,5 +82,5 @@ this coordination with a controlled real database writer.
 - Workflow YAML parsed and automatic/manual conditions, triggers, and `test-job`
   name checked. No remote workflow was triggered by this change.
 - The previous full-suite run passed all 115 in 20.02 seconds; it predates the
-  marker-only selection change. The two timings are local observations, not a
-  controlled benchmark or a prediction of total GitHub Actions duration.
+  marker-only selection change. Observed local durations from separate runs: 20.02 seconds for the full
+  suite and 3.15 seconds for the core selection.

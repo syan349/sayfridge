@@ -41,7 +41,9 @@ python -m pytest -v tests/test_inventory_batch_create.py tests/test_inventory_ba
 All 11 batch-create scenarios passed locally in 67.35 seconds. All 15 batch-move
 scenarios passed locally in 106.03 seconds. All 13 batch-archive scenarios passed
 locally in 97.10 seconds. Nine representative scenarios are marked for the core
-selection across the three endpoints. Full regression and manual Postman acceptance
-remain pending. GitHub Actions is currently unavailable because the organization
-has exhausted its Actions quota. No database structure change or migration script
-is required.
+selection across the three endpoints.
+
+On 2026-09-23, GitHub Actions execution was blocked by the organization's exhausted
+quota. B15 used the existing schema and migrations. At the time of release, record
+Full Regression and manual Postman acceptance for the selected commit in the
+[Final Acceptance Record](FINAL_ACCEPTANCE.md).

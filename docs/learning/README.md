@@ -16,10 +16,10 @@ and associated Issues/PRs.
 | Structured user memory | User-specific conversions and aliases need context and authorization | Remembered knowledge is conditional evidence, not inventory truth | Reusable preferences and estimates preserve ownership and their original basis |
 | Multimodal input | Photos contain uncertain quantities, personal metadata and large payloads | Validate media and require review independently of model interpretation | Camera/gallery stock entry with controlled writes and reduced metadata disclosure |
 | PostgreSQL in cloud hosting | Serverless instances and database poolers have different connection/state lifetimes | Persistent consistency belongs in shared storage; session-level operations need direct connections | Cross-instance sessions, receipts and explicit migration/setup |
-| Browser E2E and CI composition | Passing mocked client tests does not prove that clients/API/database work together | Use real boundaries in an isolated environment and test an immutable revision | Eight browser flows plus repeatable multi-module regression |
+| Browser E2E and CI composition | Mocked tests verify client behavior; browser E2E verifies client/API/database integration | Use real boundaries in an isolated environment and test an immutable revision | Eight browser flows plus repeatable multi-module regression |
 | Rotating authentication sessions | A short access expiry interrupts Mobile use | Access lifetime, continued login and revocation are separate mechanisms | Automatic renewal with hashed refresh credentials and device-session logout |
 
-## LangGraph: resumable work is not a database transaction
+## LangGraph: separating workflow recovery from business transactions
 
 The [original Realtime/dual-Agent blueprint](../archive/2026-09-25/ARCHITECTURE_REALTIME_DRAFT.md)
 considered a larger real-time architecture. The implemented system uses one

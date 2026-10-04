@@ -1569,7 +1569,7 @@ Public items in preview/result/waiting/state responses add a `display` object:
 | item_name / space_name | Display labels; may be empty before resolving missing information |
 | category_id / category_name | Validated category for a prepared new-stock proposal |
 | source_image_ids | Validated image references; conservative fallback may include all historical images |
-| recognized_text | Model transcription/source wording, not guaranteed OCR truth |
+| recognized_text | Model-extracted text presented for user review and correction |
 | package_description | Optional label detail, e.g. 500ml per bottle; not a second stock balance |
 | review_notes | Model-supplied notes requiring user attention |
 | missing_fields | Required fields identified by backend preparation errors |

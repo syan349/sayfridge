@@ -32,5 +32,6 @@ python -m pytest -v tests/test_inventory_item_history.py tests/test_inventory_op
 All 7 item-scoped history scenarios passed in 44.40 seconds. All 17 global
 list/detail scenarios passed in 112.77 seconds. Four representative scenarios are
 marked for core CI: ordering/field exposure and resource isolation for both route
-groups. Full regression, remote CI, and manual Postman acceptance remain pending.
-No database structure change or migration script is required.
+groups. B14 used the existing schema and migrations. At the time of release, record Full
+Regression, remote CI and manual Postman acceptance for the selected commit in the
+[Final Acceptance Record](FINAL_ACCEPTANCE.md).

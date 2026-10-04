@@ -3,8 +3,7 @@
 ## Delivery and environment
 
 Validation date: 2026-09-13. These results cover the uncommitted B05–B06 working
-tree on `syan349_feat_backend_apis`, based on commit `12d45a0`. They do not assert
-that the remote branch or GitHub Actions has tested these changes.
+tree on `syan349_feat_backend_apis`, based on commit `12d45a0`. Recorded execution: local PostgreSQL tests.
 
 Environment: macOS, Python 3.11.16, pytest 9.1.1, and PostgreSQL 18 in a disposable
 local Docker container. `TEST_DATABASE_URL` pointed only to that container.
@@ -58,8 +57,8 @@ PostgreSQL 18 service without Neon credentials. See the [selection index](../REA
 for the full list of core scenarios.
 
 Local OpenAPI inspection verified all seven catalog operations, their Bearer
-security requirements, and business validation response schemas. Manual Postman
-acceptance of B05–B06 and remote CI verification remain pending. Use the
+security requirements, and business validation response schemas. At the time of release, record manual Postman acceptance and remote CI for the
+selected commit in the [Final Acceptance Record](FINAL_ACCEPTANCE.md). Use the
 [API reference](../../reference/API_REFERENCE.md#5-item-definitions--b06) for
 request examples. An active category must already exist through approved data
 initialization; B05 does not add category-management endpoints or seed shared data.

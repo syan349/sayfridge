@@ -33,9 +33,10 @@ criterion 9: identifying and mitigating relevant cybersecurity and privacy risks
 | Users could misunderstand data retention and third-party processing. | Documented stored data, service providers, text/image/voice handling and actual deletion behaviour; corrected the Web retention notice. | Documentation checked against implementation; Web recovery-notice test passed. |
 | Secrets or known vulnerable dependencies could enter the project. | Ran Gitleaks with finding triage and Python/npm/Dart dependency audits; documented secret storage and incident procedures. | Redacted scan/audit attachments retained; no known dependency vulnerabilities reported within the scanned scope. |
 
-These achievements are supported by **473 passing Backend tests**, **7 passing Web Assistant tests**,
-a successful Web production build, and linked JUnit/audit evidence. The test counts describe the
-recorded selections, not a full regression run or a count of OWASP requirements.
+Recorded selections: **473 passing Backend tests**, **7 passing Web Assistant tests**,
+and a successful Web production build. Linked JUnit/audit files retain the results.
+Full Regression and release results are linked from the
+[Final Acceptance Record](../testing/reports/FINAL_ACCEPTANCE.md).
 
 ## Security controls and verification
 
@@ -47,12 +48,12 @@ recorded selections, not a full regression run or a count of OWASP requirements.
 | Authorization and IDOR | Resource reads/writes are scoped to the authenticated user. Tests cover foreign inventory, spaces, private definitions, history and batch operations. Ordinary users receive 403 from administrator endpoints; missing authentication receives 401. |
 | Role escalation | Registration creates a USER. Registration/status-update payload validation rejects unsupported role fields. Tests verify that input cannot create an administrator. |
 | Terminal states | Discard/archive and quantity/batch tests reject illegal operations on terminal resources; failed operations do not partially write or restore resources. |
-| Agent isolation | Tests cover conversation ownership and repeated/concurrent requests. Model/graph execution uses test doubles; this is not acceptance of the deployed checkpoint service. |
+| Agent isolation | Tests cover conversation ownership and repeated/concurrent requests. Local model/graph execution uses test doubles. Record deployed checkpoint validation in the Final Acceptance Record. |
 | Authentication coverage | The new route probe enumerated 34 protected OpenAPI method/path pairs, all rejecting missing identity with 401. Registration, login and public version metadata are explicitly excluded. Refresh and logout use a separate refresh credential; missing or malformed credentials return 422, and refresh rejection returns 401. |
 | Input and SQL | Pydantic types, ranges and extra-field restrictions; parameterized ORM queries. Tests cover identifiers, quantities, pagination and status values. No input-concatenated business SQL was found in the reviewed code. |
-| Token lifecycle | Access JWTs expire after 15 minutes. Rotating refresh credentials provide a 30-day sliding idle window and a 90-day absolute session limit. PostgreSQL stores only refresh hashes. Server logout and refresh replay revoke the device session; protected requests check revocation and current account status. Network failure during logout cannot confirm server revocation. |
-| CORS | Explicit origin allowlist, no wildcard configuration or cookie credentials. Tests cover allowed/rejected origins and validation/body-limit responses. CORS does not replace authentication. |
-| Login throttling | Basic process-local client/account limits exist. This does not provide a shared limit across Vercel instances. |
+| Token lifecycle | Access JWTs expire after 15 minutes. Rotating refresh credentials provide a 30-day sliding idle window and a 90-day absolute session limit. PostgreSQL stores only refresh hashes. Server logout and refresh replay revoke the device session; protected requests check revocation and current account status. If the logout request fails over the network, server revocation remains unconfirmed. |
+| CORS | Explicit origin allowlist, no wildcard configuration or cookie credentials. Tests cover allowed/rejected origins and validation/body-limit responses. Protected endpoints also require authentication. |
+| Login throttling | Client/account limits are process-local; each Vercel instance maintains its own counters. |
 
 ### Hostile input and uploads — 8.3
 
@@ -66,25 +67,26 @@ recorded selections, not a full regression run or a count of OWASP requirements.
 | Negative, zero or abnormal quantities/units | Existing invalid/reject tests enforce operation-specific rules; reconciliation is distinguished from additions and consumption. |
 | Reused idempotency key | Existing tests cover safe replay, conflicting payload rejection, user isolation and rollback. |
 
-These checks are not antivirus scanning or comprehensive polyglot detection. New model-bound images now have metadata stripped as described in SEC-04; existing checkpoints are not rewritten.
+Upload checks validate format, decoded content, dimensions and size. SEC-04 strips
+metadata from newly submitted model-bound images; existing checkpoints remain unchanged.
 
 ## Findings, fixes and verification record
 
 The following table records identified problems, implemented changes and their verification.
-Results are local review evidence; see the verification scope below.
+Verification environment: local Python/PostgreSQL and Web component tests.
 
-| ID | Finding and risk | Fix or response | Verification evidence | Status at review |
+| ID | Finding and risk | Fix or response | Verification evidence | Recorded verification — 2026-09-29 |
 | --- | --- | --- | --- | --- |
-| SEC-01 | SQLAlchemy exceptions could include bound email/inventory parameters in logs. | Enable `hide_parameters=True` in [database session setup](../../backend/app/db/session.py). | `test_sql_exception_representation_hides_bound_private_data` in [security probes](../../backend/tests/test_security_review.py): failed before the fix and passed afterward. | Locally verified; deployed behaviour not verified. |
-| SEC-02 | Unhandled request exceptions could reach server traceback logs containing sensitive exception text. | Add [SafeErrorsMiddleware](../../backend/app/middleware/safe_errors.py): record only random error ID and exception class; return a generic 500 before response start, or end an already-started stream without exposing the exception. CORS wraps this boundary. | `test_exception_details_never_reach_logs_or_response`, two cases in [safe-error tests](../../backend/tests/test_safe_errors.py), checks logs, response and CORS. Both passed; no saved pre-fix failing run. | Locally verified; provider/startup logs remain outside this boundary. |
-| SEC-03 | Printed settings-validation errors could include sensitive input values. | Set `hide_input_in_errors=True` in [application settings](../../backend/app/core/config.py) and [Agent settings](../../backend/app/agents/model.py). | `test_settings_validation_does_not_print_input`, two cases in [safe-error tests](../../backend/tests/test_safe_errors.py), passed; no saved pre-fix failing run. | Locally verified; structured error exports are not covered by this setting. |
-| SEC-04 | Uploaded image metadata could expose private photo information to the model/checkpoint. | Re-encode decoded pixels before constructing model messages; preserve orientation and original-byte request identity. | Four tests in [image privacy tests](../../backend/tests/test_image_privacy.py) cover JPEG/PNG/WebP metadata and trailing data, orientation, retries and transparency; passed. | Local verification only; does not erase old checkpoints or client copies. |
-| PRIV-02 | Web recovery notice incorrectly claimed the server only retained operations. | Correct the Assistant notice to disclose retained conversation history and images. | Assistant page tests passed, including recovery and literal rendering of hostile model HTML. | Locally verified; not deployed. |
-| PRIV-01 | Data destinations, retention and deletion limitations were not consolidated for reviewers/users. | Document data flows, third parties, access and deletion limitations below. | Reviewed against Agent state/persistence/tools, client session storage and voice-input implementation. | Disclosure prepared; not implementation of automatic deletion or a frontend consent screen. |
+| SEC-01 | SQLAlchemy exceptions could include bound email/inventory parameters in logs. | Enable `hide_parameters=True` in [database session setup](../../backend/app/db/session.py). | `test_sql_exception_representation_hides_bound_private_data` in [security probes](../../backend/tests/test_security_review.py): failed before the fix and passed afterward. | Local regression: passed. Deployment verification: pending. |
+| SEC-02 | Unhandled request exceptions could reach server traceback logs containing sensitive exception text. | Add [SafeErrorsMiddleware](../../backend/app/middleware/safe_errors.py): record only random error ID and exception class; return a generic 500 before response start, or end an already-started stream without exposing the exception. CORS wraps this boundary. | `test_exception_details_never_reach_logs_or_response`, two cases in [safe-error tests](../../backend/tests/test_safe_errors.py), checks logs, response and CORS. Both passed; retained evidence: post-fix regression results. | Local regression: passed. HTTP scope: request processing after application startup; provider/startup logging requires separate checks. |
+| SEC-03 | Printed settings-validation errors could include sensitive input values. | Set `hide_input_in_errors=True` in [application settings](../../backend/app/core/config.py) and [Agent settings](../../backend/app/agents/model.py). | `test_settings_validation_does_not_print_input`, two cases in [safe-error tests](../../backend/tests/test_safe_errors.py), passed; retained evidence: post-fix regression results. | Local regression: passed. Sanitization covers printed errors; structured exports retain input values. |
+| SEC-04 | Uploaded image metadata could expose private photo information to the model/checkpoint. | Re-encode decoded pixels before constructing model messages; preserve orientation and original-byte request identity. | Four tests in [image privacy tests](../../backend/tests/test_image_privacy.py) cover JPEG/PNG/WebP metadata and trailing data, orientation, retries and transparency; passed. | Local regression: passed. Processing scope: new submissions; existing checkpoints and client copies remain unchanged. |
+| PRIV-02 | Web recovery notice incorrectly claimed the server only retained operations. | Correct the Assistant notice to disclose retained conversation history and images. | Assistant page tests passed, including recovery and literal rendering of hostile model HTML. | Local regression: passed. Deployment: not performed in this review. |
+| PRIV-01 | Data destinations, retention and deletion limitations were not consolidated for reviewers/users. | Document data flows, third parties, access and deletion limitations below. | Reviewed against Agent state/persistence/tools, client session storage and voice-input implementation. | Delivered: data-handling disclosure and operator removal procedure. Automatic deletion and a consent screen are outside this implementation. |
 
-SQL parameter hiding does not redact driver-generated error details, SQL literals or arbitrary application
-logs. The HTTP boundary cannot cover failures before the application starts. Once a streaming response
-has started, its status cannot change; clients must treat missing completion events as interruption.
+SQLAlchemy hides bound parameters. Driver-generated errors, SQL literals, application
+logs and startup output require separate logging configuration. After streaming
+headers are sent, the status is fixed; treat missing completion events as interruption.
 
 ## Privacy and third-party data handling
 
@@ -95,7 +97,7 @@ has started, its status cannot change; clients must treat missing completion eve
 | Email, password hash, role, account status and timestamps | PostgreSQL on Neon for authentication and account administration. Passwords are hashed, not stored as plaintext. |
 | Device session IDs, expiry/revocation timestamps and refresh credential hashes | PostgreSQL on Neon. Raw refresh credentials are never stored server-side; expiry ends authorization rather than deleting session records. |
 | Spaces, private item definitions, inventory quantities/dates/notes and operation history | Neon, scoped to the authenticated user. Administrator account inspection does not grant unrestricted inventory access through ordinary inventory APIs. |
-| Agent messages, images embedded in messages, pending actions, results and request identifiers | LangGraph PostgreSQL checkpoints for conversation recovery and repeat-operation protection. Base64 is encoding, not encryption. |
+| Agent messages, images embedded in messages, pending actions, results and request identifiers | LangGraph PostgreSQL checkpoints for conversation recovery and repeat-operation protection. Images are stored as Base64-encoded bytes; access is controlled through authenticated APIs and database permissions. |
 | Explicitly requested Agent memories | A user-specific PostgreSQL store namespace. |
 | Client session data | Web stores access and refresh credentials in memory/sessionStorage. Mobile uses FlutterSecureStorage for tokens and per-user Agent conversation/retry state. Flutter Web storage is subject to browser security and is not equivalent to Android device storage. |
 
@@ -113,30 +115,30 @@ has started, its status cannot change; clients must treat missing completion eve
 - Voice uses device/browser speech recognition through `speech_to_text`. Recognized words become
   editable text; the current Backend does not receive raw audio. Recognition may use a platform vendor's
   cloud service; offline recognition is not enforced. Check the transcript before sending it.
-- Model-provider retention/training terms depend on the provider and account configuration. The project
-  has not verified zero-data-retention guarantees. Reassess this disclosure when changing the model endpoint.
+- Provider retention and training follow the configured account and service terms.
+  Provider-retention verification: pending. Review these settings when changing the model endpoint.
 
 ### Access, retention and deletion
 
 Users access data through authenticated APIs. Database/project operators have broader access, which
 must be restricted to team members who need it. Shared demo accounts share data: use synthetic data only.
 
-No automatic retention deadline is configured. Accounts, inventory history, checkpoints and memories
-remain until explicitly cleaned up. There is no complete self-service account deletion, all-chat deletion
-or personal-data export workflow. Inventory archive/discard changes state; it does **not** erase history.
-Logout removes a client token; it does **not** delete server data or necessarily clear device chat history.
+Accounts, inventory history, checkpoints and memories remain until explicitly
+cleaned up; automatic retention cleanup is not configured. Removal requests use
+the operator procedure below. Self-service account/all-chat deletion and personal-data
+export workflows are not implemented. Archive/discard retains inventory
+history. Logout revokes the server session after a successful request and clears
+client credentials; stored server data and device chat history have separate lifecycles.
 
-The Agent can delete an individual memory following an explicit user request. This removes the store
-entry, but does not guarantee erasure from old messages, checkpoints, backups or provider logs.
+An explicit user request can delete an individual Agent memory from the Store.
+Existing messages, checkpoints, backups and provider logs follow their separate
+retention and removal procedures.
 
 For access/removal requests, contact the team through the course/project communication channel.
-An operator must verify ownership, identify related relational data/checkpoints/store entries, coordinate
-safe removal and explain backup/provider limitations. This is a manual request procedure, not a tested
-one-command deletion service. Resetting an approved isolated demo database is not the normal method
-of deleting one user's data.
-
-No automatic cleanup date is promised. Removal requests are handled through the manual contact
-procedure above, with backup and provider limitations explained to the requester.
+The operator verifies ownership, identifies the user's relational data, checkpoints
+and Store entries, coordinates removal, and explains the applicable backup/provider
+retention. Handle individual removal requests through this procedure; isolated demo
+database resets use the separate reset process.
 
 ## Logging and secret management
 
@@ -184,7 +186,8 @@ URLs, conversation text or Base64 images. Do not log settings `exc.errors()` or 
 
 Use error IDs, operation names and exception classes for diagnostics. Reproduce failures locally with
 synthetic inputs when more detail is needed. Restrict provider log access and explicitly configure retention.
-These application controls do not prove that provider logs, startup errors or third-party tracing are safe.
+During deployment acceptance, verify provider log access, retention, startup output
+and third-party tracing settings.
 
 ### Secret storage and incident procedure
 
@@ -205,14 +208,16 @@ team channel for operational sharing. Never publish actual demo/admin passwords 
 
 If a real secret is committed, revoke/rotate it first, update provider settings, redeploy and verify access.
 Deleting a file or rewriting history does not revoke a secret. Coordinate any history rewrite with the team.
-This review did not rotate live credentials or rewrite history.
+Review activity: code, test and audit verification. Credential rotation and history
+rewrites are operator incident-response steps.
 
 ## Test and audit evidence
 
 ### Recorded local test runs
 
 Environment: Python 3.12 and disposable local PostgreSQL 18, with isolated schemas for database tests.
-No live Neon changes, live model calls, Android/iOS builds or full regression were performed for this review.
+Executed selections: local Backend tests, Web Assistant tests and Web production build.
+Live Neon/model, Android/iOS and Full Regression execution are recorded separately.
 
 | Run | Result | Interpretation |
 | --- | --- | --- |
@@ -220,7 +225,7 @@ No live Neon changes, live model calls, Android/iOS builds or full regression we
 | Inventory/space/catalog boundary selection | 314 passed, 183 deselected | [Boundary JUnit](../testing/evidence/security/inventory-boundaries-junit.xml); disjoint from the 159-case selection, giving 473 Backend cases. |
 | Web Assistant selection | 7 passed | [Web JUnit](../testing/evidence/security/web-assistant-junit.xml); includes hostile-text rendering and retention-notice verification. |
 | Web production build | Passed | TypeScript checks and Vite build completed locally. |
-| Backend CI collection | 168 selected out of 726 collected | Collection snapshot only, not a CI execution result. |
+| Backend CI collection | 168 selected out of 726 collected | Collection: 168 selected / 726 collected. Execution result: not recorded for this collection check. |
 
 [Security probes](../../backend/tests/test_security_review.py) contain 60 new cases;
 [safe-error tests](../../backend/tests/test_safe_errors.py) and
@@ -256,14 +261,15 @@ with the tested commit, environment and date. Keep sensitive data out of failure
 
 ### Dependency audits — 8.6
 
-| Scope | Result on review date | Evidence and limits |
+| Audited scope | Recorded result — 2026-09-29 | Evidence and coverage |
 | --- | --- | --- |
-| 75 recorded local Python dependency versions | No known vulnerabilities reported by pip-audit 2.10.1. | [JSON](../testing/evidence/security/python-audit.json), [audited versions](../testing/evidence/security/python-audited-versions.txt). Not the actual Vercel installation or a project install lockfile. |
-| Web package-lock | npm audit reports zero vulnerabilities at all severity levels. | [JSON](../testing/evidence/security/web-audit.json). Does not test browser behaviour. |
+| 75 recorded local Python dependency versions | No known vulnerabilities reported by pip-audit 2.10.1. | [JSON](../testing/evidence/security/python-audit.json), [audited versions](../testing/evidence/security/python-audited-versions.txt). Audited environment: the 75 recorded local package versions; Vercel-installed versions require a separate audit. |
+| Web package-lock | npm audit reports zero vulnerabilities at all severity levels. | [JSON](../testing/evidence/security/web-audit.json); npm dependency audit. |
 | 84 hosted packages in Flutter/Dart pubspec.lock | OSV Pub ecosystem query by exact package/version returned no matches. | [Queries/results](../testing/evidence/security/dart-audit.json). Excludes Flutter/Dart SDKs, SDK packages and native Gradle dependencies. |
 
-No dependency upgrades or lockfile changes were made for these audits. Outdated does not automatically
-mean vulnerable; no known advisory is not a guarantee of safety.
+The audits reported no matching advisories for the recorded versions on
+2026-09-29. Package versions and lockfiles were unchanged. Rerun the audits after
+dependency changes.
 
 Reproduce Python using the recorded version list with
 `pip-audit -r docs/testing/evidence/security/python-audited-versions.txt --no-deps --disable-pip --format json`
@@ -272,7 +278,8 @@ from the repository root; regenerate the list when installed versions change. Fo
 For Dart, derive hosted packages and exact versions from the current `mobile/pubspec.lock` and POST
 `{"queries":[{"package":{"name":"PACKAGE","ecosystem":"Pub"},"version":"VERSION"}]}`
 to `https://api.osv.dev/v1/querybatch`; inspect each result and any pagination token.
-Network errors are not passing results. Regenerate queries after lockfile changes.
+Record network errors as incomplete audit attempts and rerun them. Regenerate
+queries after lockfile changes.
 
 ### Secret-pattern checks
 
@@ -282,21 +289,24 @@ found no private-key/API-key matches. Its 15 current and 18 historical database-
 localhost, example or template hosts. See [redacted counts](../testing/evidence/security/secret-scan.json).
 Actual local environment files are ignored; tracked example secrets use placeholders.
 
-This is a heuristic check, not a comprehensive secret scanner. It excludes unavailable/deleted remote
-history, forks, screenshots and external artifacts. Provider dashboards were not inspected: the storage
-rules above are requirements, not evidence that every deployed setting is correct.
+Scanned: tracked text, current source/configuration/documentation and locally
+available Git refs. Excluded: unavailable/deleted remote history, forks, screenshots
+and external artifacts. Hosting-secret configuration verification: pending in this
+review; use the storage checklist during deployment acceptance.
 
 ## Verification scope
 
-Evidence covers local code review, selected automated tests, tracked-file/history secret scanning and
-basic dependency audits. It does not represent a full penetration test, full regression run or verification
-of provider dashboards and the deployed service. Dependency audit coverage is stated with each artifact.
-The documented data-handling behaviour remains applicable: archive/logout is not data erasure, and
-individual memory deletion does not erase historical checkpoints or provider backups.
+| Activity | Execution in the initial review |
+| --- | --- |
+| Code review and selected automated tests | Completed locally; evidence linked above |
+| Tracked-file/history secret scans and dependency audits | Completed for the stated artifact scopes |
+| Full Regression, deployed service and provider-dashboard checks | Separate release verification; see the Final Acceptance Record |
+| Full penetration test | Not performed |
+| Physical Android device acceptance | Not performed in this review; record results in the Final Acceptance Record |
 
-OWASP categories are used to explain relevant risks and mitigations, not to claim certification or that
-every possible risk has been eliminated. Local login throttling and request-size limits mitigate specific
-abuse cases; they are not a claim of distributed denial-of-service protection.
+OWASP categories organize the risk-to-control mapping. Login limits are process-local;
+request-size limits bound individual requests. Data retention and removal follow
+the procedures above.
 
 ## References
 
@@ -313,8 +323,8 @@ abuse cases; they are not a claim of distributed denial-of-service protection.
 - New image handling strips metadata before model messages/checkpoint writes. Original-byte digests and
   sizes remain as non-reversible identity metadata to preserve existing retry semantics. The upload body
   exists transiently in request memory; frontend copies and existing database history are unchanged.
-- Web model output is tested as literal text: hostile HTML does not create script/image/event-handler
-  elements. This is a jsdom component test, not a complete browser penetration test.
+- jsdom component verification passed: hostile model text renders without executable
+  script/image/event-handler elements.
 - [Backend JUnit](../testing/evidence/security/backend-security-junit.xml): 159 passed (authentication, security,
   configuration, Agent, image and multimodal selections). This overlaps earlier results.
 - [Inventory boundary JUnit](../testing/evidence/security/inventory-boundaries-junit.xml): 314 passed, 183 deselected. Together with the 159-case selection, 473 distinct Backend cases passed. An initial sandboxed run could not connect to local PostgreSQL; this rerun used the required local access and passed.
@@ -322,15 +332,14 @@ abuse cases; they are not a claim of distributed denial-of-service protection.
 - Official Gitleaks 8.30.1 was checksum-verified and run against all locally available Git history and a
   tracked-file snapshot. [History results](../testing/evidence/security/gitleaks-history.json) and
   [snapshot results](../testing/evidence/security/gitleaks-tracked.json) each contain two findings, reviewed as a
-  synthetic conversation identifier and an unsubmitted widget-test password. Scanner exit was 1 because
-  findings exist; this is a triaged outcome, not an unqualified zero-finding scan. No blanket allowlist was added.
-- A broader local directory scan also detected a JWT key in ignored `backend/.env`; this is expected local
-  secret storage, not evidence of a Git leak. Its value was never included in the report.
+  synthetic conversation identifier and an unsubmitted widget-test password. Scanner exit code: 1. Both findings were classified as synthetic test values.
+  No blanket allowlist was added.
+- A broader local directory scan detected a JWT key in ignored `backend/.env`.
+  Tracked-file/history findings are listed separately; the key value is omitted.
 
-All follow-up artifacts are local verification evidence.
-
-Scope note: **Not verified on a physical Android device.** Physical-device verification is outside this
-review's agreed scope and does not reduce its completion status.
+Verification platform: local Python/PostgreSQL and Web/jsdom. Record Android
+acceptance results in the
+[Final Acceptance Record](../testing/reports/FINAL_ACCEPTANCE.md#manual-cross-client-and-android-validation).
 
 
 ### Persistent-session verification
@@ -342,9 +351,10 @@ client tests cover concurrent renewal, credential replacement, and network failu
 See [Backend tests](../../backend/tests/test_persistent_auth.py),
 [Web client tests](../../web/src/api/client.test.ts), and
 [Flutter repository tests](../../mobile/test/repositories/auth_repository_test.dart).
-These results validate local isolated environments; cloud migration and deployment
-are separate release steps. Browser refresh credentials remain accessible to same-origin
-JavaScript, so this feature does not remove the need for XSS protections.
+Verification environment: local isolated schemas and client tests. Apply the
+session migration and verify deployed renewal during release acceptance. Browser
+credentials are accessible to same-origin JavaScript; retain literal-text rendering
+and other XSS controls.
 
 
 ## Related maintained guides

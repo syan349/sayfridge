@@ -1,8 +1,8 @@
 # Final Release Acceptance Record
 
-**Status: awaiting final release execution.** This is the prepared record for the
-selected release; no final-release result is recorded yet. Existing test results
-remain in the [testing evidence index](../README.md#reports).
+**Status: awaiting final-release execution.** At the time of release, enter results
+for the selected commit. Dated test runs remain in the
+[testing evidence index](../README.md#reports).
 
 ## Release identity
 
@@ -33,8 +33,7 @@ Complete this section when selecting the submission release.
 | Deployed Backend smoke | smoke_deployment.py | Not run for final release | Pending sanitized output and commit match |
 
 The [delivery runbook](../../delivery/README.md) owns commands, configuration and
-deployment order. Run results identify the selected release rather than reusing
-older results as if they tested the final commit.
+deployment order. At the time of release, record the selected commit with each run result.
 
 ## Performance verification — 2026-10-04
 
