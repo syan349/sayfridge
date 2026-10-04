@@ -1,0 +1,11 @@
+{
+  "commit": "a370559786f5305a36b0f48d729792451c38eaff",
+  "committed_backend_files_checked": 187,
+  "different_or_missing_files": [],
+  "all_committed_backend_files_match": true,
+  "method": "Read-only SHA-1-verified Git objects; no Git commands",
+  "hosted_commit": "e538779976a46e1a218c8e4d59bbbaeb374fa9b3",
+  "local_backend_tree": "ba7571720cda657a36813848e4cc3fd21c54d828",
+  "hosted_backend_tree": "ba7571720cda657a36813848e4cc3fd21c54d828",
+  "hosted_and_local_backend_tree_identical": true
+}

@@ -1,0 +1,19 @@
+INFO:     Started server process [85977]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:53565 (Press CTRL+C to quit)
+Agent request failed (APIError)
+{"event": "session_revoked", "request_id": "fe135a75-19fb-4379-9a94-e3e9c336a9ef", "session_id": "9445d7df-9a77-4497-96d5-24e871a370ca", "user_id": "2be6b1c1-3bd9-4d44-b064-24a2c083e223"}
+{"event": "session_revoked", "request_id": "0aca1193-6398-43cd-b16d-eae9d9bd93c5", "session_id": "feb3b002-a874-407d-8a44-f4d167335c71", "user_id": "fa4b372f-f20b-4f6d-bd59-87681d700226"}
+{"event": "session_revoked", "request_id": "96e31d06-08bf-40b2-9852-798662645a6b", "session_id": "44021bfc-7de7-4ff3-8a1b-2f3532f5bcda", "user_id": "0a9e35ef-dc7a-4ba3-9b8f-b3311cacec4d"}
+{"event": "session_revoked", "request_id": "88852d0f-ba82-4dd8-98ff-023abcda1ef1", "session_id": "ea4a34e0-aa07-46f1-bd37-4492dcda7215", "user_id": "2716753f-e5b7-412b-8608-b6c5cd195559"}
+{"event": "session_revoked", "request_id": "35eb9b83-f0ae-4410-a593-5ac41660d5a6", "session_id": "a9087557-4303-4383-a120-ad7136beae2d", "user_id": "5b5e7d5d-b41a-4ee7-aea6-c885d0532230"}
+{"event": "session_revoked", "request_id": "dee27f44-32b7-4ef7-8c63-64ad96a26781", "session_id": "55c34d06-d886-4123-8920-ffbf761d8339", "user_id": "57aa77e7-5736-4d47-b8d4-5272d9270f49"}
+{"event": "session_revoked", "request_id": "34d3b900-4e73-4c89-83db-05ad747a87db", "session_id": "d492d5c0-4285-4670-95e9-b992ed2b3f0a", "user_id": "94c8ef87-6071-4ca5-9334-9f1ff27b59bf"}
+{"event": "session_revoked", "request_id": "e450fabc-973c-42a2-b84b-16465918b999", "session_id": "dcb6e3b7-8936-4962-b0f0-4ab2db753e10", "user_id": "bb0b55b1-3335-4273-9bd2-c0c5d0462302"}
+{"event": "session_revoked", "request_id": "efff723f-e45d-4cd1-859f-ee3e3080d15f", "session_id": "4b1f90dc-5973-4162-a469-513e0e619577", "user_id": "0510e415-8757-4cd5-b64c-da39c7fb2d1e"}
+{"event": "session_revoked", "request_id": "de78ff6d-725d-4fc9-bda4-a640e0d04674", "session_id": "b5ffed6b-dd6c-47ce-bc86-27aa47b88b0f", "user_id": "81f626dc-b653-4ca3-ab14-b93b7cda0271"}
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [85977]
