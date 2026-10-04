@@ -96,6 +96,10 @@ def missing_fields(item):
     """Describe actual holes, including unit-only and proportion cases."""
     draft = item.get("draft", {})
     error = item.get("error") or {}
+    if error.get("code") == "TARGET_REQUIRED":
+        # Existing clients render these names literally. The question explains
+        # target resolution; users never need to supply an internal record ID.
+        return []
     if "missing_fields" in error.get("details", {}):
         return error["details"]["missing_fields"]
     code = error.get("code")
@@ -108,5 +112,5 @@ def missing_fields(item):
         return fields
     return {"WHOLE_COUNT_REQUIRED": ["quantity_value"], "IMAGE_QUANTITY_UNCLEAR": ["quantity_value"],
             "QUANTITY_PRECISION_UNSUPPORTED": ["quantity_value"], "SPACE_REQUIRED": ["storage_space_id"],
-            "TARGET_REQUIRED": ["inventory_item_id"], "DEFINITION_REQUIRED": ["item_definition_id"],
+            "DEFINITION_REQUIRED": ["item_definition_id"],
             "CATEGORY_REQUIRED": ["category_id"]}.get(code, [])

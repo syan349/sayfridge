@@ -281,7 +281,7 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
             "requires_confirmation": bool(reasons or draft.confirmation_requested), "expected_version": None}
     if not draft.inventory_item_id:
         if not draft.item_query:
-            raise PreparationError("TARGET_REQUIRED", "Identify the inventory item")
+            raise PreparationError("TARGET_REQUIRED", "Identify the inventory item", {"reason": "MISSING_QUERY"})
         try:
             explicit_id = UUID(draft.item_query.strip())
         except ValueError:
@@ -289,7 +289,10 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
         targets = await resolve_targets(session, user_id, [draft.item_query], draft.storage_space_id, memory) if explicit_id is None else None
         chosen = str(explicit_id) if explicit_id else targets["preferred_id"] or (targets["candidates"][0]["id"] if targets["total"] == 1 else None)
         if not chosen:
-            raise PreparationError("TARGET_REQUIRED", "Select a specific inventory batch", targets)
+            reason = "NO_MATCH" if targets["total"] == 0 else "AMBIGUOUS"
+            message = ("No stock matched this name. Please check the inventory before requesting clarification."
+                       if reason == "NO_MATCH" else "Select a specific inventory batch")
+            raise PreparationError("TARGET_REQUIRED", message, {**targets, "reason": reason})
         draft = draft.model_copy(update={"inventory_item_id": UUID(chosen)})
     item = await inventory.get_inventory(session, draft.inventory_item_id, user_id)
     if target_context:
@@ -314,7 +317,7 @@ async def prepare_action(session, user_id, draft: ActionDraft, memory: MemorySer
                     if qualified:
                         break
                 if len(qualified) != 1 or qualified[0]["id"] != str(draft.inventory_item_id):
-                    raise PreparationError("TARGET_REQUIRED", "Select a specific inventory batch", targets)
+                    raise PreparationError("TARGET_REQUIRED", "Select a specific inventory batch", {**targets, "reason": "AMBIGUOUS"})
     if draft.storage_space_id and item.storage_space_id != draft.storage_space_id:
         raise PreparationError("TARGET_CONFLICT", "The selected batch is in a different space")
     if draft.quantity_kind == "FRACTION":

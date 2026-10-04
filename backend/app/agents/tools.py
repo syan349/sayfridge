@@ -252,7 +252,7 @@ async def delete_user_memory(runtime: AgentToolRuntime, memory_id, authorization
 
 @tool
 async def resolve_inventory_targets(runtime: AgentToolRuntime, queries: list[str], storage_space_id: str | None = None, space_query: str | None = None) -> str:
-    """Resolve colloquial names or synonyms to owned inventory candidates; never assume the first candidate."""
+    """Search supplied names and saved aliases for owned inventory. This does not translate names. Zero matches only describes this search: use list_inventory(q='') to inspect real stock, including later pages, before asking the user. Never choose the first of ambiguous batches."""
     from app.services.agent_actions import resolve_targets
     async with AsyncSessionFactory() as session:
         result = await resolve_targets(session, runtime.context.user_id, queries,
