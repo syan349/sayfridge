@@ -21,7 +21,7 @@ configured. Start with the local setup below.
 
 <br clear="right" />
 
-[Run locally](#local-development-prerequisites) · [My contribution](#maintainer-contribution) ·
+[Repository](https://github.com/syan349/sayfridge) · [Run locally](#local-development-prerequisites) · [My contribution](#maintainer-contribution) ·
 [Run tests](#run-the-tests) · [Architecture](#technology-stack-and-architecture) ·
 [Documentation](#documentation-and-historical-evidence) · [Publication review](docs/maintenance/PUBLICATION_REVIEW.md)
 
@@ -257,8 +257,14 @@ docs/      Architecture, API, database, design, and test documentation
 
 Python 3.12 matches the Backend README and GitHub Actions environment. Commands
 below use Bash unless labelled PowerShell; start each component in a separate
-terminal. Clone this repository using its GitHub **Code** URL, then work from the
-clone's root. The local personal copy is named `sayfridge-personal`.
+terminal. Clone the personal repository, then work from its root:
+
+```bash
+git clone https://github.com/syan349/sayfridge.git
+cd sayfridge
+```
+
+An existing checkout can keep its current directory name.
 
 Real credentials belong only in ignored local environment files or deployment
 secret managers. Never commit `.env`, `.env.test`, database passwords, JWT

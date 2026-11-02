@@ -3,6 +3,10 @@
 Reviewed locally on 2 November 2026. This record covers the independent personal
 copy, its retained Git history and the documentation changes made for publication.
 
+Personal repository: [syan349/sayfridge](https://github.com/syan349/sayfridge).
+The GitHub repository was renamed from `sayfridge-personal` to `sayfridge`;
+the local checkout can retain its original directory name.
+
 ## Project origin and ownership
 
 SayFridge began as Team Appix's COMPSCI 734 project. Team members agreed that each
