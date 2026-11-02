@@ -1,4 +1,4 @@
-# SayFridge
+# SayFridge — Personal Maintenance
 
 <img align="right" src="mobile/assets/launcher/launcher_avatar.png" alt="SayFridge app icon: a green fridge and microphone" width="200" height="200" />
 
@@ -10,14 +10,49 @@ can translate text, editable speech transcripts, and supported image input into 
 the backend remains responsible for authentication, ownership checks, quantity
 rules, and database transactions.
 
-This repository is the implementation project for COMPSCI 734, developed by
-Team Appix.
+This is an independent personal continuation maintained by **syan349**. SayFridge
+was originally developed by **Team Appix** for COMPSCI 734. The team agreed that
+members could maintain personal copies. The original implementation is shared
+team work; the contributor table below preserves that attribution.
+
+The personal copy currently contains the course implementation and local
+privacy/documentation changes. A personal hosted demo and release have not been
+configured. Start with the local setup below.
 
 <br clear="right" />
 
-[Try the system](#assessment-entry-points) · [Run locally](#local-development-prerequisites) ·
+[Run locally](#local-development-prerequisites) · [My contribution](#maintainer-contribution) ·
 [Run tests](#run-the-tests) · [Architecture](#technology-stack-and-architecture) ·
-[Assessment evidence](#documentation-and-assessment-evidence) · [Team Wiki](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/wiki)
+[Documentation](#documentation-and-historical-evidence) · [Publication review](docs/maintenance/PUBLICATION_REVIEW.md)
+
+## Maintainer contribution
+
+My work focused on Backend business APIs and database integration, including
+inventory operations and their validation. I also implemented persistent-login
+fixes, strengthened JWT verification and security-event logging, and worked on
+test and release verification.
+
+| Area | Examples in this copy's history |
+| --- | --- |
+| Persistent login and authentication | `13c63ce` adds token renewal and revocable sessions; `3e4981b` strengthens JWT verification and security logging. |
+| Testing and CI | `ae1f663` fixes an E2E navigation race; `41e314d` coordinates full regression against one commit; `875c52e` adds performance tests and records. |
+| Documentation and delivery | `2ccb38c`, `f30e66a` and `808ed67` organize project guides and preserve evidence; `fc0fc1b` records manual integration testing. I also coordinated Vercel/Neon deployment verification and Android release records. |
+
+Architecture, the AI agent and both frontends were developed with the team. The
+[original contributors](#original-team-contributors) section distinguishes these roles.
+
+## Personal maintenance direction
+
+The next work is to make the project reproducible under personal infrastructure,
+keep the authentication and inventory regression checks current, and improve
+deployment instructions. Future feature changes will have their own tests and
+release records. This copy's recent work has been privacy cleanup and documentation.
+
+Historical test reports retain their original dates, environments and source
+commit identifiers. Git history was rewritten to remove selected personal data,
+so original commit IDs in reports refer to the team repository, not this copy.
+Links to its Wiki, Issues, PRs and Actions remain historical references and require
+access to that repository. They are not required for local setup.
 
 ## App screenshots
 
@@ -59,7 +94,7 @@ different contexts rather than duplicating the same interface.
 | Flutter Mobile | Quick use while shopping or standing near stored items; camera, image selection, voice input, and guided inventory actions. |
 | React Web | Large-screen inventory review, search and filtering, batch stock entry and movement, expiry reporting, operation history, and administrator account management. |
 
-The Flutter project also has a Web build so assessors can open the Mobile UI in
+The Flutter project also has a Web build so the Mobile UI can run in
 a browser. This is a deployment and demonstration entry point; Android device
 or emulator testing is still required for native permissions and device
 features.
@@ -106,6 +141,9 @@ native acceptance. The selected APK/device results belong in the
 [Final Acceptance Record](docs/testing/reports/FINAL_ACCEPTANCE.md#manual-cross-client-and-android-validation).
 
 ## Technology stack and architecture
+
+The hosting labels below describe the original course deployment. For personal
+deployment, configure your own Render/Vercel projects, database and model access.
 
 | Layer | Technology | Responsibility |
 | --- | --- | --- |
@@ -162,66 +200,40 @@ sessions, cloud database connections, and realistic browser testing is explained
 in [Learning and Design Evolution](docs/learning/README.md), with code and test
 evidence for each technique's contribution to the product.
 
-## Documentation and assessment evidence
+## Documentation and historical evidence
 
-This README is the project entry point. Each subject guide owns its detailed
-content; module READMEs retain local setup and checks.
-
-| Canvas criterion | What to inspect | Evidence entry |
-| --- | --- | --- |
-| 1. Integrated system (8%) | Distinct Mobile/Web workflows using the same accounts, API, and persisted inventory | [Product scope](docs/product/README.md), [API reference](docs/reference/API_REFERENCE.md), [Agent client integration](docs/reference/AGENT_FRONTEND_INTEGRATION.md), [browser E2E](docs/testing/README.md#core-e2e) |
-| 2. Flutter and chosen tools (10%) | Widgets, state/controllers, repositories, navigation, asynchronous API handling, and cloud integration | [Mobile guide](mobile/README.md), [Mobile source](mobile/lib), [architecture](docs/architecture/README.md) |
-| 3. Independent learning (6%) | Persistent AI workflows, multimodal input, refresh sessions, PostgreSQL connection behavior, and CI composition | [Learning and Design Evolution](docs/learning/README.md) |
-| 4. Genuine user need (8%) | Target users, user stories, and delivered stock/expiry workflows | [User stories and verification](docs/product/README.md#core-user-stories-and-evidence) |
-| 5. Mobile capabilities (10%) | Camera/gallery, editable speech, gestures, and local notifications | [Mobile capabilities](#mobile-capabilities-and-user-value), [manual integration record](docs/testing/reports/MANUAL_INTEGRATION_TEST_RECORD.md), [native acceptance record](docs/testing/reports/FINAL_ACCEPTANCE.md#manual-cross-client-and-android-validation) |
-| 6. Architecture and justification (10%) | Diagram, REST/SSE choices, transaction boundaries, recovery, and capacity planning | [System Architecture](docs/architecture/README.md), [LangGraph Agent workflow](docs/architecture/AGENT_DESIGN.md#six-node-workflow), [quantity rules](docs/architecture/QUANTITY_STATE_DESIGN.md), [performance record](docs/testing/records/PERFORMANCE_TEST_RECORD.md) |
-| 7. Engineering practice (8%) | Module boundaries, locked dependencies, validation, migrations, local lint/analyze commands, and CI | [Repository layout](#repository-layout), [Backend](backend/README.md), [Web](web/README.md), [Mobile](mobile/README.md), [.gitignore](.gitignore) |
-| 8. Testing strategy (10%) | Unit, API/database, component/widget, browser, manual/native, model, and performance verification | [Testing strategy and reports](docs/testing/README.md), [CI workflows](.github/workflows) |
-| 9. Security and privacy (4%) | Ownership/role checks, sessions, hostile inputs, image metadata, secret handling, and OWASP-related findings | [Security and Privacy](docs/security/README.md) |
-| 10. Project management and teamwork (12%) | Dated meeting records, assigned work, project tracking, feature branches, commits, and reviewed PRs | [Meetings](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/wiki/Meeting-Records), [responsibilities](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/wiki/Team-Responsibilities), [Issues](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/issues), [boards](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/projects), [PRs](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/pulls) |
-| 11. Deployment (8%) | Hosted client/API entry points, database migration, Android build/install, and version matching | [Assessment entry points](#assessment-entry-points), [delivery runbook](docs/delivery/README.md), [Final Acceptance Record](docs/testing/reports/FINAL_ACCEPTANCE.md) |
-| 12. Communicating decisions (6%) | Setup/tests, architectural tradeoffs, research, test outcomes, and lessons learned | This README, [learning record](docs/learning/README.md), [project retrospective](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/wiki/Project-Retrospective), [original designs](docs/archive/README.md) |
-
-Flutter implementation and native capability evidence are linked from the
-[Mobile README](mobile/README.md), testing guide and release record for criteria
-2 and 5. Historical reports retain their tested date/version. The final release
-acceptance record is currently awaiting execution; its prepared fields do not
-establish a passing submission release. Complete it with the selected `main`
-commit, deployment versions, APK/device details, and actual results.
-
-## Assessment entry points
-
-| Component | URL |
+| Topic | Entry point |
 | --- | --- |
-| React Web | <https://project-implementation-appix.onrender.com> |
-| Flutter Mobile Web | <https://sayfridge-mobile.onrender.com> |
-| Flutter Mobile Web integration site | <https://sayfridge-mobile-test.onrender.com> |
-| Backend health | <https://sayfridge-backend-preview.vercel.app/health> |
-| Swagger UI | <https://sayfridge-backend-preview.vercel.app/docs> |
-| Backend base URL | <https://sayfridge-backend-preview.vercel.app> |
+| Product and quantity rules | [Product scope](docs/product/README.md), [quantity-state design](docs/architecture/QUANTITY_STATE_DESIGN.md) |
+| Architecture and API | [Architecture](docs/architecture/README.md), [Backend design](docs/architecture/BACKEND_DESIGN.md), [API reference](docs/reference/API_REFERENCE.md) |
+| AI workflow | [Agent design](docs/architecture/AGENT_DESIGN.md), [client integration](docs/reference/AGENT_FRONTEND_INTEGRATION.md) |
+| Testing and learning | [Test strategy and records](docs/testing/README.md), [design evolution](docs/learning/README.md) |
+| Security and deployment | [Security](docs/security/README.md), [deployment guide](docs/delivery/README.md) |
+| Original course evidence | [Acceptance record](docs/testing/reports/FINAL_ACCEPTANCE.md), [archived designs](docs/archive/README.md) |
+| Personal publication | [Privacy, links and asset review](docs/maintenance/PUBLICATION_REVIEW.md) |
 
-Assessment credentials are not stored in this repository. They must be
-provided through the course-approved private-data channel.
+The reports document the original course work. They do not represent a new
+regression run or deployment of this personal copy. Their recorded results and
+unfinished fields are retained as found in the copied revision.
 
-### Suggested assessment walkthrough
+## Run your own instance
 
-1. Open either client and register an ordinary account, or sign in with privately
-   supplied demonstration credentials. Administrator access uses a separate account.
-2. Create a storage space, add an item with quantity/unit and dates, and inspect
-   its inventory detail. On Android, also try camera/photo and editable speech input.
-3. Sign in to React Web with the same account and verify the same saved stock.
-   Record consumption or reconcile the remaining amount; inspect operation history
-   and refresh Mobile to check the persisted result.
-4. Inspect upcoming/expired stock, and try an assistant query. Review photo-derived
-   proposals before confirmation. Model features require configured provider access.
-5. On Android, check notification permission and reminder settings. Use the private
-   administrator account to inspect account management in React Web.
+Use your own local PostgreSQL database or Neon project, an independent JWT secret,
+and your own model-provider configuration. The local setup below does not need
+team demonstration credentials. Register a local user through the application;
+optional demo seeding is described in the [deployment guide](docs/delivery/README.md#optional-demo-data).
 
-These steps are a demonstration route, not a recorded acceptance result. For
-repeatable test cases and observed findings, use the
-[manual integration record](docs/testing/reports/MANUAL_INTEGRATION_TEST_RECORD.md).
-Build/install instructions for Android are below and in the
-[delivery runbook](docs/delivery/README.md#android-apk-build-and-installation).
+The original team URLs in older guides and reports identify course infrastructure.
+They are not personal demo endpoints. Personal deployments need their own API URL,
+browser CORS origins, database credentials and hosting project settings.
+
+### Suggested local walkthrough
+
+1. Start the Backend and React client, then register an ordinary account.
+2. Create a storage space, add an item and record consumption or a stocktake.
+3. Run Flutter against the same Backend and check that the saved data agrees.
+4. Configure a model provider to try the assistant, photo review and speech input.
+5. Run the automated checks and use the manual integration cases for device testing.
 
 ## Repository layout
 
@@ -245,12 +257,8 @@ docs/      Architecture, API, database, design, and test documentation
 
 Python 3.12 matches the Backend README and GitHub Actions environment. Commands
 below use Bash unless labelled PowerShell; start each component in a separate
-terminal. Clone the repository and work from its root:
-
-```bash
-git clone https://github.com/UOA-CS734-S2-2026/project-implementation-appix.git
-cd project-implementation-appix
-```
+terminal. Clone this repository using its GitHub **Code** URL, then work from the
+clone's root. The local personal copy is named `sayfridge-personal`.
 
 Real credentials belong only in ignored local environment files or deployment
 secret managers. Never commit `.env`, `.env.test`, database passwords, JWT
@@ -357,11 +365,12 @@ Web, preview, and deployment details.
 
 ### Build and install the Android app
 
-From `mobile/`, build the native app against the hosted API:
+From `mobile/`, set your own hosted API URL and build the native app:
 
 ```bash
+export PERSONAL_API_BASE_URL="https://YOUR-BACKEND-HOST/api/v1"
 flutter build apk --release -t lib/main.dart \
-  --dart-define=API_BASE_URL=https://sayfridge-backend-preview.vercel.app/api/v1
+  --dart-define=API_BASE_URL="$PERSONAL_API_BASE_URL"
 adb devices
 adb -s YOUR_DEVICE_ID install -r build/app/outputs/flutter-apk/app-release.apk
 ```
@@ -370,7 +379,7 @@ The output is `mobile/build/app/outputs/flutter-apk/app-release.apk`. You can al
 transfer it to Android and install it after allowing installation from that source.
 The course build uses the current debug signing configuration for sideloading;
 it is not a store-signed release. Publish any distributable APK as a
-[GitHub Release asset](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/releases),
+GitHub Release asset in this personal repository,
 with its commit and checksum, rather than committing build output. Device results
 and the selected artifact belong in the final acceptance record.
 
@@ -437,7 +446,7 @@ flutter pub get --enforce-lockfile
 flutter analyze
 flutter test --exclude-tags manual_preview
 flutter build web --release --no-web-resources-cdn \
-  --dart-define=API_BASE_URL=https://sayfridge-backend-preview.vercel.app/api/v1
+  --dart-define=API_BASE_URL=http://127.0.0.1:8000/api/v1
 ```
 
 ### End-to-end acceptance
@@ -464,7 +473,7 @@ retain measured outcomes and development findings. Offline tests, live-model
 checks, and native/deployed acceptance have distinct scopes; results from different
 selections or revisions are not added together as one release total.
 
-## Team
+## Original team contributors
 
 | Member | Account | Primary contribution area |
 | --- | --- | --- |
@@ -474,20 +483,14 @@ selections or revisions are not added together as one release total.
 | DaryaRastegar | `dras728` | React user/admin interfaces, Web API integration, components, and frontend testing |
 | hrainy | `rhan637` | Architecture, database schema/migrations, authentication foundation, AI workflow/persistence, and Agent testing |
 
-The [Team Responsibilities Wiki](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/wiki/Team-Responsibilities)
-records the detailed allocation and shared work. Dated discussions and decisions
-are indexed in [Meeting Records](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/wiki/Meeting-Records);
-[Issues](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/issues)
-and [project boards](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/projects)
-track work and ownership, while [PRs](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/pulls)
-and the [commit history](https://github.com/UOA-CS734-S2-2026/project-implementation-appix/commits/main/)
-provide implementation and review evidence.
+The source project is [Team Appix's course repository](https://github.com/UOA-CS734-S2-2026/project-implementation-appix).
+Its Wiki and review records belong to that repository and depend on its access
+settings. This personal copy retains contributor handles and the rewritten commit
+history. Team permission to maintain copies is recorded above; project and asset
+licensing remains to be documented in the [publication review](docs/maintenance/PUBLICATION_REVIEW.md#licensing-and-material-sources).
 
-The contribution workflow uses a task/feature branch, small commits, linked
-issues, checks, and PR review before merging to `main`. The course assesses the
-last `main` commit at the deadline; branch-only work is not the submission.
-Dependencies, caches, build output, IDE files, and secrets stay outside source
-control. Wiki and board records accompany the implementation evidence.
+For new work, use focused branches, tests and reviewed changes. Keep dependencies,
+build output, private configuration and credentials outside source control.
 
 ## Privacy and security
 
@@ -508,8 +511,8 @@ by the configured model provider. Conversation checkpoints can retain messages
 and images. Speech recognition produces editable text on the client; the Backend
 does not accept raw audio. Archive/discard retains inventory history, and there is
 no complete self-service account/data deletion workflow. Use synthetic data for
-shared demonstrations and supply assessment secrets through the course's private
-submission channel. Provider/storage/retention details and the manual removal
+shared demonstrations and keep instance credentials in ignored environment files
+or the hosting secret store. Provider/storage/retention details and the manual removal
 procedure are in the security guide.
 
 ## Current scope and limitations
@@ -524,9 +527,16 @@ procedure are in the security guide.
   provider limits; clients retain pending work for explicit recovery.
 - Android is the native assessment target. Flutter Web demonstrates the shared UI;
   the repository does not claim final iOS device acceptance.
-- The [Final Acceptance Record](docs/testing/reports/FINAL_ACCEPTANCE.md) still awaits
-  the selected submission release's validation. Existing dated evidence identifies
-  the revision and environment it tested.
+- No personal release has been validated yet. The [retained acceptance record](docs/testing/reports/FINAL_ACCEPTANCE.md)
+  describes course revisions; create a dated record for each future personal release.
 
 See [Product Scope](docs/product/README.md#scope-boundaries) for the full boundary
 and [Build and Deployment](docs/delivery/README.md) for final release preparation.
+
+## Licensing and materials
+
+This copy currently has no project-level open-source license. The source and
+permission records for bundled images also need to be completed. Dependency
+licenses do not establish the license of this project's own code or artwork.
+See the [publication review](docs/maintenance/PUBLICATION_REVIEW.md#licensing-and-material-sources)
+for the specific files and remaining decisions.

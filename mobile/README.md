@@ -1,5 +1,9 @@
 # SayFridge Mobile
 
+> Personal copy: configure your own infrastructure and credentials. Team hosting
+> addresses in inherited notes describe the course deployment. See the
+> [publication review](../docs/maintenance/PUBLICATION_REVIEW.md).
+
 Flutter Android application with a browser build of the same Mobile interface.
 The [project README](../README.md) is the overall entry point. Use Flutter 3.44.8,
 Dart 3.12.2 and Android Studio/SDK for Android development.
@@ -14,9 +18,9 @@ flutter run -t lib/main.dart \
   --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
 ```
 
-`10.0.2.2` reaches the host backend from an Android emulator. To use the shared
-cloud backend, replace it with `https://sayfridge-backend-preview.vercel.app/api/v1`.
-The native app connects directly to Vercel, not through Render; Vercel connects to Neon.
+`10.0.2.2` reaches the host backend from an Android emulator. For a hosted personal
+instance, use your own HTTPS Backend URL ending in `/api/v1`.
+The native app calls that Backend directly; it does not go through the Render client.
 Restart the Flutter run/build after changing compile-time API configuration.
 
 ```bash

@@ -1,5 +1,9 @@
 # SayFridge Backend
 
+> Personal copy: configure your own infrastructure and credentials. Team hosting
+> addresses in inherited notes describe the course deployment. See the
+> [publication review](../docs/maintenance/PUBLICATION_REVIEW.md).
+
 FastAPI/Python 3.12 backend. Run commands below from `backend/`.
 The [project README](../README.md) is the overall entry point.
 

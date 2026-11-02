@@ -1,7 +1,17 @@
 # Build and Deployment
 
-This is the current delivery runbook for Render clients, Vercel Backend, Neon
-and Android APKs. Deploy selected, verified commits from `main`. Neon stores
+This delivery runbook covers Render clients, Vercel Backend, Neon and Android APKs.
+For this personal copy, use independent hosting projects and database credentials.
+Set the variables below for your own environment; original course deployment
+results remain in the dated test reports.
+
+```bash
+export BACKEND_BASE_URL="https://YOUR-BACKEND-HOST"
+export VERCEL_PROJECT="YOUR-PERSONAL-PROJECT"
+export VERCEL_SCOPE="YOUR-VERCEL-SCOPE"
+```
+
+Deploy selected, verified commits from `main`. Neon stores
 schema/data rather than a Git branch: apply the migrations associated with the
 selected code commit. Do not reset shared data to update application code.
 
@@ -23,8 +33,8 @@ the selected SHA or choose a new one and repeat the applicable checks.
 
 | Component | Source/build | Configuration |
 | --- | --- | --- |
-| React Web / Render | main, root `web`, `npm ci && npm run build`, publish `dist` | `VITE_API_BASE_URL=https://sayfridge-backend-preview.vercel.app/api/v1` |
-| Flutter Web / Render | main, root `mobile`, `bash scripts/render-build.sh`, publish `build/web` | `API_BASE_URL=https://sayfridge-backend-preview.vercel.app/api/v1`; script pins Flutter 3.44.8 |
+| React Web / Render | main, root `web`, `npm ci && npm run build`, publish `dist` | `VITE_API_BASE_URL`: your HTTPS Backend URL followed by `/api/v1` |
+| Flutter Web / Render | main, root `mobile`, `bash scripts/render-build.sh`, publish `build/web` | `API_BASE_URL`: your HTTPS Backend URL followed by `/api/v1`; script pins Flutter 3.44.8 |
 | Backend / Vercel | selected main snapshot, deploy from `backend` | Runtime pooled DATABASE_URL, direct DATABASE_URL_DIRECT, JWT/model secrets, exact CORS origins |
 | Neon | business and Agent schemas | Same selected database/branch for backend runtime, direct migration and Agent persistence |
 | Android | selected main commit, `lib/main.dart` | Compile-time API_BASE_URL ending `/api/v1` |
@@ -32,8 +42,8 @@ the selected SHA or choose a new one and repeat the applicable checks.
 Both Render static sites require SPA rewrite `/*` → `/index.html` (200).
 Build-time client API URLs are public; database passwords, JWT keys and model keys
 belong only in operator/hosting secret stores. API origins contain no database URL.
-The Flutter integration site also uses main under the current deployment policy;
-confirm that source setting in Render before release.
+Configure each personal Render site to build the intended branch and record its
+deployed commit.
 
 Vercel runtime and Neon should use the same region where available. Verify the
 configured function and database regions in platform settings rather than inferring
@@ -117,13 +127,13 @@ acquired non-demo dependent data. Restore and reset serve different purposes.
 
 ## Vercel deployment
 
-Use an authenticated operator account with access to `appix2`. Run from the
+Use an authenticated operator account with access to your personal Vercel scope. Run from the
 selected Backend checkout/snapshot, with Node.js 22:
 
 ```bash
 npx vercel login
-npx vercel link --project sayfridge-backend-preview --scope appix2
-npx vercel deploy --prod --scope appix2 --env APP_COMMIT_SHA="$RELEASE_SHA"
+npx vercel link --project "$VERCEL_PROJECT" --scope "$VERCEL_SCOPE"
+npx vercel deploy --prod --scope "$VERCEL_SCOPE" --env APP_COMMIT_SHA="$RELEASE_SHA"
 ```
 
 Ensure the linked project deploys this backend directory without a second `backend`
@@ -134,8 +144,8 @@ the intended public client/assessor access. After deployment, verify health, the
 Verify the public alias after deployment:
 
 ```bash
-curl --fail https://sayfridge-backend-preview.vercel.app/health
-curl --fail https://sayfridge-backend-preview.vercel.app/api/v1/system/version
+curl --fail "${BACKEND_BASE_URL}/health"
+curl --fail "${BACKEND_BASE_URL}/api/v1/system/version"
 ```
 
 Match commit_sha to RELEASE_SHA. Inspect platform logs for startup errors without
@@ -158,7 +168,7 @@ Run from `mobile/` at the selected main commit:
 ```bash
 flutter pub get --enforce-lockfile
 flutter build apk --release -t lib/main.dart \
-  --dart-define=API_BASE_URL=https://sayfridge-backend-preview.vercel.app/api/v1
+  --dart-define=API_BASE_URL="${BACKEND_BASE_URL}/api/v1"
 ```
 
 Output: `mobile/build/app/outputs/flutter-apk/app-release.apk` from repository root.
@@ -187,7 +197,7 @@ GitHub Android build workflow is optional; this runbook supports local builds.
 Run from `backend/` using dedicated ordinary/admin accounts and ignored operator secrets:
 
 ```bash
-export SMOKE_BASE_URL='https://sayfridge-backend-preview.vercel.app'
+export SMOKE_BASE_URL="$BACKEND_BASE_URL"
 export SMOKE_USER_EMAIL='deployment-smoke@example.com'
 export SMOKE_USER_PASSWORD='replace-with-dedicated-user-password'
 export SMOKE_ADMIN_EMAIL='deployment-smoke-admin@example.com'
@@ -215,7 +225,7 @@ Then test Android stock entry/consumption → React view of the same account/dat
 → quantity history and expiry → ordinary/admin permission checks. Include renewal,
 network interruption and selected device permissions. Record exact environment,
 commit, APK and outcome; link that release evidence from the testing guide. Submit
-private acceptance credentials through the course-designated application.
+instance credentials through a private channel.
 
 ## Release record
 

@@ -1,5 +1,9 @@
 # SayFridge Web
 
+> Personal copy: configure your own infrastructure and credentials. Team hosting
+> addresses in inherited notes describe the course deployment. See the
+> [publication review](../docs/maintenance/PUBLICATION_REVIEW.md).
+
 React/TypeScript desktop client for inventory maintenance and administration.
 The [project README](../README.md) is the overall entry point.
 
