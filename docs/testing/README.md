@@ -18,6 +18,11 @@ test outcomes and subsequent improvements are separate fields; a recorded fix
 does not change the original test result. It complements the detailed manual
 integration record and does not replace final release acceptance.
 
+In this personal public copy, contributor handles replace names in the workbook,
+and receipt and chat images have personal identifiers redacted. Test cases,
+dates and recorded outcomes are preserved. The redacted receipt fixtures use PNG;
+the historical live-model results describe the original photographs.
+
 For automated execution, see [Fast CI](#fast-ci-entry-point),
 [Core E2E](#core-e2e) and [Full Regression](#unified-full-regression).
 For feature-specific results, use the [report index](#reports) below.

@@ -27,7 +27,7 @@ Flutter widget renders of the updated UI. Select an image to view it at full siz
 
 | Home dashboard | Inventory | AI inventory query |
 | :---: | :---: | :---: |
-| <a href="docs/images/readme/mobile-home.jpg"><img src="docs/images/readme/mobile-home.jpg" alt="Home dashboard showing expiry alerts, inventory totals, and assistant navigation" width="240" /></a> | <a href="docs/images/readme/mobile-inventory.jpg"><img src="docs/images/readme/mobile-inventory.jpg" alt="Inventory list with storage locations, expiry status, exact quantities, and AI estimates" width="240" /></a> | <a href="docs/images/readme/mobile-ai-inventory-query.jpg"><img src="docs/images/readme/mobile-ai-inventory-query.jpg" alt="AI Assistant answering an inventory query with milk and apple cards" width="240" /></a> |
+| <a href="docs/images/readme/mobile-home.jpg"><img src="docs/images/readme/mobile-home.jpg" alt="Home dashboard showing expiry alerts, inventory totals, and assistant navigation" width="240" /></a> | <a href="docs/images/readme/mobile-inventory.jpg"><img src="docs/images/readme/mobile-inventory.jpg" alt="Inventory list with storage locations, expiry status, exact quantities, and AI estimates" width="240" /></a> | <a href="docs/images/readme/mobile-ai-inventory-query.png"><img src="docs/images/readme/mobile-ai-inventory-query.png" alt="AI Assistant answering an inventory query with milk and apple cards" width="240" /></a> |
 | Review stock and expiry alerts. | View exact and estimated balances. | Ask what is in your fridge. |
 
 | Add item | Storage spaces | Expiry overview |

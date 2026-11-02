@@ -76,7 +76,7 @@ def receipt_image(name):
     from pathlib import Path
     from app.schemas.agent_media import AgentImage
     raw = (Path(__file__).parent / "receipts" / name).read_bytes()
-    return AgentImage(image_id=uuid4(), mime_type="image/jpeg", data_base64=base64.b64encode(raw).decode("ascii"))
+    return AgentImage(image_id=uuid4(), mime_type="image/png" if name.lower().endswith(".png") else "image/jpeg", data_base64=base64.b64encode(raw).decode("ascii"))
 
 
 async def seed_catalog(context, sessions):

@@ -1,4 +1,4 @@
-"""Opt-in natural dialogue acceptance using the original receipt photographs."""
+"""Opt-in natural dialogue acceptance using receipt photographs with personal details redacted."""
 import os
 import json
 import re
@@ -15,7 +15,7 @@ from agent_dialogue_support import Dialogue, receipt_image, seed_catalog, descri
 pytestmark = [pytest.mark.postgres, pytest.mark.skipif(os.getenv("AGENT_LIVE_MODEL") != "1", reason="Opt in to model API costs")]
 
 
-@pytest.mark.parametrize("filename,count", [("newworld.jpg", 8), ("TAIPING.jpg", 8), ("woolworth.jpg", 3)])
+@pytest.mark.parametrize("filename,count", [("newworld.png", 8), ("TAIPING.png", 8), ("woolworth.png", 3)])
 @pytest.mark.parametrize("cross_turn", [False, True])
 def test_original_receipt_http(filename, count, cross_turn, inventory_context, monkeypatch, live_runner):
     async def scenario(client, sessions):
@@ -44,7 +44,7 @@ def test_original_receipt_http(filename, count, cross_turn, inventory_context, m
 
 
 RECEIPT_ROWS = {
-    "newworld.jpg": [
+    "newworld.png": [
         (r"sea.*(?:slt|salt).*vine|海盐.*醋", "2", "count", "150g"),
         (r"honey.*soy|蜂蜜.*(?:酱|鸡)", "2", "count", "150g"),
         (r"apple.*juice|苹果汁", "2", "count", "1l"),
@@ -54,7 +54,7 @@ RECEIPT_ROWS = {
         (r"beef.*(?:prime|premium).*mince|牛肉末|牛肉糜", "1", "count", None),
         (r"beef.*(?:prime|premium).*mince|牛肉末|牛肉糜", "1", "count", None),
     ],
-    "TAIPING.jpg": [
+    "TAIPING.png": [
         (r"mushroom|香菇", "1", "count", "500g"),
         (r"watermelon|西瓜", "1", "count", "480ml"),
         (r"onion|洋葱", "0.17", None, None),
@@ -64,7 +64,7 @@ RECEIPT_ROWS = {
         (r"sliced.*beef|牛肉片", "1", "count", "400g"),
         (r"sliced.*lamb|羊肉片", "1", "count", "400g"),
     ],
-    "woolworth.jpg": [
+    "woolworth.png": [
         (r"peanut|花生", "1", "count", "200g"),
         (r"milk|牛奶", "1", "count", "1l"),
         (r"b.?bird|bluebird|original.*cut|薯片", "1", "count", "150g"),
@@ -107,7 +107,7 @@ async def check_receipt(dialogue, state, filename):
     assert state["status"] == "WAITING_INPUT"
     rows = match_rows(state, filename)
     before = {i["item_id"]: i for i in state["items"]}
-    if filename == "TAIPING.jpg":
+    if filename == "TAIPING.png":
         onion, soda = rows[2], rows[3]
         state = await dialogue.chat("洋葱的0.17是公斤。")
         revised = {i["item_id"]: i for i in state["items"]}
@@ -120,15 +120,15 @@ async def check_receipt(dialogue, state, filename):
         assert revised[soda["item_id"]]["status"] == "NEEDS_CONFIRMATION", describe(state)
         assert Decimal(revised[soda["item_id"]]["display"]["quantity_value"]) == 1
     else:
-        target = rows[2] if filename == "newworld.jpg" else rows[0]
-        text = "苹果汁按瓶记录，数量不变。" if filename == "newworld.jpg" else "花生按袋记录，数量不变。"
+        target = rows[2] if filename == "newworld.png" else rows[0]
+        text = "苹果汁按瓶记录，数量不变。" if filename == "newworld.png" else "花生按袋记录，数量不变。"
         state = await dialogue.chat(text)
         revised = {i["item_id"]: i for i in state["items"]}
         assert revised[target["item_id"]]["proposal_id"] != target["proposal_id"]
         assert all(revised[k]["proposal_id"] == before[k]["proposal_id"] for k in before if k != target["item_id"])
     # Any uncertainty about a receipt abbreviation is a targeted identity answer,
     # never a request to re-list the other recognized goods.
-    if filename == "woolworth.jpg" and any(i["status"] == "NEEDS_INPUT" for i in state["items"]):
+    if filename == "woolworth.png" and any(i["status"] == "NEEDS_INPUT" for i in state["items"]):
         state = await dialogue.chat("B/bird那项是原味咸薯片。")
     assert all(i["status"] == "NEEDS_CONFIRMATION" for i in state["items"]), describe(state)
     assert await dialogue.counts() == (0, 0, 0)
@@ -318,7 +318,7 @@ def test_real_photo_can_answer_existing_text_task(inventory_context, monkeypatch
         first = await dialogue.chat("买了牛奶，帮我入库。")
         assert len(first["items"]) == 1 and first["items"][0]["status"] == "NEEDS_INPUT", describe(first)
         old_id = first["items"][0]["item_id"]
-        state = await dialogue.chat("牛奶的信息在这张小票里。", [receipt_image("woolworth.jpg")])
+        state = await dialogue.chat("牛奶的信息在这张小票里。", [receipt_image("woolworth.png")])
         assert len(state["items"]) == 1 and state["items"][0]["item_id"] == old_id
         item = state["items"][0]
         assert item["status"] == "NEEDS_CONFIRMATION", describe(state)
