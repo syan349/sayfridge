@@ -53,14 +53,30 @@ Web), and React uses relative `/api/v1`; hosted builds require explicit configur
 
 ## Licensing and material sources
 
-No project-level `LICENSE` or asset attribution register was found in this copy.
-No new open-source license has been assigned during publication preparation.
+On 2 November 2026, the maintainer confirmed that the team has not agreed on an
+open-source license. No project-level `LICENSE` has been added. The maintainer
+also identified the avatars and `team-image.jpg` as original team work made with
+AI assistance. This statement records the team-reported source of those assets;
+the generating tools, reference materials and asset license terms are not yet
+recorded. It does not cover the other application icons or illustrations.
+
+The maintainer prefers a strong copyleft license that also covers modified hosted
+versions. **AGPL-3.0-only is the proposed candidate, pending agreement from the
+relevant copyright holders and a dependency/license review.** It has not been
+adopted or added as `LICENSE`. Permission to maintain personal copies and
+agreement to grant an open-source license are recorded separately.
+
+The [AGPL v3 text](https://opensource.org/license/agpl-3-0) covers distribution of
+covered works and requires a source offer to users who interact remotely with a
+modified version. It does not require every independent project that merely uses
+the application to adopt AGPL. It permits commercial use.
 
 | Material | Evidence in the repository | Remaining action |
 | --- | --- | --- |
 | Team-authored code and documentation | Contributor history and the team's agreement to maintain personal copies | Record the team's chosen redistribution/license terms before describing the project as open source. |
-| `team-image.jpg` | Illustration of the Fix-It Felix character; no source/license record | Establish the source and permission for redistribution, or remove it from the personal history before public release. It is not used in the personal README. |
-| `mobile/assets/` | App illustrations, launcher icon, UI icons and avatars; no creator/source register | Record which files are team-created, generated or third-party, with the applicable source/terms. |
+| `team-image.jpg` | Maintainer identifies it as AI-assisted original team work; the image depicts the Fix-It Felix character | Record the generation tool and reference sources, and resolve the character-art permission before redistribution. It is not used in the personal README. |
+| Avatar artwork, including `mobile/assets/images/avatars/` | Maintainer identifies the avatars as AI-assisted original team work | Record generation tools, reference sources and the agreed asset license. Apply the same record to matching Web copies. |
+| Other artwork in `mobile/assets/` | App illustrations, launcher icon and UI icons; sources not yet confirmed | Record which files are team-created, generated or third-party, with the applicable source/terms. |
 | `web/public/assets/` | Contains copies of Mobile artwork | Apply the same provenance decisions to both copies. |
 | `mobile/assets/icons/social/` | Google, Apple, Facebook and Twitter logos | Record the source and applicable brand-asset terms separately from team artwork. |
 | `docs/images/readme/` | Application screenshots and widget renders | Preserve test context; resolve the provenance of artwork appearing within the UI. |

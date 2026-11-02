@@ -535,8 +535,11 @@ and [Build and Deployment](docs/delivery/README.md) for final release preparatio
 
 ## Licensing and materials
 
-This copy currently has no project-level open-source license. The source and
-permission records for bundled images also need to be completed. Dependency
-licenses do not establish the license of this project's own code or artwork.
+The team has not yet agreed on a project-level open-source license. AGPL-3.0-only
+is the maintainer's proposed choice, not an adopted license. The maintainer
+identifies the avatars and team image as original team work made with AI assistance.
+Their generation details and license terms, and the sources of other bundled
+artwork, remain to be recorded. Dependency licenses do not establish the license
+of this project's own code or artwork.
 See the [publication review](docs/maintenance/PUBLICATION_REVIEW.md#licensing-and-material-sources)
 for the specific files and remaining decisions.
