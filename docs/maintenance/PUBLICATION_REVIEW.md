@@ -24,8 +24,9 @@ contributors and separates their work from the maintainer's contribution.
   anonymous project or a transfer of authorship to the personal maintainer.
 - Private configuration, cleanup mappings and original-file backups are outside
   the published file set. Only example environment files belong in the repository.
-- This local copy has no remote configured. No GitHub repository, team deployment
-  or database was changed during this preparation.
+- At the end of the initial local cleanup, this copy had no remote configured.
+  That phase made no changes to GitHub, team deployments or databases. Subsequent
+  upload to a personal private repository is a separate step.
 
 The agreed private strings were checked against all reachable Git objects and
 current files. Historical image metadata was checked for recorded private strings,
@@ -53,18 +54,15 @@ Web), and React uses relative `/api/v1`; hosted builds require explicit configur
 
 ## Licensing and material sources
 
-On 2 November 2026, the maintainer confirmed that the team has not agreed on an
-open-source license. No project-level `LICENSE` has been added. The maintainer
-also identified the avatars and `team-image.jpg` as original team work made with
-AI assistance. This statement records the team-reported source of those assets;
-the generating tools, reference materials and asset license terms are not yet
-recorded. It does not cover the other application icons or illustrations.
+On 2 November 2026, the maintainer confirmed that contributor agreement had been
+obtained to adopt **AGPL-3.0-only** for the project's original source code and
+documentation. The complete GNU AGPL v3 text is included in [LICENSE](../../LICENSE).
+It was downloaded unchanged from the GNU project's official license text.
 
-The maintainer prefers a strong copyleft license that also covers modified hosted
-versions. **AGPL-3.0-only is the proposed candidate, pending agreement from the
-relevant copyright holders and a dependency/license review.** It has not been
-adopted or added as `LICENSE`. Permission to maintain personal copies and
-agreement to grant an open-source license are recorded separately.
+The maintainer also identified the avatars and `team-image.jpg` as original team
+work made with AI assistance. Generating tools and reference materials are not
+yet recorded. This provenance statement does not cover the other application icons
+or illustrations, and the project license does not replace third-party terms.
 
 The [AGPL v3 text](https://opensource.org/license/agpl-3-0) covers distribution of
 covered works and requires a source offer to users who interact remotely with a
@@ -73,7 +71,7 @@ the application to adopt AGPL. It permits commercial use.
 
 | Material | Evidence in the repository | Remaining action |
 | --- | --- | --- |
-| Team-authored code and documentation | Contributor history and the team's agreement to maintain personal copies | Record the team's chosen redistribution/license terms before describing the project as open source. |
+| Team-authored code and documentation | Maintainer confirms contributor agreement to AGPL-3.0-only on 2 November 2026; full license included | Preserve contributor attribution and license notices when redistributing. |
 | `team-image.jpg` | Maintainer identifies it as AI-assisted original team work; the image depicts the Fix-It Felix character | Record the generation tool and reference sources, and resolve the character-art permission before redistribution. It is not used in the personal README. |
 | Avatar artwork, including `mobile/assets/images/avatars/` | Maintainer identifies the avatars as AI-assisted original team work | Record generation tools, reference sources and the agreed asset license. Apply the same record to matching Web copies. |
 | Other artwork in `mobile/assets/` | App illustrations, launcher icon and UI icons; sources not yet confirmed | Record which files are team-created, generated or third-party, with the applicable source/terms. |
@@ -83,8 +81,9 @@ the application to adopt AGPL. It permits commercial use.
 | `backend/tests/receipts/` | Redacted photographs used as recognition fixtures | Confirm permission to redistribute the photographs; keep their redactions. |
 | Third-party packages | Python requirements, npm lockfile and Flutter lockfile | Retain dependency notices when distributing builds; package licenses do not license the team's own work. |
 
-The pending source and license decisions above remain separate from the completed
-personal-data cleanup. Public release should follow those decisions.
+The software license is adopted. The remaining artwork-source and third-party
+permission checks above are separate from software licensing and personal-data
+cleanup. Complete those checks before public release.
 
 ## Local verification
 

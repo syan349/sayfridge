@@ -486,8 +486,9 @@ selections or revisions are not added together as one release total.
 The source project is [Team Appix's course repository](https://github.com/UOA-CS734-S2-2026/project-implementation-appix).
 Its Wiki and review records belong to that repository and depend on its access
 settings. This personal copy retains contributor handles and the rewritten commit
-history. Team permission to maintain copies is recorded above; project and asset
-licensing remains to be documented in the [publication review](docs/maintenance/PUBLICATION_REVIEW.md#licensing-and-material-sources).
+history. Contributor confirmation to adopt AGPL-3.0-only is recorded below.
+Artwork sources and remaining material checks are listed in the
+[publication review](docs/maintenance/PUBLICATION_REVIEW.md#licensing-and-material-sources).
 
 For new work, use focused branches, tests and reviewed changes. Keep dependencies,
 build output, private configuration and credentials outside source control.
@@ -535,11 +536,14 @@ and [Build and Deployment](docs/delivery/README.md) for final release preparatio
 
 ## Licensing and materials
 
-The team has not yet agreed on a project-level open-source license. AGPL-3.0-only
-is the maintainer's proposed choice, not an adopted license. The maintainer
-identifies the avatars and team image as original team work made with AI assistance.
-Their generation details and license terms, and the sources of other bundled
-artwork, remain to be recorded. Dependency licenses do not establish the license
-of this project's own code or artwork.
-See the [publication review](docs/maintenance/PUBLICATION_REVIEW.md#licensing-and-material-sources)
-for the specific files and remaining decisions.
+Copyright (C) 2026 SayFridge contributors.
+
+The project's original source code and documentation are licensed under the
+**GNU Affero General Public License, version 3 only** (`AGPL-3.0-only`). See
+[LICENSE](LICENSE) for the full terms. The maintainer obtained contributor
+confirmation to adopt this license on 2 November 2026.
+
+The maintainer identifies the avatars and team image as original team work made
+with AI assistance. Artwork provenance and third-party material terms are recorded
+separately in the [publication review](docs/maintenance/PUBLICATION_REVIEW.md#licensing-and-material-sources).
+Third-party dependencies and materials retain their own notices and terms.
