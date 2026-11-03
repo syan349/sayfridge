@@ -107,6 +107,22 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<bool> changePassword({required String currentPassword, required String newPassword}) async {
+    if (_isSubmitting) return false;
+    _startSubmission();
+    try {
+      await _authRepository.changePassword(currentPassword: currentPassword, newPassword: newPassword);
+      _user = null;
+      _status = AuthStatus.unauthenticated;
+      return true;
+    } catch (error) {
+      _errorMessage = error is ApiException && error.statusCode == 0
+          ? 'We could not confirm the password change. Please sign in again to check.'
+          : _messageFor(error);
+      return false;
+    } finally { _finishSubmission(); }
+  }
+
   Future<bool> logout() async {
     _startSubmission();
 

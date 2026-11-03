@@ -3,22 +3,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
 from app.core.config import Settings, get_settings
-from app.core.login_rate_limit import login_rate_limiter
+from app.core.login_rate_limit import LoginRateLimiter, login_rate_limiter
 from app.core.security_events import request_correlation_id, security_event
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas.auth import (
     AuthErrorResponse,
     AuthValidationErrorResponse,
+    ChangePasswordRequest,
     LoginRequest,
     LoginResponse,
+    PasswordChangeErrorResponse,
     RefreshRequest,
     RegisterRequest,
     UserPublic,
 )
 from app.services.auth import (
     EmailAlreadyRegisteredError,
+    PasswordChangeError,
     authenticate_user,
+    change_password,
     register_user,
 )
 
@@ -106,7 +110,10 @@ async def login(
 
     login_rate_limiter.clear(limit_key)
     from app.services.storage_spaces import ensure_default_space
-    await ensure_default_space(session, user.id)
+    # Keep the user row lock acquired in authenticate_user until start_session
+    # commits: committing here would release it and let a concurrent password
+    # change revoke sessions before this login mints its own (still-valid) one.
+    await ensure_default_space(session, user.id, commit=False)
     from app.services.auth_sessions import start_session
     result = await start_session(session, user, settings)
     security_event("login_succeeded", request_id=request_correlation_id(request), user_id=user.id)
@@ -163,3 +170,60 @@ async def logout(
 async def me(current_user: User = Depends(get_current_user)) -> User:
     """Read the current account status and role."""
     return current_user
+
+
+password_change_limiter = LoginRateLimiter()
+
+
+@router.post(
+    "/change-password",
+    status_code=204,
+    summary="Change password and revoke all sessions",
+    description=(
+        "Change the password of the currently authenticated local account. Requires "
+        "the current password and a new password (8–128 characters, different from "
+        "the current one). On success the stored Argon2id hash is updated and every "
+        "session of the account is revoked atomically, so all devices must sign in "
+        "again with the new password. A wrong current password returns 400 "
+        "(not 401, so clients do not mistake it for an expired token and retry)."
+    ),
+    responses={
+        400: {
+            "model": PasswordChangeErrorResponse,
+            "description": "Current password is incorrect, or the new password equals the current one",
+        },
+        401: {
+            "model": AuthErrorResponse,
+            "description": "Missing, invalid, expired or revoked access credentials, or the account session ended",
+        },
+        403: {
+            "model": PasswordChangeErrorResponse,
+            "description": "The account does not use a local password (e.g. external identity provider)",
+        },
+        429: {
+            "model": AuthErrorResponse,
+            "description": "Too many password-change attempts; Retry-After is included",
+        },
+    },
+)
+async def update_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> Response:
+    """Atomically update the caller's password hash and revoke all sessions."""
+    request_id = request_correlation_id(request)
+    key = password_change_limiter.key("password-change", str(current_user.id))
+    decision = password_change_limiter.reserve(key, maximum_attempts=5, window_seconds=300)
+    if not decision.allowed:
+        security_event("password_change_rate_limited", request_id=request_id, user_id=current_user.id)
+        raise HTTPException(429, "Too many attempts; try again later", headers={"Retry-After":str(decision.retry_after_seconds)})
+    try:
+        await change_password(session, current_user.id, payload.current_password, payload.new_password)
+    except PasswordChangeError as exc:
+        security_event("password_change_denied", request_id=request_id, user_id=current_user.id)
+        raise HTTPException(exc.status, {"code":exc.code,"message":exc.message}) from None
+    password_change_limiter.clear(key)
+    security_event("password_changed", request_id=request_id, user_id=current_user.id)
+    return Response(status_code=204, headers={"Cache-Control":"no-store"})

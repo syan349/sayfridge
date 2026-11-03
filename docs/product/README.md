@@ -81,10 +81,11 @@ limits apply independently of these fields.
 
 ### Password changes and forgotten-password recovery
 
-Password changes and forgotten-password recovery are not implemented. The Mobile
-change-password form displays an unavailable message and leaves the password
-unchanged. The recovery form displays an unavailable message and sends no email.
-Administrator account management provides status changes, not password resets.
+Signed-in users can change their password from Mobile Profile → Account → Change
+password by entering their current password and confirming a different new password.
+A successful change ends every device session, including the current device, and
+requires sign-in with the new password. Inventory and conversation data are retained.
+Forgotten-password email recovery and administrator password resets are not provided.
 
 ### Conversation title management
 

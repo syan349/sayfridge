@@ -192,7 +192,7 @@ void main() {
 
     for (final label in [
       'Personal Information',
-      'Password',
+      'Change password',
       'Reminders',
       'Voice Usage',
     ]) {
@@ -338,7 +338,7 @@ void main() {
   });
 
   testWidgets(
-    'password validation, visibility and unsupported submit are honest',
+    'password validation and visibility prevent invalid submissions',
     (tester) async {
       _phoneSize(tester);
       await tester.pumpWidget(_app(const PasswordResetScreen()));
@@ -381,10 +381,7 @@ void main() {
       await tester.pump();
       expect(find.text('Passwords do not match'), findsNothing);
       expect(button().onPressed, isNotNull);
-      await tester.ensureVisible(find.text('Change password'));
-      await tester.tap(find.text('Change password'));
-      await tester.pumpAndSettle();
-      expect(find.text('Password change unavailable'), findsOneWidget);
+      // Successful and failed submissions are exercised in password_change_test.dart.
       expect(tester.takeException(), isNull);
     },
   );
@@ -771,6 +768,11 @@ class _Notifications extends NotificationService {
 }
 
 class _FakeAuthRepository implements AuthRepository {
+  @override
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    throw UnimplementedError('Use the HTTP-backed password change tests');
+  }
+
   @override
   void Function()? onSessionExpired;
   @override

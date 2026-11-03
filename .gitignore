@@ -38,3 +38,10 @@ Thumbs.db
 /.github/scripts/__pycache__/
 /regression-summary.json
 /regression-summary.md
+
+# Local task handoff (not published)
+/HANDOFF.md
+/HANDOFF_IMPL_TO_TEST.md
+
+# Local QA/Dev coordination records
+/.agent-handoff/

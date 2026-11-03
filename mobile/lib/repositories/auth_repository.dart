@@ -32,7 +32,8 @@ class AuthRepository {
     final refresh = await _tokenStorage.readRefreshToken();
     if (generation != _generation) return null;
     if (refresh == null) {
-      await _tokenStorage.clearSession();
+      _generation++;
+      await _clearSessionBestEffort();
       onSessionExpired?.call();
       return null;
     }
@@ -50,11 +51,21 @@ class AuthRepository {
       } // Offline refresh preserves the session.
       if (generation == _generation) {
         _generation++;
-        await _tokenStorage.clearSession();
+        await _clearSessionBestEffort();
         onSessionExpired?.call();
       }
       return null;
     }
+  }
+
+  /// End-of-session cleanup: in-memory auth must end even when the platform
+  /// store cannot be erased. A failure here is swallowed on purpose — the
+  /// stored credential has just been rejected by the server, so leftover
+  /// bytes authorize nothing and every later renewal is treated as expired.
+  Future<void> _clearSessionBestEffort() async {
+    try {
+      await _tokenStorage.clearSession();
+    } catch (_) {}
   }
 
   Future<AppUser> register({required String email, required String password}) {
@@ -94,12 +105,38 @@ class AuthRepository {
     }
   }
 
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    final token = await _tokenStorage.readAccessToken();
+    if (token == null) throw const ApiException(statusCode: 401, message: 'Please sign in again.');
+    await _authApiService.changePassword(accessToken: token, currentPassword: currentPassword, newPassword: newPassword);
+    _generation++;
+    // A renewal started before the change must not restore its revoked tokens.
+    try { if (_refreshing != null) await _refreshing; } catch (_) { /* Server has already revoked every session. */ }
+    try {
+      await _tokenStorage.clearSession();
+    } catch (_) {
+      // The server already committed the change and revoked every session.
+      // Reporting a confirmed change as failed would invite a retry that
+      // cannot succeed (the current password no longer matches). Any tokens
+      // left in storage are revoked server-side: the next request gets 401,
+      // renewal fails, and the expired-session path clears them for good.
+    }
+  }
+
   Future<void> logout() async {
     // Wait for any rotation before revoking its replacement credential.
-    if (_refreshing != null) await _refreshing;
+    // Its failure must not block revocation of the stored credential.
+    try { if (_refreshing != null) await _refreshing; } catch (_) { }
     final refresh = await _tokenStorage.readRefreshToken();
     if (refresh != null) await _authApiService.revoke(refresh);
     _generation++;
-    await _tokenStorage.clearSession();
+    try {
+      await _tokenStorage.clearSession();
+    } catch (_) {
+      // The server confirmed revocation: treat the user as signed out even
+      // if the local store cannot be erased right now. Any leftover bytes
+      // hold a revoked credential that no longer authorizes anything; the
+      // next renewal attempt treats them as a dead session.
+    }
   }
 }

@@ -142,7 +142,7 @@ def test_protected_request_verifies_jwt_once(database, monkeypatch):
 
 @pytest.mark.ci
 @pytest.mark.parametrize("keep_session", [False, True])
-def test_existing_unscoped_access_token_keeps_original_behavior(database, keep_session):
+def test_unscoped_access_requires_session_and_checks_revocation(database, keep_session):
     data = login(database)
     claims = jwt.decode(data["access_token"], "s" * 40, algorithms=["HS256"],
                         audience="sayfridge-api", issuer="sayfridge")
@@ -150,7 +150,7 @@ def test_existing_unscoped_access_token_keeps_original_behavior(database, keep_s
     if not keep_session:
         del claims["sid"]
     data["access_token"] = jwt.encode(claims, "s" * 40, algorithm="HS256")
-    assert me(database, data).status_code == 200
+    assert me(database, data).status_code == (200 if keep_session else 401)
     if keep_session:
         request(database, "POST", "/api/v1/auth/logout", json={"refresh_token": data["refresh_token"]})
         assert me(database, data).status_code == 401

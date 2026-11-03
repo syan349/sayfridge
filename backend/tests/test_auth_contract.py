@@ -3,9 +3,9 @@ import uuid
 import pytest
 from app.core.config import get_settings
 from app.core.security import create_access_token
-from sqlalchemy import update
+from sqlalchemy import delete, update
 from app.db.models import User
-from auth_test_support import make_user, request, seed_users
+from auth_test_support import make_user, request, seed_users, session_token
 
 pytestmark = pytest.mark.postgres
 
@@ -28,7 +28,11 @@ def test_validation_omits_submitted_values(database, path, payload):
 
 
 def test_me_rejects_deleted_user(database):
-    token = create_access_token(uuid.uuid4(), get_settings().jwt_secret_key, 15)
+    user = make_user()
+    seed_users(database, user)
+    token = session_token(database, user.id)
+    with database[2].begin() as connection:
+        connection.execute(delete(User).where(User.id == user.id))
     response = request(database, "GET", "/api/v1/auth/me",
                        headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
@@ -37,7 +41,7 @@ def test_me_rejects_deleted_user(database):
 def test_me_reads_current_role_and_disabled_status(database):
     user = make_user()
     seed_users(database, user)
-    token = create_access_token(user.id, get_settings().jwt_secret_key, 15)
+    token = session_token(database, user.id)
     headers = {"Authorization": f"Bearer {token}"}
     with database[2].begin() as connection:
         connection.execute(update(User).where(User.id == user.id).values(role="ADMIN"))

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/app_dialog.dart';
+import '../state/auth_controller.dart';
+import 'sign_in_screen.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/profile_widgets.dart';
 
 class PasswordResetScreen extends StatefulWidget {
-  const PasswordResetScreen({super.key});
+  const PasswordResetScreen({this.authController, super.key});
+
+  final AuthController? authController;
 
   @override
   State<PasswordResetScreen> createState() => _PasswordResetScreenState();
@@ -17,6 +20,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
   final _password = TextEditingController();
   final _confirm = TextEditingController();
   final _hidden = [true, true, true];
+  bool _submitting = false;
+  String? _error;
 
   bool get _mismatch =>
       _confirm.text.isNotEmpty && _confirm.text != _password.text;
@@ -44,37 +49,43 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    if (!_canSubmit) return;
+  Future<void> _submit() async {
+    final auth = widget.authController;
+    if (!_canSubmit || _submitting || auth == null) return;
     FocusScope.of(context).unfocus();
-    // There is no change-password endpoint in the current auth contract.
-    // Never store passwords locally or simulate a successful account change.
-    showDialog<void>(
-      context: context,
-      builder: (context) => AppDialog(
-        title: const Text('Password change unavailable'),
-        content: const Text(
-          'Password changes are not available yet. Your current password has not been changed.',
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    setState(() { _submitting = true; _error = null; });
+    final success = await auth.changePassword(currentPassword: _current.text, newPassword: _password.text);
+    if (!mounted) return;
+    if (success) {
+      _current.clear(); _password.clear(); _confirm.clear();
+      // The auth controller clears credentials on success, which makes
+      // SayFridgeApp._syncSession schedule a post-frame popUntil(route.isFirst).
+      // Defer our navigation to the same frame so that callback runs first
+      // (callbacks are FIFO): the protected stack is discarded, then SignInScreen
+      // is pushed ABOVE the AuthGate root instead of replacing it. That keeps
+      // sign-in usable (back returns to the guest home, logging in pops normally).
+      final navigator = Navigator.of(context);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigator.popUntil((route) => route.isFirst);
+        navigator.push(MaterialPageRoute<void>(builder: (_) => SignInScreen(authController: auth,
+          initialMessage: 'Password changed. Please sign in with your new password.')));
+      });
+    } else {
+      setState(() { _submitting = false; _error = auth.errorMessage; });
+    }
   }
 
   @override
   Widget build(BuildContext context) => ProfilePageScaffold(
-    title: 'Password Reset',
+    title: 'Change password',
     footer: ProfileActionButton(
       key: const Key('profile-change-password'),
       label: 'Change password',
-      onPressed: _canSubmit ? _submit : null,
+      onPressed: _canSubmit && !_submitting ? _submit : null,
     ),
     children: [
+      if (_submitting) const LinearProgressIndicator(),
+      if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
       AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

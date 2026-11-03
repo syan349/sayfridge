@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.security import create_access_token
+from auth_test_support import session_token
 from app.db.models import StorageSpace
 from app.services import storage_spaces as service
 from auth_test_support import exercise, make_user, seed_users
@@ -20,7 +20,7 @@ pytestmark = pytest.mark.postgres
 def setup_owner(database):
     owner = make_user()
     seed_users(database, owner)
-    token = create_access_token(owner.id, get_settings().jwt_secret_key, 15)
+    token = session_token(database, owner.id)
     return owner, {"Authorization": f"Bearer {token}"}
 
 

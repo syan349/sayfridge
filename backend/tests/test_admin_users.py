@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import create_access_token
+from auth_test_support import session_token
 from app.db.models import User
 from auth_test_support import exercise, make_user, request, seed_users
 
@@ -29,10 +29,10 @@ def admin_context(database):
     seed_users(database, admin, ordinary, suspended, disabled)
     secret = get_settings().jwt_secret_key
     admin_headers = {
-        "Authorization": f"Bearer {create_access_token(admin.id, secret, 15)}"
+        "Authorization": f"Bearer {session_token(database, admin.id)}"
     }
     ordinary_headers = {
-        "Authorization": f"Bearer {create_access_token(ordinary.id, secret, 15)}"
+        "Authorization": f"Bearer {session_token(database, ordinary.id)}"
     }
     return database, admin, ordinary, suspended, disabled, admin_headers, ordinary_headers
 
@@ -158,7 +158,7 @@ def test_admin_changes_user_status_and_new_state_controls_authentication(admin_c
         stored = session.get(User, target.id)
         assert stored.status == "SUSPENDED" and stored.role == "USER"
 
-    token = create_access_token(target.id, get_settings().jwt_secret_key, 15)
+    token = session_token(context[0], target.id)
     unavailable = request(
         context[0],
         "GET",

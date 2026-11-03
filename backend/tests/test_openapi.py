@@ -78,6 +78,7 @@ def test_openapi_is_complete_enough_for_interactive_acceptance() -> None:
         ("/api/v1/auth/login", "post"),
         ("/api/v1/auth/refresh", "post"),
         ("/api/v1/auth/logout", "post"),
+        ("/api/v1/auth/change-password", "post"),
         ("/api/v1/storage-spaces", "post"),
         ("/api/v1/storage-spaces/{space_id}", "patch"),
         ("/api/v1/item-categories", "post"),
@@ -138,3 +139,11 @@ def test_version_endpoint_exposes_safe_deployment_identity() -> None:
         "version": "1.2.3",
         "commit_sha": "0123456789abcdef0123456789abcdef01234567",
     }
+
+
+def test_change_password_documents_json_error_contracts():
+    operation = app.openapi()["paths"]["/api/v1/auth/change-password"]["post"]
+    assert operation["security"]
+    for code in ("400", "401", "403", "429", "422"):
+        assert "schema" in operation["responses"][code]["content"]["application/json"], code
+    assert "content" not in operation["responses"]["204"]

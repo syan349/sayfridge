@@ -529,7 +529,8 @@ procedure are in the security guide.
 - Native reminders are local. Browser notifications depend on permission and the
   application being open; there is no server push service.
 - Profile/reminder preferences are local per user and are not synchronized through
-  the Backend. Email/password changes and complete account deletion have no API.
+  the Backend. Signed-in users can change their password from Mobile Profile. Email changes,
+  forgotten-password recovery and complete account deletion have no API.
 - Model-assisted operations need provider access and can encounter network or
   provider limits; clients retain pending work for explicit recovery.
 - Android is the native assessment target. Flutter Web demonstrates the shared UI;

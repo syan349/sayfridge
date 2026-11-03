@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import create_access_token
+from auth_test_support import session_token
 from app.db.models import InventoryItem, ItemCategory, ItemDefinition
 from auth_test_support import exercise, request
 from catalog_test_support import CATEGORIES, DEFINITIONS, catalog_context, seed_category
@@ -15,8 +15,8 @@ from inventory_test_support import BASE, inventory_context, seed_inventory
 pytestmark = pytest.mark.postgres
 
 
-def auth(user):
-    return {"Authorization": f"Bearer {create_access_token(user.id, get_settings().jwt_secret_key, 15)}"}
+def auth(database, user):
+    return {"Authorization": f"Bearer {session_token(database, user.id)}"}
 
 
 def test_typed_category_reuses_public_and_owned_normalized_names(catalog_context):
@@ -36,7 +36,7 @@ def test_typed_category_reuses_public_and_owned_normalized_names(catalog_context
 def test_private_categories_are_not_listed_or_usable_by_other_accounts(catalog_context):
     db, _, other, _, headers = catalog_context
     category = request(db, "POST", CATEGORIES, headers=headers, json={"name": "Family snacks"}).json()
-    other_headers = auth(other)
+    other_headers = auth(db, other)
     listed = request(db, "GET", CATEGORIES + "?status=ALL", headers=other_headers).json()
     assert category["id"] not in {row["id"] for row in listed["items"]}
     denied = request(db, "POST", DEFINITIONS, headers=other_headers,
@@ -103,7 +103,7 @@ def test_invalid_category_edits_do_not_save_other_fields(inventory_context, targ
     context = inventory_context
     item = seed_inventory(context)
     if target == "other-account":
-        category_id = request(context[0], "POST", CATEGORIES, headers=auth(context[2]), json={"name": "Private"}).json()["id"]
+        category_id = request(context[0], "POST", CATEGORIES, headers=auth(context[0], context[2]), json={"name": "Private"}).json()["id"]
     elif target == "archived":
         category_id = str(seed_category(context[0], "Old", status="ARCHIVED").id)
     else:

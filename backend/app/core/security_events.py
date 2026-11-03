@@ -10,7 +10,8 @@ logger = logging.getLogger("app.security.audit")
 Event = Literal[
     "authentication_denied", "admin_access_denied", "login_denied",
     "login_rate_limited", "login_succeeded", "refresh_denied",
-    "refresh_replay_detected", "session_revoked",
+    "refresh_replay_detected", "session_revoked", "password_changed",
+    "password_change_denied", "password_change_rate_limited",
 ]
 
 
@@ -30,5 +31,5 @@ def security_event(
         if isinstance(value, uuid.UUID):
             record[name] = str(value)
     # No email, IP, credentials, hashes, exception text or request payload.
-    level = logging.INFO if event == "login_succeeded" else logging.WARNING
+    level = logging.INFO if event in {"login_succeeded", "password_changed"} else logging.WARNING
     logger.log(level, json.dumps(record, sort_keys=True))

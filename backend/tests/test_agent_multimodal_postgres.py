@@ -108,9 +108,9 @@ def test_image_http_review_supplement_restart_and_duplicate_submission(inventory
                 receipt = await session.scalar(select(AgentInventoryAction))
                 assert photo.data_base64 not in str(receipt.request_snapshot)
                 assert supplement.data_base64 not in str(receipt.request_snapshot)
-            from app.core.security import create_access_token
+            from auth_test_support import session_token
             from app.core.config import get_settings
-            other = {"Authorization": "Bearer " + create_access_token(c[2].id, get_settings().jwt_secret_key, 15)}
+            other = {"Authorization": "Bearer " + session_token(c[0], c[2].id)}
             assert (await client.get(state_url, headers=other)).status_code == 404
             assert (await client.post("/api/v1/agent/resume", json=old, headers=other)).status_code == 409
             invalid = {"images": [{**photo.model_dump(mode="json"), "data_base64": "SECRET_NOT_AN_IMAGE"}]}

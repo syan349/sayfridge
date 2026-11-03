@@ -11,6 +11,11 @@ class AuthApiService {
     _apiClient.renewAccessToken = renewal;
   }
 
+  Future<void> changePassword({required String accessToken, required String currentPassword, required String newPassword}) async {
+    await _apiClient.postJson('/auth/change-password', accessToken: accessToken,
+      body: {'current_password': currentPassword, 'new_password': newPassword});
+  }
+
   Future<AuthSession> refresh(String token) async => AuthSession.fromJson(
     await _apiClient.postJson('/auth/refresh', body: {'refresh_token': token}),
   );
