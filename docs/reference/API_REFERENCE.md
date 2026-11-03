@@ -177,11 +177,24 @@ local credential deletion alone does not revoke a server session.
 Access JWTs issued before this change retain their original expiry and have no
 revocable session ID. Login again to obtain the new session credentials.
 
-Password changes and forgotten-password recovery have no API endpoints. The
-Mobile forms display unavailable messages. Administrator endpoints manage account
-status and provide no password-reset operation. Profile editing and cookie login
-are not part of this authentication contract. See
-[password scope](../product/README.md#password-changes-and-forgotten-password-recovery).
+### POST /auth/change-password
+
+Requires an active LOCAL account and a valid, session-bound Bearer token.
+JSON: `{"current_password":"...","new_password":"..."}`; extra fields are rejected.
+New passwords have 8–128 characters and differ from the current password. Spaces
+are preserved. The server verifies the current password with Argon2id.
+
+- **204**: password hash updated and every device session revoked in one transaction.
+  The response has no body and uses `Cache-Control: no-store`. Sign in again.
+- **400**, `CURRENT_PASSWORD_INCORRECT`: the current password does not match.
+- **401**: missing, expired or revoked session; tokens without `sid` require login.
+- **403**, `PASSWORD_CHANGE_UNAVAILABLE`: the account does not use local passwords.
+- **422**: invalid body or password policy violation; values are not echoed.
+- **429**: five attempts per account in five minutes per process; `Retry-After`
+  specifies the wait. Multi-instance deployments also need a shared ingress limit.
+
+Forgotten-password recovery and administrator password resets remain unsupported.
+See [password scope](../product/README.md#password-changes-and-forgotten-password-recovery).
 
 ## 3. Storage spaces — B04
 

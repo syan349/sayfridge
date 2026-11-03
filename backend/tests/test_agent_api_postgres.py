@@ -60,9 +60,9 @@ def test_api_confirm_stale_replay_and_user_isolation(inventory_context, monkeypa
         assert parse_events(replay)[-1]["status"] == "COMPLETED"
         async with sessions() as session:
             assert await session.scalar(select(func.count()).select_from(InventoryOperation)) == 1
-        from app.core.security import create_access_token
+        from auth_test_support import session_token
         from app.core.config import get_settings
-        other = {"Authorization": "Bearer " + create_access_token(c[2].id, get_settings().jwt_secret_key, 15)}
+        other = {"Authorization": "Bearer " + session_token(c[0], c[2].id)}
         assert (await client.get(f"/api/v1/agent/conversations/{conversation_id}/state", headers=other)).status_code == 404
         assert (await client.post("/api/v1/agent/resume", json=resume, headers=other)).status_code == 409
     asyncio.run(exercise(c[0], scenario))

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.catalog import normalize_catalog_name
 from app.core.config import get_settings
-from app.core.security import create_access_token
+from auth_test_support import session_token
 from app.db.models import ItemCategory, ItemDefinition
 from auth_test_support import make_user, seed_users
 
@@ -43,5 +43,5 @@ def catalog_context(database):
     other = make_user(email="catalog-other@example.com")
     seed_users(database, owner, other)
     category = seed_category(database)
-    token = create_access_token(owner.id, get_settings().jwt_secret_key, 15)
+    token = session_token(database, owner.id)
     return database, owner, other, category, {"Authorization": f"Bearer {token}"}

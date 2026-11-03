@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import create_access_token
+from auth_test_support import session_token
 from app.db.models import InventoryItem, ItemCategory, ItemDefinition, StorageSpace
 from auth_test_support import exercise, make_user, request, seed_users
 
@@ -23,7 +23,7 @@ def space_context(database):
     owner = make_user(email="space-owner@example.com")
     other = make_user(email="space-other@example.com")
     seed_users(database, owner, other)
-    token = create_access_token(owner.id, get_settings().jwt_secret_key, 15)
+    token = session_token(database, owner.id)
     return database, owner, other, {"Authorization": f"Bearer {token}"}
 
 

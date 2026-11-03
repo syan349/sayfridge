@@ -159,15 +159,15 @@ class ProfileScreen extends StatelessWidget {
                                       ),
                                       _MenuRow(
                                         label: isGuest
-                                            ? 'Password'
-                                            : 'Password Reset',
+                                            ? 'Change password'
+                                            : 'Change password',
                                         icon: const ProfileIcon(
                                           ProfileAssets.password,
                                         ),
                                         locked: isGuest,
                                         onTap: () => _open(
                                           context,
-                                          const PasswordResetScreen(),
+                                          PasswordResetScreen(authController: authController),
                                         ),
                                       ),
                                     ],

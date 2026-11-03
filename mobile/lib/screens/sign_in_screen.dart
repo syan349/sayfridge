@@ -8,9 +8,10 @@ import '../widgets/auth_widgets.dart';
 import 'sign_up_screen.dart';
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({required this.authController, super.key});
+  const SignInScreen({required this.authController, this.initialMessage, super.key});
 
   final AuthController authController;
+  final String? initialMessage;
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -133,6 +134,14 @@ class _SignInScreenState extends State<SignInScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 42),
+                if (widget.initialMessage != null) ...[
+                  Text(
+                    widget.initialMessage!,
+                    key: const Key('sign-in-initial-message'),
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                  const SizedBox(height: 18),
+                ],
                 Text(
                   'Sign in',
                   style: Theme.of(context).textTheme.displaySmall,

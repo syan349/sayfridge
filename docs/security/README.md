@@ -44,7 +44,7 @@ Full Regression and release results are linked from the
 
 | Area | Implemented control and verified behaviour |
 | --- | --- |
-| Authentication | Argon2 password hashing; one fixed HS256 JWT verification per protected request; required `sub`, `type`, `iat` and `exp` claims. New login/refresh tokens carry issuer `sayfridge` and audience `sayfridge-api`; incorrect or partial scope claims are rejected. Legacy signed tokens with neither scope claim retain their original expiry and session checks. Account status is checked on authenticated requests. |
+| Authentication | Argon2 password hashing; one fixed HS256 JWT verification per protected request; required `sub`, `type`, `iat` and `exp` claims. New login/refresh tokens carry issuer `sayfridge` and audience `sayfridge-api`; incorrect or partial scope claims are rejected. Every protected request requires a session ID; pre-session tokens require sign-in again. Account status is checked on authenticated requests. |
 | Authorization and IDOR | Resource reads/writes are scoped to the authenticated user. Tests cover foreign inventory, spaces, private definitions, history and batch operations. Ordinary users receive 403 from administrator endpoints; missing authentication receives 401. |
 | Role escalation | Registration creates a USER. Registration/status-update payload validation rejects unsupported role fields. Tests verify that input cannot create an administrator. |
 | Terminal states | Discard/archive and quantity/batch tests reject illegal operations on terminal resources; failed operations do not partially write or restore resources. |
@@ -56,9 +56,12 @@ Full Regression and release results are linked from the
 | Login throttling | Client/account limits are process-local; each Vercel instance maintains its own counters. |
 
 The authentication API provides registration, login, current identity, refresh
-and logout. Password changes and forgotten-password recovery are not implemented.
-Mobile forms report that these actions are unavailable. Administrator account
-management changes account status and provides no password-reset operation. See
+and logout. Password changes verify the current password, update its Argon2id hash and
+revoke all device sessions in one transaction. User-row locks coordinate changes
+with login and refresh; credential values are excluded from responses and audit logs.
+The change endpoint has a separate process-local rate limit. Multi-instance hosting
+requires a shared ingress limit. Forgotten-password recovery and administrator
+password resets remain unsupported. See
 [password scope](../product/README.md#password-changes-and-forgotten-password-recovery).
 
 ### Hostile input and uploads — 8.3

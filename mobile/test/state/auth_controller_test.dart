@@ -218,6 +218,11 @@ class _FailingProfiles extends ProfilePreferencesRepository {
 
 class _FakeAuthRepository implements AuthRepository {
   @override
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    throw UnimplementedError('Use the HTTP-backed password change tests');
+  }
+
+  @override
   void Function()? onSessionExpired;
   @override
   Future<String?> renewAccess(String rejected) async => null;

@@ -36,7 +36,7 @@ void main() {
       expect(find.text('Preview Alex'), findsOneWidget);
 
       for (final page in {
-        'Password Reset': 'Current password',
+        'Change password': 'Current password',
         'Reminders Settings': 'Expiry reminders',
         'Voice Usage': '12 / 50',
       }.entries) {

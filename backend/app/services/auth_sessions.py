@@ -66,6 +66,8 @@ async def locked_session(
     ))
     if sid is None:
         raise InvalidSession()
+    user_id = await db.scalar(select(AuthSession.user_id).where(AuthSession.id == sid))
+    await db.scalar(select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True))
     session = await db.scalar(
         select(AuthSession).where(AuthSession.id == sid).with_for_update()
         .execution_options(populate_existing=True)
@@ -127,8 +129,7 @@ async def validate_access_session(
     db: AsyncSession, identity: AccessIdentity,
 ) -> None:
     if identity.session_id is None:
-        # Pre-migration access tokens keep their original short expiry.
-        return
+        raise InvalidSession()
     session = await db.get(AuthSession, identity.session_id)
     now = datetime.now(timezone.utc)
     if (

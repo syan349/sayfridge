@@ -67,3 +67,22 @@ class AuthValidationIssue(BaseModel):
 
 class AuthValidationErrorResponse(BaseModel):
     detail: list[AuthValidationIssue]
+
+
+class PasswordChangeErrorBody(BaseModel):
+    code: str
+    message: str
+
+
+class PasswordChangeErrorResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"detail": {"code": "CURRENT_PASSWORD_INCORRECT", "message": "Current password is incorrect."}}}
+    )
+
+    detail: PasswordChangeErrorBody
+
+
+class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)

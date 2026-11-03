@@ -1,3 +1,4 @@
+from auth_test_support import session_token
 """B01–B03 API tests using real PostgreSQL on both local runs and CI."""
 import uuid
 
@@ -171,14 +172,11 @@ def test_user_without_local_password_cannot_login(database, account_kind: str) -
 
 def test_me_reads_and_returns_current_active_user_without_password_hash(database) -> None:
     user = make_user()
-    token = create_access_token(
-        user.id,
-        get_settings().jwt_secret_key,
-        15,
-    )
+    seed_users(database, user)
+    token = session_token(database, user.id)
 
     response = request(
-        seed_users(database, user),
+        database,
         "GET",
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},
@@ -192,10 +190,11 @@ def test_me_reads_and_returns_current_active_user_without_password_hash(database
 
 def test_me_tolerates_legacy_invalid_stored_email(database) -> None:
     user = make_user(email="legacy@example.test")
-    token = create_access_token(user.id, get_settings().jwt_secret_key, 15)
+    seed_users(database, user)
+    token = session_token(database, user.id)
 
     response = request(
-        seed_users(database, user),
+        database,
         "GET",
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},
@@ -231,14 +230,11 @@ def test_me_rejects_missing_invalid_or_expired_token(database, token_kind: str) 
 
 def test_me_rejects_user_who_is_no_longer_active(database) -> None:
     user = make_user(status="SUSPENDED")
-    token = create_access_token(
-        user.id,
-        get_settings().jwt_secret_key,
-        15,
-    )
+    seed_users(database, user)
+    token = session_token(database, user.id)
 
     response = request(
-        seed_users(database, user),
+        database,
         "GET",
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},

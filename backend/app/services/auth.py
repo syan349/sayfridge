@@ -31,7 +31,7 @@ def normalize_email(email: str) -> str:
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     result = await session.execute(
-        select(User).where(User.email == normalize_email(email))
+        select(User).where(User.email == normalize_email(email)).with_for_update().execution_options(populate_existing=True)
     )
     return result.scalar_one_or_none()
 
@@ -98,3 +98,32 @@ async def authenticate_user(
     ):
         return None
     return user
+
+
+class PasswordChangeError(Exception):
+    def __init__(self, status: int, code: str, message: str):
+        self.status, self.code, self.message = status, code, message
+
+
+async def change_password(db: AsyncSession, user_id: uuid.UUID, current: str, new: str) -> None:
+    from datetime import datetime, timezone
+    from app.db.models import AuthSession
+    user = await db.scalar(select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True))
+    if user is None or user.status != ACTIVE_STATUS:
+        raise PasswordChangeError(401, "SESSION_ENDED", "Please sign in again.")
+    if user.auth_provider != LOCAL_PROVIDER or not user.password_hash:
+        raise PasswordChangeError(403, "PASSWORD_CHANGE_UNAVAILABLE", "This account does not use a local password.")
+    if not await run_in_threadpool(verify_password, current, user.password_hash):
+        raise PasswordChangeError(400, "CURRENT_PASSWORD_INCORRECT", "Current password is incorrect.")
+    if new == current:
+        raise PasswordChangeError(422, "PASSWORD_UNCHANGED", "Choose a different new password.")
+    user.password_hash = await run_in_threadpool(hash_password, new)
+    sessions = list(await db.scalars(select(AuthSession).where(AuthSession.user_id == user_id).with_for_update().execution_options(populate_existing=True)))
+    now = datetime.now(timezone.utc)
+    for item in sessions:
+        item.revoked_at = item.revoked_at or now
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise

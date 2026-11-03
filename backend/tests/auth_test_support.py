@@ -99,3 +99,19 @@ def request(database, method, path, *, json=None, headers=None):
         return await client.request(method, path, json=json, headers=headers)
 
     return asyncio.run(exercise(database, scenario))
+
+
+def session_token(database, user_id, expires_minutes=15):
+    """Persist a device session for an already seeded identity; no auth bypass."""
+    from datetime import timedelta
+    from app.db.models import AuthSession
+    from app.core.config import get_settings
+    from app.core.security import create_access_token
+    now = datetime.now(timezone.utc)
+    row = AuthSession(id=uuid.uuid4(), user_id=user_id,
+        expires_at=now + timedelta(days=30), absolute_expires_at=now + timedelta(days=90))
+    sid = row.id
+    with Session(database[2]) as db:
+        db.add(row)
+        db.commit()
+    return create_access_token(user_id, get_settings().jwt_secret_key, expires_minutes, session_id=sid)
